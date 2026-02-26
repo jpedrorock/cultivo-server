@@ -141,7 +141,16 @@ export default function QuickLog() {
   });
 
   // Upload photo mutation
-  const uploadPhotoMutation = trpc.plantPhotos.upload.useMutation();
+  const uploadPhotoMutation = trpc.plantPhotos.upload.useMutation({
+    onSuccess: (data) => {
+      console.log('[QuickLog] Photo uploaded successfully:', data);
+      toast.success("📸 Foto salva!");
+    },
+    onError: (error) => {
+      console.error('[QuickLog] Photo upload failed:', error);
+      toast.error(`Erro ao salvar foto: ${error.message}`);
+    },
+  });
 
   // Trichomes and LST mutations removed - available in individual plant pages
 
@@ -222,18 +231,19 @@ export default function QuickLog() {
 
       // 2. Upload photo if exists
       if (record.photoBase64) {
-        // Convert base64 to buffer and upload to S3
-        const base64Data = record.photoBase64.replace(/^data:image\/\w+;base64,/, "");
-        const response = await fetch(record.photoBase64);
-        const blob = await response.blob();
-        
-        // For now, we'll use the plantHealth photo upload via backend
-        // The backend will handle S3 upload
-        await uploadPhotoMutation.mutateAsync({
-          plantId: plant.id,
-          photoBase64: record.photoBase64, // Backend will process base64
-          description: "Foto do QuickLog",
-        });
+        console.log('[QuickLog] Uploading photo for plant:', plant.id);
+        try {
+          const result = await uploadPhotoMutation.mutateAsync({
+            plantId: plant.id,
+            photoBase64: record.photoBase64,
+            description: "Foto do QuickLog",
+          });
+          console.log('[QuickLog] Photo upload result:', result);
+        } catch (photoError: any) {
+          console.error('[QuickLog] Photo upload error:', photoError);
+          // Don't throw - continue with health record save
+          toast.error(`Aviso: Foto não foi salva - ${photoError.message}`);
+        }
       }
 
       // Trichomes and LST save logic removed - available in individual plant pages

@@ -3032,3 +3032,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Remover seção de Técnicas LST do registro rápido (QuickLog)
 - [x] Manter apenas: Foto + Status de Saúde + Sintomas/Notas no registro rápido
 - [x] Funcionalidades completas de Tricomas e LST permanecem na página individual de cada planta
+
+## Bug: Foto do QuickLog Não Aparece na Página da Planta (26/02/2026)
+
+- [x] Investigar por que foto enviada pelo registro rápido não aparece na página individual da planta
+- [x] Corrigir fluxo de upload de foto no QuickLog com error handling e logging detalhado
+- [ ] Testar que foto aparece na galeria da planta após upload pelo QuickLog (aguardando teste do usuário)
