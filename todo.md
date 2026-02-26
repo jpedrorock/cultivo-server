@@ -3060,4 +3060,4 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Mostrar tamanho original → tamanho comprimido em tempo real
 - [x] Adicionar barra de progresso animada com indicadores de etapa
 - [x] Implementar no QuickLog
-- [ ] Implementar no PlantHealthTab (opcional)
+- [x] Implementar no PlantHealthTab para consistência de UI

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -92,6 +93,16 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
   const [uploadStatus, setUploadStatus] = useState<"idle" | "processing" | "uploading" | "success" | "error">("idle");
   const [uploadMessage, setUploadMessage] = useState<string>("");
   
+  // Photo upload progress state
+  const [uploadProgress, setUploadProgress] = useState<{
+    isUploading: boolean;
+    stage: UploadStage;
+    progress: number;
+    originalSize?: string;
+    compressedSize?: string;
+    reduction?: number;
+  }>({ isUploading: false, stage: "converting", progress: 0 });
+  
   // Swipe gesture states
   const [touchStart, setTouchStart] = useState<number>(0);
   const [touchEnd, setTouchEnd] = useState<number>(0);
@@ -172,15 +183,35 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
     }
 
     try {
+      const originalSize = file.size;
+      const originalSizeStr = formatFileSize(originalSize);
+      
+      // Start upload progress
+      setUploadProgress({
+        isUploading: true,
+        stage: "converting",
+        progress: 10,
+        originalSize: originalSizeStr,
+      });
+      setUploadStatus("processing");
+
+      // Convert HEIC to PNG if needed
       if (isHEIC(file)) {
-        toast.info("🔄 Convertendo HEIC para JPEG...");
+        setUploadProgress(prev => ({ ...prev, progress: 30 }));
         file = await processImageFile(file);
-        toast.success("✅ Imagem convertida!");
+        setUploadProgress(prev => ({ ...prev, progress: 40 }));
+      } else {
+        // Skip conversion for non-HEIC
+        setUploadProgress(prev => ({ ...prev, progress: 40 }));
       }
 
-      setUploadStatus("processing");
+      // Compress image
+      setUploadProgress(prev => ({
+        ...prev,
+        stage: "compressing",
+        progress: 50,
+      }));
       setUploadMessage("Otimizando imagem...");
-      toast.info("Processando imagem...");
 
       const processedBlob = await processImage(file, {
         maxWidth: 1920,
@@ -191,25 +222,55 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
       const processedFile = new File([processedBlob], file.name, {
         type: "image/png",
       });
+
+      const compressedSize = processedFile.size;
+      const compressedSizeStr = formatFileSize(compressedSize);
+      const reduction = Math.round((1 - compressedSize / originalSize) * 100);
+
+      setUploadProgress(prev => ({
+        ...prev,
+        progress: 70,
+        compressedSize: compressedSizeStr,
+        reduction,
+      }));
+
       console.log('[PlantHealthTab] Photo processed:', {
         name: processedFile.name,
-        size: processedFile.size,
-        type: processedFile.type
+        originalSize: originalSizeStr,
+        compressedSize: compressedSizeStr,
+        reduction: `${reduction}%`
       });
-      setPhotoFile(processedFile);
 
+      // Convert to base64 and set preview
+      setUploadProgress(prev => ({
+        ...prev,
+        stage: "uploading",
+        progress: 80,
+      }));
+
+      setPhotoFile(processedFile);
       const base64 = await blobToBase64(processedBlob);
       setPhotoPreview(base64);
 
-      const originalSize = formatFileSize(file.size);
-      const newSize = formatFileSize(processedFile.size);
+      // Complete
+      setUploadProgress(prev => ({
+        ...prev,
+        stage: "complete",
+        progress: 100,
+      }));
+
       setUploadStatus("success");
-      setUploadMessage(`Imagem otimizada: ${originalSize} → ${newSize}`);
-      toast.success(`Imagem otimizada: ${originalSize} → ${newSize}`);
-      // Reset status after 2 seconds
-      setTimeout(() => setUploadStatus("idle"), 2000);
+      setUploadMessage(`Imagem otimizada: ${originalSizeStr} → ${compressedSizeStr}`);
+
+      // Hide progress after 1.5s
+      setTimeout(() => {
+        setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
+        toast.success(`📸 Foto otimizada! (${originalSizeStr} → ${compressedSizeStr}, -${reduction}%)`);
+        setUploadStatus("idle");
+      }, 1500);
     } catch (error) {
       console.error("Erro ao processar imagem:", error);
+      setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
       setUploadStatus("error");
       setUploadMessage("Erro ao processar imagem");
       toast.error("Erro ao processar imagem");
@@ -803,6 +864,17 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
         onSave={handleEditSave}
         isSaving={updateHealthLog.isPending}
       />
+
+      {/* Photo Upload Progress Overlay */}
+      {uploadProgress.isUploading && (
+        <PhotoUploadProgress
+          stage={uploadProgress.stage}
+          progress={uploadProgress.progress}
+          originalSize={uploadProgress.originalSize}
+          compressedSize={uploadProgress.compressedSize}
+          reduction={uploadProgress.reduction}
+        />
+      )}
     </div>
   );
 }
