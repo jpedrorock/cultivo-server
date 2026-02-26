@@ -408,7 +408,7 @@ export default function QuickLog() {
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 flex items-center justify-center overflow-hidden pb-32">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">
           <div className="bg-card dark:bg-card rounded-2xl shadow-lg p-6 space-y-6 relative max-h-[85vh] overflow-y-auto w-full">
           {/* Decorative animated circle */}
@@ -1008,7 +1008,7 @@ export default function QuickLog() {
       )}
 
       {/* Navigation buttons */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 pb-24 md:pb-6 bg-background border-t border-border flex gap-3">
+      <div className="fixed bottom-0 left-0 right-0 p-6 pb-24 md:pb-6 bg-background border-t border-border flex gap-3 z-50">
         {/* Back button - only for daily log steps */}
         {currentStep > 0 && currentStep < 9 && (
           <Button

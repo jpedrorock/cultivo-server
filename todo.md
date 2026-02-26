@@ -3061,3 +3061,8 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar barra de progresso animada com indicadores de etapa
 - [x] Implementar no QuickLog
 - [x] Implementar no PlantHealthTab para consistência de UI
+
+## Bug: Conteúdo Invadindo Bottom Navigation (26/02/2026)
+
+- [x] Corrigir z-index do bottom navigation para ficar acima de todo o conteúdo (z-50 confirmado)
+- [x] Garantir que botões e elementos não fiquem sobrepostos pelo menu inferior (adicionado pb-32 no QuickLog content wrapper)
