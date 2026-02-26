@@ -7,6 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { processImage, processImageFile, isHEIC, blobToBase64, formatFileSize } from "@/lib/imageUtils";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
 
@@ -185,23 +186,58 @@ export default function QuickLog() {
   // toggleLSTTechnique removed - LST available in individual plant pages
 
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Foto muito grande! Máximo 5MB");
+    if (!file.type.startsWith("image/") && !isHEIC(file)) {
+      toast.error("Por favor, selecione apenas imagens");
       return;
     }
 
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 10MB)");
+      return;
+    }
+
+    try {
+      // Convert HEIC to PNG if needed
+      if (isHEIC(file)) {
+        toast.info("🔄 Convertendo HEIC para JPEG...");
+        file = await processImageFile(file);
+        toast.success("✅ Imagem convertida!");
+      }
+
+      toast.info("Processando imagem...");
+      const originalSize = file.size;
+
+      // Compress image (same as PlantHealthTab)
+      const processedBlob = await processImage(file, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.9
+      });
+
+      const processedFile = new File([processedBlob], file.name, {
+        type: "image/png",
+      });
+
+      console.log('[QuickLog] Photo processed:', {
+        name: processedFile.name,
+        originalSize: formatFileSize(originalSize),
+        compressedSize: formatFileSize(processedFile.size),
+        reduction: `${Math.round((1 - processedFile.size / originalSize) * 100)}%`
+      });
+
+      // Convert to base64
+      const base64 = await blobToBase64(processedBlob);
       updatePlantHealthRecord(plants[currentPlantIndex].id, "photoBase64", base64);
-      toast.success("📸 Foto adicionada!");
-    };
-    reader.readAsDataURL(file);
+
+      const reduction = Math.round((1 - processedFile.size / originalSize) * 100);
+      toast.success(`📸 Foto otimizada! (${formatFileSize(originalSize)} → ${formatFileSize(processedFile.size)}, -${reduction}%)`);
+    } catch (error) {
+      console.error("Erro ao processar imagem:", error);
+      toast.error("Erro ao processar imagem");
+    }
   };
 
   const handleSavePlantHealth = async () => {

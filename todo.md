@@ -3045,3 +3045,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 
 - [x] Corrigir erro de validação React: `<button>` não pode conter `<button>` aninhado
 - [x] Encontrar e corrigir estrutura HTML inválida em /plants/:id (convertido buttons para divs com role="button")
+
+## Bug: Botão "Salvando..." Travado no QuickLog (26/02/2026)
+
+- [x] Investigar por que botão de salvar fica travado em "Salvando..." no QuickLog ao enviar foto (foto 2MB sem compressão = timeout)
+- [x] Verificar logs do servidor e navegador para identificar erro (BadRequestError: request aborted)
+- [x] Corrigir mutation que está travando/não completando (adicionado compressão de imagem 2MB → ~48KB)
