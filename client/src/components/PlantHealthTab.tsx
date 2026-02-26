@@ -440,7 +440,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                   {/* Main Row - Always Visible */}
                   <Accordion type="single" collapsible>
                     <AccordionItem value={`log-${log.id}`} className="border-0">
-                      <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex items-center gap-3 px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         {/* Photo Thumbnail */}
                         {log.photoUrl ? (
                           <div
@@ -495,18 +495,29 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
 
                         {/* Actions */}
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            className="p-1.5 rounded-md hover:bg-muted transition-colors"
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="p-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingLog(log);
                               setIsEditModalOpen(true);
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setEditingLog(log);
+                                setIsEditModalOpen(true);
+                              }
+                            }}
                           >
                             <Edit className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                          <button
-                            className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                          </div>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               if (
@@ -517,9 +528,17 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                                 deleteHealthLog.mutate({ id: log.id });
                               }
                             }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (confirm("Deseja realmente excluir este registro?")) {
+                                  deleteHealthLog.mutate({ id: log.id });
+                                }
+                              }
+                            }}
                           >
                             <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                          </button>
+                          </div>
                           {(hasDetails || log.photoUrl) && (
                             <AccordionTrigger className="p-1.5 hover:no-underline [&>svg]:w-3.5 [&>svg]:h-3.5" />
                           )}

@@ -3038,3 +3038,8 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Investigar por que foto enviada pelo registro rápido não aparece na página individual da planta
 - [x] Corrigir fluxo de upload de foto no QuickLog com error handling e logging detalhado
 - [ ] Testar que foto aparece na galeria da planta após upload pelo QuickLog (aguardando teste do usuário)
+
+## Bug: Botão Aninhado na Página de Detalhes da Planta (26/02/2026)
+
+- [x] Corrigir erro de validação React: `<button>` não pode conter `<button>` aninhado
+- [x] Encontrar e corrigir estrutura HTML inválida em /plants/:id (convertido buttons para divs com role="button")
