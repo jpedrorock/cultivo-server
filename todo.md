@@ -3066,3 +3066,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 
 - [x] Corrigir z-index do bottom navigation para ficar acima de todo o conteúdo (z-50 confirmado)
 - [x] Garantir que botões e elementos não fiquem sobrepostos pelo menu inferior (adicionado pb-32 no QuickLog content wrapper)
+
+## Consistência: Aplicar Fix de Sobreposição em PlantDetail (26/02/2026)
+
+- [x] Aplicar mesma correção de padding-bottom (pb-32) na página PlantDetail
+- [x] Garantir que conteúdo não seja coberto pelo bottom navigation
+- [x] Verificar outras páginas que possam ter o mesmo problema (nenhuma outra página encontrada com pb-24)

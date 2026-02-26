@@ -379,7 +379,7 @@ export default function PlantDetail() {
       </header>
 
       {/* Main Content */}
-      <main className="container py-8 pb-24 md:pb-8">
+      <main className="container py-8 pb-32 md:pb-8">
         {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <Card>
