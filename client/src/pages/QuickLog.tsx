@@ -8,12 +8,23 @@ import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { processImage, processImageFile, isHEIC, blobToBase64, formatFileSize } from "@/lib/imageUtils";
+import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
 
 export default function QuickLog() {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
+  
+  // Photo upload progress state
+  const [uploadProgress, setUploadProgress] = useState<{
+    isUploading: boolean;
+    stage: UploadStage;
+    progress: number;
+    originalSize?: string;
+    compressedSize?: string;
+    reduction?: number;
+  }>({ isUploading: false, stage: "converting", progress: 0 });
   
   // Haptic feedback helper
   const triggerHaptic = (type: 'light' | 'medium' | 'heavy' = 'light') => {
@@ -200,17 +211,34 @@ export default function QuickLog() {
     }
 
     try {
+      const originalSize = file.size;
+      const originalSizeStr = formatFileSize(originalSize);
+      
+      // Start upload progress
+      setUploadProgress({
+        isUploading: true,
+        stage: "converting",
+        progress: 10,
+        originalSize: originalSizeStr,
+      });
+
       // Convert HEIC to PNG if needed
       if (isHEIC(file)) {
-        toast.info("🔄 Convertendo HEIC para JPEG...");
+        setUploadProgress(prev => ({ ...prev, progress: 30 }));
         file = await processImageFile(file);
-        toast.success("✅ Imagem convertida!");
+        setUploadProgress(prev => ({ ...prev, progress: 40 }));
+      } else {
+        // Skip conversion for non-HEIC
+        setUploadProgress(prev => ({ ...prev, progress: 40 }));
       }
 
-      toast.info("Processando imagem...");
-      const originalSize = file.size;
+      // Compress image
+      setUploadProgress(prev => ({
+        ...prev,
+        stage: "compressing",
+        progress: 50,
+      }));
 
-      // Compress image (same as PlantHealthTab)
       const processedBlob = await processImage(file, {
         maxWidth: 1920,
         maxHeight: 1920,
@@ -221,21 +249,49 @@ export default function QuickLog() {
         type: "image/png",
       });
 
+      const compressedSize = processedFile.size;
+      const compressedSizeStr = formatFileSize(compressedSize);
+      const reduction = Math.round((1 - compressedSize / originalSize) * 100);
+
+      setUploadProgress(prev => ({
+        ...prev,
+        progress: 70,
+        compressedSize: compressedSizeStr,
+        reduction,
+      }));
+
       console.log('[QuickLog] Photo processed:', {
         name: processedFile.name,
-        originalSize: formatFileSize(originalSize),
-        compressedSize: formatFileSize(processedFile.size),
-        reduction: `${Math.round((1 - processedFile.size / originalSize) * 100)}%`
+        originalSize: originalSizeStr,
+        compressedSize: compressedSizeStr,
+        reduction: `${reduction}%`
       });
 
       // Convert to base64
+      setUploadProgress(prev => ({
+        ...prev,
+        stage: "uploading",
+        progress: 80,
+      }));
+
       const base64 = await blobToBase64(processedBlob);
       updatePlantHealthRecord(plants[currentPlantIndex].id, "photoBase64", base64);
 
-      const reduction = Math.round((1 - processedFile.size / originalSize) * 100);
-      toast.success(`📸 Foto otimizada! (${formatFileSize(originalSize)} → ${formatFileSize(processedFile.size)}, -${reduction}%)`);
+      // Complete
+      setUploadProgress(prev => ({
+        ...prev,
+        stage: "complete",
+        progress: 100,
+      }));
+
+      // Hide progress after 1.5s
+      setTimeout(() => {
+        setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
+        toast.success(`📸 Foto otimizada! (${originalSizeStr} → ${compressedSizeStr}, -${reduction}%)`);
+      }, 1500);
     } catch (error) {
       console.error("Erro ao processar imagem:", error);
+      setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
       toast.error("Erro ao processar imagem");
     }
   };
@@ -1033,6 +1089,17 @@ export default function QuickLog() {
           </>
         )}
       </div>
+
+      {/* Photo Upload Progress Overlay */}
+      {uploadProgress.isUploading && (
+        <PhotoUploadProgress
+          stage={uploadProgress.stage}
+          progress={uploadProgress.progress}
+          originalSize={uploadProgress.originalSize}
+          compressedSize={uploadProgress.compressedSize}
+          reduction={uploadProgress.reduction}
+        />
+      )}
     </div>
   );
 }

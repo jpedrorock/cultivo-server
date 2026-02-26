@@ -3051,3 +3051,13 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Investigar por que botão de salvar fica travado em "Salvando..." no QuickLog ao enviar foto (foto 2MB sem compressão = timeout)
 - [x] Verificar logs do servidor e navegador para identificar erro (BadRequestError: request aborted)
 - [x] Corrigir mutation que está travando/não completando (adicionado compressão de imagem 2MB → ~48KB)
+
+## Feature: Indicador de Progresso Detalhado de Upload (26/02/2026)
+
+- [x] Criar componente de indicador de progresso visual para upload de fotos (PhotoUploadProgress)
+- [x] Mostrar etapas: Convertendo HEIC → Comprimindo → Enviando
+- [x] Exibir porcentagem de progresso em cada etapa (10% → 40% → 70% → 100%)
+- [x] Mostrar tamanho original → tamanho comprimido em tempo real
+- [x] Adicionar barra de progresso animada com indicadores de etapa
+- [x] Implementar no QuickLog
+- [ ] Implementar no PlantHealthTab (opcional)
