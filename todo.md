@@ -3037,7 +3037,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 
 - [x] Investigar por que foto enviada pelo registro rápido não aparece na página individual da planta
 - [x] Corrigir fluxo de upload de foto no QuickLog com error handling e logging detalhado
-- [ ] Testar que foto aparece na galeria da planta após upload pelo QuickLog (aguardando teste do usuário)
+- [x] Testar que foto aparece na galeria da planta após upload pelo QuickLog (CONFIRMADO: funciona na página de plantas, NÃO funciona no QuickLog)
+- [x] Comparar implementação de upload entre PlantHealthTab (funciona) e QuickLog (não funciona)
+- [x] Corrigir lógica de upload no QuickLog para corresponder à implementação funcional (enviando photoBase64 no mesmo mutation)
 
 ## Bug: Botão Aninhado na Página de Detalhes da Planta (26/02/2026)
 

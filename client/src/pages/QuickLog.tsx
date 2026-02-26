@@ -214,12 +214,18 @@ export default function QuickLog() {
     }
 
     try {
-      // 1. Save health status
+      // Save health status WITH photo (same as PlantHealthTab)
       const healthStatusMap: Record<string, "HEALTHY" | "STRESSED" | "SICK"> = {
         healthy: "HEALTHY",
         attention: "STRESSED",
         sick: "SICK",
       };
+
+      console.log('[QuickLog] Saving health log with photo:', {
+        plantId: plant.id,
+        hasPhoto: !!record.photoBase64,
+        status: healthStatusMap[record.status]
+      });
 
       await savePlantHealthMutation.mutateAsync({
         plantId: plant.id,
@@ -227,23 +233,12 @@ export default function QuickLog() {
         symptoms: record.symptoms || undefined,
         treatment: undefined,
         notes: record.notes || undefined,
+        photoBase64: record.photoBase64 || undefined, // ✅ Send photo in same mutation!
       });
 
-      // 2. Upload photo if exists
+      console.log('[QuickLog] Health log saved successfully with photo');
       if (record.photoBase64) {
-        console.log('[QuickLog] Uploading photo for plant:', plant.id);
-        try {
-          const result = await uploadPhotoMutation.mutateAsync({
-            plantId: plant.id,
-            photoBase64: record.photoBase64,
-            description: "Foto do QuickLog",
-          });
-          console.log('[QuickLog] Photo upload result:', result);
-        } catch (photoError: any) {
-          console.error('[QuickLog] Photo upload error:', photoError);
-          // Don't throw - continue with health record save
-          toast.error(`Aviso: Foto não foi salva - ${photoError.message}`);
-        }
+        toast.success("📸 Foto salva!");
       }
 
       // Trichomes and LST save logic removed - available in individual plant pages
