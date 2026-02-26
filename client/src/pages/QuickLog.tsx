@@ -8,19 +8,7 @@ import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
-// LST Techniques data
-const LST_TECHNIQUES = [
-  { id: "LST", name: "LST", icon: "🌿", description: "Low Stress Training - Dobrar e amarrar galhos" },
-  { id: "TOPPING", name: "Topping", icon: "✂️", description: "Cortar o topo principal para criar 2 colas" },
-  { id: "FIM", name: "FIM", icon: "🔪", description: "Fuck I Missed - Corte parcial do topo" },
-  { id: "SUPER_CROPPING", name: "Super Cropping", icon: "💪", description: "Dobrar galhos até quebrar fibras internas" },
-  { id: "LOLLIPOPPING", name: "Lollipopping", icon: "🍭", description: "Remover folhas e galhos inferiores" },
-  { id: "DEFOLIATION", name: "Defoliação", icon: "🍂", description: "Remover folhas para melhorar penetração de luz" },
-  { id: "MAINLINING", name: "Mainlining", icon: "🌳", description: "Criar estrutura simétrica com topping múltiplo" },
-  { id: "SCROG", name: "ScrOG", icon: "🕸️", description: "Screen of Green - Treliça para distribuir colas" },
-];
-
-type TrichomeStatus = "clear" | "cloudy" | "amber" | "mixed";
+// LST Techniques and Trichome types removed - available in individual plant pages
 
 export default function QuickLog() {
   const [, setLocation] = useLocation();
@@ -74,12 +62,6 @@ export default function QuickLog() {
     symptoms: string;
     notes: string;
     photoBase64?: string;
-    trichomeStatus?: TrichomeStatus;
-    trichomeClear?: number;
-    trichomeCloudy?: number;
-    trichomeAmber?: number;
-    lstTechniques?: string[];
-    lstResponse?: string;
   }>>(new Map());
 
   // Fetch tents for selection
@@ -140,7 +122,7 @@ export default function QuickLog() {
     },
   });
 
-  // Save plant health mutation (now includes photo, trichomes, LST)
+  // Save plant health mutation (now includes photo only)
   const savePlantHealthMutation = trpc.plantHealth.create.useMutation({
     onSuccess: () => {
       // Move to next plant or finish
@@ -161,11 +143,7 @@ export default function QuickLog() {
   // Upload photo mutation
   const uploadPhotoMutation = trpc.plantPhotos.upload.useMutation();
 
-  // Save trichomes mutation
-  const saveTrichomesMutation = trpc.plantTrichomes.create.useMutation();
-
-  // Save LST mutation
-  const saveLSTMutation = trpc.plantLST.create.useMutation();
+  // Trichomes and LST mutations removed - available in individual plant pages
 
   const resetForm = () => {
     setCurrentStep(0);
@@ -195,23 +173,7 @@ export default function QuickLog() {
     });
   };
 
-  const toggleLSTTechnique = (plantId: number, techniqueId: string) => {
-    setPlantHealthRecords((prev) => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(plantId) || {
-        status: "healthy",
-        symptoms: "",
-        notes: "",
-        lstTechniques: [],
-      };
-      const techniques = existing.lstTechniques || [];
-      const newTechniques = techniques.includes(techniqueId)
-        ? techniques.filter((t) => t !== techniqueId)
-        : [...techniques, techniqueId];
-      newMap.set(plantId, { ...existing, lstTechniques: newTechniques });
-      return newMap;
-    });
-  };
+  // toggleLSTTechnique removed - LST available in individual plant pages
 
   const handlePhotoCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -274,29 +236,7 @@ export default function QuickLog() {
         });
       }
 
-      // 3. Save trichomes if exists
-      if (record.trichomeStatus) {
-        await saveTrichomesMutation.mutateAsync({
-          plantId: plant.id,
-          weekNumber: 1, // Default week number for QuickLog
-          trichomeStatus: record.trichomeStatus.toUpperCase() as "CLEAR" | "CLOUDY" | "AMBER" | "MIXED",
-          clearPercent: record.trichomeClear || undefined,
-          cloudyPercent: record.trichomeCloudy || undefined,
-          amberPercent: record.trichomeAmber || undefined,
-          notes: undefined,
-          photoBase64: undefined,
-        });
-      }
-
-      // 4. Save LST if exists
-      if (record.lstTechniques && record.lstTechniques.length > 0) {
-        await saveLSTMutation.mutateAsync({
-          plantId: plant.id,
-          technique: record.lstTechniques.join(", "),
-          response: record.lstResponse || undefined,
-          notes: undefined,
-        });
-      }
+      // Trichomes and LST save logic removed - available in individual plant pages
 
       // Success handled by mutation onSuccess
     } catch (error: any) {
@@ -943,123 +883,7 @@ export default function QuickLog() {
                     </AccordionContent>
                   </AccordionItem>
 
-                  {/* Trichomes Section */}
-                  <AccordionItem value="trichomes" className="border border-border rounded-xl bg-card shadow-sm">
-                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                        <span className="font-semibold">Tricomas (opcional)</span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4 space-y-4">
-                      {/* Trichome status */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {(["clear", "cloudy", "amber", "mixed"] as TrichomeStatus[]).map((status) => (
-                            <button
-                              key={status}
-                              onClick={() => updatePlantHealthRecord(plants[currentPlantIndex].id, "trichomeStatus", status)}
-                              className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
-                                plantHealthRecords.get(plants[currentPlantIndex].id)?.trichomeStatus === status
-                                  ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg"
-                                  : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-600"
-                              }`}
-                            >
-                              {status === "clear" ? "💧 Clear" : status === "cloudy" ? "☁️ Cloudy" : status === "amber" ? "🟠 Amber" : "🌈 Mixed"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Percentages (only if mixed) */}
-                      {plantHealthRecords.get(plants[currentPlantIndex].id)?.trichomeStatus === "mixed" && (
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Clear %</label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={plantHealthRecords.get(plants[currentPlantIndex].id)?.trichomeClear || ""}
-                              onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "trichomeClear", parseInt(e.target.value) || 0)}
-                              placeholder="0"
-                              className="h-10"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Cloudy %</label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={plantHealthRecords.get(plants[currentPlantIndex].id)?.trichomeCloudy || ""}
-                              onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "trichomeCloudy", parseInt(e.target.value) || 0)}
-                              placeholder="0"
-                              className="h-10"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm text-gray-600 mb-1">Amber %</label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={plantHealthRecords.get(plants[currentPlantIndex].id)?.trichomeAmber || ""}
-                              onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "trichomeAmber", parseInt(e.target.value) || 0)}
-                              placeholder="0"
-                              className="h-10"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  {/* LST Section */}
-                  <AccordionItem value="lst" className="border border-border rounded-xl bg-card shadow-sm">
-                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                      <div className="flex items-center gap-2">
-                        <Sprout className="h-5 w-5 text-green-600" />
-                        <span className="font-semibold">Técnicas LST (opcional)</span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4 space-y-4">
-                      {/* LST techniques grid */}
-                      <div className="grid grid-cols-2 gap-2">
-                        {LST_TECHNIQUES.map((technique) => {
-                          const isSelected = (plantHealthRecords.get(plants[currentPlantIndex].id)?.lstTechniques || []).includes(technique.id);
-                          return (
-                            <button
-                              key={technique.id}
-                              onClick={() => toggleLSTTechnique(plants[currentPlantIndex].id, technique.id)}
-                              className={`p-3 rounded-xl text-left transition-all duration-300 ${
-                                isSelected
-                                  ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg"
-                                  : "bg-white text-gray-700 border-2 border-gray-200"
-                              }`}
-                            >
-                              <div className="text-2xl mb-1">{technique.icon}</div>
-                              <div className="font-semibold text-sm">{technique.name}</div>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Plant response */}
-                      {(plantHealthRecords.get(plants[currentPlantIndex].id)?.lstTechniques || []).length > 0 && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Resposta da Planta (opcional)</label>
-                          <Textarea
-                            value={plantHealthRecords.get(plants[currentPlantIndex].id)?.lstResponse || ""}
-                            onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "lstResponse", e.target.value)}
-                            placeholder="Como a planta respondeu à técnica?"
-                            className="min-h-[60px]"
-                          />
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
+                  {/* Trichomes and LST sections removed - available in individual plant pages */}
                 </Accordion>
               </div>
             )}
