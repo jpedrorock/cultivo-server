@@ -3016,3 +3016,8 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Integrar conversão automática no fluxo de upload (processImageFile)
 - [x] Testar servidor após implementação
 - [ ] Testar upload de foto HEIC real do iPhone em dispositivo físico
+
+## Bugs Críticos Reportados (26/02/2026)
+
+- [x] Corrigir erro "Falha ao salvar foto" ao fazer upload de foto no formulário de saúde (melhorado error handling e logging)
+- [x] Corrigir bottom navigation sobrepondo botões "Pular" e "Finalizar" (adicionado pb-24 em todos os tabs)

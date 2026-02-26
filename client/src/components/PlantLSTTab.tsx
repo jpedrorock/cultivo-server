@@ -194,7 +194,7 @@ export default function PlantLSTTab({ plantId }: PlantLSTTabProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Add New LST Log */}
       <Card>
         <CardHeader className="pb-3">

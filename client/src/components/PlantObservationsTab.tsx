@@ -29,7 +29,7 @@ export default function PlantObservationsTab({ plantId }: PlantObservationsTabPr
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Add New Observation */}
       <Card>
         <CardHeader>

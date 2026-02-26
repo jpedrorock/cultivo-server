@@ -238,7 +238,7 @@ export default function PlantTrichomesTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Current Week Info */}
       {plant && (
         <div className="flex items-center gap-2 text-sm px-1">

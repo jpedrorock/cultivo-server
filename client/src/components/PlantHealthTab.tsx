@@ -106,6 +106,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
 
   const createHealthLog = trpc.plantHealth.create.useMutation({
     onSuccess: () => {
+      console.log('[PlantHealthTab] Health log created successfully');
       toast.success("Registro de saúde adicionado!");
       setSymptoms("");
       setTreatment("");
@@ -113,12 +114,18 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
       setPhotoPreview(null);
       setPhotoFile(null);
       setIsFormOpen(false);
+      setUploadStatus("idle");
+      setUploadMessage("");
       refetch();
       utils.plants.list.invalidate();
       utils.plants.getById.invalidate({ id: plantId });
     },
     onError: (error) => {
-      toast.error(`Erro ao adicionar registro: ${error.message}`);
+      console.error('[PlantHealthTab] Failed to create health log:', error);
+      setUploadStatus("error");
+      setUploadMessage("Erro ao salvar foto");
+      toast.error(`Erro: ${error.message}`);
+      setTimeout(() => setUploadStatus("idle"), 3000);
     },
   });
 
@@ -256,7 +263,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
     STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Collapsible Form */}
       <Collapsible open={isFormOpen} onOpenChange={setIsFormOpen}>
         <CollapsibleTrigger asChild>
