@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSwipeable } from "react-swipeable";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -359,22 +358,7 @@ export default function QuickLog() {
 
   const currentStepData = steps[currentStep];
 
-  // Swipe handlers
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => {
-      if (currentStep < 8 && canGoNext()) {
-        triggerHaptic('medium');
-        setCurrentStep(currentStep + 1);
-      }
-    },
-    onSwipedRight: () => {
-      if (currentStep > 0 && currentStep < 9) {
-        triggerHaptic('light');
-        setCurrentStep(currentStep - 1);
-      }
-    },
-    trackMouse: false,
-  });
+  // Swipe handlers removed to prevent interference with PPFD slider
 
   if (tentsLoading) {
     return (
@@ -385,7 +369,7 @@ export default function QuickLog() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col" {...swipeHandlers}>
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
       {/* Content */}
       <div className="flex-1 flex items-center justify-center overflow-hidden">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">

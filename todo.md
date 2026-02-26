@@ -3021,3 +3021,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 
 - [x] Corrigir erro "Falha ao salvar foto" ao fazer upload de foto no formulário de saúde (melhorado error handling e logging)
 - [x] Corrigir bottom navigation sobrepondo botões "Pular" e "Finalizar" (adicionado pb-24 em todos os tabs)
+
+## Bug: Swipe Interferindo com Slider PPFD (26/02/2026)
+
+- [x] Remover gesto de swipe da página de registro rápido que interfere com o slider de PPFD (removido useSwipeable e handlers)
