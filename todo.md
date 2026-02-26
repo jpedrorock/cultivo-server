@@ -3072,3 +3072,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Aplicar mesma correção de padding-bottom (pb-32) na página PlantDetail
 - [x] Garantir que conteúdo não seja coberto pelo bottom navigation
 - [x] Verificar outras páginas que possam ter o mesmo problema (nenhuma outra página encontrada com pb-24)
+
+## Feature: Feedback Tátil no Bottom Navigation (26/02/2026)
+
+- [x] Implementar vibração leve (haptic feedback) ao pressionar ícones do bottom navigation (10ms)
+- [x] Usar Vibration API do navegador para feedback tátil
+- [x] Garantir compatibilidade com iOS e Android (navigator.vibrate)
+- [x] Adicionar fallback silencioso para navegadores sem suporte (if 'vibrate' in navigator)

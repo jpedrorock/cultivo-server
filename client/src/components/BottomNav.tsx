@@ -2,6 +2,13 @@ import { Warehouse, Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Setting
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+
+// Haptic feedback helper
+const triggerHapticFeedback = () => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(10); // 10ms light vibration
+  }
+};
 import { trpc } from "@/lib/trpc";
 import {
   Sheet,
@@ -54,6 +61,7 @@ export function BottomNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={triggerHapticFeedback}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 py-3 px-4 rounded-lg transition-colors relative",
                   item.href === "/quick-log"
@@ -82,6 +90,7 @@ export function BottomNav() {
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
             <SheetTrigger asChild>
               <button
+                onClick={triggerHapticFeedback}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 py-3 px-4 rounded-lg transition-colors",
                   "hover:bg-primary/10",
@@ -107,7 +116,10 @@ export function BottomNav() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => setMoreMenuOpen(false)}
+                      onClick={() => {
+                        triggerHapticFeedback();
+                        setMoreMenuOpen(false);
+                      }}
                       className={cn(
                         "flex items-center gap-4 px-4 py-4 rounded-lg transition-colors relative",
                         "hover:bg-primary/10",
