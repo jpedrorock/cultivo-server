@@ -40,6 +40,7 @@ import {
 } from "@/lib/imageUtils";
 import EditHealthLogDialog from "@/components/EditHealthLogDialog";
 import UploadProgress from "@/components/UploadProgress";
+import { HealthTabSkeleton } from "@/components/TabSkeletons";
 
 interface PlantHealthTabProps {
   plantId: number;
@@ -109,7 +110,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
   const [swipeOffset, setSwipeOffset] = useState<number>(0);
   const [isSwiping, setIsSwiping] = useState<boolean>(false);
 
-  const { data: healthLogs, refetch } = trpc.plantHealth.list.useQuery({
+  const { data: healthLogs, refetch, isLoading } = trpc.plantHealth.list.useQuery({
     plantId,
   });
 
@@ -488,7 +489,9 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
             </span>
           )}
         </h3>
-        {healthLogs && healthLogs.length > 0 ? (
+        {isLoading ? (
+          <HealthTabSkeleton />
+        ) : healthLogs && healthLogs.length > 0 ? (
           <div className="space-y-2">
             {healthLogs.map((log: any) => {
               const status = getStatusOption(log.healthStatus);

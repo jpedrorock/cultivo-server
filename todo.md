@@ -3018,6 +3018,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] Testar upload de foto HEIC real do iPhone em dispositivo físico
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 ## Bugs Críticos Reportados (26/02/2026)
 
 - [x] Corrigir erro "Falha ao salvar foto" ao fazer upload de foto no formulário de saúde (melhorado error handling e logging)
@@ -3208,3 +3209,14 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] Substituir botões em modais de confirmação (Confirmar exclusão, Salvar alterações)
 - [x] Testar ripple effect em todos os novos botões
 - [x] Verificar consistência visual em todas as páginas
+=======
+## Adicionar Skeleton Loading nas Abas de PlantDetail
+
+- [x] Analisar estrutura das abas de PlantDetail (Saúde, Tricomas, LST)
+- [x] Criar HealthTabSkeleton component
+- [x] Criar TrichomesTabSkeleton component
+- [x] Criar LSTTabSkeleton component
+- [x] Integrar skeletons nas abas de PlantDetail
+- [x] Testar loading states em todas as abas
+- [x] Verificar shimmer effect funcionando corretamente
+>>>>>>> Stashed changes

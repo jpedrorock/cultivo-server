@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/accordion";
 import { Plus, Scissors, Check, Info, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { LSTTabSkeleton } from "@/components/TabSkeletons";
 
 interface PlantLSTTabProps {
   plantId: number;
@@ -152,7 +153,7 @@ export default function PlantLSTTab({ plantId }: PlantLSTTabProps) {
   const [response, setResponse] = useState("");
   const [notes, setNotes] = useState("");
 
-  const { data: lstLogs, refetch } = trpc.plantLST.list.useQuery({ plantId });
+  const { data: lstLogs, refetch, isLoading } = trpc.plantLST.list.useQuery({ plantId });
   const createLSTLog = trpc.plantLST.create.useMutation({
     onSuccess: () => {
       toast.success("Registro de LST adicionado!");
@@ -345,7 +346,9 @@ export default function PlantLSTTab({ plantId }: PlantLSTTabProps) {
           <CardTitle className="text-base">Histórico de Técnicas</CardTitle>
         </CardHeader>
         <CardContent>
-          {!lstLogs || lstLogs.length === 0 ? (
+          {isLoading ? (
+            <LSTTabSkeleton />
+          ) : !lstLogs || lstLogs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm">
               <Scissors className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p>Nenhuma técnica registrada ainda</p>

@@ -29,6 +29,7 @@ import {
   isHEIC,
   processImageFile,
 } from "@/lib/imageUtils";
+import { TrichomesTabSkeleton } from "@/components/TabSkeletons";
 
 interface PlantTrichomesTabProps {
   plantId: number;
@@ -86,7 +87,7 @@ export default function PlantTrichomesTab({
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const { data: plant } = trpc.plants.getById.useQuery({ id: plantId });
-  const { data: trichomeLogs, refetch } =
+  const { data: trichomeLogs, refetch, isLoading } =
     trpc.plantTrichomes.list.useQuery({ plantId });
 
   const createTrichomeLog = trpc.plantTrichomes.create.useMutation({
@@ -449,7 +450,9 @@ export default function PlantTrichomesTab({
             </span>
           )}
         </h3>
-        {trichomeLogs && trichomeLogs.length > 0 ? (
+        {isLoading ? (
+          <TrichomesTabSkeleton />
+        ) : trichomeLogs && trichomeLogs.length > 0 ? (
           <div className="space-y-2">
             {trichomeLogs.map((log: any) => {
               const status = getStatusOption(log.trichomeStatus);
