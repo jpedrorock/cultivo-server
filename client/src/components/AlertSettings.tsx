@@ -122,13 +122,13 @@ export function AlertSettings() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          <Bell className="h-5 w-5 text-primary" />
-          <CardTitle>Margens de Alertas por Fase</CardTitle>
+          <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+          <CardTitle className="text-base sm:text-lg">Margens de Alertas por Fase</CardTitle>
         </div>
-        <CardDescription>
-          Configure as margens de tolerância para cada fase do cultivo. O sistema gera alertas quando valores reais ultrapassam (ideal ± margem).
+        <CardDescription className="text-xs sm:text-sm">
+          Configure as margens de tolerância para cada fase. Alertas são gerados quando valores reais ultrapassam (ideal ± margem).
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -139,12 +139,12 @@ export function AlertSettings() {
             
             return (
               <AccordionItem key={phase} value={phase} className="border rounded-lg mb-3 px-4">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{info.icon}</span>
-                    <div className="text-left">
-                      <div className={`font-semibold ${info.color}`}>{info.label}</div>
-                      <div className="text-sm text-muted-foreground">{info.description}</div>
+                <AccordionTrigger className="hover:no-underline py-3 sm:py-4">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <span className="text-xl sm:text-2xl shrink-0">{info.icon}</span>
+                    <div className="text-left min-w-0">
+                      <div className={`font-semibold text-sm sm:text-base ${info.color}`}>{info.label}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground line-clamp-1 sm:line-clamp-none">{info.description}</div>
                     </div>
                   </div>
                 </AccordionTrigger>
@@ -232,11 +232,12 @@ export function AlertSettings() {
                     </div>
 
                     {/* Botão Salvar */}
-                    <div className="pt-2 flex justify-end">
+                    <div className="pt-2">
                       <Button 
                         onClick={() => handleSave(phase)}
                         disabled={updateMargin.isPending}
                         size="sm"
+                        className="w-full sm:w-auto min-h-[44px]"
                       >
                         <Save className="mr-2 h-4 w-4" />
                         {updateMargin.isPending ? "Salvando..." : `Salvar ${info.label}`}

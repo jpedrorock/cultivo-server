@@ -288,15 +288,15 @@ export function NotificationSettings() {
 
           {/* Alerts Card */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                    <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            <CardHeader className="pb-3">
+              <label className="flex items-center justify-between gap-3 cursor-pointer min-h-[44px]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg shrink-0">
+                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Alertas Automáticos</CardTitle>
-                    <CardDescription className="text-sm">
+                  <div className="min-w-0">
+                    <CardTitle className="text-sm sm:text-base">Alertas Automáticos</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
                       Notificações quando Temp/RH/PPFD estiverem fora da faixa ideal
                     </CardDescription>
                   </div>
@@ -304,22 +304,23 @@ export function NotificationSettings() {
                 <Switch
                   checked={config.alertsEnabled}
                   onCheckedChange={handleToggleAlerts}
+                  className="shrink-0"
                 />
-              </div>
+              </label>
             </CardHeader>
           </Card>
 
           {/* Task Reminders Card */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <CardHeader className="pb-3">
+              <label className="flex items-center justify-between gap-3 cursor-pointer min-h-[44px]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg shrink-0">
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Lembretes de Tarefas</CardTitle>
-                    <CardDescription className="text-sm">
+                  <div className="min-w-0">
+                    <CardTitle className="text-sm sm:text-base">Lembretes de Tarefas</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
                       Notificações sobre tarefas pendentes no fim da semana
                     </CardDescription>
                   </div>
@@ -327,22 +328,23 @@ export function NotificationSettings() {
                 <Switch
                   checked={config.taskRemindersEnabled}
                   onCheckedChange={handleToggleTaskReminders}
+                  className="shrink-0"
                 />
-              </div>
+              </label>
             </CardHeader>
           </Card>
 
           {/* Sound Settings Card */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                    <Volume2 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <CardHeader className="pb-3">
+              <label className="flex items-center justify-between gap-3 cursor-pointer min-h-[44px]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg shrink-0">
+                    <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <div>
-                    <CardTitle className="text-base">Sons de Notificação</CardTitle>
-                    <CardDescription className="text-sm">
+                  <div className="min-w-0">
+                    <CardTitle className="text-sm sm:text-base">Sons de Notificação</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
                       Tocar som quando receber notificações
                     </CardDescription>
                   </div>
@@ -350,8 +352,9 @@ export function NotificationSettings() {
                 <Switch
                   checked={config.soundEnabled}
                   onCheckedChange={(enabled) => setConfig({ ...config, soundEnabled: enabled })}
+                  className="shrink-0"
                 />
-              </div>
+              </label>
             </CardHeader>
             {config.soundEnabled && (
               <CardContent>
@@ -407,8 +410,13 @@ export function NotificationSettings() {
 
           {/* Test Notification Card */}
           <Card className="border-dashed">
-            <CardContent className="pt-6">
-              <Button onClick={testNotification} variant="outline" className="w-full" size="lg">
+            <CardContent className="pt-4 pb-4">
+              <Button
+                onClick={testNotification}
+                variant="outline"
+                className="w-full min-h-[48px]"
+                size="lg"
+              >
                 <Bell className="w-4 h-4 mr-2" />
                 Testar Notificação
               </Button>

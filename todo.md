@@ -3461,3 +3461,17 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] UI: adicionar "DRYING" como opção no Select de fase do TaskTemplatesManager
 - [x] UI: adicionar cor laranja para fase DRYING no TaskTemplatesManager
 - [x] Verificado: 12 templates inseridos corretamente no banco
+
+## Responsividade Mobile - Configurações (27/02/2026)
+
+- [x] Settings.tsx: header sticky compacto com título menor no mobile (text-lg sm:text-2xl)
+- [x] Settings.tsx: padding-bottom para não sobrepor BottomNav mobile (pb-28 sm:pb-8)
+- [x] ThemeToggle: opções de tema com touch target mínimo 56px (min-h-[56px] via label wrapper)
+- [x] ThemeToggle: tema ativo destacado com borda primary e fundo primary/5
+- [x] ThemeToggle: refatorado para array de temas (sem repetição de código)
+- [x] AlertSettings: accordion trigger com py-3 sm:py-4 (touch target adequado)
+- [x] AlertSettings: grid de inputs 1 coluna no mobile (já usava grid-cols-1 sm:grid-cols-2)
+- [x] AlertSettings: botão "Salvar" full-width no mobile (w-full sm:w-auto min-h-[44px])
+- [x] AlertSettings: description do accordion com line-clamp-1 no mobile
+- [x] NotificationSettings: switches com label wrapper clicável (min-h-[44px])
+- [x] NotificationSettings: botão "Testar Notificação" full-width (já era, melhorado min-h-[48px])

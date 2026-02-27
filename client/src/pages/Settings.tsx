@@ -1,42 +1,39 @@
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AlertSettings } from "@/components/AlertSettings";
-import { ArrowLeft, Download, Upload, Keyboard, Database } from "lucide-react";
+import { ArrowLeft, Database, Keyboard } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
-import { useState } from "react";
 
 export default function Settings() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Header — sticky, compacto no mobile */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button asChild variant="ghost" size="icon">
+        <div className="container mx-auto px-4 py-3 sm:py-4">
+          <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10">
               <Link href="/">
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-              <p className="text-sm text-muted-foreground">Personalize seu app</p>
+              <h1 className="text-lg sm:text-2xl font-bold text-foreground leading-tight">Configurações</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">Personalize seu app</p>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto space-y-6">
+      {/* Content — padding-bottom para não sobrepor BottomNav */}
+      <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8">
+        <div className="max-w-2xl mx-auto space-y-5">
           <ThemeToggle />
           <AlertSettings />
-          <KeyboardShortcuts />
-          <BackupCard />
           <NotificationSettings />
+          <BackupCard />
+          <KeyboardShortcuts />
         </div>
       </main>
     </div>
@@ -46,17 +43,17 @@ export default function Settings() {
 function BackupCard() {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Database className="w-5 h-5" />
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <Database className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
           Backup e Restauração
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs sm:text-sm">
           Faça backup dos seus dados ou restaure de um backup anterior
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button asChild className="w-full sm:w-auto">
+        <Button asChild className="w-full sm:w-auto min-h-[44px]">
           <Link href="/settings/backup">
             <Database className="w-4 h-4 mr-2" />
             Gerenciar Backups
@@ -72,33 +69,36 @@ function BackupCard() {
 
 function KeyboardShortcuts() {
   const shortcuts = [
-    { description: 'Criar Nova Estufa', shortcut: 'Ctrl+N', context: 'Página inicial' },
-    { description: 'Salvar Registro', shortcut: 'Ctrl+S', context: 'Página de registro' },
-    { description: 'Ir para Histórico', shortcut: 'Ctrl+H', context: 'Qualquer página' },
-    { description: 'Ir para Calculadoras', shortcut: 'Ctrl+C', context: 'Qualquer página' },
-    { description: 'Mostrar Atalhos', shortcut: 'Ctrl+/', context: 'Qualquer página' },
+    { description: "Criar Nova Estufa", shortcut: "Ctrl+N", context: "Página inicial" },
+    { description: "Salvar Registro", shortcut: "Ctrl+S", context: "Página de registro" },
+    { description: "Ir para Histórico", shortcut: "Ctrl+H", context: "Qualquer página" },
+    { description: "Ir para Calculadoras", shortcut: "Ctrl+C", context: "Qualquer página" },
+    { description: "Mostrar Atalhos", shortcut: "Ctrl+/", context: "Qualquer página" },
   ];
 
   return (
     <Card className="max-lg:hidden">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Keyboard className="w-5 h-5" />
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <Keyboard className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
           Atalhos de Teclado
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs sm:text-sm">
           Use estes atalhos para navegar mais rapidamente pelo aplicativo
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
           {shortcuts.map((item, index) => (
-            <div key={index} className="flex items-center justify-between py-2 px-3 bg-muted rounded-md">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-foreground">{item.description}</span>
+            <div
+              key={index}
+              className="flex items-center justify-between py-2 px-3 bg-muted rounded-md"
+            >
+              <div className="flex flex-col min-w-0 mr-3">
+                <span className="text-sm font-medium text-foreground truncate">{item.description}</span>
                 <span className="text-xs text-muted-foreground">{item.context}</span>
               </div>
-              <kbd className="px-2 py-1 text-xs font-semibold text-foreground bg-background border border-border rounded shadow-sm">
+              <kbd className="shrink-0 px-2 py-1 text-xs font-semibold text-foreground bg-background border border-border rounded shadow-sm">
                 {item.shortcut}
               </kbd>
             </div>
@@ -113,5 +113,3 @@ function KeyboardShortcuts() {
     </Card>
   );
 }
-
-
