@@ -3452,3 +3452,12 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] TaskTemplatesManager: itens de template com ações em botões 36x36px
 - [x] TaskTemplatesManager: cores por fase (verde/roxo/âmbar) nos badges do accordion
 - [x] TaskTemplatesManager: dialog com scroll interno e footer empilhado no mobile
+
+## Templates de Tarefas - Fase DRYING (27/02/2026)
+
+- [x] Backend: adicionar "DRYING" ao enum do router taskTemplates.create e update
+- [x] Backend: adicionar "DRYING" ao enum do router taskTemplates.update
+- [x] Banco: inserir 12 templates DRYING (6 na semana 1, 6 na semana 2) via SQL
+- [x] UI: adicionar "DRYING" como opção no Select de fase do TaskTemplatesManager
+- [x] UI: adicionar cor laranja para fase DRYING no TaskTemplatesManager
+- [x] Verificado: 12 templates inseridos corretamente no banco

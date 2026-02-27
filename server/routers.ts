@@ -4012,7 +4012,7 @@ export const appRouter = router({
         z.object({
           title: z.string().min(1),
           description: z.string().optional(),
-          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE"]),
+          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })
@@ -4038,7 +4038,7 @@ export const appRouter = router({
           id: z.number(),
           title: z.string().min(1),
           description: z.string().optional(),
-          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE"]),
+          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })

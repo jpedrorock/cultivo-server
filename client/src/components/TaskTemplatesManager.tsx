@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Plus, Edit, Trash2, Loader2, Search, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 
-type Phase = "VEGA" | "FLORA" | "MAINTENANCE";
+type Phase = "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
 type Context = "TENT_A" | "TENT_BC";
 
 interface TaskTemplate {
@@ -29,12 +29,14 @@ const PHASE_LABELS: Record<Phase, string> = {
   VEGA: "Vegetativo",
   FLORA: "Floração",
   MAINTENANCE: "Manutenção",
+  DRYING: "Secagem",
 };
 
 const PHASE_COLORS: Record<Phase, string> = {
   VEGA: "bg-green-500/10 text-green-700 border-green-200",
   FLORA: "bg-purple-500/10 text-purple-700 border-purple-200",
   MAINTENANCE: "bg-amber-500/10 text-amber-700 border-amber-200",
+  DRYING: "bg-orange-500/10 text-orange-700 border-orange-200",
 };
 
 export function TaskTemplatesManager() {
@@ -346,6 +348,7 @@ export function TaskTemplatesManager() {
                     <SelectItem value="VEGA">Vegetativo</SelectItem>
                     <SelectItem value="FLORA">Floração</SelectItem>
                     <SelectItem value="MAINTENANCE">Manutenção</SelectItem>
+                    <SelectItem value="DRYING">Secagem</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
