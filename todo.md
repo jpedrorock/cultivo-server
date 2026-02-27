@@ -3620,3 +3620,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar botão "Excluir" na barra de ações em massa
 - [x] Confirm dialog com contagem de plantas a excluir
 - [x] Executar bulk delete e atualizar lista
+
+## Excluir planta na página de detalhes (27/02/2026)
+
+- [x] Adicionar botão Excluir no cabeçalho do PlantDetail
+- [x] Confirm dialog com nome da planta e aviso de irreversibilidade
+- [x] Após exclusão, redirecionar para /plants

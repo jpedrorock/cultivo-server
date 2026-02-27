@@ -53,6 +53,7 @@ export default function PlantDetail() {
   const [moveTentModalOpen, setMoveTentModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", code: "", notes: "" });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { data: plant, isLoading, refetch } = trpc.plants.getById.useQuery({ id: plantId });
   const { data: strain } = trpc.strains.getById.useQuery(
@@ -138,9 +139,11 @@ export default function PlantDetail() {
   };
   
   const handleDelete = () => {
-    if (confirm('⚠️ ATENÇÃO: Esta ação é PERMANENTE e não pode ser desfeita!\n\nUse apenas para plantas cadastradas por erro.\n\nPara plantas colhidas ou descartadas, use "Marcar como Colhida" ou "Descartar Planta".\n\nDeseja realmente excluir permanentemente?')) {
-      deleteMutation.mutate({ plantId: plant!.id });
-    }
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (plant) deleteMutation.mutate({ plantId: plant.id });
   };
   
   const handleDiscard = () => {
@@ -300,6 +303,19 @@ export default function PlantDetail() {
               <Button variant="outline" onClick={handleEditClick}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500"
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
+                Excluir
               </Button>
               
               {/* Menu de Ações Rápidas */}
@@ -557,6 +573,50 @@ export default function PlantDetail() {
                 </>
               ) : (
                 'Salvar'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Excluir Planta
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir permanentemente{" "}
+              <span className="font-semibold text-foreground">{plant.name}</span>?
+              Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
+              Use apenas para plantas cadastradas por engano.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir Permanentemente
+                </>
               )}
             </Button>
           </DialogFooter>
