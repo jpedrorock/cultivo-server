@@ -782,7 +782,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
 
   return (
     <ListItemAnimation>
-      <Card className="bg-card/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1" data-tour="tent-card">
+      <Card className="bg-card/90 backdrop-blur-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-primary/30 group cursor-pointer" data-tour="tent-card">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>

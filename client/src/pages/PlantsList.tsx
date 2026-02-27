@@ -396,10 +396,10 @@ export default function PlantsList() {
                       <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {tentPlants.map((plant: any) => (
                           <ListItemAnimation key={plant.id}>
-                            <Card className={`border-2 transition-all ${
+                            <Card className={`border-2 transition-all duration-200 ease-out group cursor-pointer ${
                             selectedPlants.has(plant.id) 
-                              ? "border-primary bg-primary/5" 
-                              : "hover:border-primary/50"
+                              ? "border-primary bg-primary/5 shadow-md shadow-primary/10" 
+                              : "hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.01]"
                           }`}>
                             <CardHeader>
                               <div className="flex items-start justify-between gap-2">

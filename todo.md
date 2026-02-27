@@ -3374,3 +3374,16 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - Botão "Tour das Calculadoras" no header do CalculatorMenu (desktop e mobile)
 - Estado persistente via localStorage (hasCompletedAdvancedTour)
 - Tours independentes (principal e avançado) sem interferência
+
+
+## Micro-interações nos Cards (27/02/2026)
+
+- [x] Analisar estilos atuais dos cards de estufas e plantas
+- [x] Adicionar hover scale (1.01) nos cards de estufas (Home)
+- [x] Adicionar shadow elevation nos cards de estufas no hover
+- [x] Adicionar transição suave (200ms ease-out) para hover states
+- [x] Adicionar hover scale (1.01) nos cards de plantas (PlantsList)
+- [x] Adicionar shadow elevation nos cards de plantas no hover
+- [x] Adicionar cursor pointer nos cards clicáveis
+- [x] Testar micro-interações em desktop (mouse hover)
+- [x] Verificar que não interferem com touch em mobile
