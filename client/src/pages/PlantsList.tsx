@@ -387,9 +387,10 @@ export default function PlantsList() {
 
                   {isExpanded && (
                     <CardContent className="pt-0">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {tentPlants.map((plant: any) => (
-                          <Card key={plant.id} className={`border-2 transition-all ${
+                          <ListItemAnimation key={plant.id}>
+                            <Card className={`border-2 transition-all ${
                             selectedPlants.has(plant.id) 
                               ? "border-primary bg-primary/5" 
                               : "hover:border-primary/50"
@@ -484,8 +485,9 @@ export default function PlantsList() {
                               )}
                             </CardContent>
                           </Card>
+                          </ListItemAnimation>
                         ))}
-                      </div>
+                      </StaggerList>
                     </CardContent>
                   )}
                 </Card>

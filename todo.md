@@ -3184,3 +3184,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Aplicar PageTransition na página Calculators
 - [x] Testar todas as animações no navegador
 - [ ] Verificar performance (60fps)
+
+## Aplicar Animações na Lista de Plantas
+
+- [x] Aplicar StaggerList no grid de cards de plantas (PlantsList)
+- [x] Aplicar ListItemAnimation em cada PlantCard
+- [x] Testar animação de entrada escalonada
+- [x] Verificar performance no navegador
