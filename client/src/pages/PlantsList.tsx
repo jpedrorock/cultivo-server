@@ -477,17 +477,25 @@ export default function PlantsList() {
                                 </div>
                               </div>
 
-                              {plant.status === "ACTIVE" && (
-                                <AnimatedButton
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full gap-2"
-                                  onClick={() => handleMovePlant(plant, tent.id)}
+                              <div className="flex gap-2">
+                                <Link
+                                  href={`/plants/${plant.id}`}
+                                  className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground h-8 px-3 transition-all duration-150 ease-out hover:bg-primary/90 hover:scale-[1.03] hover:shadow-md hover:shadow-primary/30 active:scale-95"
                                 >
-                                  <MoveRight className="w-4 h-4" />
-                                  Mover para outra estufa
-                                </AnimatedButton>
-                              )}
+                                  Ver Planta
+                                </Link>
+                                {plant.status === "ACTIVE" && (
+                                  <AnimatedButton
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 gap-1 hover:scale-[1.03] hover:border-primary/40 hover:shadow-sm active:scale-95 transition-all duration-150"
+                                    onClick={() => handleMovePlant(plant, tent.id)}
+                                  >
+                                    <MoveRight className="w-3 h-3" />
+                                    Mover
+                                  </AnimatedButton>
+                                )}
+                              </div>
                             </CardContent>
                           </Card>
                           </ListItemAnimation>

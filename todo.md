@@ -3387,3 +3387,16 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar cursor pointer nos cards clicáveis
 - [x] Testar micro-interações em desktop (mouse hover)
 - [x] Verificar que não interferem com touch em mobile
+
+
+## Micro-interações nos Botões de Ação dos Cards (27/02/2026)
+
+- [x] Localizar botões "Registrar" e "Ver Detalhes" nos cards de estufas (Home)
+- [x] Adicionar hover scale + color shift nos botões "Registrar" (hover:scale-[1.03] + shadow-primary/30)
+- [x] Adicionar hover scale + border glow nos botões "Ver Detalhes" (hover:border-primary/40)
+- [x] Adicionar active:scale-95 para feedback de clique em ambos
+- [x] Adicionar transição suave (150ms ease-out) em todos os botões
+- [x] Localizar botões de ação nos cards de plantas (PlantsList)
+- [x] Adicionar botão "Ver Planta" com micro-interações nos cards de plantas
+- [x] Adicionar hover scale + border glow no botão "Mover" (AnimatedButton)
+- [x] Testar feedback visual em todos os botões
