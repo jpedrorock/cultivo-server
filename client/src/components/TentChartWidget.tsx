@@ -285,6 +285,9 @@ export function TentChartWidget({ tentId, tentName, data }: TentChartWidgetProps
                 dot={{ r: 3, fill: config.color }}
                 activeDot={{ r: 5 }}
                 connectNulls
+                animationDuration={800}
+                animationBegin={0}
+                animationEasing="ease-out"
               />
             );
           })}

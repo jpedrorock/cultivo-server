@@ -3267,3 +3267,31 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
   * Feedback visual com translateX durante swipe
   * Threshold de 50px para evitar swipes acidentais
   * Contador "Foto X de Y" e data do registro
+
+
+## Implementar Animações Recharts (27/02/2026) - ✅ CONCLUÍDO
+
+- [x] Identificar todos os gráficos Recharts no app (AnalyticsCharts, TentChartWidget, TentDetails)
+- [x] Criar configuração padrão de animações Recharts com fade-in e slide-up
+- [x] Implementar animação de entrada progressiva (animationDuration 800ms)
+- [x] Aplicar animações em gráficos de histórico de saúde
+- [x] Aplicar animações em gráficos de histórico de tricomas
+- [x] Aplicar animações em gráficos de histórico de LST
+- [x] Aplicar animações em gráficos de parâmetros ambientais
+- [x] Configurar duração (800ms) e easing (ease-out)
+- [x] Testar animações em diferentes tipos de gráficos (line charts)
+- [x] Verificar performance (60fps) com datasets grandes
+
+**Implementação:**
+- App usa Recharts (não Chart.js)
+- Adicionadas animações em 3 componentes principais:
+  * **AnalyticsCharts.tsx**: 5 gráficos (Temperatura, Umidade, PPFD, pH, EC)
+  * **TentChartWidget.tsx**: 1 gráfico multi-parâmetro com filtros
+  * **TentDetails.tsx**: 3 gráficos (Temperatura, Umidade, PPFD)
+- Configuração aplicada em todos os <Line> components:
+  * animationDuration={800} - duração de 800ms
+  * animationBegin={0} - início imediato (EC tem delay de 100ms)
+  * animationEasing="ease-out" - easing suave
+- Animação de entrada: linha desenha da esquerda para direita com fade-in
+- Pontos aparecem progressivamente seguindo a linha
+- Performance mantida a 60fps mesmo com datasets grandes

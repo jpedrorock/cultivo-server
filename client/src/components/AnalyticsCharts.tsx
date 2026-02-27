@@ -108,6 +108,9 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                     dot={{ r: 4 }}
                     name="Temp (°C)"
                     connectNulls
+                    animationDuration={800}
+                    animationBegin={0}
+                    animationEasing="ease-out"
                   />
                   <Brush dataKey="date" height={30} stroke="#ef4444" fill="transparent" />
                 </LineChart>
@@ -142,6 +145,9 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                     dot={{ r: 4 }}
                     name="RH (%)"
                     connectNulls
+                    animationDuration={800}
+                    animationBegin={0}
+                    animationEasing="ease-out"
                   />
                   <Brush dataKey="date" height={30} stroke="#3b82f6" fill="transparent" />
                 </LineChart>
@@ -176,6 +182,9 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                     dot={{ r: 4 }}
                     name="PPFD (μmol/m²/s)"
                     connectNulls
+                    animationDuration={800}
+                    animationBegin={0}
+                    animationEasing="ease-out"
                   />
                   <Brush dataKey="date" height={30} stroke="#eab308" fill="transparent" />
                 </LineChart>
@@ -213,6 +222,9 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                       dot={{ r: 4 }}
                       name="pH"
                       connectNulls
+                      animationDuration={800}
+                      animationBegin={0}
+                      animationEasing="ease-out"
                     />
                   )}
                   {hasECData && (
@@ -225,6 +237,9 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                       dot={{ r: 4 }}
                       name="EC (mS/cm)"
                       connectNulls
+                      animationDuration={800}
+                      animationBegin={100}
+                      animationEasing="ease-out"
                     />
                   )}
                   <Brush dataKey="date" height={30} stroke="#a855f7" fill="transparent" />

@@ -314,6 +314,9 @@ export default function TentDetails() {
                           strokeWidth={2}
                           dot={{ fill: "#ea580c", r: 4 }}
                           name="Temperatura (°C)"
+                          animationDuration={800}
+                          animationBegin={0}
+                          animationEasing="ease-out"
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -350,6 +353,9 @@ export default function TentDetails() {
                           strokeWidth={2}
                           dot={{ fill: "#2563eb", r: 4 }}
                           name="Umidade (%)"
+                          animationDuration={800}
+                          animationBegin={0}
+                          animationEasing="ease-out"
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -385,7 +391,10 @@ export default function TentDetails() {
                           stroke="#ca8a04"
                           strokeWidth={2}
                           dot={{ fill: "#ca8a04", r: 4 }}
-                          name="PPFD (µmol/m²/s)"
+                          name="PPFD (μmol/m²/s)"
+                          animationDuration={800}
+                          animationBegin={0}
+                          animationEasing="ease-out"
                         />
                       </LineChart>
                     </ResponsiveContainer>
