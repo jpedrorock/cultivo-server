@@ -10,6 +10,7 @@ import { BottomNav } from "./components/BottomNav";
 import { Sidebar } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { TourGuide } from "./components/TourGuide";
 import Home from "./pages/Home";
 import TentLog from "./pages/TentLog";
 import TentDetails from "./pages/TentDetails";
@@ -89,9 +90,26 @@ function App() {
     return !hasSeenSplash;
   });
 
+  const [runTour, setRunTour] = useState(() => {
+    // Check if user has completed the tour
+    const hasCompletedTour = localStorage.getItem('hasCompletedTour');
+    return !hasCompletedTour;
+  });
+
   const handleSplashFinish = () => {
     sessionStorage.setItem('hasSeenSplash', 'true');
     setShowSplash(false);
+  };
+
+  const handleTourFinish = () => {
+    localStorage.setItem('hasCompletedTour', 'true');
+    setRunTour(false);
+  };
+
+  // Expose function to restart tour (can be called from help button)
+  (window as any).restartTour = () => {
+    localStorage.removeItem('hasCompletedTour');
+    setRunTour(true);
   };
 
   if (showSplash) {
@@ -113,6 +131,7 @@ function App() {
           <BottomNav />
           <InstallPWA />
           <AddToHomeScreenPrompt />
+          <TourGuide run={runTour} onFinish={handleTourFinish} />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

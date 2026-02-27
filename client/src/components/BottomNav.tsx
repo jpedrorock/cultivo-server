@@ -62,6 +62,7 @@ export function BottomNav() {
                 key={item.href}
                 href={item.href}
                 onClick={triggerHapticFeedback}
+                data-tour={item.href === "/quick-log" ? "quick-log-menu" : item.href === "/calculators" ? "calculators-menu" : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 py-3 px-4 rounded-lg transition-colors relative",
                   item.href === "/quick-log"
@@ -120,6 +121,7 @@ export function BottomNav() {
                         triggerHapticFeedback();
                         setMoreMenuOpen(false);
                       }}
+                      data-tour={item.href === "/history" ? "history-menu" : undefined}
                       className={cn(
                         "flex items-center gap-4 px-4 py-4 rounded-lg transition-colors relative",
                         "hover:bg-primary/10",

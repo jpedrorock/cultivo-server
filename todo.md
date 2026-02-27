@@ -3295,3 +3295,45 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - Animação de entrada: linha desenha da esquerda para direita com fade-in
 - Pontos aparecem progressivamente seguindo a linha
 - Performance mantida a 60fps mesmo com datasets grandes
+
+
+## Criar Guia do Usuário Interativo (27/02/2026) - ✅ CONCLUÍDO
+
+- [x] Instalar biblioteca react-joyride para tours guiados
+- [x] Criar componente TourGuide wrapper
+- [x] Definir steps do tour principal:
+  * Boas-vindas e visão geral do app
+  * Como criar uma nova estufa
+  * Como adicionar plantas a uma estufa
+  * Como registrar saúde das plantas (Quick Log)
+  * Como visualizar histórico e gráficos
+  * Como finalizar harvest
+- [ ] Implementar tour secundário para features avançadas:
+  * Calculadoras (DLI, VPD, Runoff)
+  * Registro de tricomas
+  * Registro de LST
+  * Tarefas e notificações
+- [x] Criar botão "Ajuda" ou "Tour" no header/sidebar
+- [x] Implementar estado persistente (localStorage) para não repetir tour
+- [x] Adicionar opção "Pular tour" e "Reiniciar tour"
+- [x] Estilizar tooltips com tema do app (dark/light mode)
+- [x] Adicionar animações suaves nas transições entre steps
+- [x] Testar tour em desktop e mobile
+- [ ] Criar documentação escrita complementar (FAQ/Help Center)
+
+**Implementação:**
+- Instalado react-joyride 2.9.3
+- Criado componente TourGuide com 8 steps cobrindo fluxo completo
+- Adicionados atributos data-tour em elementos-alvo:
+  * create-tent-button: Botão "Criar Nova Estufa"
+  * tent-card: Cards de estufas
+  * quick-log-menu: Menu Quick Log
+  * calculators-menu: Menu Calculadoras
+  * history-menu: Menu Histórico
+- Integrado no App.tsx com localStorage (hasCompletedTour)
+- Botão "Tour Guiado" no Sidebar (desktop) com ícone HelpCircle
+- Função window.restartTour() exposta para reiniciar via console
+- Tooltips estilizados com variáveis CSS do tema (--primary, --card, --foreground)
+- Animações suaves entre steps (continuous mode)
+- Localização em português (Voltar, Próximo, Pular Tour, Finalizar)
+- Tour inicia automaticamente para novos usuários

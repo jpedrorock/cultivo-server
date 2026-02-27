@@ -1,4 +1,4 @@
-import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, Droplets, CheckSquare, Beaker } from "lucide-react";
+import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, Droplets, CheckSquare, Beaker, HelpCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
@@ -85,6 +85,16 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border space-y-3">
+        <button
+          onClick={() => (window as any).restartTour?.()}
+          className={cn(
+            "flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full text-left",
+            "hover:bg-sidebar-accent text-sidebar-foreground hover:text-primary"
+          )}
+        >
+          <HelpCircle className="w-5 h-5" />
+          <span>Tour Guiado</span>
+        </button>
         <Link
           href="/settings"
           className={cn(

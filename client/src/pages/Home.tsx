@@ -359,7 +359,7 @@ export default function Home() {
         {/* Tents Grid */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-foreground">Estufas</h2>
-          <AnimatedButton onClick={() => setCreateTentModalOpen(true)} className="gap-2">
+          <AnimatedButton onClick={() => setCreateTentModalOpen(true)} className="gap-2" data-tour="create-tent-button">
             <Sprout className="w-4 h-4" />
             Criar Nova Estufa
           </AnimatedButton>
@@ -782,7 +782,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
 
   return (
     <ListItemAnimation>
-      <Card className="bg-card/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+      <Card className="bg-card/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1" data-tour="tent-card">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
