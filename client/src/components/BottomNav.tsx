@@ -1,7 +1,7 @@
 import { Warehouse, Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // Haptic feedback helper
 const triggerHapticFeedback = () => {
@@ -30,7 +30,24 @@ export function BottomNav() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   
   // Buscar contagem de alertas não lidos
-  const { data: alertCount } = trpc.alerts.getNewCount.useQuery({});
+  const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
+    {},
+    { refetchInterval: 30_000 } // poll every 30s to detect new alerts
+  );
+
+  // Track previous count to detect new alerts
+  const prevCountRef = useRef<number | null>(null);
+  const [badgeShaking, setBadgeShaking] = useState(false);
+
+  useEffect(() => {
+    const current = alertCount ?? 0;
+    if (prevCountRef.current !== null && current > prevCountRef.current) {
+      setBadgeShaking(true);
+      const timer = setTimeout(() => setBadgeShaking(false), 700);
+      return () => clearTimeout(timer);
+    }
+    prevCountRef.current = current;
+  }, [alertCount]);
 
   const mainNavItems: NavItem[] = [
     { href: "/quick-log", icon: Plus, label: "Registro" },
@@ -113,6 +130,7 @@ export function BottomNav() {
                 {moreMenuItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location === item.href;
+                  const isAlertsItem = item.href === "/alerts";
                   
                   return (
                     <Link
@@ -134,7 +152,10 @@ export function BottomNav() {
                       <Icon className={cn("w-5 h-5", isActive && "stroke-[2.5]")} />
                       <span className="text-base">{item.label}</span>
                       {item.badge !== undefined && item.badge > 0 && (
-                        <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                        <span className={cn(
+                          "ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center",
+                          isAlertsItem && badgeShaking ? "animate-badge-shake" : "animate-pulse"
+                        )}>
                           {item.badge > 9 ? '9+' : item.badge}
                         </span>
                       )}

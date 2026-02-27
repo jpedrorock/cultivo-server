@@ -3550,3 +3550,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Bloco Ciclo Ativo: label "Ciclo Ativo" com ícone de fase e cor correspondente
 - [x] Bloco Ciclo Ativo: número da semana com cor correspondente à fase
 - [x] TypeScript: 0 erros
+
+## Animação de Shake no Badge de Alertas (27/02/2026)
+
+- [x] Adicionar keyframe de shake no index.css (translate + rotate sutil)
+- [x] Detectar aumento na contagem de alertas não lidos (comparar valor anterior com atual)
+- [x] Disparar animação de shake no badge quando novos alertas chegarem
+- [x] Garantir que a animação só ocorre uma vez por novo alerta (não em loop)
+- [x] Testar no desktop (Sidebar) e mobile (BottomNav)

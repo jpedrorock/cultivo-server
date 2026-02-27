@@ -2,6 +2,7 @@ import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, CheckSquare,
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
+import { useState, useEffect, useRef } from "react";
 import {
   Tooltip,
   TooltipContent,
@@ -12,7 +13,26 @@ import { Badge } from "@/components/ui/badge";
 export function Sidebar() {
   const [location] = useLocation();
   const { data: tents } = trpc.tents.list.useQuery();
-  const { data: alertCount } = trpc.alerts.getNewCount.useQuery({});
+  const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
+    {},
+    { refetchInterval: 30_000 } // poll every 30s to detect new alerts
+  );
+
+  // Track previous count to detect new alerts
+  const prevCountRef = useRef<number | null>(null);
+  const [badgeShaking, setBadgeShaking] = useState(false);
+
+  useEffect(() => {
+    const current = alertCount ?? 0;
+    // Only shake if count increased (new alerts arrived) and we already had a previous value
+    if (prevCountRef.current !== null && current > prevCountRef.current) {
+      setBadgeShaking(true);
+      // Remove class after animation ends so it can be re-triggered
+      const timer = setTimeout(() => setBadgeShaking(false), 700);
+      return () => clearTimeout(timer);
+    }
+    prevCountRef.current = current;
+  }, [alertCount]);
 
   const navItems = [
     { href: "/", icon: Home, label: "Home", enabled: true, badge: 0 },
@@ -52,6 +72,7 @@ export function Sidebar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location === item.href;
+          const isAlertsItem = item.href === "/alerts";
           
           if (!item.enabled) {
             return (
@@ -93,7 +114,10 @@ export function Sidebar() {
               {item.badge > 0 && (
                 <Badge
                   variant="destructive"
-                  className="h-5 min-w-5 px-1.5 text-[10px] font-bold rounded-full"
+                  className={cn(
+                    "h-5 min-w-5 px-1.5 text-[10px] font-bold rounded-full inline-block",
+                    isAlertsItem && badgeShaking && "animate-badge-shake"
+                  )}
                 >
                   {item.badge > 99 ? '99+' : item.badge}
                 </Badge>
