@@ -220,13 +220,31 @@ export default function TentDetails() {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Ciclo Ativo</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    Semana{" "}
-                    {Math.floor(
-                      (Date.now() - new Date(cycle.startDate).getTime()) / (7 * 24 * 60 * 60 * 1000)
-                    ) + 1}
-                  </p>
+                  {tent?.category === 'MAINTENANCE' ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">Última Clonagem</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        {(tent as any).lastCloningAt
+                          ? (() => {
+                              const days = Math.floor((Date.now() - (tent as any).lastCloningAt) / (24 * 60 * 60 * 1000));
+                              if (days === 0) return 'Hoje';
+                              if (days === 1) return 'Ontem';
+                              return `Há ${days} dias`;
+                            })()
+                          : 'Nenhuma'}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">Ciclo Ativo</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        Semana{" "}
+                        {Math.floor(
+                          (Date.now() - new Date(cycle.startDate).getTime()) / (7 * 24 * 60 * 60 * 1000)
+                        ) + 1}
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Data de Início</p>

@@ -142,7 +142,7 @@ export async function getUserByOpenId(openId: string) {
   }
 }
 
-export async function getAllTents(): Promise<(Tent & { plantCount: number; seedlingCount: number; lastReadingAt: number | null })[]> {
+export async function getAllTents(): Promise<(Tent & { plantCount: number; seedlingCount: number; lastReadingAt: number | null; lastCloningAt: number | null; lastCloningCount: number | null })[]> {
   const db = await getDb();
   if (!db) return [];
   
@@ -166,12 +166,30 @@ export async function getAllTents(): Promise<(Tent & { plantCount: number; seedl
         .where(eq(dailyLogs.tentId, tent.id))
         .orderBy(desc(dailyLogs.logDate))
         .limit(1);
+
+      // Para estufas de manutenção, buscar último evento de clonagem
+      let lastCloningAt: number | null = null;
+      let lastCloningCount: number | null = null;
+      if (tent.category === 'MAINTENANCE') {
+        const lastCloning = await db
+          .select()
+          .from(cloningEvents)
+          .where(eq(cloningEvents.tentId, tent.id))
+          .orderBy(desc(cloningEvents.startDate))
+          .limit(1);
+        if (lastCloning[0]) {
+          lastCloningAt = new Date(lastCloning[0].startDate).getTime();
+          lastCloningCount = lastCloning[0].clonesProduced ?? null;
+        }
+      }
       
       return {
         ...tent,
         plantCount: plantsOnly.length,
         seedlingCount: seedlingsOnly.length,
         lastReadingAt: lastLog[0]?.logDate ? new Date(lastLog[0].logDate).getTime() : null,
+        lastCloningAt,
+        lastCloningCount,
       };
     })
   );

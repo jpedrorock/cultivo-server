@@ -74,7 +74,26 @@ export const appRouter = router({
       return db.getAllTents();
     }),
     getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
-      return db.getTentById(input.id);
+      const database = await getDb();
+      if (!database) throw new Error("DB not available");
+      const tent = await db.getTentById(input.id);
+      if (!tent) return undefined;
+      // Para estufas de manutenção, buscar último evento de clonagem
+      let lastCloningAt: number | null = null;
+      let lastCloningCount: number | null = null;
+      if (tent.category === 'MAINTENANCE') {
+        const lastCloning = await database
+          .select()
+          .from(cloningEvents)
+          .where(eq(cloningEvents.tentId, tent.id))
+          .orderBy(desc(cloningEvents.startDate))
+          .limit(1);
+        if (lastCloning[0]) {
+          lastCloningAt = new Date(lastCloning[0].startDate).getTime();
+          lastCloningCount = lastCloning[0].clonesProduced ?? null;
+        }
+      }
+      return { ...tent, lastCloningAt, lastCloningCount };
     }),
     create: publicProcedure
       .input(

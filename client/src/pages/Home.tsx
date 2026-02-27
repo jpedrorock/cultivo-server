@@ -978,47 +978,69 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   : 'text-blue-700 dark:text-blue-400'
                 }`}>
                   <PhaseIcon className="w-3.5 h-3.5" />
-                  Ciclo Ativo
+                  {tent.category === 'MAINTENANCE' ? 'Manutenção Perpétua' : 'Ciclo Ativo'}
                 </span>
-                <span className={`text-sm font-bold ${
-                  tent.category === 'VEGA' ? 'text-green-700 dark:text-green-400'
-                  : tent.category === 'FLORA' ? 'text-purple-700 dark:text-purple-400'
-                  : tent.category === 'DRYING' ? 'text-amber-700 dark:text-amber-400'
-                  : 'text-blue-700 dark:text-blue-400'
-                }`}>
-                  Semana {(() => {
-                    const now = new Date();
-                    const start = new Date(cycle.startDate);
-                    const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                    
-                    if (floraStart && now >= floraStart) {
-                      return Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-                    }
-                    return Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-                  })()}
-                </span>
+                {tent.category === 'MAINTENANCE' ? (
+                  <span className="text-sm font-bold text-blue-700 dark:text-blue-400">
+                    {tent.lastCloningAt
+                      ? (() => {
+                          const days = Math.floor((Date.now() - tent.lastCloningAt) / (24 * 60 * 60 * 1000));
+                          if (days === 0) return 'Hoje';
+                          if (days === 1) return 'Ontem';
+                          return `Há ${days} dias`;
+                        })()
+                      : 'Sem clonagem'}
+                  </span>
+                ) : (
+                  <span className={`text-sm font-bold ${
+                    tent.category === 'VEGA' ? 'text-green-700 dark:text-green-400'
+                    : tent.category === 'FLORA' ? 'text-purple-700 dark:text-purple-400'
+                    : tent.category === 'DRYING' ? 'text-amber-700 dark:text-amber-400'
+                    : 'text-blue-700 dark:text-blue-400'
+                  }`}>
+                    Semana {(() => {
+                      const now = new Date();
+                      const start = new Date(cycle.startDate);
+                      const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
+                      if (floraStart && now >= floraStart) {
+                        return Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+                      }
+                      return Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+                    })()}
+                  </span>
+                )}
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">Semana Atual</span>
-                <span className="text-xs font-medium text-foreground">
-                  {(() => {
-                    const now = new Date();
-                    const start = new Date(cycle.startDate);
-                    const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                    
-                    // Calcular a data de início da semana atual
-                    let weekStart;
-                    if (floraStart && now >= floraStart) {
-                      const weeksSinceFlora = Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                      weekStart = new Date(floraStart.getTime() + (weeksSinceFlora * 7 * 24 * 60 * 60 * 1000));
-                    } else {
-                      const weeksSinceStart = Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                      weekStart = new Date(start.getTime() + (weeksSinceStart * 7 * 24 * 60 * 60 * 1000));
-                    }
-                    
-                    return weekStart.toLocaleDateString("pt-BR");
-                  })()}
-                </span>
+                {tent.category === 'MAINTENANCE' ? (
+                  <>
+                    <span className="text-xs text-muted-foreground">Última Clonagem</span>
+                    <span className="text-xs font-medium text-foreground">
+                      {tent.lastCloningAt
+                        ? new Date(tent.lastCloningAt).toLocaleDateString('pt-BR')
+                        : '—'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs text-muted-foreground">Semana Atual</span>
+                    <span className="text-xs font-medium text-foreground">
+                      {(() => {
+                        const now = new Date();
+                        const start = new Date(cycle.startDate);
+                        const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
+                        let weekStart;
+                        if (floraStart && now >= floraStart) {
+                          const weeksSinceFlora = Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          weekStart = new Date(floraStart.getTime() + (weeksSinceFlora * 7 * 24 * 60 * 60 * 1000));
+                        } else {
+                          const weeksSinceStart = Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
+                          weekStart = new Date(start.getTime() + (weeksSinceStart * 7 * 24 * 60 * 60 * 1000));
+                        }
+                        return weekStart.toLocaleDateString('pt-BR');
+                      })()}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           ) : (

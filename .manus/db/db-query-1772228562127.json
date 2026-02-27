@@ -1,0 +1,58 @@
+{
+  "query": "\nSELECT 'strains' as tabela, COUNT(*) as total FROM strains\nUNION ALL SELECT 'tents', COUNT(*) FROM tents\nUNION ALL SELECT 'plants', COUNT(*) FROM plants\nUNION ALL SELECT 'cycles', COUNT(*) FROM cycles\nUNION ALL SELECT 'dailyLogs', COUNT(*) FROM dailyLogs\nUNION ALL SELECT 'taskTemplates', COUNT(*) FROM taskTemplates\nUNION ALL SELECT 'taskInstances', COUNT(*) FROM taskInstances\nUNION ALL SELECT 'plantObservations', COUNT(*) FROM plantObservations\nUNION ALL SELECT 'plantHealthLogs', COUNT(*) FROM plantHealthLogs\nUNION ALL SELECT 'plantTentHistory', COUNT(*) FROM plantTentHistory\nUNION ALL SELECT 'alerts', COUNT(*) FROM alerts\nUNION ALL SELECT 'weeklyTargets', COUNT(*) FROM weeklyTargets;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nSELECT 'strains' as tabela, COUNT(*) as total FROM strains\nUNION ALL SELECT 'tents', COUNT(*) FROM tents\nUNION ALL SELECT 'plants', COUNT(*) FROM plants\nUNION ALL SELECT 'cycles', COUNT(*) FROM cycles\nUNION ALL SELECT 'dailyLogs', COUNT(*) FROM dailyLogs\nUNION ALL SELECT 'taskTemplates', COUNT(*) FROM taskTemplates\nUNION ALL SELECT 'taskInstances', COUNT(*) FROM taskInstances\nUNION ALL SELECT 'plantObservations', COUNT(*) FROM plantObservations\nUNION ALL SELECT 'plantHealthLogs', COUNT(*) FROM plantHealthLogs\nUNION ALL SELECT 'plantTentHistory', COUNT(*) FROM plantTentHistory\nUNION ALL SELECT 'alerts', COUNT(*) FROM alerts\nUNION ALL SELECT 'weeklyTargets', COUNT(*) FROM weeklyTargets;\n",
+  "rows": [
+    {
+      "tabela": "tents",
+      "total": "3"
+    },
+    {
+      "tabela": "cycles",
+      "total": "2"
+    },
+    {
+      "tabela": "plants",
+      "total": "8"
+    },
+    {
+      "tabela": "dailyLogs",
+      "total": "84"
+    },
+    {
+      "tabela": "plantHealthLogs",
+      "total": "11"
+    },
+    {
+      "tabela": "taskInstances",
+      "total": "58"
+    },
+    {
+      "tabela": "taskTemplates",
+      "total": "34"
+    },
+    {
+      "tabela": "weeklyTargets",
+      "total": "28"
+    },
+    {
+      "tabela": "alerts",
+      "total": "4"
+    },
+    {
+      "tabela": "plantObservations",
+      "total": "30"
+    },
+    {
+      "tabela": "strains",
+      "total": "8"
+    },
+    {
+      "tabela": "plantTentHistory",
+      "total": "6"
+    }
+  ],
+  "messages": [],
+  "stdout": "tabela\ttotal\ntents\t3\ncycles\t2\nplants\t8\ndailyLogs\t84\nplantHealthLogs\t11\ntaskInstances\t58\ntaskTemplates\t34\nweeklyTargets\t28\nalerts\t4\nplantObservations\t30\nstrains\t8\nplantTentHistory\t6\n",
+  "stderr": "",
+  "execution_time_ms": 131
+}

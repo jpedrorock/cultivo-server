@@ -1,0 +1,74 @@
+{
+  "query": "\nSELECT p.name, p.code, s.name as strain, t.name as tent, p.plantStage, p.status\nFROM plants p\nJOIN strains s ON p.strainId = s.id\nLEFT JOIN tents t ON p.currentTentId = t.id\nORDER BY p.id;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nSELECT p.name, p.code, s.name as strain, t.name as tent, p.plantStage, p.status\nFROM plants p\nJOIN strains s ON p.strainId = s.id\nLEFT JOIN tents t ON p.currentTentId = t.id\nORDER BY p.id;\n",
+  "rows": [
+    {
+      "name": "Orange Punch Mãe",
+      "code": "OP-MAE-01",
+      "strain": "Orange Punch",
+      "tent": "Manutenção",
+      "plantStage": "PLANT",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "24K Mãe",
+      "code": "24K-MAE-01",
+      "strain": "24K",
+      "tent": "Manutenção",
+      "plantStage": "PLANT",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "Orange Punch #1",
+      "code": "OP-V-01",
+      "strain": "Orange Punch",
+      "tent": "Vega",
+      "plantStage": "CLONE",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "Orange Punch #2",
+      "code": "OP-V-02",
+      "strain": "Orange Punch",
+      "tent": "Vega",
+      "plantStage": "CLONE",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "Orange Punch #3",
+      "code": "OP-V-03",
+      "strain": "Orange Punch",
+      "tent": "Vega",
+      "plantStage": "CLONE",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "24K #1",
+      "code": "24K-F-01",
+      "strain": "24K",
+      "tent": "Flora",
+      "plantStage": "PLANT",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "24K #2",
+      "code": "24K-F-02",
+      "strain": "24K",
+      "tent": "Flora",
+      "plantStage": "PLANT",
+      "status": "ACTIVE"
+    },
+    {
+      "name": "24K #3",
+      "code": "24K-F-03",
+      "strain": "24K",
+      "tent": "Flora",
+      "plantStage": "PLANT",
+      "status": "ACTIVE"
+    }
+  ],
+  "messages": [],
+  "stdout": "name\tcode\tstrain\ttent\tplantStage\tstatus\nOrange Punch Mãe\tOP-MAE-01\tOrange Punch\tManutenção\tPLANT\tACTIVE\n24K Mãe\t24K-MAE-01\t24K\tManutenção\tPLANT\tACTIVE\nOrange Punch #1\tOP-V-01\tOrange Punch\tVega\tCLONE\tACTIVE\nOrange Punch #2\tOP-V-02\tOrange Punch\tVega\tCLONE\tACTIVE\nOrange Punch #3\tOP-V-03\tOrange Punch\tVega\tCLONE\tACTIVE\n24K #1\t24K-F-01\t24K\tFlora\tPLANT\tACTIVE\n24K #2\t24K-F-02\t24K\tFlora\tPLANT\tACTIVE\n24K #3\t24K-F-03\t24K\tFlora\tPLANT\tACTIVE\n",
+  "stderr": "",
+  "execution_time_ms": 143
+}

@@ -3684,3 +3684,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar botão Editar (lápis) no cabeçalho do TentDetails
 - [x] Modal de edição com campos: nome, largura, profundidade, altura, tipo
 - [x] Após salvar, invalidar query e atualizar dados da estufa na página
+
+## Card de Manutenção - Última Clonagem
+
+- [x] Substituir "Semana X" por "Última clonagem: há X dias" no card da estufa de Manutenção (Home)
+- [x] Atualizar TentDetails para mostrar "Última Clonagem" em vez de "Ciclo Ativo / Semana X" para estufas MAINTENANCE
+- [x] Adicionar lastCloningAt e lastCloningCount na procedure tents.list e tents.getById
+- [x] Inserir evento de clonagem de demonstração no seed (14 dias atrás, 6 clones)

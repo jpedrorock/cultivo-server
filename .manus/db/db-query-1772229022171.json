@@ -1,0 +1,9 @@
+{
+  "query": "\nINSERT INTO cloningEvents (tentId, startDate, endDate, status, notes)\nVALUES (\n  1,\n  DATE_SUB(NOW(), INTERVAL 14 DAY),\n  DATE_SUB(NOW(), INTERVAL 7 DAY),\n  'FINISHED',\n  'Rodada de clonagem: 6 clones retirados das plantas-mãe Orange Punch e 24K. 5 enraizaram com sucesso.'\n);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nINSERT INTO cloningEvents (tentId, startDate, endDate, status, notes)\nVALUES (\n  1,\n  DATE_SUB(NOW(), INTERVAL 14 DAY),\n  DATE_SUB(NOW(), INTERVAL 7 DAY),\n  'FINISHED',\n  'Rodada de clonagem: 6 clones retirados das plantas-mãe Orange Punch e 24K. 5 enraizaram com sucesso.'\n);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 69
+}
