@@ -3669,3 +3669,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Usar a mesma procedure plants.getTentHistory já criada
 - [x] Criar componente PlantTentHistoryTab reutilizável
 - [x] Manter o mesmo visual de linha do tempo do PlantArchivePage
+
+## Excluir estufa na página de detalhes (27/02/2026)
+
+- [x] Verificar procedure tents.delete no backend
+- [x] Adicionar botão Excluir (lixeira) no cabeçalho do TentDetails
+- [x] Confirm dialog com nome da estufa e aviso de irreversibilidade
+- [x] Após exclusão, redirecionar para /

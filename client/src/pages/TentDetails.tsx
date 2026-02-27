@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind } from "lucide-react";
-import { Link, useParams } from "wouter";
+import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle } from "lucide-react";
+import { Link, useParams, useLocation } from "wouter";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -15,6 +15,15 @@ import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseCon
 import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
 import { FinishCloningDialog } from "@/components/FinishCloningDialog";
 import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export default function TentDetails() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +40,7 @@ export default function TentDetails() {
   const [selectedClonesCount] = useState<number>(10);
   const [finishCloningOpen, setFinishCloningOpen] = useState(false);
   const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const openPhaseConfirm = (type: PhaseConfirmType) => {
     setPhaseConfirmType(type);
@@ -47,6 +57,21 @@ export default function TentDetails() {
   };
 
   const { data: tent, isLoading: tentLoading } = trpc.tents.getById.useQuery({ id: tentId });
+  const [, navigate] = useLocation();
+
+  const deleteMutation = trpc.tents.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Estufa excluída com sucesso!");
+      navigate("/");
+    },
+    onError: (error) => {
+      toast.error(`Erro ao excluir: ${error.message}`);
+    },
+  });
+
+  const handleDeleteConfirmed = () => {
+    deleteMutation.mutate({ id: tentId });
+  };
   const { data: cycle } = trpc.cycles.getByTent.useQuery({ tentId });
   
   // Memoize dates to prevent infinite re-renders
@@ -154,6 +179,15 @@ export default function TentDetails() {
               <Badge className={`${phaseInfo.color} text-white border-0 text-xs md:text-sm`}>{phaseInfo.phase}</Badge>
             </div>
             <div className="flex gap-2 md:ml-auto">
+              <Button
+                variant="outline"
+                size="icon"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                onClick={() => setDeleteConfirmOpen(true)}
+                title="Excluir estufa"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
               <Button variant="outline" onClick={handlePrint} className="flex-1 md:flex-none">
                 <Printer className="w-4 h-4 md:mr-2" />
                 <span className="hidden md:inline">Imprimir</span>
@@ -628,6 +662,44 @@ export default function TentDetails() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Dialog de confirmação de exclusão da estufa */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+              </div>
+              <DialogTitle className="text-lg">Excluir Estufa</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Tem certeza que deseja excluir a estufa{" "}
+              <span className="font-semibold text-foreground">{tent.name}</span>? Esta ação é irreversível e removerá todos os ciclos, registros, alertas e histórico associados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirmed}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Excluindo...</>
+              ) : (
+                <><Trash2 className="w-4 h-4 mr-2" />Excluir Estufa</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </PageTransition>
   );
