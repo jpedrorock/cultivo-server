@@ -3097,3 +3097,22 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] Aplicar ConflictFreeSlider em NotificationSettings.tsx
 - [ ] Testar todos os sliders no iPhone
 >>>>>>> Stashed changes
+
+
+## Implementação PWA (Progressive Web App) - 27/02/2026
+
+- [x] **Ícones PWA:** Usar ícones existentes (icon-512.png, icon-192.png, favicon.svg)
+- [x] **Splash Screen:** Gerada splash screen com logo e nome do app (não usada, ícones existentes preferidos)
+- [x] **Manifest:** Criar manifest.json com metadados PWA
+- [x] **Manifest:** Configurar nome, descrição, tema (#10b981), ícones
+- [x] **Manifest:** Configurar display mode (standalone), orientação (portrait)
+- [x] **Meta Tags:** Meta tags iOS já existentes em index.html (apple-mobile-web-app)
+- [x] **Add to Home Screen:** Criar componente AddToHomeScreenPrompt customizado
+- [x] **Add to Home Screen:** Detectar se app já está instalado (display-mode: standalone)
+- [x] **Add to Home Screen:** Mostrar prompt apenas em mobile (iOS e Android)
+- [x] **Add to Home Screen:** Instruções específicas para iOS (Share → Adicionar à Tela de Início)
+- [x] **Add to Home Screen:** Botão de instalação para Android/Chrome
+- [x] **Add to Home Screen:** Dismiss por 7 dias (localStorage)
+- [ ] **Service Worker:** Configurar service worker básico para PWA (opcional, futuro)
+- [ ] Testar instalação no iPhone Safari
+- [ ] Testar prompt "Add to Home Screen" no Android Chrome

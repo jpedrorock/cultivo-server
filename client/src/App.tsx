@@ -5,6 +5,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { InstallPWA } from "./components/InstallPWA";
+import { AddToHomeScreenPrompt } from "./components/AddToHomeScreenPrompt";
 import { BottomNav } from "./components/BottomNav";
 import { Sidebar } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
@@ -111,6 +112,7 @@ function App() {
           </div>
           <BottomNav />
           <InstallPWA />
+          <AddToHomeScreenPrompt />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

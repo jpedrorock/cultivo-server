@@ -1,69 +1,35 @@
 {
   "name": "App Cultivo - Gerenciamento de Estufas",
   "short_name": "App Cultivo",
-  "description": "Aplicativo profissional para gerenciamento de estufas de cultivo indoor com monitoramento de parâmetros, alertas automáticos e calculadoras práticas",
+  "description": "Sistema completo para gerenciamento de cultivo de cannabis: controle de estufas, plantas, ambiente e análises.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#10b981",
   "orientation": "portrait-primary",
-  "scope": "/",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
-    },
-    {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ],
-  "categories": ["productivity", "utilities"],
-  "screenshots": [
-    {
-      "src": "/screenshot-mobile.png",
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Registrar Dados",
-      "short_name": "Registro",
-      "description": "Registrar novos dados de monitoramento",
-      "url": "/tent-log",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Calculadoras",
-      "short_name": "Calc",
-      "description": "Acessar calculadoras práticas",
-      "url": "/calculators",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Alertas",
-      "short_name": "Alertas",
-      "description": "Ver alertas e configurações",
-      "url": "/alerts",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    }
-  ]
+  "categories": ["productivity", "lifestyle"],
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false
 }
