@@ -3427,3 +3427,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] Verificar que todas as funcionalidades funcionam com N estufas
 - [x] PlantArchivePage: adicionar exibição de estufa de origem, peso da colheita e notas do ciclo
 - [x] Backend listArchived: incluir tentName, harvestWeight e harvestNotes nos dados retornados
+
+## Limpeza de Dados de Teste (27/02/2026)
+
+- [x] Remover 56 estufas de teste criadas pelos testes automatizados (IDs 90001–90088)
+- [x] Manter apenas as 3 estufas originais: Estufa A (60001), Estufa B (60002), Estufa C (60003)
+- [x] Funcionalidade de estufas ilimitadas preservada (sem limite no código)

@@ -1,0 +1,8 @@
+{
+  "query": "\n-- Delete related data for test tents first (cascade-safe order)\nDELETE FROM alertHistory WHERE tentId >= 90001;\nDELETE FROM alertSettings WHERE tentId >= 90001;\nDELETE FROM alerts WHERE tentId >= 90001;\nDELETE FROM dailyLogs WHERE tentId >= 90001;\nDELETE FROM taskInstances WHERE tentId >= 90001;\nDELETE FROM tentAState WHERE tentId >= 90001;\nDELETE FROM weeklyTargets WHERE cycleId IN (SELECT id FROM cycles WHERE tentId >= 90001);\nDELETE FROM cycles WHERE tentId >= 90001;\nDELETE FROM recipes WHERE tentId >= 90001;\nDELETE FROM plantTentHistory WHERE fromTentId >= 90001 OR toTentId >= 90001;\nDELETE FROM plants WHERE currentTentId >= 90001;\nDELETE FROM tents WHERE id >= 90001;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \n-- Delete related data for test tents first (cascade-safe order)\nDELETE FROM alertHistory WHERE tentId >= 90001;\nDELETE FROM alertSettings WHERE tentId >= 90001;\nDELETE FROM alerts WHERE tentId >= 90001;\nDELETE FROM dailyLogs WHERE tentId >= 90001;\nDELETE FROM taskInstances WHERE tentId >= 90001;\nDELETE FROM tentAState WHERE tentId >= 90001;\nDELETE FROM weeklyTargets WHERE cycleId IN (SELECT id FROM cycles WHERE tentId >= 90001);\nDELETE FROM cycles WHERE tentId >= 90001;\nDELETE FROM recipes WHERE tentId >= 90001;\nDELETE FROM plantTentHistory WHERE fromTentId >= 90001 OR toTentId >= 90001;\nDELETE FROM plants WHERE currentTentId >= 90001;\nDELETE FROM tents WHERE id >= 90001;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 9: Unknown column 'cycleid' in 'where clause'"
+  ]
+}

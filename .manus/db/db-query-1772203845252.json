@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, name, category, createdAt FROM tents ORDER BY id LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute SELECT id, name, category, createdAt FROM tents ORDER BY id LIMIT 10;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "Estufa A",
+      "category": "MAINTENANCE",
+      "createdAt": "2026-02-24 01:44:52"
+    },
+    {
+      "id": "60002",
+      "name": "Estufa B",
+      "category": "VEGA",
+      "createdAt": "2026-02-24 01:46:00"
+    },
+    {
+      "id": "60003",
+      "name": "Estufa C",
+      "category": "FLORA",
+      "createdAt": "2026-02-24 01:48:00"
+    },
+    {
+      "id": "90001",
+      "name": "Test Tent 1772203602626",
+      "category": "VEGA",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90002",
+      "name": "Test Tent Health",
+      "category": "VEGA",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90003",
+      "name": "Test Tent Archive 1772203602792",
+      "category": "VEGA",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90004",
+      "name": "Test Tent 1772203602921",
+      "category": "FLORA",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90005",
+      "name": "Filter Test Tent 1772203603110",
+      "category": "VEGA",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90006",
+      "name": "Test Tent Edit 1772203603221",
+      "category": "VEGA",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90007",
+      "name": "Test Tent C",
+      "category": "FLORA",
+      "createdAt": "2026-02-27 14:46:43"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcategory\tcreatedAt\n60001\tEstufa A\tMAINTENANCE\t2026-02-24 01:44:52\n60002\tEstufa B\tVEGA\t2026-02-24 01:46:00\n60003\tEstufa C\tFLORA\t2026-02-24 01:48:00\n90001\tTest Tent 1772203602626\tVEGA\t2026-02-27 14:46:42\n90002\tTest Tent Health\tVEGA\t2026-02-27 14:46:42\n90003\tTest Tent Archive 1772203602792\tVEGA\t2026-02-27 14:46:42\n90004\tTest Tent 1772203602921\tFLORA\t2026-02-27 14:46:42\n90005\tFilter Test Tent 1772203603110\tVEGA\t2026-02-27 14:46:43\n90006\tTest Tent Edit 1772203603221\tVEGA\t2026-02-27 14:46:43\n90007\tTest Tent C\tFLORA\t2026-02-27 14:46:43\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

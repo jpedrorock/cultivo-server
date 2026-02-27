@@ -1,0 +1,600 @@
+{
+  "query": "SELECT id, name, category, width, depth, height, powerW, createdAt FROM tents ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute SELECT id, name, category, width, depth, height, powerW, createdAt FROM tents ORDER BY id;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "Estufa A",
+      "category": "MAINTENANCE",
+      "width": "45",
+      "depth": "75",
+      "height": "90",
+      "powerW": "65",
+      "createdAt": "2026-02-24 01:44:52"
+    },
+    {
+      "id": "60002",
+      "name": "Estufa B",
+      "category": "VEGA",
+      "width": "60",
+      "depth": "60",
+      "height": "120",
+      "powerW": "240",
+      "createdAt": "2026-02-24 01:46:00"
+    },
+    {
+      "id": "60003",
+      "name": "Estufa C",
+      "category": "FLORA",
+      "width": "60",
+      "depth": "120",
+      "height": "150",
+      "powerW": "320",
+      "createdAt": "2026-02-24 01:48:00"
+    },
+    {
+      "id": "90001",
+      "name": "Test Tent 1772203602626",
+      "category": "VEGA",
+      "width": "60",
+      "depth": "60",
+      "height": "120",
+      "powerW": "240",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90002",
+      "name": "Test Tent Health",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90003",
+      "name": "Test Tent Archive 1772203602792",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90004",
+      "name": "Test Tent 1772203602921",
+      "category": "FLORA",
+      "width": "60",
+      "depth": "120",
+      "height": "150",
+      "powerW": "320",
+      "createdAt": "2026-02-27 14:46:42"
+    },
+    {
+      "id": "90005",
+      "name": "Filter Test Tent 1772203603110",
+      "category": "VEGA",
+      "width": "60",
+      "depth": "60",
+      "height": "120",
+      "powerW": "240",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90006",
+      "name": "Test Tent Edit 1772203603221",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90007",
+      "name": "Test Tent C",
+      "category": "FLORA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90008",
+      "name": "Test Tent B",
+      "category": "FLORA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90009",
+      "name": "Test Tent A",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90010",
+      "name": "Test Tent Flora",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:43"
+    },
+    {
+      "id": "90011",
+      "name": "Test Tent 1772203604376",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:44"
+    },
+    {
+      "id": "90015",
+      "name": "Test Tent Selected 1",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:44"
+    },
+    {
+      "id": "90016",
+      "name": "Test Tent Selected 2",
+      "category": "FLORA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:44"
+    },
+    {
+      "id": "90022",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:46"
+    },
+    {
+      "id": "90024",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:46"
+    },
+    {
+      "id": "90025",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:46"
+    },
+    {
+      "id": "90026",
+      "name": "Updated Tent Name",
+      "category": "FLORA",
+      "width": "150",
+      "depth": "150",
+      "height": "220",
+      "powerW": "800",
+      "createdAt": "2026-02-27 14:46:46"
+    },
+    {
+      "id": "90027",
+      "name": "Tent Without Power",
+      "category": "DRYING",
+      "width": "100",
+      "depth": "100",
+      "height": "180",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:46"
+    },
+    {
+      "id": "90028",
+      "name": "Test Tent for Update",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "600",
+      "createdAt": "2026-02-27 14:46:46"
+    },
+    {
+      "id": "90029",
+      "name": "Test Tent for Update",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "600",
+      "createdAt": "2026-02-27 14:46:46"
+    },
+    {
+      "id": "90030",
+      "name": "Test Tent Archive 1772203615024",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:55"
+    },
+    {
+      "id": "90031",
+      "name": "Test Tent 1772203615026",
+      "category": "VEGA",
+      "width": "60",
+      "depth": "60",
+      "height": "120",
+      "powerW": "240",
+      "createdAt": "2026-02-27 14:46:55"
+    },
+    {
+      "id": "90032",
+      "name": "Test Tent Health",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:55"
+    },
+    {
+      "id": "90033",
+      "name": "Test Tent 1772203615259",
+      "category": "FLORA",
+      "width": "60",
+      "depth": "120",
+      "height": "150",
+      "powerW": "320",
+      "createdAt": "2026-02-27 14:46:55"
+    },
+    {
+      "id": "90034",
+      "name": "Filter Test Tent 1772203615403",
+      "category": "VEGA",
+      "width": "60",
+      "depth": "60",
+      "height": "120",
+      "powerW": "240",
+      "createdAt": "2026-02-27 14:46:55"
+    },
+    {
+      "id": "90035",
+      "name": "Test Tent Edit 1772203616570",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:56"
+    },
+    {
+      "id": "90036",
+      "name": "Test Tent C",
+      "category": "FLORA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:56"
+    },
+    {
+      "id": "90037",
+      "name": "Test Tent B",
+      "category": "FLORA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:56"
+    },
+    {
+      "id": "90041",
+      "name": "Test Tent 1772203616747",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:56"
+    },
+    {
+      "id": "90042",
+      "name": "Test Tent A",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:56"
+    },
+    {
+      "id": "90043",
+      "name": "Test Tent Flora",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:56"
+    },
+    {
+      "id": "90050",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:58"
+    },
+    {
+      "id": "90051",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:58"
+    },
+    {
+      "id": "90052",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:58"
+    },
+    {
+      "id": "90053",
+      "name": "Updated Tent Name",
+      "category": "FLORA",
+      "width": "150",
+      "depth": "150",
+      "height": "220",
+      "powerW": "800",
+      "createdAt": "2026-02-27 14:46:58"
+    },
+    {
+      "id": "90054",
+      "name": "Tent Without Power",
+      "category": "DRYING",
+      "width": "100",
+      "depth": "100",
+      "height": "180",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:46:58"
+    },
+    {
+      "id": "90055",
+      "name": "Test Tent for Update",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "600",
+      "createdAt": "2026-02-27 14:46:59"
+    },
+    {
+      "id": "90056",
+      "name": "Test Tent for Update",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "600",
+      "createdAt": "2026-02-27 14:46:59"
+    },
+    {
+      "id": "90059",
+      "name": "Test Tent Archive 1772203627050",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:07"
+    },
+    {
+      "id": "90060",
+      "name": "Test Tent Health",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:07"
+    },
+    {
+      "id": "90061",
+      "name": "Test Tent 1772203627023",
+      "category": "VEGA",
+      "width": "60",
+      "depth": "60",
+      "height": "120",
+      "powerW": "240",
+      "createdAt": "2026-02-27 14:47:07"
+    },
+    {
+      "id": "90062",
+      "name": "Test Tent 1772203627302",
+      "category": "FLORA",
+      "width": "60",
+      "depth": "120",
+      "height": "150",
+      "powerW": "320",
+      "createdAt": "2026-02-27 14:47:07"
+    },
+    {
+      "id": "90063",
+      "name": "Filter Test Tent 1772203627447",
+      "category": "VEGA",
+      "width": "60",
+      "depth": "60",
+      "height": "120",
+      "powerW": "240",
+      "createdAt": "2026-02-27 14:47:07"
+    },
+    {
+      "id": "90064",
+      "name": "Test Tent Edit 1772203628413",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:08"
+    },
+    {
+      "id": "90065",
+      "name": "Test Tent C",
+      "category": "FLORA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:08"
+    },
+    {
+      "id": "90066",
+      "name": "Test Tent B",
+      "category": "FLORA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:08"
+    },
+    {
+      "id": "90067",
+      "name": "Test Tent A",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:08"
+    },
+    {
+      "id": "90068",
+      "name": "Test Tent Flora",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:08"
+    },
+    {
+      "id": "90079",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:11"
+    },
+    {
+      "id": "90080",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:11"
+    },
+    {
+      "id": "90081",
+      "name": "Test Tent",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:11"
+    },
+    {
+      "id": "90084",
+      "name": "Updated Tent Name",
+      "category": "FLORA",
+      "width": "150",
+      "depth": "150",
+      "height": "220",
+      "powerW": "800",
+      "createdAt": "2026-02-27 14:47:11"
+    },
+    {
+      "id": "90085",
+      "name": "Tent Without Power",
+      "category": "DRYING",
+      "width": "100",
+      "depth": "100",
+      "height": "180",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:11"
+    },
+    {
+      "id": "90086",
+      "name": "Test Tent for Update",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "600",
+      "createdAt": "2026-02-27 14:47:11"
+    },
+    {
+      "id": "90087",
+      "name": "Test Tent for Update",
+      "category": "VEGA",
+      "width": "120",
+      "depth": "120",
+      "height": "200",
+      "powerW": "600",
+      "createdAt": "2026-02-27 14:47:11"
+    },
+    {
+      "id": "90088",
+      "name": "Test Tent Archive 1772203647285",
+      "category": "VEGA",
+      "width": "100",
+      "depth": "100",
+      "height": "200",
+      "powerW": "NULL",
+      "createdAt": "2026-02-27 14:47:27"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcategory\twidth\tdepth\theight\tpowerW\tcreatedAt\n60001\tEstufa A\tMAINTENANCE\t45\t75\t90\t65\t2026-02-24 01:44:52\n60002\tEstufa B\tVEGA\t60\t60\t120\t240\t2026-02-24 01:46:00\n60003\tEstufa C\tFLORA\t60\t120\t150\t320\t2026-02-24 01:48:00\n90001\tTest Tent 1772203602626\tVEGA\t60\t60\t120\t240\t2026-02-27 14:46:42\n90002\tTest Tent Health\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:42\n90003\tTest Tent Archive 1772203602792\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:46:42\n90004\tTest Tent 1772203602921\tFLORA\t60\t120\t150\t320\t2026-02-27 14:46:42\n90005\tFilter Test Tent 1772203603110\tVEGA\t60\t60\t120\t240\t2026-02-27 14:46:43\n90006\tTest Tent Edit 1772203603221\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:46:43\n90007\tTest Tent C\tFLORA\t120\t120\t200\tNULL\t2026-02-27 14:46:43\n90008\tTest Tent B\tFLORA\t120\t120\t200\tNULL\t2026-02-27 14:46:43\n90009\tTest Tent A\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:43\n90010\tTest Tent Flora\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:43\n90011\tTest Tent 1772203604376\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:46:44\n90015\tTest Tent Selected 1\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:46:44\n90016\tTest Tent Selected 2\tFLORA\t100\t100\t200\tNULL\t2026-02-27 14:46:44\n90022\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:46\n90024\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:46\n90025\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:46\n90026\tUpdated Tent Name\tFLORA\t150\t150\t220\t800\t2026-02-27 14:46:46\n90027\tTent Without Power\tDRYING\t100\t100\t180\tNULL\t2026-02-27 14:46:46\n90028\tTest Tent for Update\tVEGA\t120\t120\t200\t600\t2026-02-27 14:46:46\n90029\tTest Tent for Update\tVEGA\t120\t120\t200\t600\t2026-02-27 14:46:46\n90030\tTest Tent Archive 1772203615024\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:46:55\n90031\tTest Tent 1772203615026\tVEGA\t60\t60\t120\t240\t2026-02-27 14:46:55\n90032\tTest Tent Health\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:55\n90033\tTest Tent 1772203615259\tFLORA\t60\t120\t150\t320\t2026-02-27 14:46:55\n90034\tFilter Test Tent 1772203615403\tVEGA\t60\t60\t120\t240\t2026-02-27 14:46:55\n90035\tTest Tent Edit 1772203616570\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:46:56\n90036\tTest Tent C\tFLORA\t120\t120\t200\tNULL\t2026-02-27 14:46:56\n90037\tTest Tent B\tFLORA\t120\t120\t200\tNULL\t2026-02-27 14:46:56\n90041\tTest Tent 1772203616747\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:46:56\n90042\tTest Tent A\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:56\n90043\tTest Tent Flora\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:56\n90050\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:58\n90051\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:58\n90052\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:46:58\n90053\tUpdated Tent Name\tFLORA\t150\t150\t220\t800\t2026-02-27 14:46:58\n90054\tTent Without Power\tDRYING\t100\t100\t180\tNULL\t2026-02-27 14:46:58\n90055\tTest Tent for Update\tVEGA\t120\t120\t200\t600\t2026-02-27 14:46:59\n90056\tTest Tent for Update\tVEGA\t120\t120\t200\t600\t2026-02-27 14:46:59\n90059\tTest Tent Archive 1772203627050\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:47:07\n90060\tTest Tent Health\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:47:07\n90061\tTest Tent 1772203627023\tVEGA\t60\t60\t120\t240\t2026-02-27 14:47:07\n90062\tTest Tent 1772203627302\tFLORA\t60\t120\t150\t320\t2026-02-27 14:47:07\n90063\tFilter Test Tent 1772203627447\tVEGA\t60\t60\t120\t240\t2026-02-27 14:47:07\n90064\tTest Tent Edit 1772203628413\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:47:08\n90065\tTest Tent C\tFLORA\t120\t120\t200\tNULL\t2026-02-27 14:47:08\n90066\tTest Tent B\tFLORA\t120\t120\t200\tNULL\t2026-02-27 14:47:08\n90067\tTest Tent A\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:47:08\n90068\tTest Tent Flora\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:47:08\n90079\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:47:11\n90080\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:47:11\n90081\tTest Tent\tVEGA\t120\t120\t200\tNULL\t2026-02-27 14:47:11\n90084\tUpdated Tent Name\tFLORA\t150\t150\t220\t800\t2026-02-27 14:47:11\n90085\tTent Without Power\tDRYING\t100\t100\t180\tNULL\t2026-02-27 14:47:11\n90086\tTest Tent for Update\tVEGA\t120\t120\t200\t600\t2026-02-27 14:47:11\n90087\tTest Tent for Update\tVEGA\t120\t120\t200\t600\t2026-02-27 14:47:11\n90088\tTest Tent Archive 1772203647285\tVEGA\t100\t100\t200\tNULL\t2026-02-27 14:47:27\n",
+  "stderr": "",
+  "execution_time_ms": 89
+}
