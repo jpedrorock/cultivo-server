@@ -15,8 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  ArrowLeft, 
+import { ArrowLeft, 
   Sprout, 
   FileText, 
   Droplets, 
@@ -30,7 +29,9 @@ import {
   CheckCircle,
   Loader2,
   Trash2,
-  XCircle
+  XCircle,
+  History,
+  ArrowRight
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ import PlantHealthTab from "@/components/PlantHealthTab";
 import PlantTrichomesTab from "@/components/PlantTrichomesTab";
 import PlantLSTTab from "@/components/PlantLSTTab";
 import MoveTentModal from "@/components/MoveTentModal";
+import PlantTentHistoryTab from "@/components/PlantTentHistoryTab";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 
@@ -491,6 +493,10 @@ export default function PlantDetail() {
               <FileText className="w-4 h-4 mr-2" />
               Observações
             </TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="w-4 h-4 mr-2" />
+              Histórico
+            </TabsTrigger>
 
           </TabsList>
 
@@ -510,6 +516,9 @@ export default function PlantDetail() {
             <PlantObservationsTab plantId={plantId} />
           </TabsContent>
 
+          <TabsContent value="history">
+            <PlantTentHistoryTab plantId={plantId} />
+          </TabsContent>
 
         </Tabs>
       </main>

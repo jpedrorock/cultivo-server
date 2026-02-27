@@ -3661,3 +3661,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Criar procedure plants.getTentHistory no backend (busca por plantId, resolve nomes das estufas)
 - [x] Exibir linha do tempo de transferências de estufa na seção de histórico da planta arquivada
 - [x] Mostrar: estufa de origem → estufa de destino, data e motivo (se disponível)
+
+## Linha do tempo de transferências no PlantDetail ativo (27/02/2026)
+
+- [x] Ler estrutura de abas do PlantDetail para identificar onde inserir
+- [x] Adicionar aba "Histórico" com linha do tempo de transferências entre estufas no PlantDetail
+- [x] Usar a mesma procedure plants.getTentHistory já criada
+- [x] Criar componente PlantTentHistoryTab reutilizável
+- [x] Manter o mesmo visual de linha do tempo do PlantArchivePage
