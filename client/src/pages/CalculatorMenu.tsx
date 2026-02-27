@@ -1,23 +1,9 @@
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Calculator, Droplets, Sprout, Sun, Beaker, TestTube, Waves, HelpCircle } from "lucide-react";
-import { AdvancedTourGuide } from "@/components/AdvancedTourGuide";
+import { Calculator, Droplets, Sun, Beaker, TestTube } from "lucide-react";
 
 export default function CalculatorMenu() {
-  const [runAdvancedTour, setRunAdvancedTour] = useState(false);
-
-  const startAdvancedTour = () => {
-    setRunAdvancedTour(true);
-  };
-
-  const handleTourFinish = () => {
-    setRunAdvancedTour(false);
-    localStorage.setItem("hasCompletedAdvancedTour", "true");
-  };
-
   const calculators = [
     {
       id: "watering-runoff",
@@ -39,7 +25,6 @@ export default function CalculatorMenu() {
       iconColor: "text-green-600",
       badge: "Popular",
     },
-
     {
       id: "lux-ppfd",
       title: "Conversor Lux → PPFD",
@@ -83,20 +68,9 @@ export default function CalculatorMenu() {
               <h1 className="text-2xl font-bold text-foreground">Calculadoras</h1>
               <p className="text-sm text-muted-foreground">Ferramentas para cultivo</p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={startAdvancedTour}
-              className="flex items-center gap-2"
-            >
-              <HelpCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Tour das Calculadoras</span>
-            </Button>
           </div>
         </div>
       </header>
-
-      <AdvancedTourGuide run={runAdvancedTour} onFinish={handleTourFinish} />
 
       {/* Content */}
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
@@ -157,7 +131,6 @@ export default function CalculatorMenu() {
             <p>
               <strong>🧪 Fertilização:</strong> Calcule receitas de sais minerais (Nitrato de Cálcio, Potássio, MKP, Sulfato de Magnésio) por fase e semana
             </p>
-
             <p>
               <strong>☀️ Lux → PPFD:</strong> Converta leituras de luxímetro para PPFD (medida usada em cultivo)
             </p>

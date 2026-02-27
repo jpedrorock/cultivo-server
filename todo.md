@@ -3400,3 +3400,15 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar botão "Ver Planta" com micro-interações nos cards de plantas
 - [x] Adicionar hover scale + border glow no botão "Mover" (AnimatedButton)
 - [x] Testar feedback visual em todos os botões
+
+
+## Remover Tour Guiado (27/02/2026)
+
+- [x] Remover componente TourGuide.tsx
+- [x] Remover componente AdvancedTourGuide.tsx
+- [x] Remover integração do tour no App.tsx
+- [x] Remover botão "Tour Guiado" do Sidebar
+- [x] Remover botão "Tour das Calculadoras" do CalculatorMenu
+- [x] Remover atributos data-tour dos elementos (Home, BottomNav, Calculators)
+- [x] Desinstalar dependência react-joyride
+- [x] Testar que app funciona sem erros
