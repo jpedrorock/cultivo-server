@@ -3613,3 +3613,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar botão de excluir (ícone de lixeira) nos cards de plantas
 - [x] Adicionar confirm dialog antes de deletar (nome da planta + aviso)
 - [x] Executar delete e atualizar a lista com invalidate
+
+## Excluir plantas em massa (27/02/2026)
+
+- [x] Verificar/criar mutation bulkDelete no backend
+- [x] Adicionar botão "Excluir" na barra de ações em massa
+- [x] Confirm dialog com contagem de plantas a excluir
+- [x] Executar bulk delete e atualizar lista

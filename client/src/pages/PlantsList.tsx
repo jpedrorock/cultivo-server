@@ -117,6 +117,20 @@ export default function PlantsList() {
     plant?: { id: number; name: string };
   }>({ open: false });
 
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
+  const bulkDelete = trpc.plants.bulkDelete.useMutation({
+    onSuccess: (data) => {
+      utils.plants.list.invalidate();
+      toast.success(`🗑️ ${data.count} planta(s) excluída(s) com sucesso!`);
+      setSelectedPlants(new Set());
+      setBulkDeleteConfirm(false);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao excluir plantas: ${error.message}`);
+    },
+  });
+
   const deletePlant = trpc.plants.delete.useMutation({
     onSuccess: () => {
       utils.plants.list.invalidate();
@@ -763,6 +777,22 @@ export default function PlantsList() {
                   Descartar
                 </Button>
                 
+                {/* Excluir permanentemente */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  disabled={bulkDelete.isPending}
+                  className="text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 text-xs px-2 md:px-3"
+                >
+                  {bulkDelete.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
+                  Excluir
+                </Button>
+
                 {/* Cancelar */}
                 <Button
                   size="sm"
@@ -777,6 +807,49 @@ export default function PlantsList() {
           </Card>
         </div>
       )}
+
+      {/* Bulk Delete Confirm Dialog */}
+      <Dialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Excluir {selectedPlants.size} Planta{selectedPlants.size > 1 ? 's' : ''}
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir permanentemente{" "}
+              <span className="font-semibold text-foreground">{selectedPlants.size} planta{selectedPlants.size > 1 ? 's' : ''}</span>?
+              Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico de cada planta.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setBulkDeleteConfirm(false)}
+              disabled={bulkDelete.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => bulkDelete.mutate({ plantIds: Array.from(selectedPlants) })}
+              disabled={bulkDelete.isPending}
+            >
+              {bulkDelete.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir {selectedPlants.size} Planta{selectedPlants.size > 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Plant Confirm Dialog */}
       <Dialog open={deletePlantDialog.open} onOpenChange={(open) => setDeletePlantDialog({ open })}>

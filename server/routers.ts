@@ -3170,6 +3170,29 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    // Excluir múltiplas plantas em massa
+    bulkDelete: publicProcedure
+      .input(z.object({ plantIds: z.array(z.number()) }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        if (!input.plantIds.length) return { count: 0 };
+
+        // Deletar registros relacionados para todas as plantas
+        await database.delete(plantObservations).where(inArray(plantObservations.plantId, input.plantIds));
+        await database.delete(plantPhotos).where(inArray(plantPhotos.plantId, input.plantIds));
+        await database.delete(plantRunoffLogs).where(inArray(plantRunoffLogs.plantId, input.plantIds));
+        await database.delete(plantHealthLogs).where(inArray(plantHealthLogs.plantId, input.plantIds));
+        await database.delete(plantTrichomeLogs).where(inArray(plantTrichomeLogs.plantId, input.plantIds));
+        await database.delete(plantLSTLogs).where(inArray(plantLSTLogs.plantId, input.plantIds));
+        await database.delete(plantTentHistory).where(inArray(plantTentHistory.plantId, input.plantIds));
+
+        // Deletar as plantas
+        await database.delete(plants).where(inArray(plants.id, input.plantIds));
+
+        return { count: input.plantIds.length };
+      }),
+
     // Buscar fotos da planta
     getPhotos: publicProcedure
       .input(z.object({ plantId: z.number() }))
