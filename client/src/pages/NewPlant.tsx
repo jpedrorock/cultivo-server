@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AnimatedButton } from "@/components/AnimatedButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -195,7 +196,7 @@ export default function NewPlant() {
 
                 {/* Botões */}
                 <div className="flex gap-3 pt-4">
-                  <Button
+                  <AnimatedButton
                     type="submit"
                     disabled={createPlant.isPending}
                     className="flex-1"
@@ -211,7 +212,7 @@ export default function NewPlant() {
                         Criar Planta
                       </>
                     )}
-                  </Button>
+                  </AnimatedButton>
                   <Link href="/plants">
                     <Button type="button" variant="outline">
                       Cancelar

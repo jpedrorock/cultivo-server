@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AnimatedButton } from "@/components/AnimatedButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -172,14 +173,14 @@ export function TaskTemplatesManager() {
             Crie, edite ou remova templates por fase e estufa
           </p>
         </div>
-        <Button
+        <AnimatedButton
           onClick={() => handleOpenDialog()}
           className="shrink-0 h-10"
           aria-label="Nova Tarefa"
         >
           <Plus className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">Nova Tarefa</span>
-        </Button>
+        </AnimatedButton>
       </div>
 
       {/* Campo de busca */}
@@ -290,10 +291,10 @@ export function TaskTemplatesManager() {
               </p>
             </div>
             {!searchQuery && (
-              <Button onClick={() => handleOpenDialog()} className="h-11">
+              <AnimatedButton onClick={() => handleOpenDialog()} className="h-11">
                 <Plus className="h-4 w-4 mr-2" />
                 Criar Primeiro Template
-              </Button>
+              </AnimatedButton>
             )}
           </CardContent>
         </Card>
@@ -396,7 +397,7 @@ export function TaskTemplatesManager() {
             >
               Cancelar
             </Button>
-            <Button
+            <AnimatedButton
               onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}
               className="h-11 w-full sm:w-auto"
@@ -405,7 +406,7 @@ export function TaskTemplatesManager() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               {editingTemplate ? "Atualizar" : "Criar"}
-            </Button>
+            </AnimatedButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

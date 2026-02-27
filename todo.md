@@ -3486,3 +3486,12 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Animações de lista: StaggerList + ListItemAnimation adicionados em Alerts.tsx e Tarefas.tsx
 - [x] Animações de gráficos: animationDuration/Begin/Easing já configurados nos gráficos Recharts (TentDetails)
 - [x] AnimatedCounter: adicionado nos KPIs de temperatura, umidade e PPFD nos cards de estufa (Home.tsx)
+
+## AnimatedButton - Botões Primários (27/02/2026)
+
+- [x] ManageStrains.tsx: botão "Nova Strain", "Criar Primeira Strain" e botão Salvar nos dialogs
+- [x] AlertSettings.tsx (componente): botão "Salvar" por fase nos accordions
+- [x] NewPlant.tsx: botão "Criar Planta" (type=submit)
+- [x] TaskTemplatesManager.tsx: botão "Nova Tarefa", "Criar Primeiro Template" e "Criar/Atualizar" no dialog
+- [x] TypeScript: 0 erros após todas as alterações
+- [x] Vite: sem erros de compilação (erro de Tarefas.tsx era entrada antiga do log - 15:29 vs 15:44)

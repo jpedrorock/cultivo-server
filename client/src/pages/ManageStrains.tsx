@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { AnimatedButton } from "@/components/AnimatedButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Edit, Trash2, ArrowLeft, Copy, Search, Sprout, Clock } from "lucide-react";
 import { useLocation } from "wouter";
@@ -202,14 +203,14 @@ export default function ManageStrains() {
           </div>
 
           {/* Botão: ícone no mobile, texto completo no desktop */}
-          <Button
+          <AnimatedButton
             onClick={() => setIsCreateOpen(true)}
             className="bg-green-600 hover:bg-green-700 text-white shrink-0 h-10"
             aria-label="Nova Strain"
           >
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Nova Strain</span>
-          </Button>
+          </AnimatedButton>
         </div>
       </header>
 
@@ -325,13 +326,13 @@ export default function ManageStrains() {
                 </p>
               </div>
               {!searchQuery && (
-                <Button
+                <AnimatedButton
                   onClick={() => setIsCreateOpen(true)}
                   className="bg-green-600 hover:bg-green-700 text-white h-11"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Criar Primeira Strain
-                </Button>
+                </AnimatedButton>
               )}
             </CardContent>
           </Card>
@@ -411,13 +412,13 @@ export default function ManageStrains() {
               >
                 Cancelar
               </Button>
-              <Button
+              <AnimatedButton
                 onClick={onSave}
                 className={`h-11 w-full sm:w-auto ${saveClass ?? "bg-green-600 hover:bg-green-700 text-white"}`}
                 disabled={isPending}
               >
                 {isPending ? "Salvando..." : saveLabel}
-              </Button>
+              </AnimatedButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { AnimatedButton } from "@/components/AnimatedButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Bell, Save, Loader2, Sprout, Flower2, Droplets, Wind } from "lucide-react";
 import { toast } from "sonner";
@@ -233,7 +234,7 @@ export function AlertSettings() {
 
                     {/* Botão Salvar */}
                     <div className="pt-2">
-                      <Button 
+                      <AnimatedButton 
                         onClick={() => handleSave(phase)}
                         disabled={updateMargin.isPending}
                         size="sm"
@@ -241,7 +242,7 @@ export function AlertSettings() {
                       >
                         <Save className="mr-2 h-4 w-4" />
                         {updateMargin.isPending ? "Salvando..." : `Salvar ${info.label}`}
-                      </Button>
+                      </AnimatedButton>
                     </div>
                   </div>
                 </AccordionContent>
