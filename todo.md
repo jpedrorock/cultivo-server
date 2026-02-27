@@ -3655,3 +3655,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Substituir confirm() no PlantPhotosTab.tsx (excluir foto)
 - [x] Substituir confirm() no PlantHealthTab.tsx (excluir registro de saúde)
 - [x] Substituir window.confirm() no Backup.tsx (importar backup)
+
+## Histórico de movimentação de estufas no arquivo de plantas (27/02/2026)
+
+- [x] Criar procedure plants.getTentHistory no backend (busca por plantId, resolve nomes das estufas)
+- [x] Exibir linha do tempo de transferências de estufa na seção de histórico da planta arquivada
+- [x] Mostrar: estufa de origem → estufa de destino, data e motivo (se disponível)

@@ -3,7 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { eq, and, or, desc, sql, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, isNotNull, inArray } from "drizzle-orm";
 import * as db from "./db";
 import { getDb } from "./db";
 import {
@@ -3191,6 +3191,37 @@ export const appRouter = router({
         await database.delete(plants).where(inArray(plants.id, input.plantIds));
 
         return { count: input.plantIds.length };
+      }),
+
+    // Buscar histórico de movimentação entre estufas
+    getTentHistory: publicProcedure
+      .input(z.object({ plantId: z.number() }))
+      .query(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        
+        const history = await database
+          .select({
+            id: plantTentHistory.id,
+            plantId: plantTentHistory.plantId,
+            fromTentId: plantTentHistory.fromTentId,
+            toTentId: plantTentHistory.toTentId,
+            movedAt: plantTentHistory.movedAt,
+            reason: plantTentHistory.reason,
+          })
+          .from(plantTentHistory)
+          .where(eq(plantTentHistory.plantId, input.plantId))
+          .orderBy(asc(plantTentHistory.movedAt));
+        
+        // Buscar nomes das estufas
+        const allTents = await database.select({ id: tents.id, name: tents.name }).from(tents);
+        const tentMap = Object.fromEntries(allTents.map((t: any) => [t.id, t.name]));
+        
+        return history.map((h: any) => ({
+          ...h,
+          fromTentName: h.fromTentId ? tentMap[h.fromTentId] ?? `Estufa #${h.fromTentId}` : null,
+          toTentName: tentMap[h.toTentId] ?? `Estufa #${h.toTentId}`,
+        }));
       }),
 
     // Buscar fotos da planta

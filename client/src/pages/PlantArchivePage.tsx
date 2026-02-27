@@ -49,9 +49,10 @@ import { PageTransition } from "@/components/PageTransition";
 function PlantHistorySection({ plantId }: { plantId: number }) {
   const { data: observations, isLoading: loadingObs } = trpc.plantObservations.list.useQuery({ plantId });
   const { data: healthLogs, isLoading: loadingHealth } = trpc.plantHealth.list.useQuery({ plantId });
+  const { data: tentHistory, isLoading: loadingHistory } = trpc.plants.getTentHistory.useQuery({ plantId });
 
-  const isLoading = loadingObs || loadingHealth;
-  const hasData = (observations && observations.length > 0) || (healthLogs && healthLogs.length > 0);
+  const isLoading = loadingObs || loadingHealth || loadingHistory;
+  const hasData = (observations && observations.length > 0) || (healthLogs && healthLogs.length > 0) || (tentHistory && tentHistory.length > 0);
 
   if (isLoading) {
     return (
@@ -91,6 +92,52 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
 
   return (
     <div className="space-y-4 pt-2">
+      {/* Histórico de Movimentação entre Estufas */}
+      {tentHistory && tentHistory.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            <Home className="w-3.5 h-3.5" />
+            Movimentação entre Estufas ({tentHistory.length})
+          </div>
+          <div className="relative pl-4">
+            {/* Linha vertical da timeline */}
+            <div className="absolute left-1.5 top-0 bottom-0 w-px bg-border" />
+            <div className="space-y-3">
+              {tentHistory.map((entry: any, idx: number) => (
+                <div key={entry.id} className="relative flex items-start gap-3">
+                  {/* Dot da timeline */}
+                  <div className="absolute -left-2.5 mt-1 w-2 h-2 rounded-full bg-primary border-2 border-background" />
+                  <div className="bg-muted/40 rounded-md p-2.5 text-sm flex-1 ml-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {entry.fromTentName ? (
+                        <>
+                          <span className="font-medium text-foreground">{entry.fromTentName}</span>
+                          <span className="text-muted-foreground text-xs">→</span>
+                          <span className="font-medium text-foreground">{entry.toTentName}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-muted-foreground text-xs">Entrada em</span>
+                          <span className="font-medium text-foreground">{entry.toTentName}</span>
+                        </>
+                      )}
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {entry.movedAt
+                          ? format(new Date(entry.movedAt), "dd/MM/yyyy", { locale: ptBR })
+                          : "—"}
+                      </span>
+                    </div>
+                    {entry.reason && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">{entry.reason}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Observações */}
       {observations && observations.length > 0 && (
         <div>
