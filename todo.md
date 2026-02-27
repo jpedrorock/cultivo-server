@@ -3715,3 +3715,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Criar função applyPhaseTransitionLimits no db.ts que atualiza alertSettings com os safetyLimits da nova fase
 - [x] Integrar a função nos pontos de mudança de fase: transitionToFlora, transitionToDrying, transitionToCloning, transitionToMaintenance, cycles.initiate, cycles.edit
 - [x] Escrever teste vitest para verificar que os limites são atualizados corretamente na transição (5/5 passando)
+
+## Botão "Restaurar Padrões da Fase" em Alertas
+
+- [x] Criar procedure tRPC alerts.resetPhaseMarginToDefault(phase) que restaura margens para os padrões do sistema
+- [x] Adicionar botão "Restaurar padrões" em cada accordion de fase no componente AlertSettings.tsx
+- [x] Exibir toast confirmando as margens restauradas com os valores da fase (Temp/RH/PPFD/pH)

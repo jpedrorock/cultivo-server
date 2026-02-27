@@ -1779,6 +1779,51 @@ export const appRouter = router({
         return { success: true };
       }),
     
+    // Restaurar margens de uma fase para os valores padrão do sistema
+    resetPhaseMarginToDefault: publicProcedure
+      .input(
+        z.object({
+          phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Banco de dados não inicializado.");
+
+        // Valores padrão por fase (espelham os dados inseridos pelo seed-alerts.mjs)
+        const defaults: Record<string, { tempMargin: string; rhMargin: string; ppfdMargin: number; phMargin: string | null }> = {
+          MAINTENANCE: { tempMargin: "2.0", rhMargin: "5.0", ppfdMargin: 75,  phMargin: "0.3" },
+          CLONING:     { tempMargin: "1.5", rhMargin: "4.0", ppfdMargin: 50,  phMargin: "0.2" },
+          VEGA:        { tempMargin: "2.0", rhMargin: "5.0", ppfdMargin: 100, phMargin: "0.3" },
+          FLORA:       { tempMargin: "1.5", rhMargin: "3.0", ppfdMargin: 100, phMargin: "0.2" },
+          DRYING:      { tempMargin: "1.0", rhMargin: "2.0", ppfdMargin: 0,   phMargin: null  },
+        };
+
+        const d = defaults[input.phase];
+        const { phaseAlertMargins } = await import("../drizzle/schema");
+
+        await database
+          .update(phaseAlertMargins)
+          .set({
+            tempMargin:  d.tempMargin,
+            rhMargin:    d.rhMargin,
+            ppfdMargin:  d.ppfdMargin,
+            phMargin:    d.phMargin,
+          })
+          .where(eq(phaseAlertMargins.phase, input.phase));
+
+        return {
+          success: true,
+          phase: input.phase,
+          margins: {
+            tempMargin:  parseFloat(d.tempMargin),
+            rhMargin:    parseFloat(d.rhMargin),
+            ppfdMargin:  d.ppfdMargin,
+            phMargin:    d.phMargin !== null ? parseFloat(d.phMargin) : null,
+          },
+        };
+      }),
+
     // Notification Settings (Configurações de Notificações)
     getNotificationSettings: publicProcedure.query(async () => {
       const database = await getDb();

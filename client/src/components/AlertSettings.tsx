@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Bell, Save, Loader2, Sprout, Flower2, Droplets, Wind } from "lucide-react";
+import { Bell, Save, Loader2, Sprout, Flower2, Droplets, Wind, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 const PHASE_INFO = {
@@ -55,6 +55,22 @@ export function AlertSettings() {
     },
     onError: (error) => {
       toast.error(`Erro ao atualizar: ${error.message}`);
+    },
+  });
+
+  const resetToDefault = trpc.alerts.resetPhaseMarginToDefault.useMutation({
+    onSuccess: (data) => {
+      const phaseLabel = PHASE_INFO[data.phase as Phase]?.label ?? data.phase;
+      const m = data.margins;
+      toast.success(
+        `✅ Padrões de ${phaseLabel} restaurados: Temp ±${m.tempMargin}°C | RH ±${m.rhMargin}% | PPFD ±${m.ppfdMargin}${
+          m.phMargin !== null ? ` | pH ±${m.phMargin}` : ""
+        }`
+      );
+      utils.alerts.getPhaseMargins.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao restaurar: ${error.message}`);
     },
   });
 
@@ -232,17 +248,29 @@ export function AlertSettings() {
                       </div>
                     </div>
 
-                    {/* Botão Salvar */}
-                    <div className="pt-2">
+                    {/* Botões de ação */}
+                    <div className="pt-2 flex flex-wrap gap-2">
                       <AnimatedButton 
                         onClick={() => handleSave(phase)}
-                        disabled={updateMargin.isPending}
+                        disabled={updateMargin.isPending || resetToDefault.isPending}
                         size="sm"
-                        className="w-full sm:w-auto min-h-[44px]"
+                        className="min-h-[44px]"
                       >
                         <Save className="mr-2 h-4 w-4" />
                         {updateMargin.isPending ? "Salvando..." : `Salvar ${info.label}`}
                       </AnimatedButton>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px] text-muted-foreground hover:text-foreground"
+                        disabled={resetToDefault.isPending || updateMargin.isPending}
+                        onClick={() => resetToDefault.mutate({ phase })}
+                        title="Restaurar os valores padrão do sistema para esta fase"
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        {resetToDefault.isPending ? "Restaurando..." : "Restaurar padrões"}
+                      </Button>
                     </div>
                   </div>
                 </AccordionContent>
