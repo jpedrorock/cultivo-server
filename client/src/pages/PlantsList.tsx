@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive } from "lucide-react";
+import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
@@ -108,6 +108,23 @@ export default function PlantsList() {
     },
     onError: (error) => {
       toast.error(`Erro ao descartar plantas: ${error.message}`);
+    },
+  });
+
+  // Estado do dialog de confirmação de exclusão
+  const [deletePlantDialog, setDeletePlantDialog] = useState<{
+    open: boolean;
+    plant?: { id: number; name: string };
+  }>({ open: false });
+
+  const deletePlant = trpc.plants.delete.useMutation({
+    onSuccess: () => {
+      utils.plants.list.invalidate();
+      toast.success("🗑️ Planta excluída com sucesso!");
+      setDeletePlantDialog({ open: false });
+    },
+    onError: (error) => {
+      toast.error(`Erro ao excluir planta: ${error.message}`);
     },
   });
 
@@ -501,6 +518,14 @@ export default function PlantsList() {
                                     Mover
                                   </AnimatedButton>
                                 )}
+                                <AnimatedButton
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1 hover:scale-[1.03] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500 active:scale-95 transition-all duration-150"
+                                  onClick={() => setDeletePlantDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </AnimatedButton>
                               </div>
                             </CardContent>
                           </Card>
@@ -752,7 +777,54 @@ export default function PlantsList() {
           </Card>
         </div>
       )}
-    </div>
+
+      {/* Delete Plant Confirm Dialog */}
+      <Dialog open={deletePlantDialog.open} onOpenChange={(open) => setDeletePlantDialog({ open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Excluir Planta
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir permanentemente{" "}
+              <span className="font-semibold text-foreground">{deletePlantDialog.plant?.name}</span>?
+              Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeletePlantDialog({ open: false })}
+              disabled={deletePlant.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deletePlantDialog.plant) {
+                  deletePlant.mutate({ plantId: deletePlantDialog.plant.id });
+                }
+              }}
+              disabled={deletePlant.isPending}
+            >
+              {deletePlant.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir Permanentemente
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </div>
     </PageTransition>
   );
 }

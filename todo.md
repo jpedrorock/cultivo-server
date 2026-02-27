@@ -3606,3 +3606,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Localizar botões de avanço de fase no TentDetail
 - [x] Integrar PhaseConfirmDialog antes de cada ação de fase
 - [x] Garantir consistência com o fluxo da Home
+
+## Excluir plantas na página de lista (27/02/2026)
+
+- [x] Verificar se existe mutation de delete no backend (routers.ts)
+- [x] Adicionar botão de excluir (ícone de lixeira) nos cards de plantas
+- [x] Adicionar confirm dialog antes de deletar (nome da planta + aviso)
+- [x] Executar delete e atualizar a lista com invalidate
