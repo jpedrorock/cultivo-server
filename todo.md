@@ -3600,3 +3600,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Integrar confirmação antes de "Avançar para Floração" (verde)
 - [x] Integrar confirmação antes de "Avançar para Secagem" (laranja)
 - [x] Integrar confirmação antes de "Tirar Clones" (azul)
+
+## PhaseConfirmDialog no TentDetail (27/02/2026)
+
+- [x] Localizar botões de avanço de fase no TentDetail
+- [x] Integrar PhaseConfirmDialog antes de cada ação de fase
+- [x] Garantir consistência com o fluxo da Home

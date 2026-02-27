@@ -4,19 +4,47 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart } from "lucide-react";
+import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Printer } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
+import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
+import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
+import { FinishCloningDialog } from "@/components/FinishCloningDialog";
+import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
 
 export default function TentDetails() {
   const { id } = useParams<{ id: string }>();
   const tentId = parseInt(id || "0");
 
   const [dateRange, setDateRange] = useState(7); // 7, 14, 30 days
+
+  // Estados dos modais de fase
+  const [phaseConfirmOpen, setPhaseConfirmOpen] = useState(false);
+  const [phaseConfirmType, setPhaseConfirmType] = useState<PhaseConfirmType>("FLORA");
+  const [selectMotherOpen, setSelectMotherOpen] = useState(false);
+  const [selectedMotherId, setSelectedMotherId] = useState<number | null>(null);
+  const [selectedMotherName, setSelectedMotherName] = useState<string>("");
+  const [selectedClonesCount] = useState<number>(10);
+  const [finishCloningOpen, setFinishCloningOpen] = useState(false);
+  const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
+
+  const openPhaseConfirm = (type: PhaseConfirmType) => {
+    setPhaseConfirmType(type);
+    setPhaseConfirmOpen(true);
+  };
+
+  const handlePhaseConfirmed = () => {
+    setPhaseConfirmOpen(false);
+    if (phaseConfirmType === "CLONING") {
+      setSelectMotherOpen(true);
+    } else {
+      setPromotePhaseOpen(true);
+    }
+  };
 
   const { data: tent, isLoading: tentLoading } = trpc.tents.getById.useQuery({ id: tentId });
   const { data: cycle } = trpc.cycles.getByTent.useQuery({ tentId });
@@ -172,8 +200,87 @@ export default function TentDetails() {
                   <p className="text-lg font-semibold text-foreground">{cycle.status}</p>
                 </div>
               </div>
+
+              {/* Botões de avanço de fase */}
+              {tent && (
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
+                  {tent.category === "MAINTENANCE" && (
+                    <Button
+                      onClick={() => openPhaseConfirm("CLONING")}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Sprout className="w-4 h-4 mr-2" />
+                      Tirar Clones
+                    </Button>
+                  )}
+                  {tent.category === "VEGA" && (
+                    <Button
+                      onClick={() => openPhaseConfirm("FLORA")}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Flower2 className="w-4 h-4 mr-2" />
+                      Avançar para Floração
+                    </Button>
+                  )}
+                  {tent.category === "FLORA" && (
+                    <Button
+                      onClick={() => openPhaseConfirm("DRYING")}
+                      size="sm"
+                      className="bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      <Wind className="w-4 h-4 mr-2" />
+                      Avançar para Secagem
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Modais de fase */}
+        {tent && (
+          <>
+            <PhaseConfirmDialog
+              open={phaseConfirmOpen}
+              onOpenChange={setPhaseConfirmOpen}
+              phase={phaseConfirmType}
+              tentName={tent.name}
+              onConfirm={handlePhaseConfirmed}
+            />
+            <SelectMotherPlantDialog
+              open={selectMotherOpen}
+              onOpenChange={setSelectMotherOpen}
+              tentId={tentId}
+              onMotherSelected={(plantId: number, plantName: string) => {
+                setSelectedMotherId(plantId);
+                setSelectedMotherName(plantName);
+                setSelectMotherOpen(false);
+                setFinishCloningOpen(true);
+              }}
+            />
+            {cycle && (
+              <>
+                <FinishCloningDialog
+                  open={finishCloningOpen}
+                  onOpenChange={setFinishCloningOpen}
+                  cycleId={cycle.id}
+                  motherPlantId={selectedMotherId || 0}
+                  motherPlantName={selectedMotherName || "Planta Mãe"}
+                  clonesCount={selectedClonesCount}
+                />
+                <PromotePhaseDialog
+                  open={promotePhaseOpen}
+                  onOpenChange={setPromotePhaseOpen}
+                  cycleId={cycle.id}
+                  currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
+                  currentTentName={tent.name}
+                />
+              </>
+            )}
+          </>
         )}
 
         {/* Stats Cards */}
