@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AnimatedButton } from "@/components/AnimatedButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -364,21 +365,21 @@ export default function PlantsList() {
                       {isExpanded && tentPlants.length > 0 && (
                         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           {tentPlants.every((p: any) => selectedPlants.has(p.id)) ? (
-                            <Button
+                            <AnimatedButton
                               variant="outline"
                               size="sm"
                               onClick={() => deselectAllInTent(tent.id)}
                             >
                               Desmarcar Todas
-                            </Button>
+                            </AnimatedButton>
                           ) : (
-                            <Button
+                            <AnimatedButton
                               variant="outline"
                               size="sm"
                               onClick={() => selectAllInTent(tent.id)}
                             >
                               Selecionar Todas
-                            </Button>
+                            </AnimatedButton>
                           )}
                         </div>
                       )}
@@ -473,7 +474,7 @@ export default function PlantsList() {
                               </div>
 
                               {plant.status === "ACTIVE" && (
-                                <Button
+                                <AnimatedButton
                                   variant="outline"
                                   size="sm"
                                   className="w-full gap-2"
@@ -481,7 +482,7 @@ export default function PlantsList() {
                                 >
                                   <MoveRight className="w-4 h-4" />
                                   Mover para outra estufa
-                                </Button>
+                                </AnimatedButton>
                               )}
                             </CardContent>
                           </Card>

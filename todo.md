@@ -3201,3 +3201,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Substituir botões em QuickLog (Salvar, Pular, Próxima Planta)
 - [x] Testar ripple effect e haptic feedback em todos os botões
 - [x] Verificar que variantes (primary, outline, ghost) funcionam corretamente
+
+## Aplicar AnimatedButton nos Botões Restantes
+
+- [x] Substituir botões em PlantsList (Selecionar Todas, Desmarcar Todas, Mover para outra estufa)
+- [ ] Substituir botões em modais de confirmação (Confirmar exclusão, Salvar alterações)
+- [x] Testar ripple effect em todos os novos botões
+- [x] Verificar consistência visual em todas as páginas
