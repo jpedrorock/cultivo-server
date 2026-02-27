@@ -3566,3 +3566,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Tema Floresta: revisar contraste de texto (foreground vs background)
 - [x] Tema Floresta: ajustar sidebar-foreground, muted-foreground e card para legibilidade
 - [x] Tema Floresta: verificar botões primários e badges com fundo escuro
+
+## Remoção da faixa colorida no topo dos cards de estufa (27/02/2026)
+
+- [x] Remover a faixa/barra colorida grossa no topo dos cards de estufa na Home

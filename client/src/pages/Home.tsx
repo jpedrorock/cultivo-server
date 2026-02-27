@@ -810,13 +810,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   return (
     <ListItemAnimation>
       <Card className="bg-card/90 backdrop-blur-sm shadow-md shadow-black/8 hover:shadow-xl hover:shadow-primary/12 transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-primary/30 group cursor-pointer overflow-hidden" data-tour="tent-card">
-      {/* Phase-colored gradient strip at top of card */}
-      <div className={`h-1 w-full ${
-        tent.category === 'VEGA' ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-green-400' :
-        tent.category === 'FLORA' ? 'bg-gradient-to-r from-purple-400 via-violet-500 to-purple-400' :
-        tent.category === 'DRYING' ? 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400' :
-        'bg-gradient-to-r from-blue-400 via-cyan-500 to-blue-400'
-      }`} />
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
