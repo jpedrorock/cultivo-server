@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -64,6 +64,15 @@ export default function Home() {
   
   const { data: tents, isLoading } = trpc.tents.list.useQuery();
   const { data: activeCycles } = trpc.cycles.listActive.useQuery();
+  const { data: notifSettings, refetch: refetchNotifSettings } = trpc.alerts.getNotificationSettings.useQuery();
+  const systemPaused = notifSettings?.systemPaused ?? false;
+  const toggleSystemPaused = trpc.alerts.toggleSystemPaused.useMutation({
+    onSuccess: (data) => {
+      refetchNotifSettings();
+      toast.success(data.systemPaused ? "Sistema pausado — alertas desativados" : "Sistema ativo — alertas retomados");
+    },
+    onError: () => toast.error("Erro ao alterar estado do sistema"),
+  });
 
   // Start missing readings monitor when component mounts
   useEffect(() => {
@@ -345,10 +354,28 @@ export default function Home() {
                   Registro Rápido
                 </Button>
               </Link>
-              <Badge variant="outline" className="px-3 py-1.5 text-sm">
-                <Droplets className="w-4 h-4 mr-2" />
-                Sistema Ativo
-              </Badge>
+              <button
+                onClick={() => toggleSystemPaused.mutate()}
+                disabled={toggleSystemPaused.isPending}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
+                  systemPaused
+                    ? "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    : "border-primary/40 bg-primary/5 text-primary"
+                }`}
+                title={systemPaused ? "Sistema pausado — clique para retomar" : "Sistema ativo — clique para pausar"}
+              >
+                {toggleSystemPaused.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : systemPaused ? (
+                  <PauseCircle className="w-4 h-4" />
+                ) : (
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                  </span>
+                )}
+                {systemPaused ? "Sistema Pausado" : "Sistema Ativo"}
+              </button>
             </div>
           </div>
         </div>

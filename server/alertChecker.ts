@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { cycles, weeklyTargets, alertSettings, alertHistory, tents } from "../drizzle/schema";
+import { cycles, weeklyTargets, alertSettings, alertHistory, tents, notificationSettings } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
 
@@ -13,6 +13,16 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
 }) {
   const database = await getDb();
   if (!database) return;
+
+  // 0. Verificar se o sistema está pausado globalmente
+  const globalSettings = await database
+    .select({ systemPaused: notificationSettings.systemPaused })
+    .from(notificationSettings)
+    .limit(1);
+
+  if (globalSettings.length > 0 && globalSettings[0].systemPaused) {
+    return; // Sistema pausado pelo usuário — não gerar alertas
+  }
 
   // 1. Buscar configurações de alertas da estufa
   const settings = await database

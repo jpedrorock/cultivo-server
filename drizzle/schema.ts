@@ -772,6 +772,9 @@ export type InsertAlertPreference = typeof alertPreferences.$inferInsert;
  */
 export const notificationSettings = mysqlTable("notificationSettings", {
   id: int("id").autoincrement().primaryKey(),
+
+  // Pausa geral do sistema (para alertas e monitoramento)
+  systemPaused: boolean("systemPaused").default(false).notNull(),
   
   // Habilitar/desabilitar notificações por tipo de alerta
   tempAlertsEnabled: boolean("tempAlertsEnabled").default(true).notNull(),

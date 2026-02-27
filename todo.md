@@ -3519,3 +3519,26 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] KPI values: text-base font-bold tracking-tight leading-none
 - [x] Rótulos KPI: text-[10px] uppercase tracking-wider (estilo dashboard premium)
 - [x] TypeScript: 0 erros após todas as alterações
+
+## Ajustes UX - Sistema Ativo e ThemeToggle (27/02/2026)
+
+- [ ] Sistema Ativo: adicionar campo systemPaused na tabela de configurações do usuário
+- [ ] Sistema Ativo: criar procedure systemStatus.toggle no backend
+- [ ] Sistema Ativo: transformar badge estático em toggle funcional na Home (pausa/retoma alertas)
+- [ ] Sistema Ativo: quando pausado, AlertsChecker não gera novos alertas
+- [ ] Sistema Ativo: visual diferenciado quando pausado (badge vermelho/âmbar + ícone de pausa)
+- [ ] ThemeToggle: tornar o box inteiro de cada tema clicável (não apenas o radio button)
+
+## Ajustes UX - Sistema Ativo e ThemeToggle (27/02/2026)
+
+- [x] Sistema Ativo: adicionar campo systemPaused na tabela notificationSettings (schema + migração 0012)
+- [x] Sistema Ativo: criar procedure toggleSystemPaused no backend (alerts router)
+- [x] Sistema Ativo: adicionar systemPaused ao updateNotificationSettings
+- [x] Sistema Ativo: alertChecker verifica systemPaused antes de gerar alertas
+- [x] Sistema Ativo: transformar badge estático em botão interativo na Home (verde ativo / âmbar pausado)
+- [x] Sistema Ativo: dot animado (ping) quando ativo, PauseCircle quando pausado, Loader2 durante mutação
+- [x] Sistema Ativo: toast de confirmação ao pausar/retomar
+- [x] ThemeToggle: substituir RadioGroup por botões nativos — box inteiro clicável sem radio button visual
+- [x] ThemeToggle: ícone Check no tema ativo, ring-1 ring-primary/20 para destaque
+- [x] ThemeToggle: active:scale-[0.98] para feedback de toque
+- [x] TypeScript: 0 erros após todas as alterações

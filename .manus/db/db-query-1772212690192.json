@@ -1,0 +1,112 @@
+{
+  "query": "SHOW TABLES;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute SHOW TABLES;",
+  "rows": [
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "alertHistory"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "alertPreferences"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "alertSettings"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "alerts"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "calculationHistory"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "cloningEvents"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "cycles"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "dailyLogs"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "fertilizationPresets"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "notificationHistory"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "notificationSettings"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "nutrientApplications"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "phaseAlertMargins"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plantHealthLogs"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plantLSTLogs"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plantObservations"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plantPhotos"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plantRunoffLogs"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plantTentHistory"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plantTrichomeLogs"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "plants"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "recipeTemplates"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "recipes"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "safetyLimits"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "strains"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "taskInstances"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "taskTemplates"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "tentAState"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "tents"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "users"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "wateringApplications"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "wateringPresets"
+    },
+    {
+      "Tables_in_AhyBXV9CDav4cSFRqphBxc": "weeklyTargets"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_AhyBXV9CDav4cSFRqphBxc\n__drizzle_migrations\nalertHistory\nalertPreferences\nalertSettings\nalerts\ncalculationHistory\ncloningEvents\ncycles\ndailyLogs\nfertilizationPresets\nnotificationHistory\nnotificationSettings\nnutrientApplications\nphaseAlertMargins\nplantHealthLogs\nplantLSTLogs\nplantObservations\nplantPhotos\nplantRunoffLogs\nplantTentHistory\nplantTrichomeLogs\nplants\nrecipeTemplates\nrecipes\nsafetyLimits\nstrains\ntaskInstances\ntaskTemplates\ntentAState\ntents\nusers\nwateringApplications\nwateringPresets\nweeklyTargets\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

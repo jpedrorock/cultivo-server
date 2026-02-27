@@ -1748,9 +1748,29 @@ export const appRouter = router({
       return settings[0] || null;
     }),
     
+    toggleSystemPaused: publicProcedure
+      .mutation(async () => {
+        const database = await getDb();
+        if (!database) throw new Error("Banco de dados não inicializado.");
+        const { notificationSettings } = await import("../drizzle/schema");
+        const existing = await database.select().from(notificationSettings).limit(1);
+        if (existing.length > 0) {
+          const newValue = !existing[0].systemPaused;
+          await database
+            .update(notificationSettings)
+            .set({ systemPaused: newValue })
+            .where(eq(notificationSettings.id, existing[0].id));
+          return { systemPaused: newValue };
+        } else {
+          await database.insert(notificationSettings).values({ systemPaused: true });
+          return { systemPaused: true };
+        }
+      }),
+
     updateNotificationSettings: publicProcedure
       .input(
         z.object({
+          systemPaused: z.boolean().optional(),
           tempAlertsEnabled: z.boolean().optional(),
           rhAlertsEnabled: z.boolean().optional(),
           ppfdAlertsEnabled: z.boolean().optional(),

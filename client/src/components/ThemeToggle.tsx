@@ -1,7 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Apple, Contrast, Moon, Sun, Trees } from "lucide-react";
+import { Check, Apple, Contrast, Moon, Sun, Trees } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 // Theme preview component showing visual representation
@@ -93,37 +91,39 @@ export function ThemeToggle() {
           Tema
         </CardTitle>
         <CardDescription className="text-xs sm:text-sm">
-          Escolha o tema que melhor se adapta ao seu ambiente
+          Toque em qualquer tema para ativá-lo
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <RadioGroup
-          value={theme}
-          onValueChange={(value) => setTheme(value as any)}
-          className="space-y-2"
-        >
-          {THEMES.map((t) => (
-            <label
-              key={t.value}
-              htmlFor={t.value}
-              className={`flex items-center gap-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-colors min-h-[56px] ${
-                theme === t.value
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-accent/50"
-              }`}
-            >
-              <RadioGroupItem value={t.value} id={t.value} className="shrink-0" />
-              <ThemePreview type={t.value} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  {t.icon}
-                  <span className="font-medium text-sm sm:text-base">{t.label}</span>
+        <div className="space-y-2">
+          {THEMES.map((t) => {
+            const isActive = theme === t.value;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTheme(t.value)}
+                className={`w-full flex items-center gap-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-all duration-150 min-h-[56px] text-left active:scale-[0.98] ${
+                  isActive
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                    : "border-border hover:bg-accent/50 hover:border-border/80"
+                }`}
+              >
+                <ThemePreview type={t.value} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    {t.icon}
+                    <span className="font-medium text-sm sm:text-base">{t.label}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{t.description}</p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{t.description}</p>
-              </div>
-            </label>
-          ))}
-        </RadioGroup>
+                {isActive && (
+                  <Check className="w-4 h-4 text-primary shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );

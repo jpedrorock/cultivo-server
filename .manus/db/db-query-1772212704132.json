@@ -1,0 +1,112 @@
+{
+  "query": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+  "rows": [
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    },
+    {
+      "TABLE_NAME": "alertHistory"
+    },
+    {
+      "TABLE_NAME": "alertPreferences"
+    },
+    {
+      "TABLE_NAME": "alertSettings"
+    },
+    {
+      "TABLE_NAME": "alerts"
+    },
+    {
+      "TABLE_NAME": "calculationHistory"
+    },
+    {
+      "TABLE_NAME": "cloningEvents"
+    },
+    {
+      "TABLE_NAME": "cycles"
+    },
+    {
+      "TABLE_NAME": "dailyLogs"
+    },
+    {
+      "TABLE_NAME": "fertilizationPresets"
+    },
+    {
+      "TABLE_NAME": "notificationHistory"
+    },
+    {
+      "TABLE_NAME": "notificationSettings"
+    },
+    {
+      "TABLE_NAME": "nutrientApplications"
+    },
+    {
+      "TABLE_NAME": "phaseAlertMargins"
+    },
+    {
+      "TABLE_NAME": "plantHealthLogs"
+    },
+    {
+      "TABLE_NAME": "plantLSTLogs"
+    },
+    {
+      "TABLE_NAME": "plantObservations"
+    },
+    {
+      "TABLE_NAME": "plantPhotos"
+    },
+    {
+      "TABLE_NAME": "plantRunoffLogs"
+    },
+    {
+      "TABLE_NAME": "plantTentHistory"
+    },
+    {
+      "TABLE_NAME": "plantTrichomeLogs"
+    },
+    {
+      "TABLE_NAME": "plants"
+    },
+    {
+      "TABLE_NAME": "recipeTemplates"
+    },
+    {
+      "TABLE_NAME": "recipes"
+    },
+    {
+      "TABLE_NAME": "safetyLimits"
+    },
+    {
+      "TABLE_NAME": "strains"
+    },
+    {
+      "TABLE_NAME": "taskInstances"
+    },
+    {
+      "TABLE_NAME": "taskTemplates"
+    },
+    {
+      "TABLE_NAME": "tentAState"
+    },
+    {
+      "TABLE_NAME": "tents"
+    },
+    {
+      "TABLE_NAME": "users"
+    },
+    {
+      "TABLE_NAME": "wateringApplications"
+    },
+    {
+      "TABLE_NAME": "wateringPresets"
+    },
+    {
+      "TABLE_NAME": "weeklyTargets"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\n__drizzle_migrations\nalertHistory\nalertPreferences\nalertSettings\nalerts\ncalculationHistory\ncloningEvents\ncycles\ndailyLogs\nfertilizationPresets\nnotificationHistory\nnotificationSettings\nnutrientApplications\nphaseAlertMargins\nplantHealthLogs\nplantLSTLogs\nplantObservations\nplantPhotos\nplantRunoffLogs\nplantTentHistory\nplantTrichomeLogs\nplants\nrecipeTemplates\nrecipes\nsafetyLimits\nstrains\ntaskInstances\ntaskTemplates\ntentAState\ntents\nusers\nwateringApplications\nwateringPresets\nweeklyTargets\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

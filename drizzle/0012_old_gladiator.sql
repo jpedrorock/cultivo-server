@@ -1,0 +1,1 @@
+ALTER TABLE `notificationSettings` ADD `systemPaused` boolean DEFAULT false NOT NULL;
