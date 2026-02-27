@@ -3626,3 +3626,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar botão Excluir no cabeçalho do PlantDetail
 - [x] Confirm dialog com nome da planta e aviso de irreversibilidade
 - [x] Após exclusão, redirecionar para /plants
+
+## Exclusão permanente e histórico na página de arquivo (27/02/2026)
+
+- [x] Adicionar botão Excluir Permanentemente em cada card do arquivo de plantas
+- [x] Confirm dialog com aviso de irreversibilidade antes de deletar do arquivo
+- [x] Exibir histórico completo da planta arquivada (observações, saúde, logs de rega)
+- [x] Expandir card do arquivo para mostrar histórico ao clicar (seção colapsável)
