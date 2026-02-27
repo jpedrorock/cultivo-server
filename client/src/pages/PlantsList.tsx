@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
 import { useLocation } from "wouter";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
+import { LazyImage } from "@/components/LazyImage";
 
 export default function PlantsList() {
   const [, navigate] = useLocation();
@@ -433,13 +434,12 @@ export default function PlantsList() {
                             <CardContent className="space-y-3">
                               {/* Última foto da planta */}
                               {plant.lastHealthPhotoUrl && (
-                                <div className="w-full aspect-[3/4] rounded-lg overflow-hidden">
-                                  <img
-                                    src={plant.lastHealthPhotoUrl}
-                                    alt={plant.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
+                                <LazyImage
+                                  src={plant.lastHealthPhotoUrl}
+                                  alt={plant.name}
+                                  aspectRatio="3/4"
+                                  className="w-full rounded-lg"
+                                />
                               )}
 
                               {/* Indicadores visuais */}

@@ -30,6 +30,7 @@ import {
   processImageFile,
 } from "@/lib/imageUtils";
 import { TrichomesTabSkeleton } from "@/components/TabSkeletons";
+import { LazyImage } from "@/components/LazyImage";
 
 interface PlantTrichomesTabProps {
   plantId: number;
@@ -477,13 +478,14 @@ export default function PlantTrichomesTab({
                       {/* Photo Thumbnail */}
                       {log.photoUrl ? (
                         <div
-                          className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer ring-1 ring-border hover:ring-2 hover:ring-primary/50 transition-all"
+                          className="cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
                           onClick={() => setLightboxPhoto(log.photoUrl)}
                         >
-                          <img
+                          <LazyImage
                             src={log.photoUrl}
-                            alt=""
-                            className="w-full h-full object-cover"
+                            alt="Trichome inspection photo"
+                            aspectRatio="1/1"
+                            className="w-12 h-12 rounded-lg"
                           />
                         </div>
                       ) : (

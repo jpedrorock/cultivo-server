@@ -3231,3 +3231,15 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Integrar PlantCardSkeleton na PlantsList page
 - [x] Testar skeleton loading em ambas as páginas
 - [x] Verificar shimmer effect e layout consistency
+
+## Otimizar Carregamento de Imagens com Lazy Loading e Blur-up
+
+- [x] Criar componente LazyImage com blur-up placeholder
+- [x] Implementar Intersection Observer API para lazy loading
+- [x] Adicionar transição suave de blur para imagem full
+- [x] Integrar LazyImage nos cards de PlantsList
+- [x] Integrar LazyImage na página PlantDetail (foto principal)
+- [x] Integrar LazyImage nas abas de PlantDetail (Health, Trichomes, LST)
+- [x] Integrar LazyImage em QuickLog (preview de fotos)
+- [x] Testar lazy loading em conexão lenta (throttling)
+- [x] Verificar performance (redução de tempo de carregamento)

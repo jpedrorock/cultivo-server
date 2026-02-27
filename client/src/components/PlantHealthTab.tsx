@@ -41,6 +41,7 @@ import {
 import EditHealthLogDialog from "@/components/EditHealthLogDialog";
 import UploadProgress from "@/components/UploadProgress";
 import { HealthTabSkeleton } from "@/components/TabSkeletons";
+import { LazyImage } from "@/components/LazyImage";
 
 interface PlantHealthTabProps {
   plantId: number;
@@ -508,7 +509,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                         {/* Photo Thumbnail */}
                         {log.photoUrl ? (
                           <div
-                            className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer ring-1 ring-border hover:ring-2 hover:ring-primary/50 transition-all"
+                            className="flex-shrink-0 cursor-pointer ring-1 ring-border hover:ring-2 hover:ring-primary/50 transition-all rounded-lg"
                             onClick={() => {
                               const photoLogs =
                                 healthLogs?.filter(
@@ -521,10 +522,11 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                               setLightboxPhoto(log.photoUrl);
                             }}
                           >
-                            <img
+                            <LazyImage
                               src={log.photoUrl}
-                              alt=""
-                              className="w-full h-full object-cover"
+                              alt="Plant health photo"
+                              aspectRatio="1/1"
+                              className="w-12 h-12 rounded-lg"
                             />
                           </div>
                         ) : (

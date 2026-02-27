@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
+import { LazyImage } from "@/components/LazyImage";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -931,10 +932,11 @@ export default function QuickLog() {
                       <div className="space-y-3">
                         {plantHealthRecords.get(plants[currentPlantIndex].id)?.photoBase64 ? (
                           <div className="relative">
-                            <img
-                              src={plantHealthRecords.get(plants[currentPlantIndex].id)?.photoBase64}
+                            <LazyImage
+                              src={plantHealthRecords.get(plants[currentPlantIndex].id)?.photoBase64!}
                               alt="Preview"
-                              className="w-full h-48 object-cover rounded-xl"
+                              aspectRatio="16/9"
+                              className="w-full h-48 rounded-xl"
                             />
                             <Button
                               variant="destructive"
