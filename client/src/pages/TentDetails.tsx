@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { Link, useParams, useLocation } from "wouter";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, subDays } from "date-fns";
@@ -15,6 +15,7 @@ import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseCon
 import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
 import { FinishCloningDialog } from "@/components/FinishCloningDialog";
 import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
+import { EditTentDialog } from "@/components/EditTentDialog";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,7 @@ export default function TentDetails() {
   const [finishCloningOpen, setFinishCloningOpen] = useState(false);
   const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [editTentOpen, setEditTentOpen] = useState(false);
 
   const openPhaseConfirm = (type: PhaseConfirmType) => {
     setPhaseConfirmType(type);
@@ -56,6 +58,7 @@ export default function TentDetails() {
     }
   };
 
+  const utils = trpc.useUtils();
   const { data: tent, isLoading: tentLoading } = trpc.tents.getById.useQuery({ id: tentId });
   const [, navigate] = useLocation();
 
@@ -179,6 +182,15 @@ export default function TentDetails() {
               <Badge className={`${phaseInfo.color} text-white border-0 text-xs md:text-sm`}>{phaseInfo.phase}</Badge>
             </div>
             <div className="flex gap-2 md:ml-auto">
+              <Button
+                variant="outline"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setEditTentOpen(true)}
+                title="Editar estufa"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
               <Button
                 variant="outline"
                 size="icon"
@@ -662,6 +674,14 @@ export default function TentDetails() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Dialog de edição da estufa */}
+      <EditTentDialog
+        tent={tent}
+        open={editTentOpen}
+        onOpenChange={setEditTentOpen}
+        onSuccess={() => utils.tents.getById.invalidate({ id: tentId })}
+      />
 
       {/* Dialog de confirmação de exclusão da estufa */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

@@ -3676,3 +3676,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar botão Excluir (lixeira) no cabeçalho do TentDetails
 - [x] Confirm dialog com nome da estufa e aviso de irreversibilidade
 - [x] Após exclusão, redirecionar para /
+
+## Editar estufa no TentDetails (27/02/2026)
+
+- [x] Verificar procedure tents.update no backend
+- [x] Verificar se existe modal de edição de estufa reutilizável (EditTentDialog já existia)
+- [x] Adicionar botão Editar (lápis) no cabeçalho do TentDetails
+- [x] Modal de edição com campos: nome, largura, profundidade, altura, tipo
+- [x] Após salvar, invalidar query e atualizar dados da estufa na página
