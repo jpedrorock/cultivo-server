@@ -3691,3 +3691,8 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Atualizar TentDetails para mostrar "Última Clonagem" em vez de "Ciclo Ativo / Semana X" para estufas MAINTENANCE
 - [x] Adicionar lastCloningAt e lastCloningCount na procedure tents.list e tents.getById
 - [x] Inserir evento de clonagem de demonstração no seed (14 dias atrás, 6 clones)
+
+## Margens de Alerta por Fase
+
+- [x] Inserir margens de alerta por fase na tabela phaseAlertMargins (MAINTENANCE, CLONING, VEGA, FLORA, DRYING)
+- [x] Inserir safety limits por contexto (TENT_A, TENT_BC) e fase na tabela safetyLimits
