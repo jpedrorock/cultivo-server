@@ -3593,3 +3593,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar "Avançar para Secagem" em laranja (fase FLORA)
 - [x] Adicionar "Finalizar Clonagem" em azul (fase CLONING)
 - [ ] Aplicar as mesmas ações na página de detalhes da estufa (TentDetail)
+
+## Mini-modal de confirmação de avanço de fase (27/02/2026)
+
+- [x] Criar componente PhaseConfirmDialog com cores por fase
+- [x] Integrar confirmação antes de "Avançar para Floração" (verde)
+- [x] Integrar confirmação antes de "Avançar para Secagem" (laranja)
+- [x] Integrar confirmação antes de "Tirar Clones" (azul)

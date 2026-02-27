@@ -13,6 +13,7 @@ import { EditTentDialog } from "@/components/EditTentDialog";
 import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
 import { FinishCloningDialog } from "@/components/FinishCloningDialog";
 import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
+import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -691,6 +692,24 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const [selectedClonesCount, setSelectedClonesCount] = useState<number>(10);
   const [finishCloningOpen, setFinishCloningOpen] = useState(false);
   const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
+
+  // Mini-modal de confirmação de fase
+  const [phaseConfirmOpen, setPhaseConfirmOpen] = useState(false);
+  const [phaseConfirmType, setPhaseConfirmType] = useState<PhaseConfirmType>("FLORA");
+
+  const openPhaseConfirm = (type: PhaseConfirmType) => {
+    setPhaseConfirmType(type);
+    setPhaseConfirmOpen(true);
+  };
+
+  const handlePhaseConfirmed = () => {
+    setPhaseConfirmOpen(false);
+    if (phaseConfirmType === "CLONING") {
+      setSelectMotherOpen(true);
+    } else {
+      setPromotePhaseOpen(true);
+    }
+  };
   
   const { data: tasks, isLoading: tasksLoading } = trpc.tasks.getTasksByTent.useQuery(
     { tentId: tent.id },
@@ -1158,7 +1177,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 {/* Botão "Tirar Clones" para MANUTENÇÃO — azul */}
                 {cycle && tent.category === "MAINTENANCE" && (
                   <Button
-                    onClick={() => setSelectMotherOpen(true)}
+                    onClick={() => openPhaseConfirm("CLONING")}
                     variant="default"
                     size="sm"
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
@@ -1171,7 +1190,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 {/* Botão "Avançar para Floração" — verde, apenas em VEGA */}
                 {cycle && tent.category === "VEGA" && (
                   <Button
-                    onClick={() => setPromotePhaseOpen(true)}
+                    onClick={() => openPhaseConfirm("FLORA")}
                     variant="default"
                     size="sm"
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
@@ -1184,7 +1203,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 {/* Botão "Avançar para Secagem" — laranja, apenas em FLORA */}
                 {cycle && tent.category === "FLORA" && (
                   <Button
-                    onClick={() => setPromotePhaseOpen(true)}
+                    onClick={() => openPhaseConfirm("DRYING")}
                     variant="default"
                     size="sm"
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white"
@@ -1242,6 +1261,15 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         </div>
       </CardContent>
       
+
+      {/* Mini-modal de confirmação de fase */}
+      <PhaseConfirmDialog
+        open={phaseConfirmOpen}
+        onOpenChange={setPhaseConfirmOpen}
+        phase={phaseConfirmType}
+        tentName={tent.name}
+        onConfirm={handlePhaseConfirmed}
+      />
 
       {/* Select Mother Plant Dialog */}
       <SelectMotherPlantDialog
