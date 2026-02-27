@@ -3169,3 +3169,18 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] Aplicar StaggerList nas listas de plantas e registros
 - [ ] Adicionar animações suaves em charts (TentChartWidget)
 - [ ] Testar performance em iPhone Safari (60fps)
+
+## Aplicação de Animações nas Páginas Principais
+
+- [x] Aplicar PageTransition na página Home
+- [x] Aplicar SkeletonLoader nos cards de estufas (Home)
+- [x] Aplicar StaggerList + ListItemAnimation nos cards de estufas
+- [x] Aplicar PageTransition na página PlantsList
+- [ ] Aplicar SkeletonLoader nos cards de plantas (PlantsList)
+- [ ] Aplicar StaggerList + ListItemAnimation nos cards de plantas
+- [x] Aplicar PageTransition na página PlantDetail
+- [ ] Aplicar SkeletonLoader nas abas de PlantDetail
+- [ ] Aplicar AnimatedButton nos botões principais
+- [x] Aplicar PageTransition na página Calculators
+- [x] Testar todas as animações no navegador
+- [ ] Verificar performance (60fps)

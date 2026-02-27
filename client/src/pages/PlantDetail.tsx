@@ -45,6 +45,7 @@ import PlantTrichomesTab from "@/components/PlantTrichomesTab";
 import PlantLSTTab from "@/components/PlantLSTTab";
 import MoveTentModal from "@/components/MoveTentModal";
 import { toast } from "sonner";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function PlantDetail() {
   const [, params] = useRoute("/plants/:id");
@@ -235,7 +236,8 @@ export default function PlantDetail() {
 
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-6">
@@ -529,5 +531,6 @@ export default function PlantDetail() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageTransition>
   );
 }

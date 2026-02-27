@@ -34,6 +34,8 @@ import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { startMissingReadingsMonitor, getNotificationPermission } from "@/lib/notifications";
 import PullToRefresh from "react-simple-pull-to-refresh";
+import { PageTransition, StaggerList, ListItemAnimation, CardAnimation } from "@/components/PageTransition";
+import { SkeletonLoader } from "@/components/SkeletonLoader";
 
 
 export default function Home() {
@@ -320,8 +322,9 @@ export default function Home() {
   };
 
   return (
-    <PullToRefresh onRefresh={handleRefresh}>
-      <div className="min-h-screen bg-background">
+    <PageTransition>
+      <PullToRefresh onRefresh={handleRefresh}>
+        <div className="min-h-screen bg-background">
         {/* Header */}
         <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-6">
@@ -360,8 +363,13 @@ export default function Home() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tents?.map((tent) => {
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <SkeletonLoader count={3} className="h-96" />
+          </div>
+        ) : (
+          <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {tents?.map((tent) => {
             const cycle = getTentCycle(tent.id);
             const phaseInfo = getPhaseInfo(tent.category, cycle);
             const PhaseIcon = phaseInfo.icon;
@@ -382,8 +390,9 @@ export default function Home() {
                 onDeleteTent={handleDeleteTent}
               />
             );
-          })}
-        </div>
+            })}
+          </StaggerList>
+        )}
 
         {/* Weather Widget */}
         <div className="mt-8">
@@ -624,8 +633,9 @@ export default function Home() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
-    </PullToRefresh>
+        </div>
+      </PullToRefresh>
+    </PageTransition>
   );
 }
 
@@ -767,7 +777,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const totalTasks = tasks?.length || 0;
 
   return (
-    <Card className="bg-card/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+    <ListItemAnimation>
+      <Card className="bg-card/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
@@ -1200,5 +1211,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         />
       )}
     </Card>
+    </ListItemAnimation>
   );
 }

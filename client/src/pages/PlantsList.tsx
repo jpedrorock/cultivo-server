@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { PlantListSkeleton } from "@/components/ListSkeletons";
 import { useLocation } from "wouter";
+import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 
 export default function PlantsList() {
   const [, navigate] = useLocation();
@@ -240,7 +241,8 @@ export default function PlantsList() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+      <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-6">
@@ -730,5 +732,6 @@ export default function PlantsList() {
         </div>
       )}
     </div>
+    </PageTransition>
   );
 }
