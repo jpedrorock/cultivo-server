@@ -3542,3 +3542,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] ThemeToggle: ícone Check no tema ativo, ring-1 ring-primary/20 para destaque
 - [x] ThemeToggle: active:scale-[0.98] para feedback de toque
 - [x] TypeScript: 0 erros após todas as alterações
+
+## Refinamento do bloco Ciclo Ativo nos cards (27/02/2026)
+
+- [x] Bloco Ciclo Ativo: substituir bg-primary/10 genérico por cores por fase (verde/roxo/âmbar/azul)
+- [x] Bloco Ciclo Ativo: fundo colorido sutil + borda colorida por categoria da estufa
+- [x] Bloco Ciclo Ativo: label "Ciclo Ativo" com ícone de fase e cor correspondente
+- [x] Bloco Ciclo Ativo: número da semana com cor correspondente à fase
+- [x] TypeScript: 0 erros

@@ -912,11 +912,32 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           {/* Cycle Info */}
           {cycle ? (
             <div 
-              className="bg-primary/10 rounded-lg p-4 space-y-2"
+              className={`rounded-lg p-4 space-y-2 border ${
+                tent.category === 'VEGA'
+                  ? 'bg-green-500/8 border-green-500/20 dark:bg-green-500/10 dark:border-green-500/25'
+                  : tent.category === 'FLORA'
+                  ? 'bg-purple-500/8 border-purple-500/20 dark:bg-purple-500/10 dark:border-purple-500/25'
+                  : tent.category === 'DRYING'
+                  ? 'bg-amber-500/8 border-amber-500/20 dark:bg-amber-500/10 dark:border-amber-500/25'
+                  : 'bg-blue-500/8 border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-500/25'
+              }`}
             >
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-foreground">Ciclo Ativo</span>
-                <span className="text-sm font-semibold text-primary">
+                <span className={`text-sm font-semibold flex items-center gap-1.5 ${
+                  tent.category === 'VEGA' ? 'text-green-700 dark:text-green-400'
+                  : tent.category === 'FLORA' ? 'text-purple-700 dark:text-purple-400'
+                  : tent.category === 'DRYING' ? 'text-amber-700 dark:text-amber-400'
+                  : 'text-blue-700 dark:text-blue-400'
+                }`}>
+                  <PhaseIcon className="w-3.5 h-3.5" />
+                  Ciclo Ativo
+                </span>
+                <span className={`text-sm font-bold ${
+                  tent.category === 'VEGA' ? 'text-green-700 dark:text-green-400'
+                  : tent.category === 'FLORA' ? 'text-purple-700 dark:text-purple-400'
+                  : tent.category === 'DRYING' ? 'text-amber-700 dark:text-amber-400'
+                  : 'text-blue-700 dark:text-blue-400'
+                }`}>
                   Semana {(() => {
                     const now = new Date();
                     const start = new Date(cycle.startDate);
