@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { processImage, processImageFile, isHEIC, blobToBase64, formatFileSize } from "@/lib/imageUtils";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
+import { PageTransition } from "@/components/PageTransition";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
 
@@ -409,7 +410,8 @@ export default function QuickLog() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
+    <PageTransition>
+        <div className="h-screen overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
       {/* Content */}
       <div className="flex-1 flex items-center justify-center overflow-hidden pb-32">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">
@@ -1085,5 +1087,6 @@ export default function QuickLog() {
         />
       )}
     </div>
+    </PageTransition>
   );
 }

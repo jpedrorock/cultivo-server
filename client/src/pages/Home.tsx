@@ -35,7 +35,7 @@ import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { startMissingReadingsMonitor, getNotificationPermission } from "@/lib/notifications";
 import PullToRefresh from "react-simple-pull-to-refresh";
-import { PageTransition, StaggerList, ListItemAnimation, CardAnimation } from "@/components/PageTransition";
+import { PageTransition, StaggerList, ListItemAnimation, CardAnimation, AnimatedCounter } from "@/components/PageTransition";
 import { SkeletonLoader } from "@/components/SkeletonLoader";
 import { TentCardSkeleton } from "@/components/TentCardSkeleton";
 
@@ -1020,7 +1020,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     ? getValueColor(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)
                     : "text-foreground"
                 }`}>
-                  {latestLog?.tempC ? `${latestLog.tempC}°C` : "--°C"}
+                  {latestLog?.tempC ? <><AnimatedCounter value={parseFloat(latestLog.tempC)} decimals={1} suffix="°C" /></> : "--°C"}
                 </p>
                 {latestLog?.tempC && getStatusIcon(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)}
               </div>
@@ -1034,7 +1034,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     ? getValueColor(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)
                     : "text-foreground"
                 }`}>
-                  {latestLog?.rhPct ? `${latestLog.rhPct}%` : "--%"}
+                  {latestLog?.rhPct ? <><AnimatedCounter value={parseFloat(latestLog.rhPct)} decimals={1} suffix="%" /></> : "--%"}
                 </p>
                 {latestLog?.rhPct && getStatusIcon(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)}
               </div>
@@ -1048,7 +1048,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     ? getValueColor(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)
                     : "text-foreground"
                 }`}>
-                  {latestLog?.ppfd || "--"}
+                  {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : "--"}
                 </p>
                 {latestLog?.ppfd && getStatusIcon(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)}
               </div>

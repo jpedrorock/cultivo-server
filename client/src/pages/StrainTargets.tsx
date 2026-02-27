@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function StrainTargets() {
   const [, params] = useRoute("/strains/:id/targets");
@@ -239,7 +240,8 @@ export default function StrainTargets() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -314,5 +316,6 @@ export default function StrainTargets() {
         </Tabs>
       </main>
     </div>
+    </PageTransition>
   );
 }

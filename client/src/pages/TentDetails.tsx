@@ -10,6 +10,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Printer } from "lucide-react";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function TentDetails() {
   const { id } = useParams<{ id: string }>();
@@ -101,7 +102,8 @@ export default function TentDetails() {
     : "--";
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-4 md:py-6">
@@ -520,6 +522,7 @@ export default function TentDetails() {
         </Tabs>
       </main>
     </div>
+    </PageTransition>
   );
 }
 

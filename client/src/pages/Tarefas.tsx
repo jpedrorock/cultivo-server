@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import { toast } from "sonner";
 import { TaskTemplatesManager } from "@/components/TaskTemplatesManager";
 import { TaskCardSkeleton } from "@/components/ListSkeletons";
+import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { useState } from "react";
 
 export default function Tarefas() {
@@ -87,6 +88,7 @@ export default function Tarefas() {
   const tentNames = Array.from(new Set(tasks?.map((t) => t.tentName) || []));
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       {/* Header sticky */}
       <div className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
@@ -205,7 +207,7 @@ export default function Tarefas() {
 
             {/* Tarefas por estufa */}
             {tasks && tasks.length > 0 ? (
-              <div className="space-y-4">
+              <StaggerList className="space-y-4">
                 {Object.entries(tasksByTent).map(([tentName, tentTasks]) => {
                   const tentCompleted = tentTasks.filter((t) => t.isDone).length;
                   const tentTotal = tentTasks.length;
@@ -224,7 +226,8 @@ export default function Tarefas() {
                       : "bg-purple-500 hover:bg-purple-500";
 
                   return (
-                    <Card key={tentName} className="bg-card/80 backdrop-blur-sm">
+                    <ListItemAnimation key={tentName}>
+                    <Card className="bg-card/80 backdrop-blur-sm">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
@@ -314,9 +317,10 @@ export default function Tarefas() {
                         </div>
                       </CardContent>
                     </Card>
+                    </ListItemAnimation>
                   );
                 })}
-              </div>
+              </StaggerList>
             ) : (
               <Card className="bg-card/80 backdrop-blur-sm">
                 <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
@@ -341,5 +345,6 @@ export default function Tarefas() {
         </Tabs>
       </div>
     </div>
+    </PageTransition>
   );
 }

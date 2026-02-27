@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function ManageStrains() {
   const [, setLocation] = useLocation();
@@ -176,7 +177,8 @@ export default function ManageStrains() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header — sticky, compacto no mobile */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 flex items-center gap-3">
@@ -451,5 +453,6 @@ export default function ManageStrains() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageTransition>
   );
 }

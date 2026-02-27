@@ -10,6 +10,7 @@ import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Save, Beaker
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function TentLog() {
   const { id } = useParams<{ id: string }>();
@@ -236,7 +237,8 @@ export default function TentLog() {
   const phaseInfo = getPhaseInfo();
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-6">
@@ -675,5 +677,6 @@ export default function TentLog() {
         </Card>
       </main>
     </div>
+    </PageTransition>
   );
 }

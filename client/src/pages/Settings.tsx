@@ -5,10 +5,12 @@ import { ArrowLeft, Database, Keyboard } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function Settings() {
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header — sticky, compacto no mobile */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 sm:py-4">
@@ -37,6 +39,7 @@ export default function Settings() {
         </div>
       </main>
     </div>
+    </PageTransition>
   );
 }
 

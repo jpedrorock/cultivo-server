@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, ArrowLeft } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { EmptyState } from "@/components/EmptyState";
+import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 
 export default function Alerts() {
   const [, navigate] = useLocation();
@@ -30,7 +31,8 @@ export default function Alerts() {
   const currentTent = tents?.find(t => t.id === selectedTentId);
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -103,10 +105,10 @@ export default function Alerts() {
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
               ) : history && history.length > 0 ? (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                <StaggerList className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                   {history.map((alert: any) => (
+                    <ListItemAnimation key={alert.id}>
                     <div
-                      key={alert.id}
                       className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -148,8 +150,9 @@ export default function Alerts() {
                         )}
                       </div>
                     </div>
+                    </ListItemAnimation>
                   ))}
-                </div>
+                </StaggerList>
               ) : (
                 <EmptyState
                   icon={Bell}
@@ -164,5 +167,6 @@ export default function Alerts() {
         </div>
       </main>
     </div>
+    </PageTransition>
   );
 }

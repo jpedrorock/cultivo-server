@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { useState } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
+import { AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { InstallPWA } from "./components/InstallPWA";
 import { AddToHomeScreenPrompt } from "./components/AddToHomeScreenPrompt";
@@ -40,8 +41,10 @@ import Nutrients from "./pages/Nutrients";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
+  const [location] = useLocation();
   return (
-    <Switch>
+    <AnimatePresence mode="wait" initial={false}>
+      <Switch key={location}>
       <Route path={"/"} component={Home} />
 
       <Route path={"/strains"} component={ManageStrains} />
@@ -73,7 +76,8 @@ function Router() {
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
-    </Switch>
+      </Switch>
+    </AnimatePresence>
   );
 }
 

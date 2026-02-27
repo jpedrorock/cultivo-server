@@ -3475,3 +3475,14 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] AlertSettings: description do accordion com line-clamp-1 no mobile
 - [x] NotificationSettings: switches com label wrapper clicável (min-h-[44px])
 - [x] NotificationSettings: botão "Testar Notificação" full-width (já era, melhorado min-h-[48px])
+
+## Animações Fase 2 (27/02/2026)
+
+- [x] framer-motion já estava instalado
+- [x] Page transitions: AnimatePresence + useLocation no App.tsx (fade+slide entre rotas)
+- [x] PageTransition wrapper adicionado em 16 páginas (Alerts, Settings, ManageStrains, Nutrients, CalculatorMenu, TentDetails, TentLog, Tarefas, AlertHistory, AlertSettings, NewPlant, PlantArchivePage, QuickLog, etc.)
+- [x] Skeleton loaders: já existiam (TentCardSkeleton, TaskCardSkeleton, SkeletonLoader)
+- [x] Micro-interações: CardAnimation já usada em Home.tsx e PlantsList.tsx
+- [x] Animações de lista: StaggerList + ListItemAnimation adicionados em Alerts.tsx e Tarefas.tsx
+- [x] Animações de gráficos: animationDuration/Begin/Easing já configurados nos gráficos Recharts (TentDetails)
+- [x] AnimatedCounter: adicionado nos KPIs de temperatura, umidade e PPFD nos cards de estufa (Home.tsx)

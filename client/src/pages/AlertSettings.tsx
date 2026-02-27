@@ -15,6 +15,7 @@ import {
   scheduleMultipleDailyReminders,
   migrateReminderConfig,
 } from "@/lib/notifications";
+import { PageTransition } from "@/components/PageTransition";
 
 interface NotificationConfig {
   dailyReminderEnabled: boolean;
@@ -153,7 +154,8 @@ export default function AlertSettings() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -428,5 +430,6 @@ export default function AlertSettings() {
         </div>
       </main>
     </div>
+    </PageTransition>
   );
 }

@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { Calculator, Droplets, Sun, Beaker, TestTube } from "lucide-react";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function CalculatorMenu() {
   const calculators = [
@@ -56,7 +57,8 @@ export default function CalculatorMenu() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-6">
@@ -144,5 +146,6 @@ export default function CalculatorMenu() {
         </Card>
       </main>
     </div>
+    </PageTransition>
   );
 }

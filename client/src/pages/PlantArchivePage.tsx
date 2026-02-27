@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function PlantArchivePage() {
   const [statusFilter, setStatusFilter] = useState<"HARVESTED" | "DISCARDED" | "DEAD" | undefined>(undefined);
@@ -125,7 +126,8 @@ export default function PlantArchivePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container py-6">
@@ -388,5 +390,6 @@ export default function PlantArchivePage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageTransition>
   );
 }

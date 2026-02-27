@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageTransition } from "@/components/PageTransition";
 
 type AlertType = "daily_reminder" | "environment_alert" | "task_reminder" | "all";
 
@@ -65,7 +66,8 @@ export default function AlertHistory() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -205,5 +207,6 @@ export default function AlertHistory() {
         </div>
       </main>
     </div>
+    </PageTransition>
   );
 }

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Sprout, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { PageTransition } from "@/components/PageTransition";
 
 export default function NewPlant() {
   const [, setLocation] = useLocation();
@@ -62,7 +63,8 @@ export default function NewPlant() {
   const isLoading = loadingStrains || loadingTents;
 
   return (
-    <div className="min-h-screen bg-background">
+    <PageTransition>
+        <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-6">
@@ -222,5 +224,6 @@ export default function NewPlant() {
         )}
       </main>
     </div>
+    </PageTransition>
   );
 }
