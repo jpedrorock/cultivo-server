@@ -5,8 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Trash2, BookmarkPlus, Share2, Copy, Check, Edit } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Trash2, BookmarkPlus, Share2, Copy, Check, Edit, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 export function FertilizationCalculator() {
@@ -26,6 +26,9 @@ export function FertilizationCalculator() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingPreset, setEditingPreset] = useState<any>(null);
   const [editPresetName, setEditPresetName] = useState("");
+  const [deletePresetConfirm, setDeletePresetConfirm] = useState<{ open: boolean; id: number | null; name: string }>({
+    open: false, id: null, name: ""
+  });
 
   // Buscar EC recomendado do backend
   const { data: weeklyTarget } = trpc.weeklyTargets.get.useQuery({
@@ -576,11 +579,7 @@ Gerado por App Cultivo em ${now.toLocaleString('pt-BR')}
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => {
-                      if (confirm(`Excluir predefinição "${preset.name}"?`)) {
-                        deletePreset.mutate({ id: preset.id });
-                      }
-                    }}
+                    onClick={() => setDeletePresetConfirm({ open: true, id: preset.id, name: preset.name })}
                     title="Excluir predefinição"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
@@ -690,6 +689,40 @@ Gerado por App Cultivo em ${now.toLocaleString('pt-BR')}
             </Button>
             <Button onClick={handleUpdatePreset} disabled={updatePreset.isPending}>
               {updatePreset.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Preset Confirm Dialog */}
+      <Dialog open={deletePresetConfirm.open} onOpenChange={(open) => !open && setDeletePresetConfirm({ open: false, id: null, name: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Excluir Predefinição
+            </DialogTitle>
+            <DialogDescription>
+              Excluir a predefinição{" "}
+              <span className="font-semibold text-foreground">"{deletePresetConfirm.name}"</span>?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeletePresetConfirm({ open: false, id: null, name: "" })}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deletePresetConfirm.id) {
+                  deletePreset.mutate({ id: deletePresetConfirm.id });
+                  setDeletePresetConfirm({ open: false, id: null, name: "" });
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir
             </Button>
           </DialogFooter>
         </DialogContent>

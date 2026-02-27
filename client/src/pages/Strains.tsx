@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,9 @@ export default function Strains() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingStrain, setEditingStrain] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: number | null; name: string }>({
+    open: false, id: null, name: ""
+  });
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -102,26 +106,29 @@ export default function Strains() {
   };
 
   const handleDelete = (id: number, name: string) => {
-    if (confirm(`Tem certeza que deseja excluir a strain "${name}"?`)) {
-      let timeoutId: NodeJS.Timeout | null = null;
-      
-      // Show toast with undo button
-      toast.info(`Strain "${name}" será excluída em 5 segundos`, {
-        duration: 5000,
-        action: {
-          label: "Desfazer",
-          onClick: () => {
-            if (timeoutId) clearTimeout(timeoutId);
-            toast.success("Exclusão cancelada!");
-          },
+    setDeleteConfirm({ open: true, id, name });
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirm.id) return;
+    const id = deleteConfirm.id;
+    const name = deleteConfirm.name;
+    setDeleteConfirm({ open: false, id: null, name: "" });
+    
+    let timeoutId: NodeJS.Timeout | null = null;
+    toast.info(`Strain "${name}" será excluída em 5 segundos`, {
+      duration: 5000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          toast.success("Exclusão cancelada!");
         },
-      });
-      
-      // Schedule deletion after 5 seconds
-      timeoutId = setTimeout(() => {
-        deleteStrain.mutate({ id });
-      }, 5000);
-    }
+      },
+    });
+    timeoutId = setTimeout(() => {
+      deleteStrain.mutate({ id });
+    }, 5000);
   };
 
   // Filtrar strains por busca
@@ -391,6 +398,32 @@ export default function Strains() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, id: null, name: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Excluir Strain
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir a strain{" "}
+              <span className="font-semibold text-foreground">"{deleteConfirm.name}"</span>?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, id: null, name: "" })}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

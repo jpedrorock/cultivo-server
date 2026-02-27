@@ -3633,3 +3633,25 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Confirm dialog com aviso de irreversibilidade antes de deletar do arquivo
 - [x] Exibir histórico completo da planta arquivada (observações, saúde, logs de rega)
 - [x] Expandir card do arquivo para mostrar histórico ao clicar (seção colapsável)
+
+## Substituição de confirm() nativos por modais (27/02/2026)
+
+- [ ] Strains.tsx: substituir confirm() de exclusão de strain por modal
+- [ ] Tarefas.tsx: substituir confirm() de exclusão de tarefa por modal
+- [ ] Tasks.tsx: substituir confirm() de exclusão de tarefa por modal
+- [ ] Home.tsx: substituir confirm() de finalizar ciclo por modal
+- [ ] PlantDetail.tsx: substituir confirm() de transplantar por modal
+- [ ] PlantDetail.tsx: substituir prompt() de colheita por modal com campo de texto
+- [ ] PlantDetail.tsx: substituir prompt() de descarte por modal com campo de texto
+- [ ] PlantsList.tsx: substituir confirm() de ações em massa (promover, colher, descartar) por modais
+
+## Substituição de confirm() nativos por modais (27/02/2026)
+
+- [x] Substituir confirm() no Strains.tsx
+- [x] Substituir confirm() no Tarefas.tsx
+- [x] Substituir confirm() no Tasks.tsx
+- [x] Substituir confirm() no Home.tsx (finalizar ciclo)
+- [x] Substituir confirm()/prompt() no PlantDetail.tsx (transplantar/colher/descartar)
+- [x] Substituir confirm() no PlantPhotosTab.tsx (excluir foto)
+- [x] Substituir confirm() no PlantHealthTab.tsx (excluir registro de saúde)
+- [x] Substituir window.confirm() no Backup.tsx (importar backup)

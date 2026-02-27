@@ -39,6 +39,8 @@ import {
   processImageFile,
 } from "@/lib/imageUtils";
 import EditHealthLogDialog from "@/components/EditHealthLogDialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertTriangle } from "lucide-react";
 import UploadProgress from "@/components/UploadProgress";
 import { HealthTabSkeleton } from "@/components/TabSkeletons";
 import { LazyImage } from "@/components/LazyImage";
@@ -105,6 +107,10 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
     reduction?: number;
   }>({ isUploading: false, stage: "converting", progress: 0 });
   
+  const [deleteHealthLogConfirm, setDeleteHealthLogConfirm] = useState<{ open: boolean; id: number | null }>({
+    open: false, id: null
+  });
+
   // Swipe gesture states
   const [touchStart, setTouchStart] = useState<number>(0);
   const [touchEnd, setTouchEnd] = useState<number>(0);
@@ -584,22 +590,11 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                             role="button"
                             tabIndex={0}
                             className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (
-                                confirm(
-                                  "Deseja realmente excluir este registro?"
-                                )
-                              ) {
-                                deleteHealthLog.mutate({ id: log.id });
-                              }
-                            }}
+                            onClick={() => setDeleteHealthLogConfirm({ open: true, id: log.id })}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                if (confirm("Deseja realmente excluir este registro?")) {
-                                  deleteHealthLog.mutate({ id: log.id });
-                                }
+                                setDeleteHealthLogConfirm({ open: true, id: log.id });
                               }
                             }}
                           >
@@ -869,6 +864,39 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
         onSave={handleEditSave}
         isSaving={updateHealthLog.isPending}
       />
+
+      {/* Delete Health Log Confirm Dialog */}
+      <Dialog open={deleteHealthLogConfirm.open} onOpenChange={(open) => !open && setDeleteHealthLogConfirm({ open: false, id: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Excluir Registro de Saúde
+            </DialogTitle>
+            <DialogDescription>
+              Deseja realmente excluir este registro de saúde? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteHealthLogConfirm({ open: false, id: null })}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteHealthLogConfirm.id) {
+                  deleteHealthLog.mutate({ id: deleteHealthLogConfirm.id });
+                  setDeleteHealthLogConfirm({ open: false, id: null });
+                }
+              }}
+              disabled={deleteHealthLog.isPending}
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Excluir Registro
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Photo Upload Progress Overlay */}
       {uploadProgress.isUploading && (

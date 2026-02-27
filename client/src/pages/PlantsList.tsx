@@ -118,6 +118,9 @@ export default function PlantsList() {
   }>({ open: false });
 
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkPromoteConfirm, setBulkPromoteConfirm] = useState(false);
+  const [bulkHarvestConfirm, setBulkHarvestConfirm] = useState(false);
+  const [bulkDiscardConfirm, setBulkDiscardConfirm] = useState(false);
 
   const bulkDelete = trpc.plants.bulkDelete.useMutation({
     onSuccess: (data) => {
@@ -710,11 +713,7 @@ export default function PlantsList() {
                     size="sm"
                     variant="outline"
                     className="text-xs px-2 md:px-3"
-                    onClick={() => {
-                      if (confirm(`Promover ${selectedPlants.size} muda(s) para planta?`)) {
-                        bulkPromote.mutate({ plantIds: Array.from(selectedPlants) });
-                      }
-                    }}
+                    onClick={() => setBulkPromoteConfirm(true)}
                     disabled={bulkPromote.isPending}
                   >
                     {bulkPromote.isPending ? (
@@ -742,11 +741,7 @@ export default function PlantsList() {
                   size="sm"
                   variant="outline"
                   className="text-xs px-2 md:px-3"
-                  onClick={() => {
-                    if (confirm(`Marcar ${selectedPlants.size} planta(s) como colhida(s)?`)) {
-                      bulkHarvest.mutate({ plantIds: Array.from(selectedPlants) });
-                    }
-                  }}
+                  onClick={() => setBulkHarvestConfirm(true)}
                   disabled={bulkHarvest.isPending}
                 >
                   {bulkHarvest.isPending ? (
@@ -761,11 +756,7 @@ export default function PlantsList() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    if (confirm(`Descartar ${selectedPlants.size} planta(s)? Esta ação não pode ser desfeita.`)) {
-                      bulkDiscard.mutate({ plantIds: Array.from(selectedPlants) });
-                    }
-                  }}
+                  onClick={() => setBulkDiscardConfirm(true)}
                   disabled={bulkDiscard.isPending}
                   className="text-destructive hover:text-destructive text-xs px-2 md:px-3"
                 >
@@ -893,6 +884,90 @@ export default function PlantsList() {
                   Excluir Permanentemente
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Promote Confirm Dialog */}
+      <Dialog open={bulkPromoteConfirm} onOpenChange={setBulkPromoteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Sprout className="w-5 h-5" />
+              Promover Mudas
+            </DialogTitle>
+            <DialogDescription>
+              Promover{" "}
+              <span className="font-semibold text-foreground">{selectedPlants.size} muda{selectedPlants.size > 1 ? 's' : ''}</span>{" "}
+              para planta? Esta ação atualizará o estágio de todas as mudas selecionadas.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBulkPromoteConfirm(false)}>Cancelar</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => { bulkPromote.mutate({ plantIds: Array.from(selectedPlants) }); setBulkPromoteConfirm(false); }}
+              disabled={bulkPromote.isPending}
+            >
+              {bulkPromote.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sprout className="w-4 h-4 mr-2" />}
+              Promover
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Harvest Confirm Dialog */}
+      <Dialog open={bulkHarvestConfirm} onOpenChange={setBulkHarvestConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <span className="text-lg">🌾</span>
+              Colher Plantas
+            </DialogTitle>
+            <DialogDescription>
+              Marcar{" "}
+              <span className="font-semibold text-foreground">{selectedPlants.size} planta{selectedPlants.size > 1 ? 's' : ''}</span>{" "}
+              como colhida{selectedPlants.size > 1 ? 's' : ''}? As plantas serão arquivadas com status Colhida.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBulkHarvestConfirm(false)}>Cancelar</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => { bulkHarvest.mutate({ plantIds: Array.from(selectedPlants) }); setBulkHarvestConfirm(false); }}
+              disabled={bulkHarvest.isPending}
+            >
+              {bulkHarvest.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <span className="mr-2">🌾</span>}
+              Confirmar Colheita
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Discard Confirm Dialog */}
+      <Dialog open={bulkDiscardConfirm} onOpenChange={setBulkDiscardConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Descartar Plantas
+            </DialogTitle>
+            <DialogDescription>
+              Descartar{" "}
+              <span className="font-semibold text-foreground">{selectedPlants.size} planta{selectedPlants.size > 1 ? 's' : ''}</span>?{" "}
+              As plantas serão arquivadas com status Descartada. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBulkDiscardConfirm(false)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { bulkDiscard.mutate({ plantIds: Array.from(selectedPlants) }); setBulkDiscardConfirm(false); }}
+              disabled={bulkDiscard.isPending}
+            >
+              {bulkDiscard.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Confirmar Descarte
             </Button>
           </DialogFooter>
         </DialogContent>

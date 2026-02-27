@@ -54,6 +54,11 @@ export default function PlantDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", code: "", notes: "" });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [transplantConfirmOpen, setTransplantConfirmOpen] = useState(false);
+  const [harvestModalOpen, setHarvestModalOpen] = useState(false);
+  const [harvestNotes, setHarvestNotes] = useState("");
+  const [discardModalOpen, setDiscardModalOpen] = useState(false);
+  const [discardReason, setDiscardReason] = useState("");
 
   const { data: plant, isLoading, refetch } = trpc.plants.getById.useQuery({ id: plantId });
   const { data: strain } = trpc.strains.getById.useQuery(
@@ -122,20 +127,21 @@ export default function PlantDetail() {
   
   // Handlers
   const handleTransplantToFlora = () => {
-    if (confirm('Deseja transplantar esta planta para a estufa de Flora?')) {
-      transplantMutation.mutate({ plantId });
-    }
+    setTransplantConfirmOpen(true);
   };
   
   const handleHarvest = () => {
-    const reason = prompt('Notas sobre a colheita (opcional - ex: peso, qualidade):');
-    if (reason !== null) { // null = cancelado
-      archiveMutation.mutate({ 
-        plantId, 
-        status: 'HARVESTED',
-        finishReason: reason || undefined
-      });
-    }
+    setHarvestNotes("");
+    setHarvestModalOpen(true);
+  };
+
+  const confirmHarvest = () => {
+    archiveMutation.mutate({ 
+      plantId, 
+      status: 'HARVESTED',
+      finishReason: harvestNotes || undefined
+    });
+    setHarvestModalOpen(false);
   };
   
   const handleDelete = () => {
@@ -147,14 +153,17 @@ export default function PlantDetail() {
   };
   
   const handleDiscard = () => {
-    const reason = prompt('Motivo do descarte (ex: doente, hermafrodita, baixa qualidade):');
-    if (reason !== null) { // null = cancelado
-      archiveMutation.mutate({ 
-        plantId, 
-        status: 'DISCARDED',
-        finishReason: reason || undefined
-      });
-    }
+    setDiscardReason("");
+    setDiscardModalOpen(true);
+  };
+
+  const confirmDiscard = () => {
+    archiveMutation.mutate({ 
+      plantId, 
+      status: 'DISCARDED',
+      finishReason: discardReason || undefined
+    });
+    setDiscardModalOpen(false);
   };
 
   const handlePromoteToPlant = () => {
@@ -617,6 +626,128 @@ export default function PlantDetail() {
                   <Trash2 className="w-4 h-4 mr-2" />
                   Excluir Permanentemente
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transplant Confirm Dialog */}
+      <Dialog open={transplantConfirmOpen} onOpenChange={setTransplantConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-purple-600">
+              <MoveRight className="w-5 h-5" />
+              Transplantar para Flora
+            </DialogTitle>
+            <DialogDescription>
+              Deseja transplantar{" "}
+              <span className="font-semibold text-foreground">{plant.name}</span>{" "}
+              para a estufa de Flora? A planta será movida automaticamente para a estufa de Floração configurada.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setTransplantConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              onClick={() => {
+                transplantMutation.mutate({ plantId });
+                setTransplantConfirmOpen(false);
+              }}
+            >
+              <MoveRight className="w-4 h-4 mr-2" />
+              Transplantar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Harvest Modal */}
+      <Dialog open={harvestModalOpen} onOpenChange={setHarvestModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Scissors className="w-5 h-5" />
+              Registrar Colheita
+            </DialogTitle>
+            <DialogDescription>
+              Colhendo{" "}
+              <span className="font-semibold text-foreground">{plant.name}</span>.
+              Adicione notas sobre a colheita (opcional).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium text-foreground mb-2 block">
+              Notas da colheita (ex: peso, qualidade)
+            </label>
+            <textarea
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+              rows={3}
+              placeholder="Ex: 45g, qualidade excelente, terpenos intensos..."
+              value={harvestNotes}
+              onChange={(e) => setHarvestNotes(e.target.value)}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setHarvestModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={confirmHarvest}
+              disabled={archiveMutation.isPending}
+            >
+              {archiveMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Colhendo...</>
+              ) : (
+                <><Scissors className="w-4 h-4 mr-2" />Confirmar Colheita</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discard Modal */}
+      <Dialog open={discardModalOpen} onOpenChange={setDiscardModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="w-5 h-5" />
+              Descartar Planta
+            </DialogTitle>
+            <DialogDescription>
+              Descartando{" "}
+              <span className="font-semibold text-foreground">{plant.name}</span>.
+              Informe o motivo do descarte (opcional).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium text-foreground mb-2 block">
+              Motivo do descarte
+            </label>
+            <textarea
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+              rows={3}
+              placeholder="Ex: doente, hermafrodita, baixa qualidade..."
+              value={discardReason}
+              onChange={(e) => setDiscardReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDiscardModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDiscard}
+              disabled={archiveMutation.isPending}
+            >
+              {archiveMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Descartando...</>
+              ) : (
+                <><XCircle className="w-4 h-4 mr-2" />Confirmar Descarte</>
               )}
             </Button>
           </DialogFooter>

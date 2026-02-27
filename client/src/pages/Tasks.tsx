@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, CheckCircle2, Circle, Sprout, Filter, Trash2 } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, Sprout, Filter, Trash2, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { TaskTemplatesManager } from "@/components/TaskTemplatesManager";
@@ -16,6 +17,9 @@ export default function Tasks() {
   const utils = trpc.useUtils();
   const [selectedTent, setSelectedTent] = useState<string>("all");
   const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [deleteTaskConfirm, setDeleteTaskConfirm] = useState<{ open: boolean; taskId: number | null }>({
+    open: false, taskId: null
+  });
 
   const markAsDone = trpc.tasks.markAsDone.useMutation({
     onSuccess: () => {
@@ -95,6 +99,7 @@ export default function Tasks() {
   const tentNames = Array.from(new Set(tasks?.map((t) => t.tentName) || []));
 
   return (
+    <>
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
@@ -282,9 +287,7 @@ export default function Tasks() {
                               variant="ghost"
                               size="icon"
                               onClick={() => {
-                                if (confirm("Tem certeza que deseja excluir esta tarefa?")) {
-                                  deleteTask.mutate({ taskId: task.id });
-                                }
+                                setDeleteTaskConfirm({ open: true, taskId: task.id });
                               }}
                               className="text-red-500 hover:text-red-700 hover:bg-red-50"
                             >
@@ -319,5 +322,38 @@ export default function Tasks() {
         </Tabs>
       </div>
     </div>
+
+      {/* Delete Task Confirm Dialog */}
+      <Dialog open={deleteTaskConfirm.open} onOpenChange={(open) => !open && setDeleteTaskConfirm({ open: false, taskId: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Excluir Tarefa
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTaskConfirm({ open: false, taskId: null })}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteTaskConfirm.taskId) {
+                  deleteTask.mutate({ taskId: deleteTaskConfirm.taskId });
+                  setDeleteTaskConfirm({ open: false, taskId: null });
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

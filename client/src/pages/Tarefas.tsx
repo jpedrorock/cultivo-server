@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, CheckCircle2, Circle, ArrowLeft, Filter, Trash2, ListChecks } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, ArrowLeft, Filter, Trash2, ListChecks, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { TaskTemplatesManager } from "@/components/TaskTemplatesManager";
@@ -17,6 +18,9 @@ export default function Tarefas() {
   const utils = trpc.useUtils();
   const [selectedTent, setSelectedTent] = useState<string>("all");
   const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [deleteTaskConfirm, setDeleteTaskConfirm] = useState<{ open: boolean; taskId: number | null }>({
+    open: false, taskId: null
+  });
 
   const markAsDone = trpc.tasks.markAsDone.useMutation({
     onSuccess: () => {
@@ -302,9 +306,7 @@ export default function Tarefas() {
                               {task.id > 0 && (
                                 <button
                                   onClick={() => {
-                                    if (confirm("Excluir esta tarefa?")) {
-                                      deleteTask.mutate({ taskId: task.id });
-                                    }
+                                    setDeleteTaskConfirm({ open: true, taskId: task.id });
                                   }}
                                   className="shrink-0 p-2 -mr-1 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                   aria-label="Excluir tarefa"
@@ -345,6 +347,37 @@ export default function Tarefas() {
         </Tabs>
       </div>
     </div>
+      {/* Delete Task Confirm Dialog */}
+      <Dialog open={deleteTaskConfirm.open} onOpenChange={(open) => !open && setDeleteTaskConfirm({ open: false, taskId: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Excluir Tarefa
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTaskConfirm({ open: false, taskId: null })}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteTaskConfirm.taskId) {
+                  deleteTask.mutate({ taskId: deleteTaskConfirm.taskId });
+                  setDeleteTaskConfirm({ open: false, taskId: null });
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageTransition>
   );
 }

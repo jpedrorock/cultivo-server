@@ -2,12 +2,15 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Download, Upload, Database, Shield } from "lucide-react";
+import { AlertCircle, Download, Upload, Database, Shield, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function Backup() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [importConfirm, setImportConfirm] = useState(false);
+  const [pendingFile, setPendingFile] = useState<any>(null);
 
   const exportBackup = trpc.backup.export.useQuery(undefined, {
     enabled: false,
@@ -73,19 +76,11 @@ export default function Backup() {
           throw new Error("Arquivo de backup inválido");
         }
         
-        // Confirmar antes de importar (apaga dados existentes)
-        const confirmed = window.confirm(
-          "⚠️ ATENÇÃO: Importar um backup irá SUBSTITUIR TODOS os dados atuais do aplicativo. " +
-          "Esta ação não pode ser desfeita. Tem certeza que deseja continuar?"
-        );
-        
-        if (!confirmed) {
-          setIsImporting(false);
-          return;
-        }
-        
-        // Importar backup
-        await importBackup.mutateAsync(backupData);
+        // Guardar dados e abrir confirm dialog
+        setPendingFile(backupData);
+        setIsImporting(false);
+        setImportConfirm(true);
+        return;
       } catch (error: any) {
         toast.error(`Erro ao ler arquivo: ${error.message}`);
         setIsImporting(false);
@@ -202,6 +197,52 @@ export default function Backup() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Import Confirm Dialog */}
+      <Dialog open={importConfirm} onOpenChange={setImportConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Confirmar Importação de Backup
+            </DialogTitle>
+            <DialogDescription className="space-y-2">
+              <span className="block font-semibold text-foreground">⚠️ ATENÇÃO: Esta ação é irreversível!</span>
+              <span className="block">Importar este backup irá <strong>substituir todos os dados atuais</strong> do aplicativo — estufas, plantas, strains, tarefas, histórico e configurações.</span>
+              <span className="block text-muted-foreground text-xs">Recomendamos exportar um backup dos dados atuais antes de continuar.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setImportConfirm(false); setPendingFile(null); }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!pendingFile) return;
+                setImportConfirm(false);
+                setIsImporting(true);
+                try {
+                  await importBackup.mutateAsync(pendingFile);
+                } catch (e) {
+                  // handled by onError
+                }
+                setPendingFile(null);
+              }}
+              disabled={importBackup.isPending}
+            >
+              {importBackup.isPending ? (
+                <><Upload className="w-4 h-4 mr-2 animate-spin" />Importando...</>
+              ) : (
+                <><Upload className="w-4 h-4 mr-2" />Confirmar Importação</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

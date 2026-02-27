@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Camera, X, ZoomIn } from "lucide-react";
+import { Camera, X, ZoomIn, Trash2 } from "lucide-react";
 import { GallerySkeletonLoader } from "@/components/SkeletonLoader";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface PlantPhotosTabProps {
   plantId: number;
@@ -13,6 +14,7 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [deletePhotoConfirm, setDeletePhotoConfirm] = useState(false);
   
   // Swipe gesture states
   const [touchStart, setTouchStart] = useState<number>(0);
@@ -219,9 +221,7 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
             className="absolute top-4 left-4 text-white hover:text-red-400 z-10"
             onClick={(e) => {
               e.stopPropagation();
-              if (confirm("Tem certeza que deseja excluir esta foto?")) {
-                handleDeletePhoto();
-              }
+              setDeletePhotoConfirm(true);
             }}
           >
             <span className="text-sm">🗑️ Excluir</span>
@@ -270,6 +270,35 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
           </div>
         </div>
       )}
+
+      {/* Delete Photo Confirm Dialog */}
+      <Dialog open={deletePhotoConfirm} onOpenChange={setDeletePhotoConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Excluir Foto
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir esta foto? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeletePhotoConfirm(false)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDeletePhotoConfirm(false);
+                handleDeletePhoto();
+              }}
+              disabled={deletePhoto.isPending}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir Foto
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -30,7 +30,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -56,6 +57,9 @@ export default function Home() {
   const [showMoveAllPlants, setShowMoveAllPlants] = useState(false);
   const [targetTentId, setTargetTentId] = useState<string>("");
   const [deletePreviewTentId, setDeletePreviewTentId] = useState<number | null>(null);
+  const [finalizeCycleConfirm, setFinalizeCycleConfirm] = useState<{ open: boolean; cycleId: number | null; tentName: string }>({
+    open: false, cycleId: null, tentName: ""
+  });
   
   const { data: deletePreview, isLoading: deletePreviewLoading } = trpc.tents.getDeletePreview.useQuery(
     { id: deletePreviewTentId! },
@@ -229,9 +233,7 @@ export default function Home() {
   });
 
   const handleFinalizeCycle = (cycleId: number, tentName: string) => {
-    if (confirm(`Tem certeza que deseja finalizar o ciclo da ${tentName}?`)) {
-      finalizeCycle.mutate({ cycleId });
-    }
+    setFinalizeCycleConfirm({ open: true, cycleId, tentName });
   };
 
   const handleInitiateCycle = (tentId: number, tentName: string) => {
@@ -665,6 +667,40 @@ export default function Home() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Finalizar Ciclo Confirm Dialog */}
+      <Dialog open={finalizeCycleConfirm.open} onOpenChange={(open) => !open && setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <CheckCircle className="w-5 h-5" />
+              Finalizar Ciclo
+            </DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja finalizar o ciclo da{" "}
+              <span className="font-semibold text-foreground">{finalizeCycleConfirm.tentName}</span>?
+              Esta ação encerrará o ciclo ativo e não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" })}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={() => {
+                if (finalizeCycleConfirm.cycleId) {
+                  finalizeCycle.mutate({ cycleId: finalizeCycleConfirm.cycleId });
+                  setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" });
+                }
+              }}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Finalizar Ciclo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
         </div>
       </PullToRefresh>
     </PageTransition>
