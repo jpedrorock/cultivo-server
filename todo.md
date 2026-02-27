@@ -3191,3 +3191,13 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Aplicar ListItemAnimation em cada PlantCard
 - [x] Testar animação de entrada escalonada
 - [x] Verificar performance no navegador
+
+## Implementar AnimatedButton com Ripple Effect
+
+- [x] Criar componente AnimatedButton com ripple effect e haptic feedback
+- [x] Substituir botões de ação em PlantDetail (Salvar, Excluir, Mover, Transplantar, Finalizar)
+- [ ] Substituir botões de ação em PlantsList (Mover, Selecionar, Desmarcar)
+- [x] Substituir botões de ação em Home (Criar Estufa, Iniciar Ciclo, Editar, Excluir)
+- [x] Substituir botões em QuickLog (Salvar, Pular, Próxima Planta)
+- [x] Testar ripple effect e haptic feedback em todos os botões
+- [x] Verificar que variantes (primary, outline, ghost) funcionam corretamente

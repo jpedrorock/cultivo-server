@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { AnimatedButton } from "@/components/AnimatedButton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -844,9 +845,9 @@ export default function QuickLog() {
                     <>
                       <SkipForward className="mr-2 h-6 w-6" />
                       Pular e Finalizar
-                    </>
-                  )}
-                </Button>
+                </>  
+              )}
+            </Button>
               </div>
             )}
 
@@ -1037,15 +1038,15 @@ export default function QuickLog() {
         {/* Plant health navigation */}
         {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
           <>
-            <Button
+            <AnimatedButton
               onClick={handleSkipPlantHealth}
               variant="outline"
               className="flex-1 h-14 text-lg font-medium rounded-xl"
             >
               <SkipForward className="mr-2 h-5 w-5" />
               Pular
-            </Button>
-            <Button
+            </AnimatedButton>
+            <AnimatedButton
               onClick={handleSavePlantHealth}
               disabled={savePlantHealthMutation.isPending || uploadPhotoMutation.isPending}
               className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
@@ -1064,9 +1065,9 @@ export default function QuickLog() {
                 <>
                   <Check className="mr-2 h-5 w-5" />
                   Finalizar
-                </>
+                </>  
               )}
-            </Button>
+            </AnimatedButton>
           </>
         )}
       </div>

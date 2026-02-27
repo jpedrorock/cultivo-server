@@ -16,6 +16,7 @@ import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AnimatedButton } from "@/components/AnimatedButton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -357,10 +358,10 @@ export default function Home() {
         {/* Tents Grid */}
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-foreground">Estufas</h2>
-          <Button onClick={() => setCreateTentModalOpen(true)} className="gap-2">
+          <AnimatedButton onClick={() => setCreateTentModalOpen(true)} className="gap-2">
             <Sprout className="w-4 h-4" />
             Criar Nova Estufa
-          </Button>
+          </AnimatedButton>
         </div>
 
         {isLoading ? (
