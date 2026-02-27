@@ -2,7 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit, Trash2, ArrowLeft, Copy, Search } from "lucide-react";
+import { Plus, Edit, Trash2, ArrowLeft, Copy, Search, Sprout, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
 export default function ManageStrains() {
   const [, setLocation] = useLocation();
@@ -42,6 +43,7 @@ export default function ManageStrains() {
       (strain.description && strain.description.toLowerCase().includes(query))
     );
   });
+
   const createStrain = trpc.strains.create.useMutation();
   const updateStrain = trpc.strains.update.useMutation();
   const deleteStrain = trpc.strains.delete.useMutation();
@@ -95,10 +97,9 @@ export default function ManageStrains() {
     const strain = selectedStrain;
     setIsDeleteOpen(false);
     setSelectedStrain(null);
-    
+
     let timeoutId: NodeJS.Timeout | null = null;
-    
-    // Show toast with undo button
+
     toast.info(`Strain "${strain.name}" será excluída em 5 segundos`, {
       duration: 5000,
       action: {
@@ -109,8 +110,7 @@ export default function ManageStrains() {
         },
       },
     });
-    
-    // Schedule deletion after 5 seconds
+
     timeoutId = setTimeout(async () => {
       try {
         await deleteStrain.mutateAsync({ id: strain.id });
@@ -161,7 +161,7 @@ export default function ManageStrains() {
         vegaWeeks,
         floraWeeks,
       });
-      
+
       toast.success("Strain duplicada com sucesso! Todos os parâmetros ideais foram copiados.");
       setIsDuplicateOpen(false);
       setSelectedStrain(null);
@@ -176,347 +176,276 @@ export default function ManageStrains() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLocation("/")}
-              className="hover:bg-card/50"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Gerenciar Strains</h1>
-              <p className="text-muted-foreground mt-1">
-                Crie e edite variedades de plantas com seus parâmetros ideais
-              </p>
-            </div>
+    <div className="min-h-screen bg-background">
+      {/* Header — sticky, compacto no mobile */}
+      <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-3 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLocation("/")}
+            className="shrink-0 h-10 w-10"
+            aria-label="Voltar"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">
+              Gerenciar Strains
+            </h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              Crie e edite variedades com seus parâmetros ideais
+            </p>
           </div>
+
+          {/* Botão: ícone no mobile, texto completo no desktop */}
           <Button
             onClick={() => setIsCreateOpen(true)}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            className="bg-green-600 hover:bg-green-700 text-white shrink-0 h-10"
+            aria-label="Nova Strain"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Strain
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nova Strain</span>
           </Button>
         </div>
+      </header>
 
+      {/* Conteúdo */}
+      <div className="container mx-auto px-4 py-6 space-y-5">
         {/* Campo de busca */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
             type="text"
             placeholder="Buscar por nome ou descrição..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-11"
           />
         </div>
 
-        {/* Strains Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredStrains.map((strain) => (
-            <Card key={strain.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl">{strain.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      <span className="text-xs text-muted-foreground">
-                        Vega: {strain.vegaWeeks} semanas | Flora: {strain.floraWeeks} semanas
-                      </span>
-                    </CardDescription>
+        {/* Grid de strains */}
+        {filteredStrains.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredStrains.map((strain: any) => (
+              <Card key={strain.id} className="hover:shadow-md transition-shadow flex flex-col">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base sm:text-lg leading-tight truncate">
+                        {strain.name}
+                      </CardTitle>
+                      {strain.description && (
+                        <CardDescription className="mt-1 text-xs line-clamp-2">
+                          {strain.description}
+                        </CardDescription>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Badges de semanas */}
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <span className="text-green-600">🌱</span>
+                      Vega: {strain.vegaWeeks} sem
+                    </Badge>
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <span className="text-purple-500">🌸</span>
+                      Flora: {strain.floraWeeks} sem
+                    </Badge>
+                    <Badge className="text-xs bg-primary/10 text-primary border-0 gap-1">
+                      <Clock className="w-3 h-3" />
+                      {strain.vegaWeeks + strain.floraWeeks} sem total
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="pt-0 flex flex-col gap-2 mt-auto">
+                  {/* Botão principal: Editar Parâmetros */}
+                  <Button
+                    variant="outline"
+                    className="w-full h-10"
+                    onClick={() => setLocation(`/strains/${strain.id}/targets`)}
+                  >
+                    Editar Parâmetros Ideais
+                  </Button>
+
+                  {/* Ações secundárias: linha com 3 botões */}
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="sm"
                       onClick={() => openDuplicateDialog(strain)}
-                      className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
+                      className="flex-1 h-10 text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
                       title="Duplicar strain"
                     >
-                      <Copy className="h-4 w-4" />
+                      <Copy className="h-4 w-4 mr-1.5" />
+                      <span className="text-xs">Duplicar</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="sm"
                       onClick={() => openEditDialog(strain)}
-                      className="h-8 w-8"
+                      className="flex-1 h-10"
+                      title="Editar strain"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4 mr-1.5" />
+                      <span className="text-xs">Editar</span>
                     </Button>
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="sm"
                       onClick={() => openDeleteDialog(strain)}
-                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="flex-1 h-10 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      title="Excluir strain"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 mr-1.5" />
+                      <span className="text-xs">Excluir</span>
                     </Button>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-3">
-                  {strain.description || "Sem descrição"}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
+              <Sprout className="w-14 h-14 text-muted-foreground/40" />
+              <div className="text-center">
+                <p className="font-medium text-foreground">
+                  {searchQuery ? "Nenhuma strain encontrada" : "Nenhuma strain cadastrada"}
                 </p>
-                <Button
-                  variant="outline"
-                  className="w-full mt-4"
-                  onClick={() => setLocation(`/strains/${strain.id}/targets`)}
-                >
-                  Editar Parâmetros Ideais
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-
-          {strains.length === 0 && (
-            <Card className="col-span-full">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-muted-foreground text-center mb-4">
-                  Nenhuma strain cadastrada ainda
+                <p className="text-sm text-muted-foreground mt-1">
+                  {searchQuery
+                    ? "Tente outro termo de busca"
+                    : "Crie sua primeira strain para começar"}
                 </p>
+              </div>
+              {!searchQuery && (
                 <Button
                   onClick={() => setIsCreateOpen(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-green-600 hover:bg-green-700 text-white h-11"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Criar Primeira Strain
                 </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Create Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nova Strain</DialogTitle>
-            <DialogDescription>
-              Crie uma nova variedade de planta. Você poderá definir os parâmetros ideais depois.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="name">Nome *</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Blue Dream, OG Kush..."
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="vegaWeeks">Semanas VEGA</Label>
-                <Input
-                  id="vegaWeeks"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={vegaWeeks}
-                  onChange={(e) => setVegaWeeks(parseInt(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="floraWeeks">Semanas FLORA</Label>
-                <Input
-                  id="floraWeeks"
-                  type="number"
-                  min={1}
-                  max={16}
-                  value={floraWeeks}
-                  onChange={(e) => setFloraWeeks(parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="description">Descrição</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Características, efeitos, notas..."
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleCreate}
-              className="bg-green-600 hover:bg-green-700 text-white"
-              disabled={createStrain.isPending}
-            >
-              {createStrain.isPending ? "Criando..." : "Criar Strain"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ─── Dialogs ─── */}
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Strain</DialogTitle>
-            <DialogDescription>Atualize as informações da strain.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="edit-name">Nome *</Label>
-              <Input
-                id="edit-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-vegaWeeks">Semanas VEGA</Label>
+      {/* Formulário reutilizável como componente interno */}
+      {[
+        { open: isCreateOpen, onOpenChange: setIsCreateOpen, title: "Nova Strain", desc: "Crie uma nova variedade. Você poderá definir os parâmetros ideais depois.", onSave: handleCreate, isPending: createStrain.isPending, saveLabel: "Criar Strain" },
+        { open: isEditOpen, onOpenChange: setIsEditOpen, title: "Editar Strain", desc: "Atualize as informações da strain.", onSave: handleEdit, isPending: updateStrain.isPending, saveLabel: "Salvar Alterações" },
+        { open: isDuplicateOpen, onOpenChange: setIsDuplicateOpen, title: "Duplicar Strain", desc: `Crie uma cópia de "${selectedStrain?.name}" com todos os parâmetros ideais.`, onSave: handleDuplicate, isPending: duplicateStrain.isPending, saveLabel: "Duplicar Strain", saveClass: "bg-blue-600 hover:bg-blue-700 text-white" },
+      ].map(({ open, onOpenChange, title, desc, onSave, isPending, saveLabel, saveClass }) => (
+        <Dialog key={title} open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="max-w-md w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription>{desc}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor={`${title}-name`}>Nome *</Label>
                 <Input
-                  id="edit-vegaWeeks"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={vegaWeeks}
-                  onChange={(e) => setVegaWeeks(parseInt(e.target.value))}
+                  id={`${title}-name`}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex: Blue Dream, OG Kush..."
+                  className="h-11"
                 />
               </div>
-              <div>
-                <Label htmlFor="edit-floraWeeks">Semanas FLORA</Label>
-                <Input
-                  id="edit-floraWeeks"
-                  type="number"
-                  min={1}
-                  max={16}
-                  value={floraWeeks}
-                  onChange={(e) => setFloraWeeks(parseInt(e.target.value))}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`${title}-vega`}>Semanas VEGA</Label>
+                  <Input
+                    id={`${title}-vega`}
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={vegaWeeks}
+                    onChange={(e) => setVegaWeeks(parseInt(e.target.value))}
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`${title}-flora`}>Semanas FLORA</Label>
+                  <Input
+                    id={`${title}-flora`}
+                    type="number"
+                    min={1}
+                    max={16}
+                    value={floraWeeks}
+                    onChange={(e) => setFloraWeeks(parseInt(e.target.value))}
+                    className="h-11"
+                  />
+                </div>
+              </div>
+              <div className="bg-primary/10 rounded-lg px-3 py-2 text-sm text-foreground">
+                <strong>Total:</strong> {vegaWeeks + floraWeeks} semanas de ciclo
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`${title}-desc`}>Descrição</Label>
+                <Textarea
+                  id={`${title}-desc`}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Características, efeitos, notas..."
+                  rows={3}
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="edit-description">Descrição</Label>
-              <Textarea
-                id="edit-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleEdit}
-              className="bg-green-600 hover:bg-green-700 text-white"
-              disabled={updateStrain.isPending}
-            >
-              {updateStrain.isPending ? "Salvando..." : "Salvar Alterações"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="h-11 w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={onSave}
+                className={`h-11 w-full sm:w-auto ${saveClass ?? "bg-green-600 hover:bg-green-700 text-white"}`}
+                disabled={isPending}
+              >
+                {isPending ? "Salvando..." : saveLabel}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ))}
 
       {/* Delete Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-sm w-[calc(100vw-2rem)]">
           <DialogHeader>
-            <DialogTitle>Deletar Strain</DialogTitle>
+            <DialogTitle>Excluir Strain</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja deletar <strong>{selectedStrain?.name}</strong>? Esta ação não
+              Tem certeza que deseja excluir <strong>{selectedStrain?.name}</strong>? Esta ação não
               pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteOpen(false)}
+              className="h-11 w-full sm:w-auto"
+            >
               Cancelar
             </Button>
             <Button
               onClick={handleDelete}
               variant="destructive"
               disabled={deleteStrain.isPending}
+              className="h-11 w-full sm:w-auto"
             >
-              {deleteStrain.isPending ? "Deletando..." : "Deletar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Duplicate Dialog */}
-      <Dialog open={isDuplicateOpen} onOpenChange={setIsDuplicateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Duplicar Strain</DialogTitle>
-            <DialogDescription>
-              Crie uma cópia de <strong>{selectedStrain?.name}</strong> com todos os parâmetros ideais.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="dup-name">Nome *</Label>
-              <Input
-                id="dup-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Blue Dream V2"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="dup-vegaWeeks">Semanas VEGA</Label>
-                <Input
-                  id="dup-vegaWeeks"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={vegaWeeks}
-                  onChange={(e) => setVegaWeeks(parseInt(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="dup-floraWeeks">Semanas FLORA</Label>
-                <Input
-                  id="dup-floraWeeks"
-                  type="number"
-                  min={1}
-                  max={16}
-                  value={floraWeeks}
-                  onChange={(e) => setFloraWeeks(parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="dup-description">Descrição</Label>
-              <Textarea
-                id="dup-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Características, efeitos, notas..."
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDuplicateOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleDuplicate}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={duplicateStrain.isPending}
-            >
-              {duplicateStrain.isPending ? "Duplicando..." : "Duplicar Strain"}
+              {deleteStrain.isPending ? "Excluindo..." : "Excluir"}
             </Button>
           </DialogFooter>
         </DialogContent>

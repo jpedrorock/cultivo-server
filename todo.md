@@ -3433,3 +3433,22 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Remover 56 estufas de teste criadas pelos testes automatizados (IDs 90001–90088)
 - [x] Manter apenas as 3 estufas originais: Estufa A (60001), Estufa B (60002), Estufa C (60003)
 - [x] Funcionalidade de estufas ilimitadas preservada (sem limite no código)
+
+## Responsividade Mobile - Strains e Tasks (27/02/2026)
+
+- [x] ManageStrains: header compacto no mobile (título menor, botão "Nova Strain" com ícone apenas)
+- [x] ManageStrains: grid de cards com 1 coluna no mobile, ações em linha horizontal com touch targets 44px
+- [x] ManageStrains: campo de busca com altura mínima de 44px (h-11)
+- [x] ManageStrains: dialogs com scroll interno e max-h-[90vh] para não ultrapassar viewport
+- [x] ManageStrains: badges de semanas (Vega/Flora/Total) nos cards
+- [x] ManageStrains: dialogs com footer empilhado no mobile (flex-col-reverse)
+- [x] Tasks (Tarefas): header com texto truncado no mobile, badge de progresso compacto
+- [x] Tasks: filtros de estufa em scroll horizontal no mobile (overflow-x-auto)
+- [x] Tasks: itens de tarefa com touch target mínimo (min-h-[56px])
+- [x] Tasks: área de toque do checkbox ampliada com botão nativo
+- [x] Tasks: estado vazio diferenciado (ciclos ativos vs. tudo concluído)
+- [x] TaskTemplatesManager: botão "Nova Tarefa" com ícone apenas no mobile
+- [x] TaskTemplatesManager: accordion com padding adequado para toque
+- [x] TaskTemplatesManager: itens de template com ações em botões 36x36px
+- [x] TaskTemplatesManager: cores por fase (verde/roxo/âmbar) nos badges do accordion
+- [x] TaskTemplatesManager: dialog com scroll interno e footer empilhado no mobile
