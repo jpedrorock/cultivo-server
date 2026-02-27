@@ -396,11 +396,15 @@ export default function PlantsList() {
                       <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {tentPlants.map((plant: any) => (
                           <ListItemAnimation key={plant.id}>
-                            <Card className={`border-2 transition-all duration-200 ease-out group cursor-pointer ${
+                            <Card className={`border-2 transition-all duration-200 ease-out group cursor-pointer overflow-hidden ${
                             selectedPlants.has(plant.id) 
                               ? "border-primary bg-primary/5 shadow-md shadow-primary/10" 
-                              : "hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.01]"
-                          }`}>
+                              : plant.cyclePhase === 'VEGA'
+                                ? 'border-green-500/25 hover:border-green-500/50 hover:shadow-xl hover:shadow-green-500/10 hover:-translate-y-1 hover:scale-[1.01]'
+                                : plant.cyclePhase === 'FLORA'
+                                ? 'border-purple-500/25 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 hover:scale-[1.01]'
+                                : 'hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.01]'
+                          }}`}>
                             <CardHeader>
                               <div className="flex items-start justify-between gap-2">
                                 <Checkbox
@@ -444,14 +448,16 @@ export default function PlantsList() {
 
                               {/* Indicadores visuais */}
                               <div className="flex flex-wrap gap-2">
-                                {/* Fase do Ciclo */}
+                                {/* Fase do Ciclo — sistema de cores por fase (consistente com cards de estufa) */}
                                 {plant.cyclePhase && plant.cycleWeek && (
-                                  <div className={`px-2 py-1 rounded-md text-xs font-medium ${
-                                    plant.cyclePhase === "VEGA" 
-                                      ? "bg-green-500/10 text-green-600 border border-green-500/30" 
-                                      : "bg-purple-500/10 text-purple-600 border border-purple-500/30"
+                                  <div className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 ${
+                                    plant.cyclePhase === 'VEGA'
+                                      ? 'bg-green-500/8 border-green-500/20 text-green-700 dark:bg-green-500/10 dark:border-green-500/25 dark:text-green-400'
+                                      : 'bg-purple-500/8 border-purple-500/20 text-purple-700 dark:bg-purple-500/10 dark:border-purple-500/25 dark:text-purple-400'
                                   }`}>
-                                    {plant.cyclePhase === "VEGA" ? "🌱" : "🌸"} {plant.cyclePhase === "VEGA" ? "Vega" : "Flora"} Semana {plant.cycleWeek}
+                                    <span>{plant.cyclePhase === 'VEGA' ? '🌱' : '🌸'}</span>
+                                    <span>{plant.cyclePhase === 'VEGA' ? 'Vega' : 'Flora'}</span>
+                                    <span className="ml-auto font-bold">Sem. {plant.cycleWeek}</span>
                                   </div>
                                 )}
                                 {/* Saúde */}

@@ -3570,3 +3570,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 ## Remoção da faixa colorida no topo dos cards de estufa (27/02/2026)
 
 - [x] Remover a faixa/barra colorida grossa no topo dos cards de estufa na Home
+
+## Sistema de cores por fase nos cards de plantas (27/02/2026)
+
+- [x] Identificar campo de fase/categoria disponível nos dados da planta
+- [x] Aplicar fundo colorido sutil + borda colorida no bloco de fase do card de planta
+- [x] Aplicar ícone de fase e cor correspondente no badge/label de fase
+- [x] Manter consistência visual com os cards de estufa (mesmas classes de cor)
