@@ -1155,42 +1155,55 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 
                 {/* Botões de ação baseados na fase */}
                 
-                {/* Botão "Tirar Clones" para MANUTENÇÃO */}
+                {/* Botão "Tirar Clones" para MANUTENÇÃO — azul */}
                 {cycle && tent.category === "MAINTENANCE" && (
                   <Button
                     onClick={() => setSelectMotherOpen(true)}
                     variant="default"
                     size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <Sprout className="w-4 h-4 mr-2" />
                     Tirar Clones
                   </Button>
                 )}
-                
-                {/* Botão "Avançar Fase" - apenas para fases lineares */}
-                {cycle && tent.category !== "MAINTENANCE" && (
+
+                {/* Botão "Avançar para Floração" — verde, apenas em VEGA */}
+                {cycle && tent.category === "VEGA" && (
                   <Button
-                    onClick={() => {
-                      // CLONING → FinishCloningDialog
-                      if (cycle.cloningStartDate) {
-                        setFinishCloningOpen(true);
-                      }
-                      // VEGA → PromotePhaseDialog (Flora)
-                      else if (!cycle.floraStartDate && tent.category === "VEGA") {
-                        setPromotePhaseOpen(true);
-                      }
-                      // FLORA → PromotePhaseDialog (Secagem)
-                      else if (cycle.floraStartDate) {
-                        setPromotePhaseOpen(true);
-                      }
-                    }}
+                    onClick={() => setPromotePhaseOpen(true)}
                     variant="default"
                     size="sm"
-                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Flower2 className="w-4 h-4 mr-2" />
+                    Avançar para Floração
+                  </Button>
+                )}
+
+                {/* Botão "Avançar para Secagem" — laranja, apenas em FLORA */}
+                {cycle && tent.category === "FLORA" && (
+                  <Button
+                    onClick={() => setPromotePhaseOpen(true)}
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                  >
+                    <Wind className="w-4 h-4 mr-2" />
+                    Avançar para Secagem
+                  </Button>
+                )}
+
+                {/* Botão "Finalizar Clonagem" — azul, apenas em CLONING */}
+                {cycle && cycle.cloningStartDate && tent.category === "CLONING" && (
+                  <Button
+                    onClick={() => setFinishCloningOpen(true)}
+                    variant="default"
+                    size="sm"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <ArrowRight className="w-4 h-4 mr-2" />
-                    Avançar Fase
+                    Finalizar Clonagem
                   </Button>
                 )}
                 <Button

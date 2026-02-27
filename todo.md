@@ -3584,3 +3584,12 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Badge de fase com ícone e cor (Vega=verde, Flora=roxo, Secagem=âmbar, Manutenção=azul)
 - [x] Número da semana com cor correspondente à fase
 - [x] Ícone do header colorido por gradiente da fase
+
+## Ações de fase personalizadas nos cards de estufa (27/02/2026)
+
+- [x] Remover botão genérico "Avançar Fase"
+- [x] Adicionar "Tirar Clones" em azul (fase MAINTENANCE)
+- [x] Adicionar "Avançar para Floração" em verde (fase VEGA)
+- [x] Adicionar "Avançar para Secagem" em laranja (fase FLORA)
+- [x] Adicionar "Finalizar Clonagem" em azul (fase CLONING)
+- [ ] Aplicar as mesmas ações na página de detalhes da estufa (TentDetail)
