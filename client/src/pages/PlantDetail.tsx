@@ -248,7 +248,15 @@ export default function PlantDetail() {
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-gradient-to-br ${
+                plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA'
+                  ? 'from-green-500 to-emerald-600'
+                  : plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA'
+                  ? 'from-purple-500 to-violet-600'
+                  : tent?.category === 'DRYING'
+                  ? 'from-amber-500 to-orange-600'
+                  : 'from-blue-500 to-cyan-600'
+              }`}>
                 <Sprout className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -257,10 +265,34 @@ export default function PlantDetail() {
                   <p className="text-sm text-muted-foreground font-mono">{plant.code}</p>
                 )}
               </div>
-              {/* Badge de fase/semana da estufa */}
-              {tent && (
-                <div className="px-3 py-1 rounded-md text-sm font-medium border bg-primary/10 text-primary border-primary/30">
-                  {tent.category === "VEGA" ? "🌱" : tent.category === "FLORA" ? "🌺" : "🔧"} {tent.category}
+              {/* Badge de fase com sistema de cores por fase */}
+              {(plant.cyclePhase || tent) && (
+                <div className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex items-center gap-1.5 ${
+                  (plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA')
+                    ? 'bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-500/15 dark:border-green-500/35 dark:text-green-400'
+                    : (plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA')
+                    ? 'bg-purple-500/10 border-purple-500/30 text-purple-700 dark:bg-purple-500/15 dark:border-purple-500/35 dark:text-purple-400'
+                    : tent?.category === 'DRYING'
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:bg-amber-500/15 dark:border-amber-500/35 dark:text-amber-400'
+                    : 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/35 dark:text-blue-400'
+                }`}>
+                  <span>{
+                    (plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA') ? '🌱' :
+                    (plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA') ? '🌸' :
+                    tent?.category === 'DRYING' ? '🍂' : '🔧'
+                  }</span>
+                  <span>{
+                    plant.cyclePhase === 'VEGA' ? 'Vegetativa' :
+                    plant.cyclePhase === 'FLORA' ? 'Floração' :
+                    tent?.category === 'VEGA' ? 'Vegetativa' :
+                    tent?.category === 'FLORA' ? 'Floração' :
+                    tent?.category === 'DRYING' ? 'Secagem' :
+                    tent?.category === 'MAINTENANCE' ? 'Manutenção' :
+                    tent?.category || ''
+                  }</span>
+                  {plant.cycleWeek && (
+                    <span className="font-bold ml-0.5">· Sem. {plant.cycleWeek}</span>
+                  )}
                 </div>
               )}
             </div>

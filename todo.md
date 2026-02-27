@@ -3577,3 +3577,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Aplicar fundo colorido sutil + borda colorida no bloco de fase do card de planta
 - [x] Aplicar ícone de fase e cor correspondente no badge/label de fase
 - [x] Manter consistência visual com os cards de estufa (mesmas classes de cor)
+
+## Cores por fase no cabeçalho do PlantDetail (27/02/2026)
+
+- [x] Aplicar fundo colorido sutil + borda por fase no bloco de ciclo do cabeçalho
+- [x] Badge de fase com ícone e cor (Vega=verde, Flora=roxo, Secagem=âmbar, Manutenção=azul)
+- [x] Número da semana com cor correspondente à fase
+- [x] Ícone do header colorido por gradiente da fase
