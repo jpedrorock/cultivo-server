@@ -19,6 +19,8 @@ import {
   Camera,
   Image,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -85,7 +87,14 @@ export default function PlantTrichomesTab({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number>(0);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  
+  // Swipe gesture states
+  const [touchStart, setTouchStart] = useState<number>(0);
+  const [touchEnd, setTouchEnd] = useState<number>(0);
+  const [swipeOffset, setSwipeOffset] = useState<number>(0);
+  const [isSwiping, setIsSwiping] = useState<boolean>(false);
 
   const { data: plant } = trpc.plants.getById.useQuery({ id: plantId });
   const { data: trichomeLogs, refetch, isLoading } =
@@ -479,7 +488,12 @@ export default function PlantTrichomesTab({
                       {log.photoUrl ? (
                         <div
                           className="cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-                          onClick={() => setLightboxPhoto(log.photoUrl)}
+                          onClick={() => {
+                            const photoLogs = trichomeLogs?.filter((l: any) => l.photoUrl) || [];
+                            const index = photoLogs.findIndex((l: any) => l.id === log.id);
+                            setLightboxIndex(index);
+                            setLightboxPhoto(log.photoUrl);
+                          }}
                         >
                           <LazyImage
                             src={log.photoUrl}
@@ -598,54 +612,164 @@ export default function PlantTrichomesTab({
       </div>
 
       {/* Lightbox */}
-      {lightboxPhoto && (
-        <div
-          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
-          onClick={() => setLightboxPhoto(null)}
-        >
-          <div className="relative max-w-5xl w-full h-full flex flex-col items-center justify-center">
-            <img
-              src={lightboxPhoto}
-              alt="Foto ampliada"
-              className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <div className="absolute top-4 right-4 flex gap-2">
-              <Button
-                size="icon"
-                variant="secondary"
-                className="bg-white/10 hover:bg-white/20 backdrop-blur-sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  try {
-                    const a = document.createElement("a");
-                    a.href = lightboxPhoto;
-                    a.download = `planta-${plantId}-tricomas-${Date.now()}.jpg`;
-                    a.target = "_blank";
-                    a.rel = "noopener noreferrer";
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    toast.success("Foto baixada!");
-                  } catch {
-                    toast.error("Erro ao baixar foto");
-                  }
-                }}
-              >
-                <Download className="w-4 h-4 text-white" />
-              </Button>
-              <Button
-                size="icon"
-                variant="destructive"
-                className="bg-red-500/80 hover:bg-red-500"
-                onClick={() => setLightboxPhoto(null)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
+      {lightboxPhoto &&
+        (() => {
+          const photoLogs =
+            trichomeLogs?.filter((l: any) => l.photoUrl) || [];
+          const currentLog = photoLogs[lightboxIndex];
+          const totalPhotos = photoLogs.length;
+
+          const handlePrevious = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (lightboxIndex > 0) {
+              setLightboxIndex(lightboxIndex - 1);
+              setLightboxPhoto(photoLogs[lightboxIndex - 1].photoUrl!);
+            }
+          };
+
+          const handleNext = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (lightboxIndex < totalPhotos - 1) {
+              setLightboxIndex(lightboxIndex + 1);
+              setLightboxPhoto(photoLogs[lightboxIndex + 1].photoUrl!);
+            }
+          };
+
+          const handleDownload = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            try {
+              const a = document.createElement("a");
+              a.href = lightboxPhoto;
+              a.download = `planta-${plantId}-tricomas-${currentLog?.id || Date.now()}.jpg`;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              toast.success("Foto baixada!");
+            } catch (error) {
+              toast.error("Erro ao baixar foto");
+            }
+          };
+
+          const handleTouchStart = (e: React.TouchEvent) => {
+            setTouchStart(e.targetTouches[0].clientX);
+            setTouchEnd(e.targetTouches[0].clientX);
+            setIsSwiping(true);
+          };
+
+          const handleTouchMove = (e: React.TouchEvent) => {
+            if (!isSwiping) return;
+            const currentTouch = e.targetTouches[0].clientX;
+            setTouchEnd(currentTouch);
+            const offset = currentTouch - touchStart;
+            setSwipeOffset(offset);
+          };
+
+          const handleTouchEnd = () => {
+            if (!isSwiping) return;
+            setIsSwiping(false);
+            const swipeDistance = touchEnd - touchStart;
+            const minSwipeDistance = 50;
+            if (Math.abs(swipeDistance) > minSwipeDistance) {
+              if (swipeDistance > 0 && lightboxIndex > 0) {
+                setLightboxIndex(lightboxIndex - 1);
+                setLightboxPhoto(photoLogs[lightboxIndex - 1].photoUrl!);
+              } else if (swipeDistance < 0 && lightboxIndex < totalPhotos - 1) {
+                setLightboxIndex(lightboxIndex + 1);
+                setLightboxPhoto(photoLogs[lightboxIndex + 1].photoUrl!);
+              }
+            }
+            setSwipeOffset(0);
+            setTouchStart(0);
+            setTouchEnd(0);
+          };
+
+          return (
+            <div
+              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+              onClick={() => setLightboxPhoto(null)}
+            >
+              <div className="relative max-w-5xl w-full h-full flex flex-col items-center justify-center">
+                <div
+                  className="relative w-full flex items-center justify-center"
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  style={{
+                    transform: isSwiping ? `translateX(${swipeOffset}px)` : 'translateX(0)',
+                    transition: isSwiping ? 'none' : 'transform 0.3s ease-out',
+                  }}
+                >
+                  <img
+                    src={lightboxPhoto}
+                    alt="Foto ampliada"
+                    className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+
+                <div
+                  className="mt-4 text-center text-white"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <p className="text-sm opacity-80">
+                    {new Date(
+                      currentLog?.logDate || Date.now()
+                    ).toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-xs opacity-60 mt-1">
+                    Foto {lightboxIndex + 1} de {totalPhotos}
+                  </p>
+                </div>
+
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+                    onClick={handleDownload}
+                  >
+                    <Download className="w-4 h-4 text-white" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="bg-red-500/80 hover:bg-red-500"
+                    onClick={() => setLightboxPhoto(null)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {totalPhotos > 1 && (
+                  <>
+                    {lightboxIndex > 0 && (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+                        onClick={handlePrevious}
+                      >
+                        <ChevronLeft className="w-6 h-6 text-white" />
+                      </Button>
+                    )}
+                    {lightboxIndex < totalPhotos - 1 && (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 backdrop-blur-sm"
+                        onClick={handleNext}
+                      >
+                        <ChevronRight className="w-6 h-6 text-white" />
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
     </div>
   );
 }

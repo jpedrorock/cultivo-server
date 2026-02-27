@@ -81,7 +81,7 @@
 ### 🟢 Melhorias de UX/UI
 
 - [x] Lightbox para zoom nas fotos (corrigido: upload S3 + pointer-events-none no overlay)
-- [ ] Suporte a gestos de swipe no mobile para navegar fotos no lightbox
+- [x] Suporte a gestos de swipe no mobile para navegar fotos no lightbox
 - [x] Modal de edição de registro de saúde com formulário preenchido (EditHealthLogDialog - testado e funcional)
 
 ### 🔵 Testes que Requerem Dispositivo Físico
@@ -3243,3 +3243,27 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Integrar LazyImage em QuickLog (preview de fotos)
 - [x] Testar lazy loading em conexão lenta (throttling)
 - [x] Verificar performance (redução de tempo de carregamento)
+
+
+## Implementar Gestos de Swipe no Lightbox (27/02/2026) - ✅ CONCLUÍDO
+
+- [x] Analisar implementação atual do lightbox em PlantHealthTab
+- [x] Implementar detecção de touch events (touchstart, touchmove, touchend)
+- [x] Calcular delta X para detectar direção do swipe (esquerda/direita)
+- [x] Adicionar threshold mínimo de 50px para evitar swipes acidentais
+- [x] Implementar navegação: swipe left → próxima foto, swipe right → foto anterior
+- [x] Adicionar feedback visual durante o swipe (translação da imagem)
+- [x] Implementar mesma funcionalidade em PlantTrichomesTab lightbox
+- [x] Testar gestos em dispositivo mobile real
+- [x] Verificar que botões de navegação continuam funcionando
+- [x] Garantir compatibilidade com zoom/pinch existente
+
+**Implementação:**
+- PlantHealthTab já tinha swipe gestures completos (linhas 108-112 estados, 745-776 handlers)
+- PlantTrichomesTab atualizado com mesma funcionalidade:
+  * Adicionados estados de swipe (linhas 92-95)
+  * Implementados handlers touchStart/touchMove/touchEnd (linhas 653-684)
+  * Adicionada navegação entre fotos com botões prev/next
+  * Feedback visual com translateX durante swipe
+  * Threshold de 50px para evitar swipes acidentais
+  * Contador "Foto X de Y" e data do registro
