@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload } from "lucide-react";
+import { ConflictFreeSlider } from "@/components/ConflictFreeSlider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { processImage, processImageFile, isHEIC, blobToBase64, formatFileSize } from "@/lib/imageUtils";
@@ -736,54 +737,34 @@ export default function QuickLog() {
                 {/* Light Intensity Slider */}
                 <div className="space-y-4">
                   {lightUnit === "ppfd" ? (
-                    <>
-                      <div className="text-center">
-                        <div className="text-5xl font-bold text-gray-900 dark:text-gray-100">{ppfd}</div>
-                        <div className="text-sm text-gray-500">μmol/m²/s</div>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="range"
-                          min="0"
-                          max="1500"
-                          step="10"
-                          value={ppfd}
-                          onChange={(e) => setPpfd(parseInt(e.target.value))}
-                          className="w-full h-10 rounded-full appearance-none cursor-pointer"
-                          style={{
-                            background: `linear-gradient(to right, #fbbf24 0%, #f59e0b ${(ppfd / 1500) * 100}%, #e5e7eb ${(ppfd / 1500) * 100}%, #e5e7eb 100%)`,
-                          }}
-                        />
-                      </div>
-                    </>
+                    <ConflictFreeSlider
+                      value={ppfd}
+                      onChange={(val) => setPpfd(val)}
+                      min={0}
+                      max={1500}
+                      step={10}
+                      unit="μmol/m²/s"
+                      showValue={true}
+                      className="-mx-4"
+                    />
                   ) : (
                     <>
-                      <div className="text-center">
-                        <div className="text-5xl font-bold text-gray-900 dark:text-gray-100">{luxValue}</div>
-                        <div className="text-sm text-gray-500">Lux</div>
-                        {luxValue > 0 && (
-                          <div className="text-xs text-gray-400 mt-1">≈ {Math.round(luxValue * 0.0185)} μmol/m²/s</div>
-                        )}
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="range"
-                          min="0"
-                          max="80000"
-                          step="500"
-                          value={luxValue}
-                          onChange={(e) => {
-                            const lux = parseInt(e.target.value);
-                            setLuxValue(lux);
-                            // Auto-convert to PPFD for storage
-                            setPpfd(Math.round(lux * 0.0185));
-                          }}
-                          className="w-full h-10 rounded-full appearance-none cursor-pointer"
-                          style={{
-                            background: `linear-gradient(to right, #fbbf24 0%, #f59e0b ${(luxValue / 80000) * 100}%, #e5e7eb ${(luxValue / 80000) * 100}%, #e5e7eb 100%)`,
-                          }}
-                        />
-                      </div>
+                      <ConflictFreeSlider
+                        value={luxValue}
+                        onChange={(val) => {
+                          setLuxValue(val);
+                          setPpfd(Math.round(val * 0.0185));
+                        }}
+                        min={0}
+                        max={80000}
+                        step={500}
+                        unit="Lux"
+                        showValue={true}
+                        className="-mx-4"
+                      />
+                      {luxValue > 0 && (
+                        <div className="text-xs text-gray-400 text-center mt-2">≈ {Math.round(luxValue * 0.0185)} μmol/m²/s</div>
+                      )}
                     </>
                   )}
                 </div>

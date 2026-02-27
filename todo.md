@@ -3017,6 +3017,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Testar servidor após implementação
 - [ ] Testar upload de foto HEIC real do iPhone em dispositivo físico
 
+<<<<<<< Updated upstream
 ## Bugs Críticos Reportados (26/02/2026)
 
 - [x] Corrigir erro "Falha ao salvar foto" ao fazer upload de foto no formulário de saúde (melhorado error handling e logging)
@@ -3079,3 +3080,20 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Usar Vibration API do navegador para feedback tátil
 - [x] Garantir compatibilidade com iOS e Android (navigator.vibrate)
 - [x] Adicionar fallback silencioso para navegadores sem suporte (if 'vibrate' in navigator)
+=======
+## Melhorias de Sliders & Prevenção de Conflitos com Swipe (27/02/2026)
+
+- [x] Pesquisar melhores práticas para prevenir conflitos entre swipe gestures e sliders
+- [x] **FASE 1 - Visual Fixes:** Criar componente ConflictFreeSlider reutilizável
+- [x] **FASE 1 - Visual Fixes:** Aumentar área de toque dos sliders (thumb 44x44px, track 48px)
+- [x] **FASE 1 - Visual Fixes:** Adicionar padding lateral 32px nos containers de sliders
+- [x] **FASE 1 - Visual Fixes:** Melhorar posicionamento dos sliders (centralizados, longe das bordas)
+- [x] **FASE 2 - Conflict Prevention:** Implementar stop propagation em eventos de touch dos sliders
+- [x] **FASE 2 - Conflict Prevention:** Adicionar visual feedback (highlight + ring verde) quando slider ativo
+- [x] **FASE 2 - Conflict Prevention:** Adicionar haptic feedback (10ms vibração) ao tocar slider
+- [x] Aplicar ConflictFreeSlider em QuickLog (PPFD e Lux)
+- [ ] Aplicar ConflictFreeSlider em Calculators.tsx (pH, EC, Lux, PPFD)
+- [ ] Aplicar ConflictFreeSlider em TentLog.tsx
+- [ ] Aplicar ConflictFreeSlider em NotificationSettings.tsx
+- [ ] Testar todos os sliders no iPhone
+>>>>>>> Stashed changes
