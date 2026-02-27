@@ -18,6 +18,7 @@ import {
   taskTemplates,
   taskInstances,
   alerts,
+  alertSettings,
   safetyLimits,
   plants,
   phaseAlertMargins,
@@ -780,5 +781,97 @@ export async function checkAlertsForTent(tentId: number): Promise<{
   return {
     alertsGenerated: alertsToInsert.length,
     messages,
+  };
+}
+
+/**
+ * Ajusta automaticamente as margens de alerta (alertSettings) de uma estufa
+ * quando ela muda de fase, usando os valores de phaseAlertMargins como referência.
+ *
+ * Chamado sempre que a categoria/fase de uma estufa muda:
+ * - VEGA → FLORA (transitionToFlora)
+ * - FLORA → DRYING (transitionToDrying)
+ * - MAINTENANCE → CLONING (transitionToCloning)
+ * - CLONING → MAINTENANCE (transitionToMaintenance)
+ * - Iniciação de novo ciclo (cycles.initiate)
+ * - Edição manual de fase (cycles.edit)
+ */
+export async function applyPhaseTransitionLimits(
+  tentId: number,
+  newPhase: "MAINTENANCE" | "CLONING" | "VEGA" | "FLORA" | "DRYING"
+): Promise<{ applied: boolean; phase: string; margins?: Record<string, number> }> {
+  const db = await getDb();
+  if (!db) return { applied: false, phase: newPhase };
+
+  // 1. Buscar margens da nova fase em phaseAlertMargins
+  const marginsResult = await db
+    .select()
+    .from(phaseAlertMargins)
+    .where(eq(phaseAlertMargins.phase, newPhase))
+    .limit(1);
+
+  if (marginsResult.length === 0) {
+    console.warn(`[PhaseTransition] Sem margens configuradas para fase ${newPhase} — alertSettings não atualizado`);
+    return { applied: false, phase: newPhase };
+  }
+
+  const margins = marginsResult[0];
+
+  // 2. Verificar se já existe alertSettings para esta estufa
+  const existing = await db
+    .select()
+    .from(alertSettings)
+    .where(eq(alertSettings.tentId, tentId))
+    .limit(1);
+
+  const newMargins = {
+    tempMargin: margins.tempMargin?.toString() ?? "2.0",
+    rhMargin:   margins.rhMargin?.toString()   ?? "5.0",
+    ppfdMargin: margins.ppfdMargin             ?? 50,
+    phMargin:   margins.phMargin?.toString()   ?? "0.2",
+  };
+
+  if (existing.length > 0) {
+    // 3a. Atualizar margens existentes
+    await db
+      .update(alertSettings)
+      .set({
+        tempMargin:  newMargins.tempMargin,
+        rhMargin:    newMargins.rhMargin,
+        ppfdMargin:  newMargins.ppfdMargin,
+        phMargin:    newMargins.phMargin,
+      })
+      .where(eq(alertSettings.tentId, tentId));
+  } else {
+    // 3b. Criar alertSettings com as margens da nova fase
+    await db.insert(alertSettings).values({
+      tentId,
+      alertsEnabled: true,
+      tempEnabled:   true,
+      rhEnabled:     true,
+      ppfdEnabled:   true,
+      phEnabled:     true,
+      tempMargin:    newMargins.tempMargin,
+      rhMargin:      newMargins.rhMargin,
+      ppfdMargin:    newMargins.ppfdMargin,
+      phMargin:      newMargins.phMargin,
+    });
+  }
+
+  console.log(
+    `[PhaseTransition] Estufa ${tentId} → ${newPhase}: ` +
+    `Temp ±${newMargins.tempMargin}°C | RH ±${newMargins.rhMargin}% | ` +
+    `PPFD ±${newMargins.ppfdMargin} | pH ±${newMargins.phMargin}`
+  );
+
+  return {
+    applied: true,
+    phase: newPhase,
+    margins: {
+      tempMargin:  parseFloat(newMargins.tempMargin),
+      rhMargin:    parseFloat(newMargins.rhMargin),
+      ppfdMargin:  newMargins.ppfdMargin,
+      phMargin:    parseFloat(newMargins.phMargin),
+    },
   };
 }

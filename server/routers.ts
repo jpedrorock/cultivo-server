@@ -5,7 +5,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { eq, and, or, desc, asc, sql, isNotNull, inArray } from "drizzle-orm";
 import * as db from "./db";
-import { getDb } from "./db";
+import { getDb, applyPhaseTransitionLimits } from "./db";
 import {
   tents,
   strains,
@@ -632,6 +632,12 @@ export const appRouter = router({
             .update(tents)
             .set({ category: "FLORA" })
             .where(eq(tents.id, input.targetTentId));
+          
+          // Ajustar margens de alerta automaticamente para FLORA
+          await applyPhaseTransitionLimits(input.targetTentId, "FLORA");
+        } else {
+          // Sem mudança de estufa: ajustar margens da estufa atual para FLORA
+          await applyPhaseTransitionLimits(cycle.tentId, "FLORA");
         }
         
         return { success: true };
@@ -726,6 +732,9 @@ export const appRouter = router({
             .update(tents)
             .set({ category: "DRYING" })
             .where(eq(tents.id, input.targetTentId));
+          
+          // Ajustar margens de alerta automaticamente para DRYING
+          await applyPhaseTransitionLimits(input.targetTentId, "DRYING");
         }
         
         return { success: true, plantsHarvested: cyclePlants.length };
@@ -763,6 +772,9 @@ export const appRouter = router({
           .update(cycles)
           .set({ cloningStartDate: input.cloningStartDate })
           .where(eq(cycles.id, input.cycleId));
+        
+        // Ajustar margens de alerta automaticamente para CLONING
+        await applyPhaseTransitionLimits(cycle.tentId, "CLONING");
         
         return { success: true };
       }),
@@ -825,6 +837,9 @@ export const appRouter = router({
           await database.insert(plants).values(seedlings);
         }
         
+        // Ajustar margens de alerta automaticamente para MAINTENANCE
+        await applyPhaseTransitionLimits(cycle.tentId, "MAINTENANCE");
+        
         return { success: true, seedlingsCreated: input.clonesProduced || 0 };
       }),
     
@@ -875,6 +890,12 @@ export const appRouter = router({
           .update(tents)
           .set({ category })
           .where(eq(tents.id, input.tentId));
+        
+        // Ajustar margens de alerta automaticamente para a fase inicial do ciclo
+        const initPhase = (input.phase === "CLONING" || input.phase === "MAINTENANCE")
+          ? "MAINTENANCE"
+          : input.phase as "VEGA" | "FLORA" | "DRYING";
+        await applyPhaseTransitionLimits(input.tentId, initPhase);
         
         return { success: true };
       }),
@@ -971,6 +992,12 @@ export const appRouter = router({
               .update(tents)
               .set({ category })
               .where(eq(tents.id, tentId));
+            
+            // Ajustar margens de alerta automaticamente para a nova fase
+            const editPhase = (input.phase === "CLONING" || input.phase === "MAINTENANCE")
+              ? "MAINTENANCE"
+              : input.phase as "VEGA" | "FLORA" | "DRYING";
+            await applyPhaseTransitionLimits(tentId, editPhase);
           }
         }
         

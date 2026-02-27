@@ -3709,3 +3709,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Remover chamada notifyOwner do alertChecker.ts
 - [x] Remover chamada notifyOwner e registro em notificationHistory do checkAlertsForTent no db.ts
 - [x] Manter apenas inserção em alerts e alertHistory (alertas internos do app)
+
+## Ajuste Automático de safetyLimits na Mudança de Fase
+
+- [x] Criar função applyPhaseTransitionLimits no db.ts que atualiza alertSettings com os safetyLimits da nova fase
+- [x] Integrar a função nos pontos de mudança de fase: transitionToFlora, transitionToDrying, transitionToCloning, transitionToMaintenance, cycles.initiate, cycles.edit
+- [x] Escrever teste vitest para verificar que os limites são atualizados corretamente na transição (5/5 passando)
