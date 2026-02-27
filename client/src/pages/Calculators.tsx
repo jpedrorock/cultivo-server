@@ -812,7 +812,7 @@ function RunoffCalculator() {
   };
 
   return (
-    <Card className="bg-card/90 backdrop-blur-sm">
+    <Card className="bg-card/90 backdrop-blur-sm" data-tour="calculator-watering">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Droplets className="w-5 h-5 text-cyan-500" />
@@ -832,6 +832,7 @@ function RunoffCalculator() {
               placeholder="Ex: 10"
               value={volumeIn}
               onChange={(e) => setVolumeIn(e.target.value)}
+              data-tour="runoff-watered"
             />
             <p className="text-xs text-muted-foreground">Quantidade de água que você regou</p>
           </div>
@@ -844,6 +845,7 @@ function RunoffCalculator() {
               placeholder="Ex: 2"
               value={volumeOut}
               onChange={(e) => setVolumeOut(e.target.value)}
+              data-tour="runoff-collected"
             />
             <p className="text-xs text-muted-foreground">Quantidade que drenou no prato</p>
           </div>
@@ -868,6 +870,7 @@ function RunoffCalculator() {
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={substrate}
               onChange={(e) => setSubstrate(e.target.value)}
+              data-tour="watering-substrate"
             >
               <option value="soil">Solo/Terra</option>
               <option value="coco">Fibra de Coco</option>
@@ -1264,7 +1267,7 @@ function LuxPPFDCalculator() {
   }, [lux, ppfd, lightType, conversionMode]);
 
   return (
-    <Card className="bg-card/90 backdrop-blur-sm">
+    <Card className="bg-card/90 backdrop-blur-sm" data-tour="calculator-lux-ppfd">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sun className="w-8 h-8 text-yellow-500" />
@@ -1319,6 +1322,7 @@ function LuxPPFDCalculator() {
                   value={lux}
                   onChange={(e) => setLux(e.target.value)}
                   className="text-2xl h-16 px-4 font-bold text-center"
+                  data-tour="lux-input"
                 />
               </div>
               
@@ -1529,7 +1533,7 @@ function PPMECConverter() {
   }, [inputValue, conversionType, scale]);
 
   return (
-    <Card className="bg-card/90 backdrop-blur-sm">
+    <Card className="bg-card/90 backdrop-blur-sm" data-tour="calculator-ppm-ec">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calculator className="w-5 h-5 text-purple-500" />
@@ -1597,6 +1601,7 @@ function PPMECConverter() {
             placeholder={conversionType === "ppm-to-ec" ? "Ex: 1000" : "Ex: 2.0"}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
+            data-tour="ppm-input"
           />
         </div>
 

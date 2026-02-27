@@ -1,9 +1,23 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Calculator, Droplets, Sprout, Sun, Beaker, TestTube, Waves } from "lucide-react";
+import { Calculator, Droplets, Sprout, Sun, Beaker, TestTube, Waves, HelpCircle } from "lucide-react";
+import { AdvancedTourGuide } from "@/components/AdvancedTourGuide";
 
 export default function CalculatorMenu() {
+  const [runAdvancedTour, setRunAdvancedTour] = useState(false);
+
+  const startAdvancedTour = () => {
+    setRunAdvancedTour(true);
+  };
+
+  const handleTourFinish = () => {
+    setRunAdvancedTour(false);
+    localStorage.setItem("hasCompletedAdvancedTour", "true");
+  };
+
   const calculators = [
     {
       id: "watering-runoff",
@@ -65,13 +79,24 @@ export default function CalculatorMenu() {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
               <Calculator className="w-6 h-6 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl font-bold text-foreground">Calculadoras</h1>
               <p className="text-sm text-muted-foreground">Ferramentas para cultivo</p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={startAdvancedTour}
+              className="flex items-center gap-2"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">Tour das Calculadoras</span>
+            </Button>
           </div>
         </div>
       </header>
+
+      <AdvancedTourGuide run={runAdvancedTour} onFinish={handleTourFinish} />
 
       {/* Content */}
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">

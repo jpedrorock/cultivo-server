@@ -3337,3 +3337,40 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - Animações suaves entre steps (continuous mode)
 - Localização em português (Voltar, Próximo, Pular Tour, Finalizar)
 - Tour inicia automaticamente para novos usuários
+
+
+## Criar Tour Guiado Avançado (27/02/2026) - ✅ CONCLUÍDO
+
+- [x] Criar componente AdvancedTourGuide para features avançadas
+- [x] Definir steps do tour avançado (adaptado para calculadoras reais):
+  * Introdução às calculadoras
+  * Calculadora Rega e Runoff - explicar volume ideal, substrato, runoff percentual
+  * Calculadora Lux→PPFD - explicar conversão de lux para PPFD
+  * Calculadora PPM↔EC - explicar conversão entre PPM e EC
+  * Dicas de uso das calculadoras no dia a dia
+- [x] Adicionar atributos data-tour nos elementos das calculadoras:
+  * Inputs de volume regado e runoff coletado (Runoff)
+  * Select de tipo de substrato
+  * Input de lux (Lux→PPFD)
+  * Input de PPM/EC (PPM↔EC)
+  * Cards das calculadoras
+- [x] Adicionar botão "Tour das Calculadoras" na página CalculatorMenu
+- [x] Implementar estado persistente separado (hasCompletedAdvancedTour)
+- [x] Testar tour avançado em desktop e mobile
+- [x] Verificar que tour não interfere com tour principal
+
+**Implementação:**
+- Criado componente AdvancedTourGuide com 11 steps
+- Adaptado para calculadoras reais do app (Rega e Runoff, Lux→PPFD, PPM↔EC)
+- Adicionados atributos data-tour:
+  * calculator-watering: Card da calculadora de Runoff
+  * runoff-watered: Input de volume regado
+  * runoff-collected: Input de runoff coletado
+  * watering-substrate: Select de tipo de substrato
+  * calculator-lux-ppfd: Card da calculadora Lux→PPFD
+  * lux-input: Input de leitura em lux
+  * calculator-ppm-ec: Card da calculadora PPM↔EC
+  * ppm-input: Input de valor em PPM/EC
+- Botão "Tour das Calculadoras" no header do CalculatorMenu (desktop e mobile)
+- Estado persistente via localStorage (hasCompletedAdvancedTour)
+- Tours independentes (principal e avançado) sem interferência
