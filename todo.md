@@ -3503,3 +3503,8 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar link "Guia do Usuário" na Sidebar desktop (rodapé, acima de Configurações)
 - [x] Adicionar card "Guia do Usuário" na página de Configurações
 - [x] Marcar item "Criar guia do usuário" como concluído no todo.md
+
+## Guia do Usuário - BottomNav Mobile (27/02/2026)
+
+- [x] Localizar componente BottomNav e menu "Mais" (/client/src/components/BottomNav.tsx)
+- [x] Adicionar link "Guia do Usuário" (BookOpen icon) no menu "Mais" do BottomNav, entre Strains e Configurações

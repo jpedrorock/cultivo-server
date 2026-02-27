@@ -1,4 +1,4 @@
-import { Warehouse, Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus } from "lucide-react";
+import { Warehouse, Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -44,6 +44,7 @@ export function BottomNav() {
     { href: "/history", icon: BarChart3, label: "Histórico" },
     { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
     { href: "/manage-strains", icon: Sprout, label: "Strains" },
+    { href: "/help", icon: BookOpen, label: "Guia do Usuário" },
     { href: "/settings", icon: Settings, label: "Configurações" },
   ];
 
