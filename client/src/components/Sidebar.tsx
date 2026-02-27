@@ -1,4 +1,4 @@
-import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, Droplets, CheckSquare, Beaker } from "lucide-react";
+import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, Droplets, CheckSquare, Beaker, BookOpen } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -94,6 +94,19 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border space-y-3">
+        <Link
+          href="/help"
+          className={cn(
+            "flex items-center gap-3 px-4 py-3 rounded-lg transition-all",
+            "hover:bg-sidebar-accent",
+            location === "/help"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+              : "text-sidebar-foreground hover:text-primary"
+          )}
+        >
+          <BookOpen className={cn("w-5 h-5", location === "/help" && "stroke-[2.5]")} />
+          <span>Guia do Usuário</span>
+        </Link>
         <Link
           href="/settings"
           className={cn(

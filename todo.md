@@ -93,7 +93,7 @@
 ### 📦 Documentação
 
 - [x] Atualizar README com funcionalidades atuais
-- [ ] Criar guia do usuário
+- [x] Criar guia do usuário
 
 ### 🗑️ Limpeza (Opcional)
 
@@ -3495,3 +3495,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] TaskTemplatesManager.tsx: botão "Nova Tarefa", "Criar Primeiro Template" e "Criar/Atualizar" no dialog
 - [x] TypeScript: 0 erros após todas as alterações
 - [x] Vite: sem erros de compilação (erro de Tarefas.tsx era entrada antiga do log - 15:29 vs 15:44)
+
+## Guia do Usuário (27/02/2026)
+
+- [x] Criar página Help.tsx com guia completo das funcionalidades (14 tópicos com accordion)
+- [x] Registrar rota /help no App.tsx
+- [x] Adicionar link "Guia do Usuário" na Sidebar desktop (rodapé, acima de Configurações)
+- [x] Adicionar card "Guia do Usuário" na página de Configurações
+- [x] Marcar item "Criar guia do usuário" como concluído no todo.md

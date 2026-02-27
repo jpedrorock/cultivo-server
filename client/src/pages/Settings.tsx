@@ -1,7 +1,7 @@
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AlertSettings } from "@/components/AlertSettings";
-import { ArrowLeft, Database, Keyboard } from "lucide-react";
+import { ArrowLeft, Database, Keyboard, BookOpen, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,10 +36,38 @@ export default function Settings() {
           <NotificationSettings />
           <BackupCard />
           <KeyboardShortcuts />
+          <HelpCard />
         </div>
       </main>
     </div>
     </PageTransition>
+  );
+}
+
+function HelpCard() {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+          Guia do Usuário
+        </CardTitle>
+        <CardDescription className="text-xs sm:text-sm">
+          Aprenda a usar todas as funcionalidades do App Cultivo
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <Button asChild variant="outline" className="w-full h-11 justify-between">
+          <Link href="/help">
+            <span className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              Abrir Guia Completo
+            </span>
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
