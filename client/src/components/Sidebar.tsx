@@ -1,23 +1,27 @@
 import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, Droplets, CheckSquare, Beaker } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { data: tents } = trpc.tents.list.useQuery();
+  const { data: alertCount } = trpc.alerts.getNewCount.useQuery({});
 
   const navItems = [
-    { href: "/", icon: Home, label: "Home", enabled: true },
-    { href: "/plants", icon: Sprout, label: "Plantas", enabled: true },
-    { href: "/tarefas", icon: CheckSquare, label: "Tarefas", enabled: true },
-    { href: "/calculators", icon: Calculator, label: "Calculadoras", enabled: true },
-    { href: "/history", icon: BarChart3, label: "Histórico", enabled: true },
-    { href: "/alerts", icon: Bell, label: "Alertas", enabled: true },
-    { href: "/manage-strains", icon: Leaf, label: "Strains", enabled: true },
+    { href: "/", icon: Home, label: "Home", enabled: true, badge: 0 },
+    { href: "/plants", icon: Sprout, label: "Plantas", enabled: true, badge: 0 },
+    { href: "/tarefas", icon: CheckSquare, label: "Tarefas", enabled: true, badge: 0 },
+    { href: "/calculators", icon: Calculator, label: "Calculadoras", enabled: true, badge: 0 },
+    { href: "/history", icon: BarChart3, label: "Histórico", enabled: true, badge: 0 },
+    { href: "/alerts", icon: Bell, label: "Alertas", enabled: true, badge: alertCount || 0 },
+    { href: "/manage-strains", icon: Leaf, label: "Strains", enabled: true, badge: 0 },
   ];
 
   return (
@@ -77,7 +81,12 @@ export function Sidebar() {
               )}
             >
               <Icon className={cn("w-5 h-5", isActive && "stroke-[2.5]")} />
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.badge > 0 && (
+                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs rounded-full">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </Badge>
+              )}
             </Link>
           );
         })}
@@ -100,7 +109,9 @@ export function Sidebar() {
         </Link>
         <div className="px-4 py-2 bg-sidebar-accent rounded-lg">
           <p className="text-xs text-primary font-medium">Sistema Ativo</p>
-          <p className="text-xs text-muted-foreground mt-1">3 estufas monitoradas</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {tents ? `${tents.length} estufa${tents.length !== 1 ? 's' : ''} monitorada${tents.length !== 1 ? 's' : ''}` : 'Carregando...'}
+          </p>
         </div>
       </div>
     </aside>

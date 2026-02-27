@@ -3412,3 +3412,18 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Remover atributos data-tour dos elementos (Home, BottomNav, Calculators)
 - [x] Desinstalar dependência react-joyride
 - [x] Testar que app funciona sem erros
+
+
+## Estufas Dinâmicas - Número Ilimitado (27/02/2026)
+
+- [x] Localizar limite fixo de estufas no frontend (Home.tsx) - Nenhum limite encontrado, grid já é responsivo
+- [x] Localizar limite fixo de estufas no backend (routers.ts) - Nenhum limite encontrado
+- [x] Remover validação de limite máximo de estufas no backend - Não existia
+- [x] Remover botão/mensagem de limite no frontend - Não existia
+- [x] Garantir que a UI suporte scroll/grid com muitas estufas - Grid responsivo já suporta N estufas
+- [x] Sidebar: substituir texto estático "3 estufas monitoradas" por contagem dinâmica do banco
+- [x] Sidebar: adicionar badge de alertas não lidos no item de navegação Alertas
+- [ ] Testar criação de mais de 3 estufas
+- [ ] Verificar que todas as funcionalidades funcionam com N estufas
+- [x] PlantArchivePage: adicionar exibição de estufa de origem, peso da colheita e notas do ciclo
+- [x] Backend listArchived: incluir tentName, harvestWeight e harvestNotes nos dados retornados

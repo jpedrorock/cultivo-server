@@ -28,7 +28,10 @@ import {
   RotateCcw,
   Loader2,
   Calendar,
-  Sprout
+  Sprout,
+  Home,
+  Scale,
+  FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -234,8 +237,17 @@ export default function PlantArchivePage() {
                   <div className="flex items-center gap-2 text-sm">
                     <Sprout className="w-4 h-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Strain:</span>
-                    <span className="font-medium">{plant.strainName}</span>
+                    <span className="font-medium">{(plant as any).strainName}</span>
                   </div>
+
+                  {/* Tent */}
+                  {(plant as any).tentName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Home className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Estufa:</span>
+                      <span className="font-medium">{(plant as any).tentName}</span>
+                    </div>
+                  )}
 
                   {/* Finished Date */}
                   {plant.finishedAt && (
@@ -248,12 +260,34 @@ export default function PlantArchivePage() {
                     </div>
                   )}
 
+                  {/* Harvest Weight */}
+                  {(plant as any).harvestWeight && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Scale className="w-4 h-4 text-green-600" />
+                      <span className="text-muted-foreground">Peso colhido:</span>
+                      <span className="font-semibold text-green-600">{(plant as any).harvestWeight}g</span>
+                    </div>
+                  )}
+
                   {/* Finish Reason */}
                   {plant.finishReason && (
                     <div className="text-sm">
-                      <p className="text-muted-foreground mb-1">Notas:</p>
-                      <p className="text-foreground italic bg-muted/50 p-2 rounded">
+                      <p className="text-muted-foreground mb-1">Motivo:</p>
+                      <p className="text-foreground italic bg-muted/50 p-2 rounded text-xs">
                         "{plant.finishReason}"
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Harvest Notes from Cycle */}
+                  {(plant as any).harvestNotes && (
+                    <div className="text-sm">
+                      <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Notas da colheita:</span>
+                      </div>
+                      <p className="text-foreground italic bg-muted/50 p-2 rounded text-xs">
+                        "{(plant as any).harvestNotes}"
                       </p>
                     </div>
                   )}

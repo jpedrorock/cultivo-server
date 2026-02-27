@@ -3323,7 +3323,7 @@ export const appRouter = router({
         
         const archivedPlants = await query;
         
-        // Para cada planta, buscar strain e última foto
+        // Para cada planta, buscar strain, última foto, estufa e ciclo
         const plantsWithDetails = await Promise.all(
           archivedPlants.map(async (plant: any) => {
             // Buscar strain
@@ -3340,10 +3340,43 @@ export const appRouter = router({
               .orderBy(desc(plantHealthLogs.logDate))
               .limit(1);
             
+            // Buscar nome da estufa
+            let tentName: string | null = null;
+            if (plant.currentTentId) {
+              const [tent] = await database
+                .select({ name: tents.name })
+                .from(tents)
+                .where(eq(tents.id, plant.currentTentId));
+              tentName = tent?.name || null;
+            }
+            
+            // Buscar dados de colheita do ciclo mais recente da estufa
+            let harvestWeight: string | null = null;
+            let harvestNotes: string | null = null;
+            if (plant.currentTentId) {
+              const [lastCycle] = await database
+                .select({ 
+                  harvestWeight: cycles.harvestWeight, 
+                  harvestNotes: cycles.harvestNotes 
+                })
+                .from(cycles)
+                .where(and(
+                  eq(cycles.tentId, plant.currentTentId),
+                  eq(cycles.status, "FINISHED")
+                ))
+                .orderBy(desc(cycles.createdAt))
+                .limit(1);
+              harvestWeight = lastCycle?.harvestWeight || null;
+              harvestNotes = lastCycle?.harvestNotes || null;
+            }
+            
             return {
               ...plant,
               strainName: strain?.name || "Desconhecida",
               lastHealthPhotoUrl: lastHealthPhoto?.photoUrl || null,
+              tentName,
+              harvestWeight,
+              harvestNotes,
             };
           })
         );
