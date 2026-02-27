@@ -3696,3 +3696,16 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 
 - [x] Inserir margens de alerta por fase na tabela phaseAlertMargins (MAINTENANCE, CLONING, VEGA, FLORA, DRYING)
 - [x] Inserir safety limits por contexto (TENT_A, TENT_BC) e fase na tabela safetyLimits
+
+## AlertsChecker → safetyLimits
+
+- [x] Criar função getSafetyLimitsByPhase no db.ts para buscar limites absolutos por fase
+- [x] Refatorar getIdealValuesByTent para usar safetyLimits como fallback quando não há weeklyTargets
+- [x] Garantir que checkAlertsForTent funciona para estufas MAINTENANCE (sem targets semanais)
+- [x] Escrever/atualizar teste vitest para checkAlertsForTent com safetyLimits
+
+## Remover Notificações por Email dos Alertas
+
+- [x] Remover chamada notifyOwner do alertChecker.ts
+- [x] Remover chamada notifyOwner e registro em notificationHistory do checkAlertsForTent no db.ts
+- [x] Manter apenas inserção em alerts e alertHistory (alertas internos do app)

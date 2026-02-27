@@ -1,10 +1,10 @@
 import { getDb } from "./db";
 import { cycles, weeklyTargets, alertSettings, alertHistory, tents, notificationSettings } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
-import { notifyOwner } from "./_core/notification";
 
 /**
- * Verifica se os valores estão dentro da faixa ideal e dispara alertas se necessário
+ * Verifica se os valores estão dentro da faixa ideal e salva alertas no app
+ * Não envia email — alertas ficam visíveis apenas dentro do app
  */
 export async function checkAndNotifyAlerts(tentId: number, values: {
   tempC?: string;
@@ -103,7 +103,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
   const tentName = tentData[0]?.name || `Estufa ${tentId}`;
 
   // 6. Verificar cada métrica e criar alertas
-  const alerts: Array<{
+  const newAlerts: Array<{
     metric: "TEMP" | "RH" | "PPFD";
     value: number;
     targetMin: number | null;
@@ -118,7 +118,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     const max = parseFloat(target.tempMax.toString());
 
     if (temp < min) {
-      alerts.push({
+      newAlerts.push({
         metric: "TEMP",
         value: temp,
         targetMin: min,
@@ -126,7 +126,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
         message: `🌡️ ALERTA: ${tentName} - Temperatura BAIXA (${temp}°C). Ideal: ${min}-${max}°C`,
       });
     } else if (temp > max) {
-      alerts.push({
+      newAlerts.push({
         metric: "TEMP",
         value: temp,
         targetMin: min,
@@ -143,7 +143,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     const max = parseFloat(target.rhMax.toString());
 
     if (rh < min) {
-      alerts.push({
+      newAlerts.push({
         metric: "RH",
         value: rh,
         targetMin: min,
@@ -151,7 +151,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
         message: `💧 ALERTA: ${tentName} - Umidade BAIXA (${rh}%). Ideal: ${min}-${max}%`,
       });
     } else if (rh > max) {
-      alerts.push({
+      newAlerts.push({
         metric: "RH",
         value: rh,
         targetMin: min,
@@ -168,7 +168,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     const max = parseFloat(target.ppfdMax.toString());
 
     if (ppfd < min) {
-      alerts.push({
+      newAlerts.push({
         metric: "PPFD",
         value: ppfd,
         targetMin: min,
@@ -176,7 +176,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
         message: `☀️ ALERTA: ${tentName} - Luz BAIXA (${ppfd} µmol/m²/s). Ideal: ${min}-${max}`,
       });
     } else if (ppfd > max) {
-      alerts.push({
+      newAlerts.push({
         metric: "PPFD",
         value: ppfd,
         targetMin: min,
@@ -186,9 +186,8 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     }
   }
 
-  // 7. Salvar alertas no histórico e enviar notificações
-  for (const alert of alerts) {
-    // Salvar no histórico
+  // 7. Salvar alertas no histórico do app (sem envio por email)
+  for (const alert of newAlerts) {
     await database.insert(alertHistory).values({
       tentId,
       metric: alert.metric,
@@ -196,21 +195,11 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
       targetMin: alert.targetMin?.toString() || null,
       targetMax: alert.targetMax?.toString() || null,
       message: alert.message,
-      notificationSent: true,
+      notificationSent: false,
     });
-
-    // Enviar notificação por email
-    try {
-      await notifyOwner({
-        title: `Alerta: ${tentName}`,
-        content: alert.message,
-      });
-    } catch (error) {
-      console.error("Erro ao enviar notificação:", error);
-    }
   }
 
-  if (alerts.length > 0) {
-    console.log(`✅ ${alerts.length} alerta(s) disparado(s) para ${tentName}`);
+  if (newAlerts.length > 0) {
+    console.log(`✅ ${newAlerts.length} alerta(s) registrado(s) para ${tentName}`);
   }
 }

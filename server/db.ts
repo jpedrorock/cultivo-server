@@ -22,7 +22,6 @@ import {
   plants,
   phaseAlertMargins,
   alertHistory,
-  notificationHistory,
   type Tent,
   type Strain,
   type Cycle,
@@ -490,8 +489,46 @@ export async function getIdealValuesByTent(tentId: number): Promise<{
     }
   }
 
-  // Se não houver targets, retornar null
-  if (targets.length === 0) return null;
+  // Se não houver targets, usar safetyLimits como fallback
+  if (targets.length === 0) {
+    // Mapear categoria da estufa para contexto do safetyLimits
+    // MAINTENANCE → TENT_A, VEGA/FLORA/DRYING → TENT_BC
+    const safetyContext: "TENT_A" | "TENT_BC" = tent.category === "MAINTENANCE" ? "TENT_A" : "TENT_BC";
+    
+    const limits = await db
+      .select()
+      .from(safetyLimits)
+      .where(
+        and(
+          eq(safetyLimits.context, safetyContext),
+          eq(safetyLimits.phase, currentPhase)
+        )
+      );
+    
+    if (limits.length === 0) return null;
+    
+    // Converter array de métricas em objeto de valores ideais
+    const byMetric = Object.fromEntries(
+      limits.map((l: SafetyLimit) => [
+        l.metric,
+        {
+          min: l.minValue ? parseFloat(String(l.minValue)) : null,
+          max: l.maxValue ? parseFloat(String(l.maxValue)) : null,
+        },
+      ])
+    );
+    
+    return {
+      tempMin: byMetric['TEMP']?.min ?? null,
+      tempMax: byMetric['TEMP']?.max ?? null,
+      rhMin:   byMetric['RH']?.min   ?? null,
+      rhMax:   byMetric['RH']?.max   ?? null,
+      ppfdMin: byMetric['PPFD']?.min != null ? Math.round(byMetric['PPFD'].min) : null,
+      ppfdMax: byMetric['PPFD']?.max != null ? Math.round(byMetric['PPFD'].max) : null,
+      phMin:   byMetric['PH']?.min   ?? null,
+      phMax:   byMetric['PH']?.max   ?? null,
+    };
+  }
 
   // Se houver apenas um target, retornar diretamente
   if (targets.length === 1) {
@@ -737,34 +774,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
       });
     }
     
-    // Enviar notificação push para o owner
-    try {
-      const { notifyOwner } = await import("./_core/notification");
-      const notificationTitle = `⚠️ Alerta de Estufa: ${tent.name}`;
-      const notificationContent = messages.join("\n");
-      
-      const sent = await notifyOwner({
-        title: notificationTitle,
-        content: notificationContent,
-      });
-      
-      if (sent) {
-        console.log(`[Notifications] Notificação enviada: ${alertsToInsert.length} alertas para ${tent.name}`);
-      } else {
-        console.warn(`[Notifications] Falha ao enviar notificação para ${tent.name}`);
-      }
-      
-      // Registrar notificação no histórico
-      await db.insert(notificationHistory).values({
-        type: "environment_alert",
-        title: notificationTitle,
-        message: notificationContent,
-        metadata: JSON.stringify({ tentId, alertsCount: alertsToInsert.length }),
-        isRead: false,
-      });
-    } catch (error) {
-      console.error(`[Notifications] Erro ao enviar notificação:`, error);
-    }
+    console.log(`[Alerts] ${alertsToInsert.length} alerta(s) registrado(s) para ${tent.name} — visíveis no app`);
   }
 
   return {
