@@ -3116,3 +3116,56 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] **Service Worker:** Configurar service worker básico para PWA (opcional, futuro)
 - [ ] Testar instalação no iPhone Safari
 - [ ] Testar prompt "Add to Home Screen" no Android Chrome
+
+
+## Fase 2 - Animações Core (27/02/2026)
+
+### 2.1 Page Transition Animations
+- [ ] Instalar framer-motion para animações
+- [ ] Criar componente PageTransition wrapper
+- [ ] Implementar slide transitions (right-to-left forward, left-to-right back)
+- [ ] Implementar fade transitions para modals/dialogs
+- [ ] Duração 200-300ms (padrão iOS)
+- [ ] Aplicar em todas as rotas principais
+
+### 2.2 Skeleton Loading States
+- [ ] Criar componente SkeletonCard
+- [ ] Criar componente SkeletonList
+- [ ] Implementar shimmer animation (left-to-right pulse)
+- [ ] Aplicar em Home (lista de estufas)
+- [ ] Aplicar em PlantsList
+- [ ] Aplicar em HistoryTable
+- [ ] Aplicar em TentDetails
+
+### 2.3 Button & Card Interactions
+- [ ] Adicionar ripple effect em botões (Material Design)
+- [ ] Implementar scale down on press (0.95)
+- [ ] Adicionar haptic feedback em ações críticas (save, delete)
+- [ ] Card lift on hover/press (shadow increase)
+- [ ] Loading spinner inside button durante async operations
+
+### 2.4 List Entrance Animations
+- [ ] Implementar stagger animation para list items (50ms delay)
+- [ ] Fade + slide up from bottom
+- [ ] Usar IntersectionObserver para performance
+- [ ] Aplicar em listas de estufas, plantas, histórico
+
+### 2.5 Chart Animations
+- [ ] Animar chart lines/bars on load (draw-in effect)
+- [ ] Smooth transitions quando data updates
+- [ ] Tooltip fade-in on hover/tap
+- [ ] Configurar Chart.js animation options
+
+## Phase 2 - Core Animations (Parcialmente Implementado)
+
+- [x] Instalar framer-motion para animações
+- [x] Criar componente PageTransition reutilizável (fade + slide)
+- [x] Criar componente SkeletonLoader com shimmer effect
+- [x] Criar componente AnimatedButton com ripple + scale
+- [x] Criar componente StaggerList para animações de entrada em listas
+- [ ] Aplicar PageTransition nas principais páginas (Home, PlantsList, PlantDetail, Calculators)
+- [ ] Aplicar SkeletonLoader nos estados de loading (plantas, estufas, ciclos)
+- [ ] Substituir botões estáticos por AnimatedButton
+- [ ] Aplicar StaggerList nas listas de plantas e registros
+- [ ] Adicionar animações suaves em charts (TentChartWidget)
+- [ ] Testar performance em iPhone Safari (60fps)
