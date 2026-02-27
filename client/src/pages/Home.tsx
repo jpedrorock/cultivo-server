@@ -37,6 +37,7 @@ import { startMissingReadingsMonitor, getNotificationPermission } from "@/lib/no
 import PullToRefresh from "react-simple-pull-to-refresh";
 import { PageTransition, StaggerList, ListItemAnimation, CardAnimation } from "@/components/PageTransition";
 import { SkeletonLoader } from "@/components/SkeletonLoader";
+import { TentCardSkeleton } from "@/components/TentCardSkeleton";
 
 
 export default function Home() {
@@ -366,7 +367,9 @@ export default function Home() {
 
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <SkeletonLoader count={3} className="h-96" />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <TentCardSkeleton key={i} />
+            ))}
           </div>
         ) : (
           <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

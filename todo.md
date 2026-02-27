@@ -3220,3 +3220,14 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Testar loading states em todas as abas
 - [x] Verificar shimmer effect funcionando corretamente
 >>>>>>> Stashed changes
+
+## Implementar Skeleton Loading na Home e PlantsList
+
+- [x] Criar TentCardSkeleton component para cards de estufas
+- [x] Adicionar isLoading ao query de tents na Home
+- [x] Integrar TentCardSkeleton na Home page
+- [x] Criar PlantCardSkeleton component para cards de plantas
+- [x] Adicionar isLoading ao query de plants na PlantsList
+- [x] Integrar PlantCardSkeleton na PlantsList page
+- [x] Testar skeleton loading em ambas as páginas
+- [x] Verificar shimmer effect e layout consistency

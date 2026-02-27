@@ -19,7 +19,7 @@ import {
 import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
-import { PlantListSkeleton } from "@/components/ListSkeletons";
+import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
 import { useLocation } from "wouter";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 
@@ -328,7 +328,11 @@ export default function PlantsList() {
 
         {/* Plants Grouped by Tent */}
         {isLoading ? (
-          <PlantListSkeleton count={6} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <PlantCardSkeleton key={i} />
+            ))}
+          </div>
         ) : filteredPlants && filteredPlants.length > 0 ? (
           <div className="space-y-4">
             {tents?.map((tent) => {
