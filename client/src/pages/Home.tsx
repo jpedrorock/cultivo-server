@@ -782,11 +782,18 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
 
   return (
     <ListItemAnimation>
-      <Card className="bg-card/90 backdrop-blur-sm hover:shadow-xl hover:shadow-primary/10 transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-primary/30 group cursor-pointer" data-tour="tent-card">
+      <Card className="bg-card/90 backdrop-blur-sm shadow-md shadow-black/8 hover:shadow-xl hover:shadow-primary/12 transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-primary/30 group cursor-pointer overflow-hidden" data-tour="tent-card">
+      {/* Phase-colored gradient strip at top of card */}
+      <div className={`h-1 w-full ${
+        tent.category === 'VEGA' ? 'bg-gradient-to-r from-green-400 via-emerald-500 to-green-400' :
+        tent.category === 'FLORA' ? 'bg-gradient-to-r from-purple-400 via-violet-500 to-purple-400' :
+        tent.category === 'DRYING' ? 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400' :
+        'bg-gradient-to-r from-blue-400 via-cyan-500 to-blue-400'
+      }`} />
       <CardHeader>
         <div className="flex items-start justify-between">
           <div>
-            <CardTitle className="text-xl flex items-center gap-2 flex-wrap">
+            <CardTitle className="text-xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
               {tent.name}
               <Badge 
                 className={`${phaseInfo.color} text-white border-0`}
@@ -1010,40 +1017,44 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               </p>
             </div>
           )}
-          <div className="grid grid-cols-4 gap-3 pt-5 border-t">
-            <div className="text-center">
-              <ThermometerSun className="w-5 h-5 mx-auto text-orange-500 mb-1" />
-              <p className="text-xs text-muted-foreground">Temp</p>
-              <div className="flex items-center justify-center gap-1">
-                <p className={`text-sm font-semibold ${
+          {/* KPI Metrics — rich typography with Geist */}
+          <div className="grid grid-cols-4 gap-2 pt-4 border-t border-border/60">
+            {/* Temperature */}
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-orange-500/5 border border-orange-500/10">
+              <ThermometerSun className="w-4 h-4 text-orange-500 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Temp</p>
+              <div className="flex items-center gap-0.5">
+                <p className={`text-base font-bold tracking-tight leading-none ${
                   latestLog?.tempC 
                     ? getValueColor(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)
                     : "text-foreground"
                 }`}>
-                  {latestLog?.tempC ? <><AnimatedCounter value={parseFloat(latestLog.tempC)} decimals={1} suffix="°C" /></> : "--°C"}
+                  {latestLog?.tempC ? <AnimatedCounter value={parseFloat(latestLog.tempC)} decimals={1} suffix="°" /> : "--"}
                 </p>
                 {latestLog?.tempC && getStatusIcon(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)}
               </div>
             </div>
-            <div className="text-center">
-              <Droplets className="w-5 h-5 mx-auto text-blue-500 mb-1" />
-              <p className="text-xs text-muted-foreground">RH</p>
-              <div className="flex items-center justify-center gap-1">
-                <p className={`text-sm font-semibold ${
+            {/* Humidity */}
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-blue-500/5 border border-blue-500/10">
+              <Droplets className="w-4 h-4 text-blue-500 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">RH</p>
+              <div className="flex items-center gap-0.5">
+                <p className={`text-base font-bold tracking-tight leading-none ${
                   latestLog?.rhPct 
                     ? getValueColor(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)
                     : "text-foreground"
                 }`}>
-                  {latestLog?.rhPct ? <><AnimatedCounter value={parseFloat(latestLog.rhPct)} decimals={1} suffix="%" /></> : "--%"}
+                  {latestLog?.rhPct ? <AnimatedCounter value={parseFloat(latestLog.rhPct)} decimals={0} suffix="%" /> : "--"}
                 </p>
                 {latestLog?.rhPct && getStatusIcon(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)}
               </div>
             </div>
-            <div className="text-center">
-              <Sun className="w-5 h-5 mx-auto text-yellow-500 dark:text-yellow-400 mb-1" />
-              <p className="text-xs text-muted-foreground">PPFD</p>
-              <div className="flex items-center justify-center gap-1">
-                <p className={`text-sm font-semibold ${
+            {/* PPFD */}
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
+              <Sun className="w-4 h-4 text-yellow-500 dark:text-yellow-400 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PPFD</p>
+              <div className="flex items-center gap-0.5">
+                <p className={`text-base font-bold tracking-tight leading-none ${
                   latestLog?.ppfd 
                     ? getValueColor(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)
                     : "text-foreground"
@@ -1053,10 +1064,11 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 {latestLog?.ppfd && getStatusIcon(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)}
               </div>
             </div>
-            <div className="text-center">
-              <Clock className="w-5 h-5 mx-auto text-purple-500 mb-1" />
-              <p className="text-xs text-muted-foreground">Foto</p>
-              <p className="text-sm font-semibold text-foreground">
+            {/* Photoperiod */}
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-purple-500/5 border border-purple-500/10">
+              <Clock className="w-4 h-4 text-purple-500 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Foto</p>
+              <p className="text-base font-bold tracking-tight leading-none text-foreground">
                 {cycle?.floraStartDate ? "12/12" : "18/6"}
               </p>
             </div>

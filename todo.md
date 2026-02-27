@@ -3508,3 +3508,14 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 
 - [x] Localizar componente BottomNav e menu "Mais" (/client/src/components/BottomNav.tsx)
 - [x] Adicionar link "Guia do Usuário" (BookOpen icon) no menu "Mais" do BottomNav, entre Strains e Configurações
+
+## Refinamento Cards de Estufa - Home (27/02/2026)
+
+- [x] Analisar estrutura atual dos cards de estufa na Home.tsx
+- [x] Adicionar sombras ricas: shadow-md shadow-black/8 base + shadow-xl no hover
+- [x] Faixa de gradiente colorida no topo do card por fase (verde/roxo/âmbar/azul)
+- [x] Hierarquia tipográfica: CardTitle com font-bold tracking-tight
+- [x] KPI boxes individuais com fundo colorido sutil (bg-orange/blue/yellow/purple 5%) e borda
+- [x] KPI values: text-base font-bold tracking-tight leading-none
+- [x] Rótulos KPI: text-[10px] uppercase tracking-wider (estilo dashboard premium)
+- [x] TypeScript: 0 erros após todas as alterações
