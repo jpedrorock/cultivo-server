@@ -1,4 +1,4 @@
-import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen } from "lucide-react";
+import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen, AlertTriangle } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -18,20 +18,31 @@ export function Sidebar() {
     { refetchInterval: 30_000 } // poll every 30s to detect new alerts
   );
 
-  // Track previous count to detect new alerts
+  // Track previous count to detect new alerts — badge shake
   const prevCountRef = useRef<number | null>(null);
   const [badgeShaking, setBadgeShaking] = useState(false);
 
+  // Track previous count for status pill shake
+  const prevPillCountRef = useRef<number | null>(null);
+  const [pillShaking, setPillShaking] = useState(false);
+
   useEffect(() => {
     const current = alertCount ?? 0;
-    // Only shake if count increased (new alerts arrived) and we already had a previous value
-    if (prevCountRef.current !== null && current > prevCountRef.current) {
+    const prev = prevCountRef.current;
+
+    if (prev !== null && current > prev) {
+      // Shake the nav badge
       setBadgeShaking(true);
-      // Remove class after animation ends so it can be re-triggered
-      const timer = setTimeout(() => setBadgeShaking(false), 700);
-      return () => clearTimeout(timer);
+      const t1 = setTimeout(() => setBadgeShaking(false), 700);
+
+      // Shake the status pill alert count too
+      setPillShaking(true);
+      const t2 = setTimeout(() => setPillShaking(false), 700);
+
+      return () => { clearTimeout(t1); clearTimeout(t2); };
     }
     prevCountRef.current = current;
+    prevPillCountRef.current = current;
   }, [alertCount]);
 
   const navItems = [
@@ -49,12 +60,13 @@ export function Sidebar() {
     ? "1 estufa monitorada"
     : `${tentCount} estufas monitoradas`;
 
+  const unreadAlerts = alertCount ?? 0;
+
   return (
     <aside className="hidden md:flex md:flex-col md:fixed md:left-0 md:top-0 md:h-screen md:w-64 bg-sidebar border-r border-sidebar-border z-40 shadow-[2px_0_12px_rgba(0,0,0,0.06)]">
       
       {/* Logo/Header — gradient accent strip */}
       <div className="relative p-5 border-b border-sidebar-border overflow-hidden">
-        {/* Subtle gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
         <div className="relative flex items-center gap-3">
           <div className="w-10 h-10 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm">
@@ -165,13 +177,31 @@ export function Sidebar() {
 
         {/* Status pill */}
         <div className="mt-3 mx-1 px-3 py-2.5 bg-primary/8 rounded-xl border border-primary/12">
+          {/* Row 1: Sistema Ativo dot */}
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
             <p className="text-xs text-primary font-semibold">Sistema Ativo</p>
           </div>
+
+          {/* Row 2: tent count */}
           <p className="text-[11px] text-muted-foreground mt-0.5 pl-3.5">
             {tents ? tentLabel : 'Carregando...'}
           </p>
+
+          {/* Row 3: alert count — only shown when there are unread alerts */}
+          {unreadAlerts > 0 && (
+            <div className={cn(
+              "flex items-center gap-1.5 mt-1.5 pl-3.5",
+              pillShaking && "animate-badge-shake"
+            )}>
+              <AlertTriangle className="w-3 h-3 text-destructive shrink-0" />
+              <p className="text-[11px] text-destructive font-semibold">
+                {unreadAlerts === 1
+                  ? "1 alerta não lido"
+                  : `${unreadAlerts} alertas não lidos`}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </aside>

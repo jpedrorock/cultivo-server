@@ -3558,3 +3558,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Disparar animação de shake no badge quando novos alertas chegarem
 - [x] Garantir que a animação só ocorre uma vez por novo alerta (não em loop)
 - [x] Testar no desktop (Sidebar) e mobile (BottomNav)
+
+## Micro-animação status pill + Tema Floresta (27/02/2026)
+
+- [x] Status pill: animar contagem de alertas com shake/pulse quando há novos alertas
+- [x] Status pill: adicionar transição suave ao texto de contagem de estufas
+- [x] Tema Floresta: revisar contraste de texto (foreground vs background)
+- [x] Tema Floresta: ajustar sidebar-foreground, muted-foreground e card para legibilidade
+- [x] Tema Floresta: verificar botões primários e badges com fundo escuro
