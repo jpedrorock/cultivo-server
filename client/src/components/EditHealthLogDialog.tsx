@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Camera, Image, X, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { processImage, blobToBase64, isHEIC, processImageFile } from "@/lib/imageUtils";
+import { prepareImageForUpload } from "@/lib/imageUtils";
 
 interface HealthLog {
   id: number;
@@ -61,49 +61,38 @@ export default function EditHealthLogDialog({
   }, [healthLog, open]);
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let file = e.target.files?.[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validação
-    if (!file.type.startsWith("image/") && !isHEIC(file)) {
+    // Aceitar qualquer imagem (incluindo HEIC sem mime type no iOS Safari)
+    const isImage = file.type.startsWith("image/") || file.type === "" || file.name.match(/\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|tiff)$/i);
+    if (!isImage) {
       toast.error("Por favor, selecione apenas imagens");
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Imagem muito grande (máx 10MB)");
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 20MB)");
       return;
     }
 
     try {
-      // Converter HEIC para JPEG se necessário
-      if (isHEIC(file)) {
-        toast.info("🔄 Convertendo HEIC para JPEG...");
-        file = await processImageFile(file);
-        toast.success("✅ Imagem convertida com sucesso!");
-      }
-      
       toast.info("Processando imagem...");
-      
-      // Processar imagem
-      const processedBlob = await processImage(file, {
+
+      const result = await prepareImageForUpload(file, {
         maxWidth: 1080,
         maxHeight: 1440,
-        quality: 0.85,
-        
-        
+        quality: 0.82,
       });
 
-      // Converter para base64 para preview
-      const base64 = await blobToBase64(processedBlob);
-      setPhotoPreview(base64);
-      setNewPhotoBase64(base64);
+      setPhotoPreview(result.base64);
+      setNewPhotoBase64(result.base64);
       setHasNewPhoto(true);
 
-      toast.success("Imagem processada!");
-    } catch (error) {
-      console.error("Erro ao processar imagem:", error);
-      toast.error("Erro ao processar imagem");
+      toast.success(`📸 Imagem pronta! (${result.originalSize} → ${result.compressedSize})`);
+    } catch (error: any) {
+      console.error("[EditHealthLogDialog] Erro ao processar imagem:", error);
+      toast.error(error?.message || "Erro ao processar imagem. Tente novamente.");
     }
   };
 

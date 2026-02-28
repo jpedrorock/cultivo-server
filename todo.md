@@ -3765,3 +3765,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Feedback visual: alertas novos com fundo destacado, cursor pointer, hover state; alertas vistos com opacidade reduzida
 - [x] Ícone CheckCircle2 em cada alerta indicando estado (visto/não visto)
 - [x] Loader spinner no alerta sendo marcado como visto
+
+## Bug - Upload de Foto no Safari iOS (28/02/2026)
+
+- [x] Corrigir detecção de HEIC no Safari iOS (magic bytes + verificação robusta)
+- [x] Corrigir processImage() com fallback para arquivo original se canvas falhar
+- [x] Corrigir PlantHealthTab e QuickLog para lidar com fotos da câmera do iPhone
+- [x] Testar fluxo completo no Safari iOS

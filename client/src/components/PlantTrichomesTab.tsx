@@ -24,13 +24,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  processImage,
-  blobToBase64,
-  formatFileSize,
-  isHEIC,
-  processImageFile,
-} from "@/lib/imageUtils";
+import { prepareImageForUpload } from "@/lib/imageUtils";
 import { TrichomesTabSkeleton } from "@/components/TabSkeletons";
 import { LazyImage } from "@/components/LazyImage";
 
@@ -119,50 +113,42 @@ export default function PlantTrichomesTab({
   });
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let file = e.target.files?.[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/") && !isHEIC(file)) {
+    // Aceitar qualquer imagem (incluindo HEIC sem mime type no iOS Safari)
+    const isImage = file.type.startsWith("image/") || file.type === "" || file.name.match(/\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|tiff)$/i);
+    if (!isImage) {
       toast.error("Por favor, selecione apenas imagens");
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Imagem muito grande (máx 10MB)");
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 20MB)");
       return;
     }
 
     try {
-      if (isHEIC(file)) {
-        toast.info("🔄 Convertendo HEIC para JPEG...");
-        file = await processImageFile(file);
-        toast.success("✅ Imagem convertida!");
-      }
-
       toast.info("Processando imagem...");
 
-      const processedBlob = await processImage(file, {
+      const result = await prepareImageForUpload(file, {
         maxWidth: 1080,
         maxHeight: 1440,
-        quality: 0.85,
-        
-        
+        quality: 0.82,
       });
 
-      const processedFile = new File([processedBlob], file.name, {
-        type: "image/jpeg",
-      });
+      const processedFile = new File(
+        [result.blob],
+        file.name.replace(/\.(heic|heif)$/i, '.jpg'),
+        { type: result.mimeType }
+      );
       setPhotoFile(processedFile);
+      setPhotoPreview(result.base64);
 
-      const base64 = await blobToBase64(processedBlob);
-      setPhotoPreview(base64);
-
-      const originalSize = formatFileSize(file.size);
-      const newSize = formatFileSize(processedFile.size);
-      toast.success(`Imagem otimizada: ${originalSize} → ${newSize}`);
-    } catch (error) {
-      console.error("Erro ao processar imagem:", error);
-      toast.error("Erro ao processar imagem");
+      toast.success(`📸 Foto pronta! (${result.originalSize} → ${result.compressedSize}${result.reduction > 0 ? `, -${result.reduction}%` : ""})`);
+    } catch (error: any) {
+      console.error("[PlantTrichomesTab] Erro ao processar imagem:", error);
+      toast.error(error?.message || "Erro ao processar imagem. Tente novamente.");
     }
   };
 
