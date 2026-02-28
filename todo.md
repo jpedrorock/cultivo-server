@@ -3820,3 +3820,8 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] Adicionar estado isUploadingPhoto no PlantTrichomesTab com spinner no botão de câmera
 - [ ] Adicionar estado isUploadingPhoto no EditHealthLogDialog com spinner no botão de câmera
 - [ ] Desabilitar botão de submit enquanto o upload está em andamento
+
+## Correções Mobile Layout - Sessão 28/02 (Parte 2)
+- [x] Corrigir cards do Guia do Usuário - botão com estilos inline para Safari iOS (display:block, width:100%)
+- [x] Corrigir header PlantDetail - flex:1 na esquerda, flex-shrink:0 na direita, h1 com text-overflow:ellipsis
+- [x] Corrigir abas PlantDetail - WebkitOverflowScrolling:touch + width:max-content para Safari iOS

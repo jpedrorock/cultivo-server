@@ -50,9 +50,9 @@ function AccordionSection({ section }: { section: Section }) {
   return (
     <Card className="overflow-hidden border border-border/60">
       <button
-        className="w-full text-left block"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px' }}>
           <div className={cn("p-2 rounded-lg shrink-0", section.color)} style={{ flexShrink: 0 }}>

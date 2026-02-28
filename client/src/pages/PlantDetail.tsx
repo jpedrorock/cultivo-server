@@ -255,8 +255,9 @@ export default function PlantDetail() {
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-3 md:py-6">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            {/* Esquerda: voltar + ícone + nome */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
               <Button variant="ghost" size="icon" className="shrink-0" asChild>
                 <Link href="/plants">
                   <ArrowLeft className="w-5 h-5" />
@@ -270,12 +271,12 @@ export default function PlantDetail() {
                   : tent?.category === 'DRYING'
                   ? 'from-amber-500 to-orange-600'
                   : 'from-blue-500 to-cyan-600'
-              }`}>
+              }`} style={{ flexShrink: 0 }}>
                 <Sprout className="w-5 h-5 text-white" />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-base md:text-2xl font-bold text-foreground truncate leading-tight">{plant.name}</h1>
-                <div className="flex items-center gap-1.5 flex-wrap">
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h1 className="text-base md:text-2xl font-bold text-foreground leading-tight" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plant.name}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   {plant.code && (
                     <p className="text-xs text-muted-foreground font-mono">{plant.code}</p>
                   )}
@@ -289,7 +290,7 @@ export default function PlantDetail() {
                         : tent?.category === 'DRYING'
                         ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                         : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                    }`}>
+                    }`} style={{ flexShrink: 0 }}>
                       {plant.cyclePhase === 'VEGA' ? '🌱 Veg' :
                        plant.cyclePhase === 'FLORA' ? '🌸 Flora' :
                        tent?.category === 'VEGA' ? '🌱 Veg' :
@@ -302,8 +303,8 @@ export default function PlantDetail() {
                 </div>
               </div>
             </div>
-            {/* Ações: no desktop mostra todos os botões, no mobile apenas o dropdown */}
-            <div className="flex items-center gap-1 shrink-0">
+            {/* Direita: ações - apenas ícone MoreVertical no mobile, botões no desktop */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
               {/* Desktop: botões individuais */}
               <Button variant="outline" size="sm" className="hidden md:flex" onClick={handleEditClick}>
                 <Edit className="w-4 h-4 mr-2" />
@@ -327,12 +328,12 @@ export default function PlantDetail() {
               {/* Dropdown de Ações - ícone no mobile, texto no desktop */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2">
+                  <Button variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2" style={{ flexShrink: 0 }}>
                     <MoreVertical className="w-4 h-4" />
                     <span className="hidden md:inline">Ações</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" sideOffset={4} className="w-56">
                   {/* Editar e Excluir: apenas no dropdown mobile */}
                   <DropdownMenuItem onClick={handleEditClick} className="md:hidden">
                     <Edit className="w-4 h-4 mr-2" />
@@ -484,8 +485,8 @@ export default function PlantDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="health" className="w-full">
-          <div className="overflow-x-auto scrollbar-none -mx-4 px-4">
-            <TabsList className="inline-flex min-w-full h-auto p-1 gap-0.5">
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: '-1rem', marginRight: '-1rem', paddingLeft: '1rem', paddingRight: '1rem' }}>
+            <TabsList style={{ display: 'inline-flex', width: 'max-content', minWidth: '100%', height: 'auto', padding: '4px', gap: '2px' }}>
               <TabsTrigger value="health" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
                 <Heart className="w-3.5 h-3.5" />
                 <span>Saúde</span>
