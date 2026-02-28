@@ -66,9 +66,9 @@ export default function QuickLog() {
   const [runoffCollected, setRunoffCollected] = useState("");
   const [ph, setPh] = useState("");
   const [ec, setEc] = useState("");
-  const [ppfd, setPpfd] = useState(0);
+  const [ppfd, setPpfd] = useState(400); // Valor inicial realista: 400 μmol/m²/s
   const [lightUnit, setLightUnit] = useState<"ppfd" | "lux">("ppfd"); // Toggle between Lux and PPFD
-  const [luxValue, setLuxValue] = useState(0);
+  const [luxValue, setLuxValue] = useState(20000); // Valor inicial realista: 20.000 lux
 
   // Plant health state - expanded
   const [recordPlantHealth, setRecordPlantHealth] = useState<boolean | null>(null);
@@ -179,7 +179,8 @@ export default function QuickLog() {
     setRunoffCollected("");
     setPh("");
     setEc("");
-    setPpfd(0);
+    setPpfd(400); // Volta ao valor inicial realista
+    setLuxValue(20000);
     setRecordPlantHealth(null);
     setCurrentPlantIndex(0);
     setPlantHealthRecords(new Map());

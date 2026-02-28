@@ -1221,8 +1221,8 @@ function IrrigationCalculator() {
 // Calculadora Lux ↔ PPFD (Bidirecional)
 function LuxPPFDCalculator() {
   const [conversionMode, setConversionMode] = useState<"lux-to-ppfd" | "ppfd-to-lux">("lux-to-ppfd");
-  const [lux, setLux] = useState<string>("");
-  const [ppfd, setPpfd] = useState<string>("");
+  const [lux, setLux] = useState<string>("20000"); // Valor inicial realista: 20.000 lux (vegetativa)
+  const [ppfd, setPpfd] = useState<string>("400"); // Valor inicial realista: 400 μmol/m²/s
   const [lightType, setLightType] = useState<string>("led-white");
   const [result, setResult] = useState<number | null>(null);
 
@@ -1654,8 +1654,8 @@ function PPMECConverter() {
 // Calculadora de Ajuste de pH
 function PHAdjustCalculator() {
   const [waterVolume, setWaterVolume] = useState<string>("");
-  const [currentPH, setCurrentPH] = useState<string>("");
-  const [targetPH, setTargetPH] = useState<string>("");
+  const [currentPH, setCurrentPH] = useState<string>("7.0"); // Valor inicial: pH neutro (ajuste conforme medido)
+  const [targetPH, setTargetPH] = useState<string>("6.2"); // Valor inicial: alvo típico cannabis em solo
   const [adjustmentType, setAdjustmentType] = useState<"down" | "up">("down");
   const [result, setResult] = useState<{ amount: number; product: string } | null>(null);
 

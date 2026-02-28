@@ -22,7 +22,7 @@ export default function TentLog() {
   const [turn, setTurn] = useState<"AM" | "PM">("AM");
   const [tempC, setTempC] = useState("");
   const [rhPct, setRhPct] = useState("");
-  const [ppfd, setPpfd] = useState("");
+  const [ppfd, setPpfd] = useState("400"); // Valor inicial realista: 400 μmol/m²/s
   const [ph, setPh] = useState("");
   const [ec, setEc] = useState("");
   const [wateringVolume, setWateringVolume] = useState("");
@@ -129,7 +129,7 @@ export default function TentLog() {
       // Limpar formulário
       setTempC("");
       setRhPct("");
-      setPpfd("");
+      setPpfd("400"); // Volta ao valor inicial realista
       setPh("");
       setEc("");
       setWateringVolume("");

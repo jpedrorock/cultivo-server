@@ -3772,3 +3772,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Corrigir processImage() com fallback para arquivo original se canvas falhar
 - [x] Corrigir PlantHealthTab e QuickLog para lidar com fotos da câmera do iPhone
 - [x] Testar fluxo completo no Safari iOS
+
+## Melhoria - Valores Iniciais dos Sliders (28/02/2026)
+
+- [x] Slider PPFD: iniciar em valor realista (ex: 400 μmol/m²/s)
+- [x] Slider Lux: iniciar em valor realista (ex: 20.000 lux)
+- [x] Slider Tricomas (clear/cloudy/amber): não são sliders, são inputs de texto com placeholder - ok
+- [x] Verificar outros sliders no app: pH Atual (7.0) e pH Alvo (6.2) na calculadora de pH ajustados
