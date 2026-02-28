@@ -3742,3 +3742,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Criar componente TentIcon.tsx com SVG isométrico line art (cantos verdes)
 - [x] Substituir Warehouse no BottomNav pelo TentIcon
 - [x] Substituir Home no Sidebar pelo TentIcon para o item "Estufas"
+
+## Refinamento TentIcon SVG
+
+- [x] Simplificar TentIcon para cubo retangular isométrico limpo em currentColor (sem detalhes extras)
