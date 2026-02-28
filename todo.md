@@ -3779,3 +3779,23 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Slider Lux: iniciar em valor realista (ex: 20.000 lux)
 - [x] Slider Tricomas (clear/cloudy/amber): não são sliders, são inputs de texto com placeholder - ok
 - [x] Verificar outros sliders no app: pH Atual (7.0) e pH Alvo (6.2) na calculadora de pH ajustados
+
+## Bug - Design Mobile (28/02/2026)
+
+- [ ] Corrigir layout dos cards no Guia do Usuário (ícone e título desalinhados no mobile)
+- [ ] Corrigir menu de ações da planta sobrepondo conteúdo no mobile
+- [ ] Corrigir abas (Tricomas, LST, Observações, Histórico) cortadas/sem espaçamento no mobile
+
+## Refatoração Definitiva do Upload de Fotos (28/02/2026)
+
+- [x] Criar endpoint POST /api/upload/image com multer + sharp no servidor
+- [x] Servidor converte HEIC/qualquer formato → JPEG, corrige orientação EXIF, redimensiona para 1920px
+- [x] Criar utilitário uploadImage() no frontend usando XMLHttpRequest + FormData (sem base64)
+- [x] Refatorar QuickLog para usar uploadImage em vez de base64
+- [x] Refatorar PlantHealthTab para usar uploadImage em vez de base64
+- [x] Refatorar EditHealthLogDialog para usar uploadImage em vez de base64
+- [x] Refatorar PlantTrichomesTab para usar uploadImage em vez de base64
+- [x] Atualizar procedure plantHealth.create para aceitar photoUrl pré-enviada
+- [x] Atualizar procedure plantHealth.update para aceitar photoUrl e removePhoto
+- [x] Atualizar procedure plantTrichomes.create para aceitar photoUrl pré-enviada
+- [x] Manter fallback base64 nas procedures para compatibilidade com registros antigos

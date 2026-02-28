@@ -54,28 +54,26 @@ function AccordionSection({ section }: { section: Section }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <CardHeader className="py-4 px-5">
-          <div className="flex items-center gap-3">
-            <div className={cn("p-2 rounded-lg", section.color)}>
-              <Icon className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <CardTitle className="text-base font-semibold">{section.title}</CardTitle>
-                {section.badge && (
-                  <Badge variant="secondary" className="text-xs">
-                    {section.badge}
-                  </Badge>
-                )}
-              </div>
-            </div>
-            {open ? (
-              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            )}
+        <div className="flex items-center gap-3 py-4 px-5">
+          <div className={cn("p-2 rounded-lg shrink-0", section.color)}>
+            <Icon className="w-5 h-5 text-white" />
           </div>
-        </CardHeader>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground leading-tight">{section.title}</span>
+              {section.badge && (
+                <Badge variant="secondary" className="text-xs shrink-0">
+                  {section.badge}
+                </Badge>
+              )}
+            </div>
+          </div>
+          {open ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          )}
+        </div>
       </button>
       {open && (
         <CardContent className="px-5 pb-5 pt-0 border-t border-border/40">

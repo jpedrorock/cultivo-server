@@ -31,10 +31,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  prepareImageForUpload,
-  formatFileSize,
-} from "@/lib/imageUtils";
+import { uploadImage } from "@/lib/uploadImage";
 import EditHealthLogDialog from "@/components/EditHealthLogDialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
@@ -85,7 +82,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
   const [treatment, setTreatment] = useState("");
   const [notes, setNotes] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoUploadedUrl, setPhotoUploadedUrl] = useState<string | null>(null); // URL S3 após upload
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number>(0);
   const [editingLog, setEditingLog] = useState<any | null>(null);
@@ -128,7 +125,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
       setTreatment("");
       setNotes("");
       setPhotoPreview(null);
-      setPhotoFile(null);
+      setPhotoUploadedUrl(null);
       setIsFormOpen(false);
       setUploadStatus("idle");
       setUploadMessage("");
@@ -189,108 +186,58 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
       return;
     }
 
+    // Preview local imediato
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreview(previewUrl);
+    setPhotoUploadedUrl(null);
+
     try {
-      setUploadProgress({
-        isUploading: true,
-        stage: "converting",
-        progress: 20,
-        originalSize: formatFileSize(file.size),
-      });
-      setUploadStatus("processing");
-      setUploadMessage("Processando imagem...");
+      setUploadProgress({ isUploading: true, stage: "uploading", progress: 10 });
+      setUploadStatus("uploading");
+      setUploadMessage("Enviando foto...");
 
-      setUploadProgress(prev => ({ ...prev, stage: "compressing", progress: 50 }));
-
-      // Pipeline completo: HEIC → JPEG + compressão + base64
-      const result = await prepareImageForUpload(file, {
-        maxWidth: 1920,
-        maxHeight: 1920,
-        quality: 0.82,
+      // Upload direto: servidor converte HEIC + comprime com sharp
+      const url = await uploadImage(file, (pct) => {
+        setUploadProgress(prev => ({ ...prev, progress: 10 + Math.round(pct * 0.85) }));
       });
 
-      console.log('[PlantHealthTab] Photo processed:', {
-        originalSize: result.originalSize,
-        compressedSize: result.compressedSize,
-        reduction: `${result.reduction}%`,
-        mimeType: result.mimeType,
-      });
-
-      setUploadProgress(prev => ({
-        ...prev,
-        stage: "uploading",
-        progress: 80,
-        compressedSize: result.compressedSize,
-        reduction: result.reduction,
-      }));
-
-      // Criar File para manter compatibilidade com handleSubmit
-      const processedFile = new File(
-        [result.blob],
-        file.name.replace(/\.(heic|heif)$/i, '.jpg'),
-        { type: result.mimeType }
-      );
-      setPhotoFile(processedFile);
-      setPhotoPreview(result.base64);
-
+      setPhotoUploadedUrl(url);
       setUploadProgress(prev => ({ ...prev, stage: "complete", progress: 100 }));
       setUploadStatus("success");
-      setUploadMessage(`Imagem pronta: ${result.originalSize} → ${result.compressedSize}`);
+      setUploadMessage("Foto enviada!");
 
       setTimeout(() => {
         setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
-        toast.success(`📸 Foto pronta! (${result.originalSize} → ${result.compressedSize}${result.reduction > 0 ? `, -${result.reduction}%` : ""})`);
+        toast.success("📸 Foto enviada com sucesso!");
         setUploadStatus("idle");
-      }, 1500);
+      }, 1000);
     } catch (error: any) {
-      console.error("[PlantHealthTab] Erro ao processar imagem:", error);
+      console.error("[PlantHealthTab] Erro ao enviar imagem:", error);
+      setPhotoPreview(null);
+      setPhotoUploadedUrl(null);
       setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
       setUploadStatus("error");
-      setUploadMessage("Erro ao processar imagem");
-      toast.error(error?.message || "Erro ao processar imagem. Tente novamente.");
+      setUploadMessage("Erro ao enviar imagem");
+      toast.error(error?.message || "Erro ao enviar imagem. Tente novamente.");
       setTimeout(() => setUploadStatus("idle"), 3000);
     }
   };
 
   const handleSubmit = () => {
-    console.log('[PlantHealthTab] handleSubmit called:', {
-      hasPhoto: !!photoFile,
-      photoName: photoFile?.name,
-      photoSize: photoFile?.size,
-      hasSymptoms: !!symptoms,
-      hasTreatment: !!treatment,
-      hasNotes: !!notes
-    });
-    
-    if (!photoFile && !symptoms && !treatment && !notes) {
-      toast.error("Adicione pelo menos uma foto ou informa\u00e7\u00e3o");
+    if (!photoUploadedUrl && !symptoms && !treatment && !notes) {
+      toast.error("Adicione pelo menos uma foto ou informação");
       return;
     }
 
-    if (photoFile) {
-      console.log('[PlantHealthTab] Reading photo file...');
-      setUploadStatus("uploading");
-      setUploadMessage("Enviando foto para CDN...");
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        createHealthLog.mutate({
-          plantId,
-          healthStatus,
-          symptoms: symptoms || undefined,
-          treatment: treatment || undefined,
-          notes: notes || undefined,
-          photoBase64: reader.result as string,
-        });
-      };
-      reader.readAsDataURL(photoFile);
-    } else {
-      createHealthLog.mutate({
-        plantId,
-        healthStatus,
-        symptoms: symptoms || undefined,
-        treatment: treatment || undefined,
-        notes: notes || undefined,
-      });
-    }
+    // Foto já foi enviada ao S3 via /api/upload/image — apenas passa a URL
+    createHealthLog.mutate({
+      plantId,
+      healthStatus,
+      symptoms: symptoms || undefined,
+      treatment: treatment || undefined,
+      notes: notes || undefined,
+      photoUrl: photoUploadedUrl || undefined,
+    });
   };
 
   const getStatusOption = (status: string) =>
@@ -379,7 +326,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                       className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-sm hover:scale-110 transition-transform"
                       onClick={() => {
                         setPhotoPreview(null);
-                        setPhotoFile(null);
+                        setPhotoUploadedUrl(null);
                       }}
                     >
                       <X className="w-3 h-3" />

@@ -24,7 +24,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
-import { prepareImageForUpload } from "@/lib/imageUtils";
+import { uploadImage } from "@/lib/uploadImage";
 import { TrichomesTabSkeleton } from "@/components/TabSkeletons";
 import { LazyImage } from "@/components/LazyImage";
 
@@ -79,7 +79,8 @@ export default function PlantTrichomesTab({
   const [amberPercent, setAmberPercent] = useState("");
   const [notes, setNotes] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoUploadedUrl, setPhotoUploadedUrl] = useState<string | null>(null); // URL S3 após upload
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number>(0);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -103,7 +104,7 @@ export default function PlantTrichomesTab({
       setAmberPercent("");
       setNotes("");
       setPhotoPreview(null);
-      setPhotoFile(null);
+      setPhotoUploadedUrl(null);
       setIsFormOpen(false);
       refetch();
     },
@@ -128,27 +129,26 @@ export default function PlantTrichomesTab({
       return;
     }
 
+    // Preview local imediato
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreview(previewUrl);
+    setPhotoUploadedUrl(null);
+
     try {
-      toast.info("Processando imagem...");
+      setIsUploadingPhoto(true);
+      toast.info("📸 Enviando foto...");
 
-      const result = await prepareImageForUpload(file, {
-        maxWidth: 1080,
-        maxHeight: 1440,
-        quality: 0.82,
-      });
+      const url = await uploadImage(file);
 
-      const processedFile = new File(
-        [result.blob],
-        file.name.replace(/\.(heic|heif)$/i, '.jpg'),
-        { type: result.mimeType }
-      );
-      setPhotoFile(processedFile);
-      setPhotoPreview(result.base64);
-
-      toast.success(`📸 Foto pronta! (${result.originalSize} → ${result.compressedSize}${result.reduction > 0 ? `, -${result.reduction}%` : ""})`);
+      setPhotoUploadedUrl(url);
+      setIsUploadingPhoto(false);
+      toast.success("📸 Foto enviada com sucesso!");
     } catch (error: any) {
-      console.error("[PlantTrichomesTab] Erro ao processar imagem:", error);
-      toast.error(error?.message || "Erro ao processar imagem. Tente novamente.");
+      console.error("[PlantTrichomesTab] Erro ao enviar imagem:", error);
+      setPhotoPreview(null);
+      setPhotoUploadedUrl(null);
+      setIsUploadingPhoto(false);
+      toast.error(error?.message || "Erro ao enviar imagem. Tente novamente.");
     }
   };
 
@@ -158,32 +158,22 @@ export default function PlantTrichomesTab({
       return;
     }
 
-    if (photoFile) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        createTrichomeLog.mutate({
-          plantId,
-          weekNumber: parseInt(weekNumber),
-          trichomeStatus,
-          clearPercent: clearPercent ? parseInt(clearPercent) : undefined,
-          cloudyPercent: cloudyPercent ? parseInt(cloudyPercent) : undefined,
-          amberPercent: amberPercent ? parseInt(amberPercent) : undefined,
-          notes: notes || undefined,
-          photoBase64: reader.result as string,
-        });
-      };
-      reader.readAsDataURL(photoFile);
-    } else {
-      createTrichomeLog.mutate({
-        plantId,
-        weekNumber: parseInt(weekNumber),
-        trichomeStatus,
-        clearPercent: clearPercent ? parseInt(clearPercent) : undefined,
-        cloudyPercent: cloudyPercent ? parseInt(cloudyPercent) : undefined,
-        amberPercent: amberPercent ? parseInt(amberPercent) : undefined,
-        notes: notes || undefined,
-      });
+    if (isUploadingPhoto) {
+      toast.error("Aguarde o envio da foto terminar.");
+      return;
     }
+
+    // Foto já foi enviada ao S3 via /api/upload/image — apenas passa a URL
+    createTrichomeLog.mutate({
+      plantId,
+      weekNumber: parseInt(weekNumber),
+      trichomeStatus,
+      clearPercent: clearPercent ? parseInt(clearPercent) : undefined,
+      cloudyPercent: cloudyPercent ? parseInt(cloudyPercent) : undefined,
+      amberPercent: amberPercent ? parseInt(amberPercent) : undefined,
+      notes: notes || undefined,
+      photoUrl: photoUploadedUrl || undefined,
+    });
   };
 
   const getStatusOption = (status: string) =>
@@ -399,7 +389,7 @@ export default function PlantTrichomesTab({
                       className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center shadow-sm hover:scale-110 transition-transform"
                       onClick={() => {
                         setPhotoPreview(null);
-                        setPhotoFile(null);
+                        setPhotoUploadedUrl(null);
                       }}
                     >
                       <X className="w-3 h-3" />

@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Camera, Image, X, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { prepareImageForUpload } from "@/lib/imageUtils";
+import { uploadImage } from "@/lib/uploadImage";
 
 interface HealthLog {
   id: number;
@@ -27,7 +27,8 @@ interface EditHealthLogDialogProps {
     symptoms?: string;
     treatment?: string;
     notes?: string;
-    photoBase64?: string;
+    photoUrl?: string;     // URL S3 pré-enviada
+    removePhoto?: boolean; // true = remover foto existente
   }) => void;
   isSaving: boolean;
 }
@@ -44,8 +45,9 @@ export default function EditHealthLogDialog({
   const [treatment, setTreatment] = useState("");
   const [notes, setNotes] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [newPhotoBase64, setNewPhotoBase64] = useState<string | null>(null);
+  const [newPhotoUrl, setNewPhotoUrl] = useState<string | null>(null); // URL S3 após upload
   const [hasNewPhoto, setHasNewPhoto] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Preencher formulário quando o dialog abrir
   useEffect(() => {
@@ -55,8 +57,9 @@ export default function EditHealthLogDialog({
       setTreatment(healthLog.treatment || "");
       setNotes(healthLog.notes || "");
       setPhotoPreview(healthLog.photoUrl || null);
-      setNewPhotoBase64(null);
+      setNewPhotoUrl(null);
       setHasNewPhoto(false);
+      setIsUploading(false);
     }
   }, [healthLog, open]);
 
@@ -76,34 +79,45 @@ export default function EditHealthLogDialog({
       return;
     }
 
+    // Preview local imediato
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreview(previewUrl);
+    setNewPhotoUrl(null);
+    setHasNewPhoto(false);
+
     try {
-      toast.info("Processando imagem...");
+      setIsUploading(true);
+      toast.info("📸 Enviando foto...");
 
-      const result = await prepareImageForUpload(file, {
-        maxWidth: 1080,
-        maxHeight: 1440,
-        quality: 0.82,
-      });
+      // Upload direto ao servidor: converte HEIC + comprime com sharp
+      const url = await uploadImage(file);
 
-      setPhotoPreview(result.base64);
-      setNewPhotoBase64(result.base64);
+      setNewPhotoUrl(url);
       setHasNewPhoto(true);
+      setIsUploading(false);
 
-      toast.success(`📸 Imagem pronta! (${result.originalSize} → ${result.compressedSize})`);
+      toast.success("📸 Foto enviada com sucesso!");
     } catch (error: any) {
-      console.error("[EditHealthLogDialog] Erro ao processar imagem:", error);
-      toast.error(error?.message || "Erro ao processar imagem. Tente novamente.");
+      console.error("[EditHealthLogDialog] Erro ao enviar imagem:", error);
+      setPhotoPreview(null);
+      setNewPhotoUrl(null);
+      setIsUploading(false);
+      toast.error(error?.message || "Erro ao enviar imagem. Tente novamente.");
     }
   };
 
   const handleRemovePhoto = () => {
     setPhotoPreview(null);
-    setNewPhotoBase64(null);
+    setNewPhotoUrl(null);
     setHasNewPhoto(true); // Marca que houve mudança (remoção)
   };
 
   const handleSave = () => {
     if (!healthLog) return;
+    if (isUploading) {
+      toast.error("Aguarde o envio da foto terminar.");
+      return;
+    }
 
     const data: any = {
       id: healthLog.id,
@@ -113,9 +127,10 @@ export default function EditHealthLogDialog({
       notes: notes || undefined,
     };
 
-    // Adicionar foto apenas se houver uma nova
-    if (hasNewPhoto && newPhotoBase64) {
-      data.photoBase64 = newPhotoBase64;
+    if (hasNewPhoto && newPhotoUrl) {
+      data.photoUrl = newPhotoUrl;      // nova foto enviada ao S3
+    } else if (hasNewPhoto && !newPhotoUrl) {
+      data.removePhoto = true;          // foto removida
     }
 
     onSave(data);

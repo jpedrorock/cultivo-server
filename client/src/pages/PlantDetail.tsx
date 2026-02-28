@@ -254,15 +254,15 @@ export default function PlantDetail() {
       <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
-        <div className="container py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" asChild>
+        <div className="container py-3 md:py-6">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Button variant="ghost" size="icon" className="shrink-0" asChild>
                 <Link href="/plants">
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg bg-gradient-to-br ${
+              <div className={`w-9 h-9 md:w-12 md:h-12 rounded-xl shrink-0 flex items-center justify-center shadow-lg bg-gradient-to-br ${
                 plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA'
                   ? 'from-green-500 to-emerald-600'
                   : plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA'
@@ -271,55 +271,49 @@ export default function PlantDetail() {
                   ? 'from-amber-500 to-orange-600'
                   : 'from-blue-500 to-cyan-600'
               }`}>
-                <Sprout className="w-6 h-6 text-white" />
+                <Sprout className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{plant.name}</h1>
-                {plant.code && (
-                  <p className="text-sm text-muted-foreground font-mono">{plant.code}</p>
-                )}
-              </div>
-              {/* Badge de fase com sistema de cores por fase */}
-              {(plant.cyclePhase || tent) && (
-                <div className={`px-3 py-1.5 rounded-lg text-sm font-semibold border flex items-center gap-1.5 ${
-                  (plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA')
-                    ? 'bg-green-500/10 border-green-500/30 text-green-700 dark:bg-green-500/15 dark:border-green-500/35 dark:text-green-400'
-                    : (plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA')
-                    ? 'bg-purple-500/10 border-purple-500/30 text-purple-700 dark:bg-purple-500/15 dark:border-purple-500/35 dark:text-purple-400'
-                    : tent?.category === 'DRYING'
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:bg-amber-500/15 dark:border-amber-500/35 dark:text-amber-400'
-                    : 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:bg-blue-500/15 dark:border-blue-500/35 dark:text-blue-400'
-                }`}>
-                  <span>{
-                    (plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA') ? '🌱' :
-                    (plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA') ? '🌸' :
-                    tent?.category === 'DRYING' ? '🍂' : '🔧'
-                  }</span>
-                  <span>{
-                    plant.cyclePhase === 'VEGA' ? 'Vegetativa' :
-                    plant.cyclePhase === 'FLORA' ? 'Floração' :
-                    tent?.category === 'VEGA' ? 'Vegetativa' :
-                    tent?.category === 'FLORA' ? 'Floração' :
-                    tent?.category === 'DRYING' ? 'Secagem' :
-                    tent?.category === 'MAINTENANCE' ? 'Manutenção' :
-                    tent?.category || ''
-                  }</span>
-                  {plant.cycleWeek && (
-                    <span className="font-bold ml-0.5">· Sem. {plant.cycleWeek}</span>
+              <div className="min-w-0">
+                <h1 className="text-base md:text-2xl font-bold text-foreground truncate leading-tight">{plant.name}</h1>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {plant.code && (
+                    <p className="text-xs text-muted-foreground font-mono">{plant.code}</p>
+                  )}
+                  {/* Badge de fase - inline no mobile */}
+                  {(plant.cyclePhase || tent) && (
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                      (plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA')
+                        ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                        : (plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA')
+                        ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+                        : tent?.category === 'DRYING'
+                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                        : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                    }`}>
+                      {plant.cyclePhase === 'VEGA' ? '🌱 Veg' :
+                       plant.cyclePhase === 'FLORA' ? '🌸 Flora' :
+                       tent?.category === 'VEGA' ? '🌱 Veg' :
+                       tent?.category === 'FLORA' ? '🌸 Flora' :
+                       tent?.category === 'DRYING' ? '🍂 Sec' :
+                       tent?.category === 'MAINTENANCE' ? '🔧 Man' : ''}
+                      {plant.cycleWeek ? ` S${plant.cycleWeek}` : ''}
+                    </span>
                   )}
                 </div>
-              )}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleEditClick}>
+            {/* Ações: no desktop mostra todos os botões, no mobile apenas o dropdown */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="hidden md:flex" onClick={handleEditClick}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
               </Button>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
-                className="text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500"
+                className="hidden md:flex text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500"
               >
                 {deleteMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -329,15 +323,32 @@ export default function PlantDetail() {
                 Excluir
               </Button>
               
-              {/* Menu de Ações Rápidas */}
+              {/* Menu de Ações - sempre visível, contém tudo no mobile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <MoreVertical className="w-4 h-4 mr-2" />
-                    Ações
+                  <Button variant="outline" size="sm">
+                    <MoreVertical className="w-4 h-4" />
+                    <span className="hidden md:inline ml-2">Ações</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  {/* Editar e Excluir: visíveis apenas no mobile (hidden md:hidden) */}
+                  <DropdownMenuItem onClick={handleEditClick} className="md:hidden">
+                    <Edit className="w-4 h-4 mr-2" />
+                    Editar Planta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    className="md:hidden text-red-600"
+                  >
+                    {deleteMutation.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Excluindo...</>
+                    ) : (
+                      <><Trash2 className="w-4 h-4 mr-2" />Excluir Planta</>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="md:hidden" />
                   {plant.plantStage === "SEEDLING" && (
                     <DropdownMenuItem 
                       onClick={handlePromoteToPlant}
@@ -472,30 +483,31 @@ export default function PlantDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="health" className="w-full">
-          <TabsList className="flex w-full overflow-x-auto">
-            <TabsTrigger value="health">
-              <Heart className="w-4 h-4 mr-2" />
-              Saúde
+          <TabsList className="flex w-full overflow-x-auto scrollbar-none gap-0 h-auto p-1">
+            <TabsTrigger value="health" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+              <Heart className="w-3.5 h-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Saúde</span>
+              <span className="sm:hidden ml-1">Saúde</span>
             </TabsTrigger>
             {plant.plantStage === "PLANT" && (
-              <TabsTrigger value="trichomes">
-                <Sparkles className="w-4 h-4 mr-2" />
-                Tricomas
+              <TabsTrigger value="trichomes" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+                <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />
+                <span className="ml-1">Tricomas</span>
               </TabsTrigger>
             )}
             {plant.plantStage === "PLANT" && (
-              <TabsTrigger value="lst">
-                <Scissors className="w-4 h-4 mr-2" />
-                LST
+              <TabsTrigger value="lst" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+                <Scissors className="w-3.5 h-3.5 sm:mr-1.5" />
+                <span className="ml-1">LST</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="observations">
-              <FileText className="w-4 h-4 mr-2" />
-              Observações
+            <TabsTrigger value="observations" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+              <FileText className="w-3.5 h-3.5 sm:mr-1.5" />
+              <span className="ml-1">Obs.</span>
             </TabsTrigger>
-            <TabsTrigger value="history">
-              <History className="w-4 h-4 mr-2" />
-              Histórico
+            <TabsTrigger value="history" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+              <History className="w-3.5 h-3.5 sm:mr-1.5" />
+              <span className="ml-1">Histórico</span>
             </TabsTrigger>
 
           </TabsList>

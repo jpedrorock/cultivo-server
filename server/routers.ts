@@ -3741,54 +3741,41 @@ export const appRouter = router({
         symptoms: z.string().optional(),
         treatment: z.string().optional(),
         notes: z.string().optional(),
-        photoBase64: z.string().optional(), // Base64 da foto para upload local
+        photoUrl: z.string().url().optional(),   // URL S3 pré-enviada via /api/upload/image
+        photoBase64: z.string().optional(),       // Legado: base64 (mantido para compatibilidade)
       }))
       .mutation(async ({ input }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
-        console.log('[PlantHealth.create] Request received:', {
-          plantId: input.plantId,
-          hasPhoto: !!input.photoBase64,
-          photoSize: input.photoBase64 ? input.photoBase64.length : 0
-        });
-        
-        let photoUrl: string | undefined;
+
+        let resolvedPhotoUrl: string | undefined = input.photoUrl; // preferência: URL pré-enviada
         let photoKey: string | undefined;
 
-        // Se tem foto, fazer upload S3
-        if (input.photoBase64) {
-          console.log('[PlantHealth.create] Processing photo upload...');
+        // Fallback legado: base64 (caso o frontend antigo ainda envie)
+        if (!resolvedPhotoUrl && input.photoBase64) {
+          console.log('[PlantHealth.create] Fallback base64 upload...');
           try {
-            // Converter base64 para buffer
             const base64Data = input.photoBase64.replace(/^data:image\/\w+;base64,/, "");
             const buffer = Buffer.from(base64Data, 'base64');
-            
-            // Upload para S3
             const { storagePut } = await import("./storage");
             photoKey = `health/${input.plantId}/${Date.now()}.jpg`;
             const result = await storagePut(photoKey, buffer, "image/jpeg");
-            photoUrl = result.url;
+            resolvedPhotoUrl = result.url;
           } catch (error: any) {
-            console.error('[PlantHealth] Upload failed:', {
-              error: error.message,
-              stack: error.stack,
-              plantId: input.plantId
-            });
-            // Continue without photo if upload fails
+            console.error('[PlantHealth] Base64 fallback upload failed:', error.message);
           }
         }
-        
+
         await database.insert(plantHealthLogs).values({
           plantId: input.plantId,
           healthStatus: input.healthStatus,
           symptoms: input.symptoms,
           treatment: input.treatment,
           notes: input.notes,
-          photoUrl,
+          photoUrl: resolvedPhotoUrl,
           photoKey,
         });
-        
+
         return { success: true };
       }),
 
@@ -3812,7 +3799,9 @@ export const appRouter = router({
         symptoms: z.string().optional(),
         treatment: z.string().optional(),
         notes: z.string().optional(),
-        photoBase64: z.string().optional(), // Nova foto (opcional)
+        photoUrl: z.string().url().optional(),  // Nova foto pré-enviada via /api/upload/image
+        removePhoto: z.boolean().optional(),    // true = remover foto existente
+        photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
       }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -3825,10 +3814,15 @@ export const appRouter = router({
         if (input.treatment !== undefined) updateData.treatment = input.treatment;
         if (input.notes !== undefined) updateData.notes = input.notes;
         
-        // Se tem nova foto, fazer upload
-        if (input.photoBase64) {
+        // Nova foto via URL S3 pré-enviada
+        if (input.photoUrl) {
+          updateData.photoUrl = input.photoUrl;
+        } else if (input.removePhoto) {
+          updateData.photoUrl = null;
+          updateData.photoKey = null;
+        } else if (input.photoBase64) {
+          // Fallback legado: base64
           try {
-            // Buscar registro atual para pegar plantId
             const [currentLog] = await database
               .select()
               .from(plantHealthLogs)
@@ -3837,17 +3831,14 @@ export const appRouter = router({
             if (currentLog) {
               const base64Data = input.photoBase64.replace(/^data:image\/\w+;base64,/, "");
               const buffer = Buffer.from(base64Data, 'base64');
-              
-              // Upload para S3
               const { storagePut } = await import("./storage");
               const photoKey = `health/${currentLog.plantId}/${Date.now()}.jpg`;
               const result = await storagePut(photoKey, buffer, "image/jpeg");
-              
               updateData.photoUrl = result.url;
               updateData.photoKey = photoKey;
             }
           } catch (error) {
-            console.error('Erro ao fazer upload da nova foto:', error);
+            console.error('Erro ao fazer upload da nova foto (base64 fallback):', error);
           }
         }
         
@@ -3891,41 +3882,27 @@ export const appRouter = router({
         cloudyPercent: z.number().optional(),
         amberPercent: z.number().optional(),
         notes: z.string().optional(),
-        photoBase64: z.string().optional(), // Base64 da foto para upload local
+        photoUrl: z.string().url().optional(),  // URL S3 pré-enviada via /api/upload/image
+        photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
       }))
       .mutation(async ({ input }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
-        console.log('[PlantHealth.create] Request received:', {
-          plantId: input.plantId,
-          hasPhoto: !!input.photoBase64,
-          photoSize: input.photoBase64 ? input.photoBase64.length : 0
-        });
-        
-        let photoUrl: string | undefined;
+        let resolvedPhotoUrl: string | undefined = input.photoUrl;
         let photoKey: string | undefined;
 
-        // Se tem foto, fazer upload S3
-        if (input.photoBase64) {
-          console.log('[PlantHealth.create] Processing photo upload...');
+        // Fallback legado: base64
+        if (!resolvedPhotoUrl && input.photoBase64) {
           try {
-            // Converter base64 para buffer
             const base64Data = input.photoBase64.replace(/^data:image\/\w+;base64,/, "");
             const buffer = Buffer.from(base64Data, 'base64');
-            
-            // Upload para S3
             const { storagePut } = await import("./storage");
             photoKey = `trichomes/${input.plantId}/${Date.now()}.jpg`;
             const result = await storagePut(photoKey, buffer, "image/jpeg");
-            photoUrl = result.url;
+            resolvedPhotoUrl = result.url;
           } catch (error: any) {
-            console.error('[PlantHealth] Upload failed:', {
-              error: error.message,
-              stack: error.stack,
-              plantId: input.plantId
-            });
-            // Continue without photo if upload fails
+            console.error('[PlantTrichomes] Base64 fallback upload failed:', error.message);
           }
         }
         
@@ -3937,7 +3914,7 @@ export const appRouter = router({
           cloudyPercent: input.cloudyPercent,
           amberPercent: input.amberPercent,
           notes: input.notes,
-          photoUrl,
+          photoUrl: resolvedPhotoUrl,
           photoKey,
         });
         

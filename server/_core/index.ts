@@ -8,6 +8,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import uploadRouter from "../uploadRouter";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -43,6 +44,8 @@ async function startServer() {
   app.use('/uploads', express.static(uploadsPath));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  // Upload de imagens (multipart/form-data) — antes do tRPC
+  app.use("/api/upload", uploadRouter);
   // tRPC API
   app.use(
     "/api/trpc",

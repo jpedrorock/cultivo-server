@@ -10,7 +10,7 @@ import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap
 import { ConflictFreeSlider } from "@/components/ConflictFreeSlider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { prepareImageForUpload, formatFileSize } from "@/lib/imageUtils";
+import { uploadImage } from "@/lib/uploadImage";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { PageTransition } from "@/components/PageTransition";
 
@@ -77,7 +77,8 @@ export default function QuickLog() {
     status: string;
     symptoms: string;
     notes: string;
-    photoBase64?: string;
+    photoUrl?: string;    // URL S3 após upload
+    photoPreview?: string; // data URL local para preview
   }>>(new Map());
 
   // Fetch tents for selection
@@ -217,51 +218,31 @@ export default function QuickLog() {
       return;
     }
 
+    // Preview local imediato (antes do upload)
+    const previewUrl = URL.createObjectURL(file);
+    updatePlantHealthRecord(plants[currentPlantIndex].id, "photoPreview", previewUrl);
+
     try {
-      // Iniciar progresso
-      setUploadProgress({
-        isUploading: true,
-        stage: "converting",
-        progress: 20,
-        originalSize: formatFileSize(file.size),
+      setUploadProgress({ isUploading: true, stage: "uploading", progress: 10 });
+
+      // Upload direto para o servidor (sharp converte HEIC + comprime no servidor)
+      const url = await uploadImage(file, (pct) => {
+        setUploadProgress(prev => ({ ...prev, progress: 10 + Math.round(pct * 0.85) }));
       });
 
-      setUploadProgress(prev => ({ ...prev, stage: "compressing", progress: 50 }));
-
-      // Pipeline completo: HEIC → JPEG + compressão + base64
-      const result = await prepareImageForUpload(file, {
-        maxWidth: 1920,
-        maxHeight: 1920,
-        quality: 0.82,
-      });
-
-      console.log('[QuickLog] Photo processed:', {
-        originalSize: result.originalSize,
-        compressedSize: result.compressedSize,
-        reduction: `${result.reduction}%`,
-        mimeType: result.mimeType,
-      });
-
-      setUploadProgress(prev => ({
-        ...prev,
-        stage: "uploading",
-        progress: 80,
-        compressedSize: result.compressedSize,
-        reduction: result.reduction,
-      }));
-
-      updatePlantHealthRecord(plants[currentPlantIndex].id, "photoBase64", result.base64);
+      updatePlantHealthRecord(plants[currentPlantIndex].id, "photoUrl", url);
 
       setUploadProgress(prev => ({ ...prev, stage: "complete", progress: 100 }));
-
       setTimeout(() => {
         setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
-        toast.success(`📸 Foto pronta! (${result.originalSize} → ${result.compressedSize}${result.reduction > 0 ? `, -${result.reduction}%` : ""})`);
-      }, 1500);
+        toast.success("📸 Foto enviada com sucesso!");
+      }, 1000);
     } catch (error: any) {
-      console.error("[QuickLog] Erro ao processar imagem:", error);
+      console.error("[QuickLog] Erro ao enviar imagem:", error);
+      // Limpar preview se o upload falhou
+      updatePlantHealthRecord(plants[currentPlantIndex].id, "photoPreview", undefined);
       setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
-      toast.error(error?.message || "Erro ao processar imagem. Tente novamente.");
+      toast.error(error?.message || "Erro ao enviar imagem. Tente novamente.");
     }
   };
 
@@ -284,7 +265,7 @@ export default function QuickLog() {
 
       console.log('[QuickLog] Saving health log with photo:', {
         plantId: plant.id,
-        hasPhoto: !!record.photoBase64,
+        hasPhoto: !!record.photoUrl,
         status: healthStatusMap[record.status]
       });
 
@@ -294,13 +275,8 @@ export default function QuickLog() {
         symptoms: record.symptoms || undefined,
         treatment: undefined,
         notes: record.notes || undefined,
-        photoBase64: record.photoBase64 || undefined, // ✅ Send photo in same mutation!
+        photoUrl: record.photoUrl || undefined, // URL S3 pré-enviada
       });
-
-      console.log('[QuickLog] Health log saved successfully with photo');
-      if (record.photoBase64) {
-        toast.success("📸 Foto salva!");
-      }
 
       // Trichomes and LST save logic removed - available in individual plant pages
 
@@ -897,18 +873,24 @@ export default function QuickLog() {
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-4">
                       <div className="space-y-3">
-                        {plantHealthRecords.get(plants[currentPlantIndex].id)?.photoBase64 ? (
+                        {(plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl) ? (
                           <div className="relative">
                             <LazyImage
-                              src={plantHealthRecords.get(plants[currentPlantIndex].id)?.photoBase64!}
+                              src={plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl!}
                               alt="Preview"
                               aspectRatio="16/9"
                               className="w-full h-48 rounded-xl"
                             />
+                            {plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl && (
+                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">✓ Enviada</div>
+                            )}
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={() => updatePlantHealthRecord(plants[currentPlantIndex].id, "photoBase64", undefined)}
+                              onClick={() => {
+                                updatePlantHealthRecord(plants[currentPlantIndex].id, "photoPreview", undefined);
+                                updatePlantHealthRecord(plants[currentPlantIndex].id, "photoUrl", undefined);
+                              }}
                               className="absolute top-2 right-2"
                             >
                               Remover
