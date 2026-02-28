@@ -9,65 +9,23 @@ interface TentIconProps {
 }
 
 /**
- * Grow tent icon — simple rectangular box in isometric perspective.
- * All lines use currentColor so it inherits the nav item active/inactive color.
+ * Grow tent icon — SVG provided by the user (Adobe Illustrator export).
+ * Uses fill="currentColor" so it inherits the nav item active/inactive color.
  */
 export function TentIcon({
   className,
   strokeColor,
-  strokeWidth = 1.8,
 }: TentIconProps) {
-  const sw = strokeWidth;
-
   return (
     <svg
-      viewBox="0 0 24 24"
-      fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 841.89 595.28"
       className={cn("w-5 h-5", className)}
       aria-label="Grow tent"
+      fill="currentColor"
       style={strokeColor ? { color: strokeColor } : undefined}
     >
-      {/*
-        Isometric rectangular box (taller than wide):
-          Top face:   A(12,2) B(21,6.5) C(21,7.5) D(12,12) E(3,7.5) F(3,6.5)
-          Left face:  F(3,6.5)→E(3,7.5)→(3,20)→(12,22)→(12,12)→(12,2)... 
-        
-        Simplified vertices:
-          Top-left:       TL = (3, 7)
-          Top-center:     TC = (12, 2)
-          Top-right:      TR = (21, 7)
-          Mid-left:       ML = (3, 7)   → bottom-left = BL = (3, 19)
-          Mid-center:     MC = (12, 12) → bottom-center = BC = (12, 22)
-          Mid-right:      MR = (21, 7)  → bottom-right = BR = (21, 19)
-      */}
-
-      {/* Top face */}
-      <polygon
-        points="12,2 21,7 12,12 3,7"
-        stroke="currentColor"
-        strokeWidth={sw}
-        strokeLinejoin="round"
-        fill="none"
-      />
-
-      {/* Left face */}
-      <polygon
-        points="3,7 12,12 12,22 3,19"
-        stroke="currentColor"
-        strokeWidth={sw}
-        strokeLinejoin="round"
-        fill="none"
-      />
-
-      {/* Right face */}
-      <polygon
-        points="12,12 21,7 21,19 12,22"
-        stroke="currentColor"
-        strokeWidth={sw}
-        strokeLinejoin="round"
-        fill="none"
-      />
+      <path d="M561.3,128.41l-78.67-32s-.03,0-.05-.01c-.25-.1-.5-.17-.77-.21-.04,0-.09,0-.13,0-.19-.02-.37-.04-.56-.03l-194,10.67c-1.86.1-3.31,1.64-3.31,3.49v34.66s0,0,0,0v3.5s0,325.83,0,325.83c0,1.82,1.4,3.34,3.21,3.49l189.65,15.64c.27.78.8,1.46,1.53,1.89.55.32,1.16.48,1.78.48s1.18-.15,1.71-.44l80-44.67c1.11-.62,1.79-1.79,1.79-3.06V131.65c0-1.42-.86-2.71-2.18-3.24ZM347.48,144.98l33.68-1.95.65,269.48-90.95,32.15-.03-229.86v-66.51s56.65-3.31,56.65-3.31ZM385.79,418.53l35.59,2.71c-8.99,18.46-26.71,29.88-45.98,28.97l-70-3.27,80.39-28.41ZM427.43,394.73c0,6.78-1.09,13.4-3.23,19.69,0,0,0,0,0,.01l-35.38-2.7-.65-267.73c7.21,1.75,14.02,5.27,19.93,10.39,12.29,10.61,19.33,26.6,19.33,43.86v196.48ZM290.82,453.27l84.26,3.94c.82.04,1.65.06,2.46.06,22.15,0,42.12-14.01,51.47-35.87,1.14-.51,1.97-1.6,2.08-2.93.05-.6-.08-1.17-.3-1.68.01-.04.03-.07.04-.11,2.39-7.02,3.61-14.4,3.61-21.95v-196.48c0-19.3-7.93-37.22-21.75-49.16-7.59-6.57-16.51-10.84-25.91-12.54-.66-.51-1.47-.78-2.32-.73l-2.13.12c-2.71-.25-5.44-.3-8.19-.12l-83.32,5.42v-27.62l186.99-10.28-1.3,383.06-185.69-15.31v-17.82ZM556.48,445.59l-71.67,40.01V104.85l71.67,29.15v311.59Z" />
     </svg>
   );
 }
