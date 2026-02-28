@@ -3799,3 +3799,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Atualizar procedure plantHealth.update para aceitar photoUrl e removePhoto
 - [x] Atualizar procedure plantTrichomes.create para aceitar photoUrl pré-enviada
 - [x] Manter fallback base64 nas procedures para compatibilidade com registros antigos
+
+## Correção Upload Produção - Remover Sharp (28/02/2026)
+
+- [x] Diagnosticar erro 500 no upload em produção (sharp com binários nativos incompatíveis com deploy)
+- [x] Remover sharp do uploadRouter.ts - servidor envia arquivo direto para S3
+- [x] Mover processamento de imagem para o browser (canvas no uploadImage.ts)
+- [x] Browser converte HEIC → JPEG via canvas antes de enviar (resolve Safari iOS)
+- [x] Testar endpoint local sem sharp - funcionando corretamente
