@@ -3746,3 +3746,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 ## Refinamento TentIcon SVG
 
 - [x] Simplificar TentIcon para cubo retangular isométrico limpo em currentColor (sem detalhes extras)
+
+## Correções Urgentes (2026-02-28)
+- [x] Corrigir Alerts.tsx para usar trpc.alerts.list em vez de trpc.alerts.getHistory (tabela alert_history não existe)
+- [x] Trocar ícone Sprout no logo da Home pelo SVG do app Cultivo (ícone do livro/pasta)
