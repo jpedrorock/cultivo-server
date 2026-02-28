@@ -344,11 +344,7 @@ export default function Home() {
         <div className="container py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-                <img src="/favicon.png" alt="App Cultivo" className="w-10 h-10 rounded-xl shadow-sm" />
-                App Cultivo
-              </h1>
-              <p className="text-muted-foreground mt-1">Gerenciamento de Estufas</p>
+              <h1 className="text-2xl font-bold text-foreground">Gerenciamento de Estufas</h1>
             </div>
             <div className="flex items-center gap-3">
               <Link href="/quick-log" className="!hidden md:!inline-block">

@@ -3843,3 +3843,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 ## Correção Header Sidebar (28/02/2026)
 - [x] Trocar ícone errado de estufa (TentIcon) pelo ícone correto Sprout (planta) no cabeçalho do sidebar
 - [x] Remover subtítulo "GERENCIAMENTO" redundante — mantém apenas "App Cultivo"
+
+## Simplificação Título Header Principal (28/02/2026)
+- [x] Remover imagem favicon e texto "App Cultivo" do h1 do header da Home
+- [x] h1 agora exibe apenas "Gerenciamento de Estufas"
