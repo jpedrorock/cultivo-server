@@ -3825,3 +3825,11 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Corrigir cards do Guia do Usuário - botão com estilos inline para Safari iOS (display:block, width:100%)
 - [x] Corrigir header PlantDetail - flex:1 na esquerda, flex-shrink:0 na direita, h1 com text-overflow:ellipsis
 - [x] Corrigir abas PlantDetail - WebkitOverflowScrolling:touch + width:max-content para Safari iOS
+
+## Feedback Tátil e Animações de Toque - PlantDetail (28/02/2026)
+- [x] Criar hook useTactileFeedback com Vibration API (tap 10ms, confirm [10,60,10], warning 40ms, destructive [50,80,50])
+- [x] Criar componente PressButton com animação scale+opacity via inline styles (Safari iOS compatível)
+- [x] Criar componente PressDropdownMenuItem com animação scale+opacity
+- [x] Aplicar PressButton + haptic nos botões Editar, Excluir e Ações do header
+- [x] Aplicar PressDropdownMenuItem + haptic em todos os itens do dropdown (tap/confirm/warning/destructive)
+- [x] Haptic diferenciado: tap para ações simples, confirm para positivas, warning para transplante, destructive para excluir/descartar

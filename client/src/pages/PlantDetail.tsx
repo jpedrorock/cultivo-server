@@ -48,6 +48,9 @@ import MoveTentModal from "@/components/MoveTentModal";
 import PlantTentHistoryTab from "@/components/PlantTentHistoryTab";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
+import { useTactileFeedback } from "@/hooks/useTactileFeedback";
+import { PressButton } from "@/components/PressButton";
+import { PressDropdownMenuItem } from "@/components/PressDropdownMenuItem";
 
 export default function PlantDetail() {
   const [, params] = useRoute("/plants/:id");
@@ -61,6 +64,7 @@ export default function PlantDetail() {
   const [harvestNotes, setHarvestNotes] = useState("");
   const [discardModalOpen, setDiscardModalOpen] = useState(false);
   const [discardReason, setDiscardReason] = useState("");
+  const haptic = useTactileFeedback();
 
   const { data: plant, isLoading, refetch } = trpc.plants.getById.useQuery({ id: plantId });
   const { data: strain } = trpc.strains.getById.useQuery(
@@ -129,15 +133,18 @@ export default function PlantDetail() {
   
   // Handlers
   const handleTransplantToFlora = () => {
+    haptic.warning();
     setTransplantConfirmOpen(true);
   };
   
   const handleHarvest = () => {
+    haptic.confirm();
     setHarvestNotes("");
     setHarvestModalOpen(true);
   };
 
   const confirmHarvest = () => {
+    haptic.confirm();
     archiveMutation.mutate({ 
       plantId, 
       status: 'HARVESTED',
@@ -147,19 +154,23 @@ export default function PlantDetail() {
   };
   
   const handleDelete = () => {
+    haptic.destructive();
     setDeleteConfirmOpen(true);
   };
 
   const confirmDelete = () => {
+    haptic.destructive();
     if (plant) deleteMutation.mutate({ plantId: plant.id });
   };
   
   const handleDiscard = () => {
+    haptic.destructive();
     setDiscardReason("");
     setDiscardModalOpen(true);
   };
 
   const confirmDiscard = () => {
+    haptic.destructive();
     archiveMutation.mutate({ 
       plantId, 
       status: 'DISCARDED',
@@ -170,10 +181,12 @@ export default function PlantDetail() {
 
   const handlePromoteToPlant = () => {
     if (!plant) return;
+    haptic.confirm();
     promoteToPlantMutation.mutate({ plantId: plant.id });
   };
 
   const handleEditClick = () => {
+    haptic.tap();
     if (plant) {
       setEditForm({
         name: plant.name,
@@ -185,6 +198,7 @@ export default function PlantDetail() {
   };
 
   const handleEditSave = () => {
+    haptic.confirm();
     updateMutation.mutate({
       id: plantId,
       name: editForm.name,
@@ -305,16 +319,17 @@ export default function PlantDetail() {
             </div>
             {/* Direita: ações - apenas ícone MoreVertical no mobile, botões no desktop */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-              {/* Desktop: botões individuais */}
-              <Button variant="outline" size="sm" className="hidden md:flex" onClick={handleEditClick}>
+              {/* Desktop: botões individuais com animação de toque */}
+              <PressButton variant="outline" size="sm" className="hidden md:flex" onClick={handleEditClick}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
-              </Button>
-              <Button
+              </PressButton>
+              <PressButton
                 variant="outline"
                 size="sm"
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
+                pressIntensity="strong"
                 className="hidden md:flex text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500"
               >
                 {deleteMutation.isPending ? (
@@ -323,25 +338,26 @@ export default function PlantDetail() {
                   <Trash2 className="w-4 h-4 mr-2" />
                 )}
                 Excluir
-              </Button>
+              </PressButton>
               
               {/* Dropdown de Ações - ícone no mobile, texto no desktop */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2" style={{ flexShrink: 0 }}>
+                  <PressButton variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2" style={{ flexShrink: 0 }}>
                     <MoreVertical className="w-4 h-4" />
                     <span className="hidden md:inline">Ações</span>
-                  </Button>
+                  </PressButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" sideOffset={4} className="w-56">
                   {/* Editar e Excluir: apenas no dropdown mobile */}
-                  <DropdownMenuItem onClick={handleEditClick} className="md:hidden">
+                  <PressDropdownMenuItem onClick={handleEditClick} className="md:hidden">
                     <Edit className="w-4 h-4 mr-2" />
                     Editar Planta
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
+                  </PressDropdownMenuItem>
+                  <PressDropdownMenuItem
                     onClick={handleDelete}
                     disabled={deleteMutation.isPending}
+                    pressIntensity="strong"
                     className="md:hidden text-red-600"
                   >
                     {deleteMutation.isPending ? (
@@ -349,12 +365,13 @@ export default function PlantDetail() {
                     ) : (
                       <><Trash2 className="w-4 h-4 mr-2" />Excluir Planta</>
                     )}
-                  </DropdownMenuItem>
+                  </PressDropdownMenuItem>
                   <DropdownMenuSeparator className="md:hidden" />
                   {plant.plantStage === "SEEDLING" && (
-                    <DropdownMenuItem 
+                    <PressDropdownMenuItem 
                       onClick={handlePromoteToPlant}
                       disabled={promoteToPlantMutation.isPending}
+                      pressIntensity="medium"
                       className="text-green-600"
                     >
                       {promoteToPlantMutation.isPending ? (
@@ -368,12 +385,13 @@ export default function PlantDetail() {
                           Promover para Planta
                         </>
                       )}
-                    </DropdownMenuItem>
+                    </PressDropdownMenuItem>
                   )}
                   {tent?.category === "VEGA" && plant.plantStage === "PLANT" && (
-                    <DropdownMenuItem 
+                    <PressDropdownMenuItem 
                       onClick={handleTransplantToFlora}
                       disabled={transplantMutation.isPending}
+                      pressIntensity="medium"
                     >
                       {transplantMutation.isPending ? (
                         <>
@@ -386,16 +404,17 @@ export default function PlantDetail() {
                           Transplantar para Flora
                         </>
                       )}
-                    </DropdownMenuItem>
+                    </PressDropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => setMoveTentModalOpen(true)}>
+                  <PressDropdownMenuItem onClick={() => { haptic.tap(); setMoveTentModalOpen(true); }}>
                     <MoveRight className="w-4 h-4 mr-2" />
                     Mover para Outra Estufa
-                  </DropdownMenuItem>
+                  </PressDropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <PressDropdownMenuItem 
                     onClick={handleHarvest} 
                     disabled={archiveMutation.isPending}
+                    pressIntensity="medium"
                     className="text-green-600"
                   >
                     {archiveMutation.isPending ? (
@@ -409,10 +428,11 @@ export default function PlantDetail() {
                         Marcar como Colhida
                       </>
                     )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  </PressDropdownMenuItem>
+                  <PressDropdownMenuItem 
                     onClick={handleDiscard} 
                     disabled={archiveMutation.isPending}
+                    pressIntensity="strong"
                     className="text-orange-600"
                   >
                     {archiveMutation.isPending ? (
@@ -426,11 +446,12 @@ export default function PlantDetail() {
                         Descartar Planta
                       </>
                     )}
-                  </DropdownMenuItem>
+                  </PressDropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <PressDropdownMenuItem 
                     onClick={handleDelete}
                     disabled={deleteMutation.isPending}
+                    pressIntensity="strong"
                     className="text-red-600"
                   >
                     {deleteMutation.isPending ? (
@@ -444,7 +465,7 @@ export default function PlantDetail() {
                         Excluir Planta
                       </>
                     )}
-                  </DropdownMenuItem>
+                  </PressDropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
