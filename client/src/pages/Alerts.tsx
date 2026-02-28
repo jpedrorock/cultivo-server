@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,21 @@ import { PageTransition, StaggerList, ListItemAnimation } from "@/components/Pag
 export default function Alerts() {
   const [, navigate] = useLocation();
   const [selectedTentId, setSelectedTentId] = useState<number>(1);
+  const utils = trpc.useUtils();
+
+  // Marcar todos os alertas como lidos ao entrar na página
+  const markAllAsSeen = trpc.alerts.markAllAsSeen.useMutation({
+    onSuccess: (data) => {
+      // Zerar o badge na navbar imediatamente
+      utils.alerts.getNewCount.invalidate();
+      utils.alerts.list.invalidate();
+    },
+  });
+
+  useEffect(() => {
+    // Dispara ao montar — marca todos os alertas NEW como SEEN
+    markAllAsSeen.mutate({});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Buscar estufas
   const { data: tents, isLoading: loadingTents } = trpc.tents.list.useQuery();

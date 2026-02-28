@@ -1728,6 +1728,24 @@ export const appRouter = router({
         return { success: true };
       }),
     
+    markAllAsSeen: publicProcedure
+      .input(z.object({ tentId: z.number().optional() }))
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) {
+          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
+        }
+        const conditions = [eq(alerts.status, "NEW")];
+        if (input.tentId !== undefined) {
+          conditions.push(eq(alerts.tentId, input.tentId));
+        }
+        const result = await database
+          .update(alerts)
+          .set({ status: "SEEN" })
+          .where(and(...conditions));
+        return { success: true, updated: result[0]?.affectedRows ?? 0 };
+      }),
+
     checkAlerts: publicProcedure
       .input(z.object({ tentId: z.number() }))
       .mutation(async ({ input }) => {

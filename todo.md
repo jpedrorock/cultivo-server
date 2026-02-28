@@ -3730,3 +3730,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Animação de shake ao receber novo alerta
 - [x] Status pill no rodapé da sidebar mostrando "X alertas não lidos"
 - [x] API retornando 1 alerta não lido (verificado)
+
+## Marcar Todos os Alertas como Lidos ao Entrar na Página
+
+- [x] Criar procedure tRPC alerts.markAllAsSeen no router (suporta filtro opcional por tentId)
+- [x] Chamar markAllAsSeen via useEffect ao montar a página /alerts
+- [x] Invalidar alerts.getNewCount e alerts.list após marcar para zerar o badge imediatamente
