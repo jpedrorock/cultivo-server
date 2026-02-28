@@ -3756,3 +3756,12 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [ ] Adicionar clique individual em cada alerta para marcar como visto (trpc.alerts.markAsSeen)
 - [ ] Feedback visual ao clicar: badge muda de "Novo" para "Visto" com animação
 - [ ] Badge da navbar atualiza após marcar alerta individual
+
+## Correções de Alertas e Ícone da Home (28/02/2026)
+
+- [x] Reverter ícone do cabeçalho da Home para usar favicon.png do app (não TentIcon)
+- [x] Remover markAllAsSeen automático ao entrar na página de alertas
+- [x] Adicionar clique individual em cada alerta para marcar como visto (markAsSeen por ID)
+- [x] Feedback visual: alertas novos com fundo destacado, cursor pointer, hover state; alertas vistos com opacidade reduzida
+- [x] Ícone CheckCircle2 em cada alerta indicando estado (visto/não visto)
+- [x] Loader spinner no alerta sendo marcado como visto

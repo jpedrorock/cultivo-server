@@ -1,35 +1,41 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, ArrowLeft, FlaskConical } from "lucide-react";
+import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, ArrowLeft, FlaskConical, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { EmptyState } from "@/components/EmptyState";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function Alerts() {
   const [, navigate] = useLocation();
   const [selectedTentId, setSelectedTentId] = useState<number | undefined>(undefined);
   const utils = trpc.useUtils();
 
-  // Marcar todos os alertas como lidos ao entrar na página
-  const markAllAsSeen = trpc.alerts.markAllAsSeen.useMutation({
+  // Marcar alerta individual como visto ao clicar
+  const markAsSeen = trpc.alerts.markAsSeen.useMutation({
     onSuccess: () => {
       utils.alerts.getNewCount.invalidate();
       utils.alerts.list.invalidate();
     },
+    onError: () => {
+      toast.error("Erro ao marcar alerta como visto");
+    },
   });
 
-  useEffect(() => {
-    markAllAsSeen.mutate({});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleMarkAsSeen = (alertId: number, currentStatus: string) => {
+    if (currentStatus !== "NEW") return; // Já está visto, não faz nada
+    markAsSeen.mutate({ alertId });
+  };
 
   // Buscar estufas
   const { data: tents, isLoading: loadingTents } = trpc.tents.list.useQuery();
 
-  // Buscar alertas (usa tabela alerts, não alertHistory)
+  // Buscar alertas
   const { data: alertList, isLoading: loadingAlerts } = trpc.alerts.list.useQuery(
     { tentId: selectedTentId },
     { enabled: true }
@@ -44,6 +50,7 @@ export default function Alerts() {
   }
 
   const currentTent = tents?.find(t => t.id === selectedTentId);
+  const newCount = alertList?.filter((a: any) => a.status === "NEW").length ?? 0;
 
   return (
     <PageTransition>
@@ -59,16 +66,24 @@ export default function Alerts() {
                   </Link>
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground">Histórico de Alertas</h1>
+                  <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                    <Bell className="w-6 h-6 text-primary" />
+                    Histórico de Alertas
+                    {newCount > 0 && (
+                      <Badge variant="destructive" className="text-xs px-2 py-0.5 animate-pulse">
+                        {newCount} novo{newCount !== 1 ? "s" : ""}
+                      </Badge>
+                    )}
+                  </h1>
                   <p className="text-sm text-muted-foreground">
-                    Visualize todos os alertas disparados pelo sistema
+                    Clique em um alerta para marcá-lo como visto
                   </p>
                 </div>
               </div>
               <Button asChild variant="outline" size="sm">
                 <Link href="/settings">
                   <Settings className="w-4 h-4 mr-2" />
-                  Configurar Alertas
+                  Configurar
                 </Link>
               </Button>
             </div>
@@ -82,7 +97,6 @@ export default function Alerts() {
             <div>
               <Label className="text-base font-medium mb-3 block">Filtrar por Estufa</Label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Opção "Todas" */}
                 <Button
                   variant={selectedTentId === undefined ? "default" : "outline"}
                   onClick={() => setSelectedTentId(undefined)}
@@ -125,7 +139,7 @@ export default function Alerts() {
                 </CardTitle>
                 <CardDescription>
                   {alertList?.length
-                    ? `${alertList.length} alerta${alertList.length !== 1 ? "s" : ""} registrado${alertList.length !== 1 ? "s" : ""}`
+                    ? `${alertList.length} alerta${alertList.length !== 1 ? "s" : ""} registrado${alertList.length !== 1 ? "s" : ""} · Clique para marcar como visto`
                     : "Alertas disparados pelo sistema de monitoramento"}
                 </CardDescription>
               </CardHeader>
@@ -136,77 +150,98 @@ export default function Alerts() {
                   </div>
                 ) : alertList && alertList.length > 0 ? (
                   <StaggerList className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                    {alertList.map((alert: any) => (
-                      <ListItemAnimation key={alert.id}>
-                        <div className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3 flex-1">
-                              {/* Ícone por métrica */}
-                              {alert.metric === "TEMP" && (
-                                <div className="p-2 bg-orange-500/10 rounded-lg shrink-0">
-                                  <ThermometerSun className="w-5 h-5 text-orange-600" />
-                                </div>
-                              )}
-                              {alert.metric === "RH" && (
-                                <div className="p-2 bg-blue-500/10 rounded-lg shrink-0">
-                                  <Droplets className="w-5 h-5 text-blue-600" />
-                                </div>
-                              )}
-                              {alert.metric === "PPFD" && (
-                                <div className="p-2 bg-yellow-500/10 rounded-lg shrink-0">
-                                  <Sun className="w-5 h-5 text-yellow-600" />
-                                </div>
-                              )}
-                              {alert.metric === "PH" && (
-                                <div className="p-2 bg-purple-500/10 rounded-lg shrink-0">
-                                  <FlaskConical className="w-5 h-5 text-purple-600" />
-                                </div>
-                              )}
-                              {!["TEMP","RH","PPFD","PH"].includes(alert.metric) && (
-                                <div className="p-2 bg-muted rounded-lg shrink-0">
-                                  <Bell className="w-5 h-5 text-muted-foreground" />
-                                </div>
-                              )}
+                    {alertList.map((alert: any) => {
+                      const isNew = alert.status === "NEW";
+                      const isPending = markAsSeen.isPending && markAsSeen.variables?.alertId === alert.id;
 
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground leading-relaxed">
-                                  {alert.message}
-                                </p>
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                  {/* Nome da estufa */}
-                                  {!selectedTentId && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {tents?.find(t => t.id === alert.tentId)?.name ?? `Estufa #${alert.tentId}`}
+                      return (
+                        <ListItemAnimation key={alert.id}>
+                          <div
+                            onClick={() => handleMarkAsSeen(alert.id, alert.status)}
+                            className={cn(
+                              "p-4 rounded-lg border transition-all duration-200",
+                              isNew
+                                ? "bg-primary/5 border-primary/20 cursor-pointer hover:bg-primary/10 hover:border-primary/40 hover:shadow-sm active:scale-[0.99]"
+                                : "bg-muted/30 border-border cursor-default opacity-70"
+                            )}
+                            title={isNew ? "Clique para marcar como visto" : "Já visualizado"}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 flex-1">
+                                {/* Ícone por métrica */}
+                                {alert.metric === "TEMP" && (
+                                  <div className={cn("p-2 rounded-lg shrink-0", isNew ? "bg-orange-500/15" : "bg-muted")}>
+                                    <ThermometerSun className={cn("w-5 h-5", isNew ? "text-orange-600" : "text-muted-foreground")} />
+                                  </div>
+                                )}
+                                {alert.metric === "RH" && (
+                                  <div className={cn("p-2 rounded-lg shrink-0", isNew ? "bg-blue-500/15" : "bg-muted")}>
+                                    <Droplets className={cn("w-5 h-5", isNew ? "text-blue-600" : "text-muted-foreground")} />
+                                  </div>
+                                )}
+                                {alert.metric === "PPFD" && (
+                                  <div className={cn("p-2 rounded-lg shrink-0", isNew ? "bg-yellow-500/15" : "bg-muted")}>
+                                    <Sun className={cn("w-5 h-5", isNew ? "text-yellow-600" : "text-muted-foreground")} />
+                                  </div>
+                                )}
+                                {alert.metric === "PH" && (
+                                  <div className={cn("p-2 rounded-lg shrink-0", isNew ? "bg-purple-500/15" : "bg-muted")}>
+                                    <FlaskConical className={cn("w-5 h-5", isNew ? "text-purple-600" : "text-muted-foreground")} />
+                                  </div>
+                                )}
+                                {!["TEMP","RH","PPFD","PH"].includes(alert.metric) && (
+                                  <div className="p-2 bg-muted rounded-lg shrink-0">
+                                    <Bell className="w-5 h-5 text-muted-foreground" />
+                                  </div>
+                                )}
+
+                                <div className="flex-1 min-w-0">
+                                  <p className={cn("text-sm font-medium leading-relaxed", isNew ? "text-foreground" : "text-muted-foreground")}>
+                                    {alert.message}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    {!selectedTentId && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {tents?.find(t => t.id === alert.tentId)?.name ?? `Estufa #${alert.tentId}`}
+                                      </Badge>
+                                    )}
+                                    <Badge variant="secondary" className="text-xs">
+                                      {alert.turn === "AM" ? "Manhã" : "Tarde"}
                                     </Badge>
-                                  )}
-                                  {/* Turno */}
-                                  <Badge variant="secondary" className="text-xs">
-                                    {alert.turn === "AM" ? "Manhã" : "Tarde"}
-                                  </Badge>
-                                  {/* Status */}
-                                  <Badge
-                                    variant={alert.status === "NEW" ? "destructive" : "outline"}
-                                    className="text-xs"
-                                  >
-                                    {alert.status === "NEW" ? "Novo" : "Visto"}
-                                  </Badge>
-                                  {/* Data */}
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(alert.createdAt).toLocaleString("pt-BR", {
-                                      day: "2-digit",
-                                      month: "2-digit",
-                                      year: "numeric",
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                  </span>
+                                    <Badge
+                                      variant={isNew ? "destructive" : "outline"}
+                                      className="text-xs"
+                                    >
+                                      {isNew ? "● Novo" : "✓ Visto"}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(alert.createdAt).toLocaleString("pt-BR", {
+                                        day: "2-digit",
+                                        month: "2-digit",
+                                        year: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                  </div>
                                 </div>
+                              </div>
+
+                              {/* Ícone de check ao clicar */}
+                              <div className="shrink-0 mt-1">
+                                {isPending ? (
+                                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                ) : isNew ? (
+                                  <CheckCircle2 className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                                ) : (
+                                  <CheckCircle2 className="w-4 h-4 text-primary/60" />
+                                )}
                               </div>
                             </div>
                           </div>
-                        </div>
-                      </ListItemAnimation>
-                    ))}
+                        </ListItemAnimation>
+                      );
+                    })}
                   </StaggerList>
                 ) : (
                   <EmptyState
