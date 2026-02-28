@@ -3833,3 +3833,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Aplicar PressButton + haptic nos botões Editar, Excluir e Ações do header
 - [x] Aplicar PressDropdownMenuItem + haptic em todos os itens do dropdown (tap/confirm/warning/destructive)
 - [x] Haptic diferenciado: tap para ações simples, confirm para positivas, warning para transplante, destructive para excluir/descartar
+
+## PressButton em Modais de Edição (28/02/2026)
+- [x] Mapear todos os modais/diálogos com botões de ação primária (25+ arquivos identificados)
+- [x] Aplicar PressButton nos 5 modais inline do PlantDetail (Editar, Excluir, Transplante, Colheita, Descartar)
+- [x] Aplicar PressButton nos 18 componentes de diálogo separados (CreateTentModal, EditCycleModal, EditHealthLogDialog, EditLogDialog, EditTentDialog, FinishCloningDialog, HarvestConfirmationDialog, InitiateCycleModal, MoveTentModal, PhaseConfirmDialog, PhaseTransitionDialog, PromotePhaseDialog, ReturnToMaintenanceModal, SelectMotherPlantDialog, StartCloningModal, StartCycleModal, StartDryingModal, StartFloraModal)
+- [x] TypeScript sem erros após todas as edições

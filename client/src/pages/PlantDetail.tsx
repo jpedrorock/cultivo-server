@@ -608,16 +608,17 @@ export default function PlantDetail() {
             </div>
           </div>
           <DialogFooter>
-            <Button
+            <PressButton
               variant="outline"
               onClick={() => setEditModalOpen(false)}
               disabled={updateMutation.isPending}
             >
               Cancelar
-            </Button>
-            <Button
+            </PressButton>
+            <PressButton
               onClick={handleEditSave}
               disabled={!editForm.name || updateMutation.isPending}
+              pressIntensity="medium"
             >
               {updateMutation.isPending ? (
                 <>
@@ -627,7 +628,7 @@ export default function PlantDetail() {
               ) : (
                 'Salvar'
               )}
-            </Button>
+            </PressButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -648,17 +649,18 @@ export default function PlantDetail() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button
+            <PressButton
               variant="outline"
               onClick={() => setDeleteConfirmOpen(false)}
               disabled={deleteMutation.isPending}
             >
               Cancelar
-            </Button>
-            <Button
+            </PressButton>
+            <PressButton
               variant="destructive"
               onClick={confirmDelete}
               disabled={deleteMutation.isPending}
+              pressIntensity="strong"
             >
               {deleteMutation.isPending ? (
                 <>
@@ -671,7 +673,7 @@ export default function PlantDetail() {
                   Excluir Permanentemente
                 </>
               )}
-            </Button>
+            </PressButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -691,19 +693,21 @@ export default function PlantDetail() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setTransplantConfirmOpen(false)}>
+            <PressButton variant="outline" onClick={() => setTransplantConfirmOpen(false)}>
               Cancelar
-            </Button>
-            <Button
+            </PressButton>
+            <PressButton
               className="bg-purple-600 hover:bg-purple-700 text-white"
+              pressIntensity="medium"
               onClick={() => {
+                haptic.warning();
                 transplantMutation.mutate({ plantId });
                 setTransplantConfirmOpen(false);
               }}
             >
               <MoveRight className="w-4 h-4 mr-2" />
               Transplantar
-            </Button>
+            </PressButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -735,20 +739,21 @@ export default function PlantDetail() {
             />
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setHarvestModalOpen(false)}>
+            <PressButton variant="outline" onClick={() => setHarvestModalOpen(false)}>
               Cancelar
-            </Button>
-            <Button
+            </PressButton>
+            <PressButton
               className="bg-green-600 hover:bg-green-700 text-white"
               onClick={confirmHarvest}
               disabled={archiveMutation.isPending}
+              pressIntensity="medium"
             >
               {archiveMutation.isPending ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Colhendo...</>
               ) : (
                 <><Scissors className="w-4 h-4 mr-2" />Confirmar Colheita</>
               )}
-            </Button>
+            </PressButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -780,20 +785,21 @@ export default function PlantDetail() {
             />
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDiscardModalOpen(false)}>
+            <PressButton variant="outline" onClick={() => setDiscardModalOpen(false)}>
               Cancelar
-            </Button>
-            <Button
+            </PressButton>
+            <PressButton
               variant="destructive"
               onClick={confirmDiscard}
               disabled={archiveMutation.isPending}
+              pressIntensity="strong"
             >
               {archiveMutation.isPending ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Descartando...</>
               ) : (
                 <><XCircle className="w-4 h-4 mr-2" />Confirmar Descarte</>
               )}
-            </Button>
+            </PressButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
