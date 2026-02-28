@@ -128,9 +128,14 @@ export default function AlertSettings() {
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold">Configurações de Alertas</h1>
-                <p className="text-sm text-muted-foreground">Gerenciar notificações</p>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
+                  <Bell className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold">Configurações de Alertas</h1>
+                  <p className="text-sm text-muted-foreground">Gerenciar notificações</p>
+                </div>
               </div>
             </div>
           </div>
@@ -165,9 +170,14 @@ export default function AlertSettings() {
                 <ArrowLeft className="w-5 h-5" />
               </Link>
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Configurações de Alertas</h1>
-              <p className="text-sm text-muted-foreground">Gerenciar notificações e lembretes</p>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
+                <Bell className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Configurações de Alertas</h1>
+                <p className="text-sm text-muted-foreground">Gerenciar notificações e lembretes</p>
+              </div>
             </div>
           </div>
         </div>

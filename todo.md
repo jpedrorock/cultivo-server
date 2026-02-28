@@ -3851,3 +3851,6 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 ## Refinamento Header/Sidebar (28/02/2026)
 - [x] Removido texto "App Cultivo" do cabeçalho do sidebar desktop — apenas ícone Sprout centralizado
 - [x] Header mobile da Home exibe "Gerenciamento de Estufas" como h1 (sem imagem/logo redundante)
+
+## Padronização de Headers com Ícone (28/02/2026)
+- [x] Aplicar ícone temático + título em todas as páginas do app (12 páginas: AlertHistory, AlertSettings, CalculatorMenu, HistoryTable, PlantsList, PlantArchivePage, ManageStrains, Settings, NewPlant, NotificationSettings, Backup, Nutrients)
