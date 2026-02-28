@@ -3847,3 +3847,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 ## Simplificação Título Header Principal (28/02/2026)
 - [x] Remover imagem favicon e texto "App Cultivo" do h1 do header da Home
 - [x] h1 agora exibe apenas "Gerenciamento de Estufas"
+
+## Refinamento Header/Sidebar (28/02/2026)
+- [x] Removido texto "App Cultivo" do cabeçalho do sidebar desktop — apenas ícone Sprout centralizado
+- [x] Header mobile da Home exibe "Gerenciamento de Estufas" como h1 (sem imagem/logo redundante)

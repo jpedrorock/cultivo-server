@@ -66,15 +66,12 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:flex-col md:fixed md:left-0 md:top-0 md:h-screen md:w-64 bg-sidebar border-r border-sidebar-border z-40 shadow-[2px_0_12px_rgba(0,0,0,0.06)]">
       
-      {/* Logo/Header — gradient accent strip */}
-      <div className="relative p-5 border-b border-sidebar-border overflow-hidden">
+      {/* Logo/Header — apenas ícone centralizado */}
+      <div className="relative py-4 px-5 border-b border-sidebar-border overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
-        <div className="relative flex items-center gap-3">
+        <div className="relative flex items-center justify-center">
           <div className="w-10 h-10 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm">
             <Sprout className="w-5 h-5 text-primary" strokeWidth={2} />
-          </div>
-          <div>
-            <h1 className="text-base font-bold tracking-tight text-sidebar-foreground leading-tight">App Cultivo</h1>
           </div>
         </div>
       </div>
