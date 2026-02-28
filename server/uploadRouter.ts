@@ -65,8 +65,11 @@ router.post(
 
       return res.json({ url });
     } catch (error) {
-      console.error("[upload] Error:", error);
-      return res.status(500).json({ error: "Erro ao processar o upload da imagem." });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errStack = error instanceof Error ? error.stack : undefined;
+      console.error("[upload] Error:", errMsg);
+      if (errStack) console.error("[upload] Stack:", errStack);
+      return res.status(500).json({ error: "Erro ao processar o upload da imagem.", detail: errMsg });
     }
   }
 );
