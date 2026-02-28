@@ -3839,3 +3839,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Aplicar PressButton nos 5 modais inline do PlantDetail (Editar, Excluir, Transplante, Colheita, Descartar)
 - [x] Aplicar PressButton nos 18 componentes de diálogo separados (CreateTentModal, EditCycleModal, EditHealthLogDialog, EditLogDialog, EditTentDialog, FinishCloningDialog, HarvestConfirmationDialog, InitiateCycleModal, MoveTentModal, PhaseConfirmDialog, PhaseTransitionDialog, PromotePhaseDialog, ReturnToMaintenanceModal, SelectMotherPlantDialog, StartCloningModal, StartCycleModal, StartDryingModal, StartFloraModal)
 - [x] TypeScript sem erros após todas as edições
+
+## Correção Header Sidebar (28/02/2026)
+- [x] Trocar ícone errado de estufa (TentIcon) pelo ícone correto Sprout (planta) no cabeçalho do sidebar
+- [x] Remover subtítulo "GERENCIAMENTO" redundante — mantém apenas "App Cultivo"
