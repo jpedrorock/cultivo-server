@@ -3750,3 +3750,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 ## Correções Urgentes (2026-02-28)
 - [x] Corrigir Alerts.tsx para usar trpc.alerts.list em vez de trpc.alerts.getHistory (tabela alert_history não existe)
 - [x] Trocar ícone Sprout no logo da Home pelo SVG do app Cultivo (ícone do livro/pasta)
+
+## Alertas - Marcar como Visto ao Clicar
+- [ ] Remover markAllAsSeen automático ao entrar na página de alertas
+- [ ] Adicionar clique individual em cada alerta para marcar como visto (trpc.alerts.markAsSeen)
+- [ ] Feedback visual ao clicar: badge muda de "Novo" para "Visto" com animação
+- [ ] Badge da navbar atualiza após marcar alerta individual
