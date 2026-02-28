@@ -3736,3 +3736,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Criar procedure tRPC alerts.markAllAsSeen no router (suporta filtro opcional por tentId)
 - [x] Chamar markAllAsSeen via useEffect ao montar a página /alerts
 - [x] Invalidar alerts.getNewCount e alerts.list após marcar para zerar o badge imediatamente
+
+## Ícone SVG de Grow Tent para Menu
+
+- [x] Criar componente TentIcon.tsx com SVG isométrico line art (cantos verdes)
+- [x] Substituir Warehouse no BottomNav pelo TentIcon
+- [x] Substituir Home no Sidebar pelo TentIcon para o item "Estufas"

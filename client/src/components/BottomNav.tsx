@@ -1,4 +1,5 @@
-import { Warehouse, Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen } from "lucide-react";
+import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
@@ -51,7 +52,7 @@ export function BottomNav() {
 
   const mainNavItems: NavItem[] = [
     { href: "/quick-log", icon: Plus, label: "Registro" },
-    { href: "/", icon: Warehouse, label: "Estufas" },
+    { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
 

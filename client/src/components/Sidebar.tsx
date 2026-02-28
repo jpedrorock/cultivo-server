@@ -1,4 +1,5 @@
-import { Home, Calculator, BarChart3, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen, AlertTriangle } from "lucide-react";
+import { Calculator, BarChart3, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen, AlertTriangle } from "lucide-react";
+import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -46,7 +47,7 @@ export function Sidebar() {
   }, [alertCount]);
 
   const navItems = [
-    { href: "/", icon: Home, label: "Home", enabled: true, badge: 0 },
+    { href: "/", icon: TentIcon, label: "Estufas", enabled: true, badge: 0 },
     { href: "/plants", icon: Sprout, label: "Plantas", enabled: true, badge: 0 },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas", enabled: true, badge: 0 },
     { href: "/calculators", icon: Calculator, label: "Calculadoras", enabled: true, badge: 0 },
