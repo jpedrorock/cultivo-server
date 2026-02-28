@@ -3813,3 +3813,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Corrigir cards do Guia do Usuário - ícone e título alinhados horizontalmente
 - [x] Corrigir menu de ações na PlantDetail - apenas ícone no mobile, dropdown com todas as ações
 - [x] Corrigir abas (Tricomas/LST/Observações/Histórico) - scroll horizontal com inline-flex
+
+## Loading Indicator no Upload de Foto (28/02/2026)
+- [ ] Adicionar estado isUploadingPhoto no QuickLog com spinner no botão de câmera
+- [ ] Adicionar estado isUploadingPhoto no PlantHealthTab com spinner no botão de câmera
+- [ ] Adicionar estado isUploadingPhoto no PlantTrichomesTab com spinner no botão de câmera
+- [ ] Adicionar estado isUploadingPhoto no EditHealthLogDialog com spinner no botão de câmera
+- [ ] Desabilitar botão de submit enquanto o upload está em andamento

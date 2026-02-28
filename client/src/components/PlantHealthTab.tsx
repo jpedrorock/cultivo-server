@@ -29,6 +29,7 @@ import {
   Camera,
   Image,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
@@ -286,7 +287,12 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
               {/* Photo Upload - Compact */}
               <div className="space-y-2">
                 <Label className="text-sm">Foto da Planta</Label>
-                {!photoPreview ? (
+                {uploadProgress.isUploading ? (
+                  <div className="flex items-center justify-center gap-3 h-12 border-2 border-dashed border-green-400 dark:border-green-600 rounded-lg bg-green-50 dark:bg-green-950">
+                    <Loader2 className="w-4 h-4 text-green-500 animate-spin" />
+                    <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enviando... {uploadProgress.progress}%</span>
+                  </div>
+                ) : !photoPreview ? (
                   <div className="flex gap-2">
                     <label className="flex-1 flex items-center justify-center gap-2 h-12 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors bg-primary/5 border-primary/30">
                       <Camera className="w-4 h-4 text-primary" />
@@ -387,10 +393,12 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
 
               <Button
                 onClick={handleSubmit}
-                disabled={createHealthLog.isPending}
+                disabled={createHealthLog.isPending || uploadProgress.isUploading}
                 className="w-full sm:w-auto"
               >
-                {createHealthLog.isPending ? "Salvando..." : "Registrar"}
+                {uploadProgress.isUploading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Aguardando foto...</>
+                ) : createHealthLog.isPending ? "Salvando..." : "Registrar"}
               </Button>
             </CardContent>
           </Card>

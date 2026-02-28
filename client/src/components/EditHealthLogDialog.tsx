@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Image, X, Upload } from "lucide-react";
+import { Camera, Image, X, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
 
@@ -211,7 +211,13 @@ export default function EditHealthLogDialog({
           {/* Foto */}
           <div className="space-y-2">
             <Label>Foto da Planta</Label>
-            {!photoPreview ? (
+            {isUploading && (
+              <div className="flex items-center justify-center gap-3 h-14 border-2 border-dashed border-green-400 dark:border-green-600 rounded-lg bg-green-50 dark:bg-green-950">
+                <Loader2 className="w-4 h-4 text-green-500 animate-spin" />
+                <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enviando foto...</span>
+              </div>
+            )}
+            {!isUploading && !photoPreview && (
               <div className="space-y-3">
                 {/* Botão Tirar Foto */}
                 <label className="flex items-center justify-center gap-2 w-full h-14 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors bg-primary/5 border-primary/30">
@@ -227,7 +233,6 @@ export default function EditHealthLogDialog({
                     onChange={handlePhotoSelect}
                   />
                 </label>
-                
                 {/* Botão Escolher Arquivo */}
                 <label className="flex items-center justify-center gap-2 w-full h-14 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
                   <Image className="w-5 h-5 text-muted-foreground" />
@@ -241,12 +246,12 @@ export default function EditHealthLogDialog({
                     onChange={handlePhotoSelect}
                   />
                 </label>
-                
                 <p className="text-xs text-center text-muted-foreground">
                   {hasNewPhoto ? "Foto removida - Adicione uma nova ou deixe sem foto" : "Mantenha a foto atual ou adicione uma nova"}
                 </p>
               </div>
-            ) : (
+            )}
+            {!isUploading && photoPreview && (
               <div className="relative">
                 <img
                   src={photoPreview}
@@ -273,11 +278,13 @@ export default function EditHealthLogDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
+          <Button variant="outline" onClick={handleCancel} disabled={isSaving || isUploading}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? "Salvando..." : "Salvar Alterações"}
+          <Button onClick={handleSave} disabled={isSaving || isUploading}>
+            {isUploading ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Aguardando foto...</>
+            ) : isSaving ? "Salvando..." : "Salvar Alterações"}
           </Button>
         </DialogFooter>
       </DialogContent>

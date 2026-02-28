@@ -896,6 +896,12 @@ export default function QuickLog() {
                               Remover
                             </Button>
                           </div>
+                        ) : uploadProgress.isUploading ? (
+                          <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-green-400 dark:border-green-600 rounded-xl bg-green-50 dark:bg-green-950">
+                            <Loader2 className="h-8 w-8 text-green-500 animate-spin mb-2" />
+                            <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enviando foto...</span>
+                            <span className="text-xs text-green-500 mt-1">{uploadProgress.progress}%</span>
+                          </div>
                         ) : (
                           <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950 transition-colors">
                             <Upload className="h-8 w-8 text-gray-400 mb-2" />
