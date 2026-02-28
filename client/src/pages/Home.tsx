@@ -343,7 +343,10 @@ export default function Home() {
         <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
         <div className="container py-6">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
+                <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
+              </div>
               <h1 className="text-2xl font-bold text-foreground">Gerenciamento de Estufas</h1>
             </div>
             <div className="flex items-center gap-3">
