@@ -3721,3 +3721,12 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Criar procedure tRPC alerts.resetPhaseMarginToDefault(phase) que restaura margens para os padrões do sistema
 - [x] Adicionar botão "Restaurar padrões" em cada accordion de fase no componente AlertSettings.tsx
 - [x] Exibir toast confirmando as margens restauradas com os valores da fase (Temp/RH/PPFD/pH)
+
+## Badge de Alertas Não Lidos na Navbar
+
+- [x] Localizar o componente de navegação com o ícone de sino
+- [x] Badge já implementado em Sidebar.tsx (desktop) e BottomNav.tsx (mobile) com polling de 30s
+- [x] Badge vermelho com contador quando count > 0, oculto quando count = 0
+- [x] Animação de shake ao receber novo alerta
+- [x] Status pill no rodapé da sidebar mostrando "X alertas não lidos"
+- [x] API retornando 1 alerta não lido (verificado)
