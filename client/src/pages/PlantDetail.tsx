@@ -303,7 +303,8 @@ export default function PlantDetail() {
               </div>
             </div>
             {/* Ações: no desktop mostra todos os botões, no mobile apenas o dropdown */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Desktop: botões individuais */}
               <Button variant="outline" size="sm" className="hidden md:flex" onClick={handleEditClick}>
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
@@ -323,16 +324,16 @@ export default function PlantDetail() {
                 Excluir
               </Button>
               
-              {/* Menu de Ações - sempre visível, contém tudo no mobile */}
+              {/* Dropdown de Ações - ícone no mobile, texto no desktop */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2">
                     <MoreVertical className="w-4 h-4" />
-                    <span className="hidden md:inline ml-2">Ações</span>
+                    <span className="hidden md:inline">Ações</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  {/* Editar e Excluir: visíveis apenas no mobile (hidden md:hidden) */}
+                  {/* Editar e Excluir: apenas no dropdown mobile */}
                   <DropdownMenuItem onClick={handleEditClick} className="md:hidden">
                     <Edit className="w-4 h-4 mr-2" />
                     Editar Planta
@@ -483,34 +484,34 @@ export default function PlantDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="health" className="w-full">
-          <TabsList className="flex w-full overflow-x-auto scrollbar-none gap-0 h-auto p-1">
-            <TabsTrigger value="health" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
-              <Heart className="w-3.5 h-3.5 sm:mr-1.5" />
-              <span className="hidden sm:inline">Saúde</span>
-              <span className="sm:hidden ml-1">Saúde</span>
-            </TabsTrigger>
-            {plant.plantStage === "PLANT" && (
-              <TabsTrigger value="trichomes" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
-                <Sparkles className="w-3.5 h-3.5 sm:mr-1.5" />
-                <span className="ml-1">Tricomas</span>
+          <div className="overflow-x-auto scrollbar-none -mx-4 px-4">
+            <TabsList className="inline-flex min-w-full h-auto p-1 gap-0.5">
+              <TabsTrigger value="health" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
+                <Heart className="w-3.5 h-3.5" />
+                <span>Saúde</span>
               </TabsTrigger>
-            )}
-            {plant.plantStage === "PLANT" && (
-              <TabsTrigger value="lst" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
-                <Scissors className="w-3.5 h-3.5 sm:mr-1.5" />
-                <span className="ml-1">LST</span>
+              {plant.plantStage === "PLANT" && (
+                <TabsTrigger value="trichomes" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Tricomas</span>
+                </TabsTrigger>
+              )}
+              {plant.plantStage === "PLANT" && (
+                <TabsTrigger value="lst" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
+                  <Scissors className="w-3.5 h-3.5" />
+                  <span>LST</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="observations" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
+                <FileText className="w-3.5 h-3.5" />
+                <span>Obs.</span>
               </TabsTrigger>
-            )}
-            <TabsTrigger value="observations" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
-              <FileText className="w-3.5 h-3.5 sm:mr-1.5" />
-              <span className="ml-1">Obs.</span>
-            </TabsTrigger>
-            <TabsTrigger value="history" className="shrink-0 text-xs sm:text-sm px-2 sm:px-3">
-              <History className="w-3.5 h-3.5 sm:mr-1.5" />
-              <span className="ml-1">Histórico</span>
-            </TabsTrigger>
-
-          </TabsList>
+              <TabsTrigger value="history" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
+                <History className="w-3.5 h-3.5" />
+                <span>Histórico</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="health">
             <PlantHealthTab plantId={plantId} />

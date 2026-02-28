@@ -3807,3 +3807,9 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Mover processamento de imagem para o browser (canvas no uploadImage.ts)
 - [x] Browser converte HEIC → JPEG via canvas antes de enviar (resolve Safari iOS)
 - [x] Testar endpoint local sem sharp - funcionando corretamente
+
+## Correções Mobile Layout (28/02/2026)
+
+- [x] Corrigir cards do Guia do Usuário - ícone e título alinhados horizontalmente
+- [x] Corrigir menu de ações na PlantDetail - apenas ícone no mobile, dropdown com todas as ações
+- [x] Corrigir abas (Tricomas/LST/Observações/Histórico) - scroll horizontal com inline-flex
