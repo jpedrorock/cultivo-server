@@ -3887,3 +3887,8 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 ## Script db:seed no package.json (28/02/2026)
 - [x] Substituir script "seed" obsoleto (seed-data.mjs) por "db:seed" (seed.mjs) no package.json
 - [x] Testado com sucesso: pnpm db:seed popula todas as tabelas sem erros
+
+## Script db:reset (28/02/2026)
+- [x] seed.mjs já executa TRUNCATE em 31 tabelas antes de inserir (limpeza sempre ativa)
+- [x] Adicionado script "db:reset": "node seed.mjs" ao package.json como alias semântico
+- [x] Testado: pnpm db:reset limpa 31 tabelas e repopula com 84 logs, 37 templates, 8 plantas, etc.
