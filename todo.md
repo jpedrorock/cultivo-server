@@ -3861,3 +3861,15 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Reescrever GUIA-USUARIO.md com todas as funcionalidades atuais do app
 - [x] Remover arquivos obsoletos: COMO-OBTER-CODIGO.md, INSTALACAO.md, LEIA-ME-DEPLOY.md, PLANO-UX-DESIGN.md, RELATORIO_TESTES_FINAL.md
 - [x] Documentação final: README.md + DEPLOY.md + GUIA-USUARIO.md + todo.md
+
+## Consolidação de Seeds (28/02/2026)
+- [ ] Analisar todos os 19 arquivos de seed existentes
+- [ ] Escrever seed.mjs consolidado e limpo
+- [ ] Testar seed no banco
+- [ ] Remover 18 arquivos de seed obsoletos da raiz
+
+## Consolidação de Seeds (28/02/2026)
+- [x] Mapeados 19 arquivos de seed obsoletos + schema real do banco verificado
+- [x] Escrito seed.mjs consolidado (22 seções: strains, estufas, ciclos, plantas, histórico, observações, saúde, tricomas, LST, logs diários, runoff, weekly targets, alertas, configs de alerta, presets, receitas, templates, tarefas)
+- [x] Seed testado com sucesso no banco: 84 logs, 14 registros de saúde, 37 templates de tarefas, 11 instâncias, etc.
+- [x] 33 arquivos .mjs obsoletos removidos da raiz — apenas seed.mjs mantido

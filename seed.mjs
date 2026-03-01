@@ -1,916 +1,699 @@
 /**
- * Seed Script - App Cultivo
- * Simula 2 semanas de uso real com 3 estufas, 8 strains, plantas e registros diários
+ * seed.mjs — App Cultivo
+ * Seed de demonstração completo e definitivo.
  *
- * Estrutura:
- * - Estufa Manutenção (75x45x90): 2 plantas-mãe (Orange Punch + 24K)
- * - Estufa Vega (80x80x160): 3 plantas Orange Punch (semana 2 de vega)
- * - Estufa Flora (120x120x200): 3 plantas 24K (semana 5 de flora)
+ * Estrutura simulada:
+ *   Estufa A (Manutenção 75×45×90cm, 65W): 2 plantas-mãe (Orange Punch + 24K Gold)
+ *   Estufa B (Vega 80×80×160cm, 240W):     3 clones Orange Punch — semana 3 de vega
+ *   Estufa C (Flora 120×120×200cm, 320W):  3 plantas 24K Gold   — semana 5 de flora
+ *
+ * Dados gerados:
+ *   - 6 strains com weekly targets (vega + flora)
+ *   - 3 estufas + ciclos ativos para B e C
+ *   - 8 plantas com histórico de movimentação
+ *   - 14 dias de logs diários (manhã + noite) para cada estufa
+ *   - Registros de saúde, tricomas, LST e observações por planta
+ *   - Alertas de desvio de parâmetros
+ *   - Configurações de alerta por estufa
+ *   - Presets de fertilização e rega
+ *   - Receitas de fertilização (últimos 5 dias)
+ *   - Templates de receitas
+ *   - Templates e instâncias de tarefas (semanas atuais)
+ *   - Runoff por planta (7 dias)
+ *
+ * Uso:
+ *   node seed.mjs
  */
 
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 dotenv.config();
 
-const db = await mysql.createConnection(process.env.DATABASE_URL);
+const conn = await mysql.createConnection(process.env.DATABASE_URL);
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-const daysAgo = (n) => {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const daysAgo = (n, hour = 8) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  d.setHours(8, 0, 0, 0);
+  d.setHours(hour, 0, 0, 0);
   return d;
 };
 
-const rand = (min, max, dec = 1) => {
-  const v = Math.random() * (max - min) + min;
-  return parseFloat(v.toFixed(dec));
-};
+const mysqlDate = (d) => d.toISOString().slice(0, 19).replace("T", " ");
 
-const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const rand = (min, max, dec = 1) =>
+  parseFloat((Math.random() * (max - min) + min).toFixed(dec));
 
-// ─── 1. LIMPAR BANCO ────────────────────────────────────────────────────────
+const randInt = (min, max) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
+
+// ─── 1. LIMPAR BANCO ─────────────────────────────────────────────────────────
+
 console.log("🗑️  Limpando banco de dados...");
-
 const tables = [
-  "wateringApplications",
-  "nutrientApplications",
-  "notificationSettings",
-  "alertPreferences",
-  "plantLSTLogs",
-  "plantTrichomeLogs",
-  "plantHealthLogs",
-  "plantRunoffLogs",
-  "plantPhotos",
-  "plantObservations",
-  "plantTentHistory",
-  "plants",
-  "taskInstances",
-  "taskTemplates",
-  "alertHistory",
-  "alertSettings",
-  "alerts",
-  "safetyLimits",
-  "phaseAlertMargins",
-  "notificationHistory",
-  "recipes",
-  "recipeTemplates",
-  "dailyLogs",
-  "weeklyTargets",
-  "tentAState",
-  "cloningEvents",
-  "cycles",
-  "fertilizationPresets",
-  "wateringPresets",
-  "tents",
-  "strains",
+  "wateringApplications","nutrientApplications","notificationSettings",
+  "alertPreferences","plantLSTLogs","plantTrichomeLogs","plantHealthLogs",
+  "plantRunoffLogs","plantPhotos","plantObservations","plantTentHistory",
+  "plants","taskInstances","taskTemplates","alertHistory","alertSettings",
+  "alerts","safetyLimits","phaseAlertMargins","notificationHistory",
+  "recipes","recipeTemplates","dailyLogs","weeklyTargets","tentAState",
+  "cloningEvents","cycles","fertilizationPresets","wateringPresets",
+  "tents","strains",
 ];
-
-await db.query("SET FOREIGN_KEY_CHECKS = 0");
+await conn.execute("SET FOREIGN_KEY_CHECKS = 0");
 for (const t of tables) {
-  await db.query(`TRUNCATE TABLE \`${t}\``);
-  console.log(`  ✓ ${t}`);
+  await conn.execute(`TRUNCATE TABLE \`${t}\``);
+  process.stdout.write(`  ✓ ${t}\n`);
 }
-await db.query("SET FOREIGN_KEY_CHECKS = 1");
+await conn.execute("SET FOREIGN_KEY_CHECKS = 1");
 
-// ─── 2. STRAINS ─────────────────────────────────────────────────────────────
+// ─── 2. STRAINS ──────────────────────────────────────────────────────────────
+
 console.log("\n🌿 Inserindo strains...");
-
 const strainsData = [
-  {
-    name: "Orange Punch",
-    description:
-      "Híbrida indica-dominante com aromas cítricos intensos de laranja e frutas tropicais. Produção acima da média, trichomas abundantes. Excelente para clonagem.",
-    vegaWeeks: 4,
-    floraWeeks: 9,
-  },
-  {
-    name: "24K",
-    description:
-      "Linhagem premium com notas de terra, pinho e especiarias. Alta potência e resina. Ciclo de flora longo mas recompensador. Boa estrutura de colas.",
-    vegaWeeks: 5,
-    floraWeeks: 10,
-  },
-  {
-    name: "Gorilla Glue #4",
-    description:
-      "Híbrida com produção massiva de resina. Aromas de chocolate, café e diesel. Plantas compactas com colas densas. Ideal para extração.",
-    vegaWeeks: 4,
-    floraWeeks: 9,
-  },
-  {
-    name: "Blue Dream",
-    description:
-      "Sativa-dominante clássica. Efeito cerebral e energético. Aromas de mirtilo e baunilha. Crescimento vigoroso, requer LST.",
-    vegaWeeks: 5,
-    floraWeeks: 9,
-  },
-  {
-    name: "Girl Scout Cookies",
-    description:
-      "Híbrida equilibrada com sabor de doce e terra. Produção moderada mas qualidade excepcional. Trichomas abundantes.",
-    vegaWeeks: 4,
-    floraWeeks: 9,
-  },
-  {
-    name: "Wedding Cake",
-    description:
-      "Indica-dominante com sabor de baunilha e terra. Crescimento compacto, ideal para espaços menores. Alta concentração de resina.",
-    vegaWeeks: 4,
-    floraWeeks: 8,
-  },
-  {
-    name: "Zkittlez",
-    description:
-      "Indica com aromas de frutas tropicais e doces. Plantas baixas e compactas. Excelente para iniciantes. Colheita precoce.",
-    vegaWeeks: 4,
-    floraWeeks: 8,
-  },
-  {
-    name: "Runtz",
-    description:
-      "Híbrida premium com sabor de balas de frutas. Alta potência. Crescimento moderado com boa resposta ao treinamento LST.",
-    vegaWeeks: 4,
-    floraWeeks: 9,
-  },
+  { name: "Orange Punch",    description: "Híbrida indica-dominante com aromas cítricos intensos. Produção acima da média, trichomas abundantes. Excelente para clonagem.",                    vegaWeeks: 4, floraWeeks: 9  },
+  { name: "24K Gold",        description: "Linhagem premium com notas de terra, pinho e especiarias. Alta potência e resina. Ciclo de flora longo mas recompensador.",                         vegaWeeks: 5, floraWeeks: 10 },
+  { name: "Gorilla Glue #4", description: "Híbrida com produção massiva de resina. Aromas de chocolate, café e diesel. Plantas compactas com colas densas. Ideal para extração.",             vegaWeeks: 4, floraWeeks: 9  },
+  { name: "White Widow",     description: "Híbrida lendária. Cobertura densa de tricomas brancos. Aroma terroso e amadeirado. Efeito potente e duradouro. Boa para extrações.",               vegaWeeks: 4, floraWeeks: 8  },
+  { name: "Northern Lights", description: "Indica pura clássica. Crescimento compacto e resistente. Aromas de pinho e terra. Ciclo curto de flora. Ideal para espaços pequenos.",             vegaWeeks: 3, floraWeeks: 7  },
+  { name: "Amnesia Haze",    description: "Sativa dominante de alto rendimento. Aromas cítricos e terrosos. Efeito cerebral intenso. Ciclo de flora longo. Requer espaço vertical.",          vegaWeeks: 6, floraWeeks: 11 },
 ];
 
-const strainIds = {};
+const strainMap = {};
 for (const s of strainsData) {
-  const [res] = await db.query(
-    "INSERT INTO strains (name, description, vegaWeeks, floraWeeks, isActive) VALUES (?, ?, ?, ?, 1)",
+  const [r] = await conn.execute(
+    "INSERT INTO strains (name, description, vegaWeeks, floraWeeks) VALUES (?, ?, ?, ?)",
     [s.name, s.description, s.vegaWeeks, s.floraWeeks]
   );
-  strainIds[s.name] = res.insertId;
-  console.log(`  ✓ ${s.name} (id=${res.insertId})`);
+  strainMap[s.name] = r.insertId;
 }
+console.log(`  ✓ ${strainsData.length} strains: ${Object.keys(strainMap).join(", ")}`);
 
-// ─── 3. ESTUFAS ─────────────────────────────────────────────────────────────
+// ─── 3. ESTUFAS ──────────────────────────────────────────────────────────────
+// Schema: name, category (MAINTENANCE|VEGA|FLORA|DRYING), width, depth, height, volume, powerW
+
 console.log("\n🏠 Inserindo estufas...");
+const volA = parseFloat(((75 * 45 * 90) / 1e6).toFixed(3));
+const volB = parseFloat(((80 * 80 * 160) / 1e6).toFixed(3));
+const volC = parseFloat(((120 * 120 * 200) / 1e6).toFixed(3));
 
-// Estufa Manutenção: 75x45x90 cm → volume = 0.075 * 0.45 * 0.90 = 0.030375 m³
-const volMaint = (75 * 45 * 90) / 1_000_000;
-const [tentMaint] = await db.query(
+const [rA] = await conn.execute(
   "INSERT INTO tents (name, category, width, depth, height, volume, powerW) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ["Manutenção", "MAINTENANCE", 75, 45, 90, volMaint.toFixed(3), 100]
+  ["Estufa A", "MAINTENANCE", 75, 45, 90, volA, 65]
 );
-const tentMaintId = tentMaint.insertId;
+const tentAId = rA.insertId;
 
-// Estufa Vega: 80x80x160 cm
-const volVega = (80 * 80 * 160) / 1_000_000;
-const [tentVega] = await db.query(
+const [rB] = await conn.execute(
   "INSERT INTO tents (name, category, width, depth, height, volume, powerW) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ["Vega", "VEGA", 80, 80, 160, volVega.toFixed(3), 200]
+  ["Estufa B", "VEGA", 80, 80, 160, volB, 240]
 );
-const tentVegaId = tentVega.insertId;
+const tentBId = rB.insertId;
 
-// Estufa Flora: 120x120x200 cm
-const volFlora = (120 * 120 * 200) / 1_000_000;
-const [tentFlora] = await db.query(
+const [rC] = await conn.execute(
   "INSERT INTO tents (name, category, width, depth, height, volume, powerW) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ["Flora", "FLORA", 120, 120, 200, volFlora.toFixed(3), 480]
+  ["Estufa C", "FLORA", 120, 120, 200, volC, 320]
 );
-const tentFloraId = tentFlora.insertId;
+const tentCId = rC.insertId;
 
-console.log(`  ✓ Manutenção (id=${tentMaintId}) - 75x45x90`);
-console.log(`  ✓ Vega (id=${tentVegaId}) - 80x80x160`);
-console.log(`  ✓ Flora (id=${tentFloraId}) - 120x120x200`);
+console.log(`  ✓ Estufa A (id=${tentAId}) — 75×45×90, 65W, Manutenção`);
+console.log(`  ✓ Estufa B (id=${tentBId}) — 80×80×160, 240W, Vega`);
+console.log(`  ✓ Estufa C (id=${tentCId}) — 120×120×200, 320W, Flora`);
 
-// ─── 4. TENTASTATE (Manutenção) ─────────────────────────────────────────────
-await db.query(
-  "INSERT INTO tentAState (tentId, mode) VALUES (?, 'MAINTENANCE')",
-  [tentMaintId]
+// ─── 4. TENTASTATE ───────────────────────────────────────────────────────────
+// Schema: tentId, mode (MAINTENANCE|CLONING), activeCloningEventId
+
+await conn.execute(
+  "INSERT INTO tentAState (tentId, mode) VALUES (?, ?)",
+  [tentAId, "MAINTENANCE"]
 );
 
-// ─── 5. CICLOS ──────────────────────────────────────────────────────────────
+// ─── 5. CICLOS ───────────────────────────────────────────────────────────────
+// Schema: tentId, strainId, startDate, cloningStartDate, floraStartDate, motherPlantId,
+//         clonesProduced, harvestWeight, harvestNotes, status
+
 console.log("\n🔄 Inserindo ciclos...");
-
-// Ciclo Vega: iniciado há 14 dias (semana 2)
-const [cycleVega] = await db.query(
-  "INSERT INTO cycles (tentId, strainId, startDate, status) VALUES (?, ?, ?, 'ACTIVE')",
-  [tentVegaId, strainIds["Orange Punch"], daysAgo(14)]
+const [rCycleB] = await conn.execute(
+  "INSERT INTO cycles (tentId, strainId, startDate, status) VALUES (?, ?, ?, ?)",
+  [tentBId, strainMap["Orange Punch"], mysqlDate(daysAgo(14)), "ACTIVE"]
 );
-const cycleVegaId = cycleVega.insertId;
+const cycleBId = rCycleB.insertId;
 
-// Ciclo Flora: iniciado há 35 dias (semana 5 de flora, flora começou há 35 dias, vega foi 5 semanas antes)
-const floraStart = daysAgo(35);
-const [cycleFlora] = await db.query(
-  "INSERT INTO cycles (tentId, strainId, startDate, floraStartDate, status) VALUES (?, ?, ?, ?, 'ACTIVE')",
-  [tentFloraId, strainIds["24K"], daysAgo(70), floraStart]
+const [rCycleC] = await conn.execute(
+  "INSERT INTO cycles (tentId, strainId, startDate, floraStartDate, status) VALUES (?, ?, ?, ?, ?)",
+  [tentCId, strainMap["24K Gold"], mysqlDate(daysAgo(35)), mysqlDate(daysAgo(28)), "ACTIVE"]
 );
-const cycleFloraId = cycleFlora.insertId;
+const cycleCId = rCycleC.insertId;
 
-console.log(`  ✓ Ciclo Vega (id=${cycleVegaId}) - Orange Punch, semana 2`);
-console.log(`  ✓ Ciclo Flora (id=${cycleFloraId}) - 24K, semana 5 de flora`);
+console.log(`  ✓ Ciclo B (id=${cycleBId}) — Orange Punch, Vega semana 3`);
+console.log(`  ✓ Ciclo C (id=${cycleCId}) — 24K Gold, Flora semana 5`);
 
-// ─── 6. PLANTAS ─────────────────────────────────────────────────────────────
+// ─── 6. PLANTAS ──────────────────────────────────────────────────────────────
+// Schema: name, code, strainId, currentTentId, plantStage (CLONE|SEEDLING|PLANT),
+//         status (ACTIVE|HARVESTED|DEAD|DISCARDED), finishedAt, finishReason, notes
+
 console.log("\n🌱 Inserindo plantas...");
 
-// Plantas-mãe na Manutenção
-const [pm1] = await db.query(
-  `INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes, createdAt)
-   VALUES (?, ?, ?, ?, 'PLANT', 'ACTIVE', ?, ?)`,
-  [
-    "Orange Punch Mãe",
-    "OP-MAE-01",
-    strainIds["Orange Punch"],
-    tentMaintId,
-    "Planta-mãe principal. Estrutura excelente, múltiplos pontos de clonagem disponíveis.",
-    daysAgo(90),
-  ]
+const [rMae1] = await conn.execute(
+  "INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ["Orange Punch Mãe", "A-OP-01", strainMap["Orange Punch"], tentAId, "PLANT", "ACTIVE", "Planta-mãe principal. Excelente para clonagem."]
 );
-const plantMae1Id = pm1.insertId;
+const plantMae1Id = rMae1.insertId;
 
-const [pm2] = await db.query(
-  `INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes, createdAt)
-   VALUES (?, ?, ?, ?, 'PLANT', 'ACTIVE', ?, ?)`,
-  [
-    "24K Mãe",
-    "24K-MAE-01",
-    strainIds["24K"],
-    tentMaintId,
-    "Planta-mãe robusta. Crescimento vigoroso, ideal para clonagem em massa.",
-    daysAgo(85),
-  ]
+const [rMae2] = await conn.execute(
+  "INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ["24K Gold Mãe", "A-24K-01", strainMap["24K Gold"], tentAId, "PLANT", "ACTIVE", "Planta-mãe secundária. Estrutura robusta."]
 );
-const plantMae2Id = pm2.insertId;
+const plantMae2Id = rMae2.insertId;
 
-// Plantas Vega (Orange Punch) - clones da mãe, semana 2
+const vegaPlantDefs = [
+  { name: "Orange Punch #1", code: "B-OP-01", notes: "Clone da mãe A-OP-01. Crescimento vigoroso." },
+  { name: "Orange Punch #2", code: "B-OP-02", notes: "Clone da mãe A-OP-01. Estrutura compacta." },
+  { name: "Orange Punch #3", code: "B-OP-03", notes: "Clone da mãe A-OP-01. Crescimento mais lento." },
+];
 const vegaPlantIds = [];
-const vegaPlantNames = ["Orange Punch #1", "Orange Punch #2", "Orange Punch #3"];
-const vegaCodes = ["OP-V-01", "OP-V-02", "OP-V-03"];
-const vegaNotes = [
-  "Clone vigoroso. Raízes bem desenvolvidas. Crescimento uniforme.",
-  "Desenvolvimento ligeiramente mais lento. Monitorar. LST iniciado.",
-  "Melhor clone do lote. Crescimento excelente, folhagem densa.",
-];
-
-for (let i = 0; i < 3; i++) {
-  const [p] = await db.query(
-    `INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes, createdAt)
-     VALUES (?, ?, ?, ?, 'CLONE', 'ACTIVE', ?, ?)`,
-    [vegaPlantNames[i], vegaCodes[i], strainIds["Orange Punch"], tentVegaId, vegaNotes[i], daysAgo(14)]
+for (const p of vegaPlantDefs) {
+  const [r] = await conn.execute(
+    "INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [p.name, p.code, strainMap["Orange Punch"], tentBId, "PLANT", "ACTIVE", p.notes]
   );
-  vegaPlantIds.push(p.insertId);
+  vegaPlantIds.push(r.insertId);
 }
 
-// Plantas Flora (24K) - semana 5 de flora
+const floraPlantDefs = [
+  { name: "24K Gold #1", code: "C-24K-01", notes: "Semana 5 de flora. Buds densos se formando." },
+  { name: "24K Gold #2", code: "C-24K-02", notes: "Semana 5 de flora. Maior produção esperada." },
+  { name: "24K Gold #3", code: "C-24K-03", notes: "Semana 5 de flora. Tricomas começando a amadurecer." },
+];
 const floraPlantIds = [];
-const floraPlantNames = ["24K #1", "24K #2", "24K #3"];
-const floraCodes = ["24K-F-01", "24K-F-02", "24K-F-03"];
-const floraNotes = [
-  "Desenvolvimento excelente. Colas bem formadas. Trichomas iniciando.",
-  "Boa produção. Algumas folhas amarelando (normal semana 5). Defoliação feita.",
-  "Planta mais alta do lote. Suporte adicionado. Colas densas.",
-];
-
-for (let i = 0; i < 3; i++) {
-  const [p] = await db.query(
-    `INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes, createdAt)
-     VALUES (?, ?, ?, ?, 'PLANT', 'ACTIVE', ?, ?)`,
-    [floraPlantNames[i], floraCodes[i], strainIds["24K"], tentFloraId, floraNotes[i], daysAgo(70)]
+for (const p of floraPlantDefs) {
+  const [r] = await conn.execute(
+    "INSERT INTO plants (name, code, strainId, currentTentId, plantStage, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [p.name, p.code, strainMap["24K Gold"], tentCId, "PLANT", "ACTIVE", p.notes]
   );
-  floraPlantIds.push(p.insertId);
+  floraPlantIds.push(r.insertId);
 }
 
-console.log(`  ✓ Orange Punch Mãe (id=${plantMae1Id})`);
-console.log(`  ✓ 24K Mãe (id=${plantMae2Id})`);
-console.log(`  ✓ Vega plants: ${vegaPlantIds.join(", ")}`);
-console.log(`  ✓ Flora plants: ${floraPlantIds.join(", ")}`);
+const allActivePlants = [...vegaPlantIds, ...floraPlantIds];
+console.log(`  ✓ Plantas-mãe: ${plantMae1Id}, ${plantMae2Id}`);
+console.log(`  ✓ Vega (B): ${vegaPlantIds.join(", ")}`);
+console.log(`  ✓ Flora (C): ${floraPlantIds.join(", ")}`);
 
-// ─── 7. HISTÓRICO DE MOVIMENTAÇÃO DAS PLANTAS ───────────────────────────────
+// ─── 7. HISTÓRICO DE MOVIMENTAÇÃO ────────────────────────────────────────────
+// Schema: plantId, fromTentId, toTentId, movedAt, reason
+
 console.log("\n📦 Inserindo histórico de movimentação...");
-
-// Plantas vega vieram da manutenção (clones)
-for (const pid of vegaPlantIds) {
-  await db.query(
+for (const id of vegaPlantIds) {
+  await conn.execute(
     "INSERT INTO plantTentHistory (plantId, fromTentId, toTentId, movedAt, reason) VALUES (?, ?, ?, ?, ?)",
-    [pid, tentMaintId, tentVegaId, daysAgo(14), "Clone enraizado transferido para Vega"]
+    [id, tentAId, tentBId, mysqlDate(daysAgo(14)), "Transferido para estufa de vegetação"]
   );
 }
-
-// Plantas flora vieram da vega
-for (const pid of floraPlantIds) {
-  await db.query(
+for (const id of floraPlantIds) {
+  await conn.execute(
     "INSERT INTO plantTentHistory (plantId, fromTentId, toTentId, movedAt, reason) VALUES (?, ?, ?, ?, ?)",
-    [pid, tentVegaId, tentFloraId, daysAgo(35), "Transferência para floração após 5 semanas de vega"]
+    [id, tentBId, tentCId, mysqlDate(daysAgo(28)), "Transplantado para floração"]
   );
 }
+console.log("  ✓ Histórico de movimentação inserido");
 
-// ─── 8. OBSERVAÇÕES DAS PLANTAS ─────────────────────────────────────────────
-console.log("\n📝 Inserindo observações das plantas...");
+// ─── 8. OBSERVAÇÕES ──────────────────────────────────────────────────────────
+// Schema: plantId, observedAt, content
 
-// Plantas-mãe
-const maePlant1Obs = [
-  [daysAgo(7), "Podada levemente para estimular brotamento lateral. 4 pontos de clone identificados."],
-  [daysAgo(3), "Aspecto saudável, folhagem verde escura. Raízes visíveis no fundo do vaso."],
-  [daysAgo(1), "Pronta para nova rodada de clonagem. Estimativa: 6-8 clones viáveis."],
+console.log("\n📝 Inserindo observações...");
+const observations = [
+  { plantId: plantMae1Id,      day: 10, content: "Planta-mãe em excelente estado. Folhas largas e verde-escuro. Pronta para nova rodada de clones." },
+  { plantId: plantMae2Id,      day: 8,  content: "Crescimento estável. Podada levemente para estimular brotação lateral." },
+  { plantId: vegaPlantIds[0],  day: 12, content: "Clone enraizou bem. Crescimento vegetativo acelerado nas últimas 48h." },
+  { plantId: vegaPlantIds[1],  day: 10, content: "Estrutura compacta. Aplicado LST para abrir copa." },
+  { plantId: vegaPlantIds[2],  day: 9,  content: "Crescimento mais lento que as irmãs. Monitorando de perto." },
+  { plantId: floraPlantIds[0], day: 5,  content: "Semana 5 de flora. Buds densos e cobertos de resina. Cheiro cítrico intenso." },
+  { plantId: floraPlantIds[1], day: 3,  content: "Maior produção esperada do ciclo. Colas principais com 15cm+." },
+  { plantId: floraPlantIds[2], day: 2,  content: "Tricomas começando a ficar leitosos. Estimativa de mais 3 semanas." },
 ];
-
-for (const [date, content] of maePlant1Obs) {
-  await db.query(
+let obsCount = 0;
+for (const o of observations) {
+  await conn.execute(
     "INSERT INTO plantObservations (plantId, observationDate, content) VALUES (?, ?, ?)",
-    [plantMae1Id, date, content]
+    [o.plantId, mysqlDate(daysAgo(o.day)), o.content]
   );
+  obsCount++;
 }
+console.log(`  ✓ ${obsCount} observações inseridas`);
 
-const maePlant2Obs = [
-  [daysAgo(10), "Crescimento vigoroso. Adicionado suporte para galhos laterais."],
-  [daysAgo(5), "Leve amarelamento nas folhas mais velhas - normal. Ajustado pH da rega."],
-  [daysAgo(2), "Recuperada. Cor uniforme, sem sinais de deficiência."],
-];
+// ─── 9. REGISTROS DE SAÚDE ───────────────────────────────────────────────────
+// Schema: plantId, logDate, healthStatus (HEALTHY|STRESSED|SICK|RECOVERING),
+//         symptoms, treatment, notes, photoUrl, photoKey
 
-for (const [date, content] of maePlant2Obs) {
-  await db.query(
-    "INSERT INTO plantObservations (plantId, observationDate, content) VALUES (?, ?, ?)",
-    [plantMae2Id, date, content]
-  );
-}
-
-// Plantas vega
-const vegaObs = [
-  [
-    [daysAgo(12), "Clone enraizado com sucesso. Primeiras folhas verdadeiras aparecendo."],
-    [daysAgo(7), "Crescimento acelerado. LST iniciado para abrir o dossel."],
-    [daysAgo(2), "Resposta excelente ao LST. 6 pontos de crescimento visíveis."],
-  ],
-  [
-    [daysAgo(12), "Clone enraizou mais devagar. Monitorando de perto."],
-    [daysAgo(8), "Crescimento normalizado. Sem sinais de stress."],
-    [daysAgo(3), "Desenvolvimento uniforme com as outras. LST aplicado."],
-  ],
-  [
-    [daysAgo(11), "Clone mais vigoroso do lote. Raízes exuberantes."],
-    [daysAgo(6), "Crescimento excepcional. Já superou as outras em altura."],
-    [daysAgo(1), "Topping realizado para equalizar com as outras plantas."],
-  ],
-];
-
-for (let i = 0; i < vegaPlantIds.length; i++) {
-  for (const [date, content] of vegaObs[i]) {
-    await db.query(
-      "INSERT INTO plantObservations (plantId, observationDate, content) VALUES (?, ?, ?)",
-      [vegaPlantIds[i], date, content]
-    );
-  }
-}
-
-// Plantas flora
-const floraObs = [
-  [
-    [daysAgo(30), "Início da floração. Primeiros pistilos brancos aparecendo."],
-    [daysAgo(21), "Semana 2 de flora. Estirão de floração intenso. Suporte adicionado."],
-    [daysAgo(14), "Semana 3. Formação de colas visível. Cheiro intenso."],
-    [daysAgo(7), "Semana 4. Colas engrossando. Trichomas visíveis a olho nu."],
-    [daysAgo(2), "Semana 5. Desenvolvimento excelente. Estimativa de colheita em 5 semanas."],
-  ],
-  [
-    [daysAgo(30), "Início da floração. Estrutura compacta, boa para o espaço."],
-    [daysAgo(21), "Semana 2. Defoliação leve para melhorar penetração de luz."],
-    [daysAgo(14), "Semana 3. Amarelamento leve nas folhas velhas - normal."],
-    [daysAgo(7), "Semana 4. Recuperada. Colas bem formadas."],
-    [daysAgo(1), "Semana 5. Trichomas leitosos iniciando. Boa evolução."],
-  ],
-  [
-    [daysAgo(30), "Início da floração. Planta mais alta, precisou de suporte extra."],
-    [daysAgo(21), "Semana 2. Estirão intenso, +15cm. Ajustado altura da luminária."],
-    [daysAgo(14), "Semana 3. Colas densas e longas. Cheiro de terra e pinho."],
-    [daysAgo(7), "Semana 4. Maior cola do lote. Estimativa de 60g+ seca."],
-    [daysAgo(2), "Semana 5. Trichomas abundantes. Candidata à melhor planta do ciclo."],
-  ],
-];
-
-for (let i = 0; i < floraPlantIds.length; i++) {
-  for (const [date, content] of floraObs[i]) {
-    await db.query(
-      "INSERT INTO plantObservations (plantId, observationDate, content) VALUES (?, ?, ?)",
-      [floraPlantIds[i], date, content]
-    );
-  }
-}
-
-// ─── 9. REGISTROS DE SAÚDE DAS PLANTAS ─────────────────────────────────────
 console.log("\n💊 Inserindo registros de saúde...");
-
-// Plantas-mãe - saudáveis
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [plantMae1Id, daysAgo(7), "HEALTHY", null, null, "Aspecto geral excelente. Sem sinais de pragas ou deficiências."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [plantMae2Id, daysAgo(5), "STRESSED", "Leve clorose nas folhas velhas", "Ajuste de pH para 6.0, adição de quelato de ferro", "Monitorar nas próximas regas."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [plantMae2Id, daysAgo(2), "RECOVERING", null, null, "Melhora visível após ajuste de pH. Novas folhas com cor normal."]
-);
-
-// Plantas vega
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [vegaPlantIds[0], daysAgo(5), "HEALTHY", null, null, "Desenvolvimento normal. Sem problemas."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [vegaPlantIds[1], daysAgo(8), "STRESSED", "Crescimento lento, folhas levemente curvadas para baixo", "Reduzido volume de rega, verificado drenagem", "Possível overwatering. Aguardar secagem do substrato."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [vegaPlantIds[1], daysAgo(3), "RECOVERING", null, null, "Recuperando bem após ajuste de rega."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [vegaPlantIds[2], daysAgo(4), "HEALTHY", null, null, "Planta mais vigorosa do lote. Excelente saúde."]
-);
-
-// Plantas flora
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [floraPlantIds[0], daysAgo(10), "HEALTHY", null, null, "Floração excelente. Sem problemas."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [floraPlantIds[1], daysAgo(14), "STRESSED", "Clorose internerval nas folhas medianas - deficiência de magnésio", "Aplicado CalMag foliar 2ml/L + ajuste de EC para 1.8", "Comum na semana 3-4 de flora. Monitorar."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [floraPlantIds[1], daysAgo(7), "RECOVERING", null, null, "Melhora após suplementação de CalMag. Novas folhas normais."]
-);
-await db.query(
-  "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
-  [floraPlantIds[2], daysAgo(5), "HEALTHY", null, null, "Melhor planta do ciclo. Desenvolvimento excepcional."]
-);
-
-// ─── 10. LOGS DIÁRIOS (14 dias para cada estufa) ────────────────────────────
-console.log("\n📊 Inserindo logs diários (14 dias × 3 estufas × 2 turnos)...");
-
-// Parâmetros por estufa/fase
-const tentParams = {
-  [tentMaintId]: {
-    phase: "MAINTENANCE",
-    tempAM: [22, 25],
-    tempPM: [24, 27],
-    rhAM: [55, 65],
-    rhPM: [50, 60],
-    ppfd: [200, 300],
-    ph: [5.8, 6.2],
-    ec: [0.8, 1.2],
-    wateringVol: 400,
-    runoffPct: [15, 25],
-  },
-  [tentVegaId]: {
-    phase: "VEGA",
-    tempAM: [23, 26],
-    tempPM: [25, 28],
-    rhAM: [60, 70],
-    rhPM: [55, 65],
-    ppfd: [400, 600],
-    ph: [5.8, 6.2],
-    ec: [1.2, 1.6],
-    wateringVol: 600,
-    runoffPct: [15, 25],
-  },
-  [tentFloraId]: {
-    phase: "FLORA",
-    tempAM: [22, 25],
-    tempPM: [24, 27],
-    rhAM: [45, 55],
-    rhPM: [40, 50],
-    ppfd: [700, 900],
-    ph: [6.0, 6.5],
-    ec: [1.6, 2.0],
-    wateringVol: 1200,
-    runoffPct: [15, 25],
-  },
-};
-
-for (const [tentId, params] of Object.entries(tentParams)) {
-  let logCount = 0;
-  for (let day = 14; day >= 1; day--) {
-    const logDate = daysAgo(day);
-
-    for (const turn of ["AM", "PM"]) {
-      const isAM = turn === "AM";
-      const temp = rand(
-        isAM ? params.tempAM[0] : params.tempPM[0],
-        isAM ? params.tempAM[1] : params.tempPM[1]
-      );
-      const rh = rand(
-        isAM ? params.rhAM[0] : params.rhPM[0],
-        isAM ? params.rhAM[1] : params.rhPM[1]
-      );
-      const ppfd = randInt(params.ppfd[0], params.ppfd[1]);
-      const ph = rand(params.ph[0], params.ph[1]);
-      const ec = rand(params.ec[0], params.ec[1], 2);
-      const wateringVol = isAM ? params.wateringVol : 0;
-      const runoffPct = rand(params.runoffPct[0], params.runoffPct[1]);
-      const runoffCollected = isAM ? Math.round(wateringVol * (runoffPct / 100)) : 0;
-
-      // Introduzir um alerta ocasional (10% de chance de valor fora do range)
-      const alertChance = Math.random();
-      const finalTemp = alertChance < 0.05 ? temp + rand(3, 5) : temp;
-      const finalRh = alertChance > 0.95 ? rh - rand(10, 15) : rh;
-
-      try {
-        await db.query(
-          `INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, ppfd, ph, ec, wateringVolume, runoffCollected, runoffPercentage, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            tentId,
-            logDate,
-            turn,
-            finalTemp,
-            finalRh,
-            ppfd,
-            ph,
-            ec,
-            isAM ? wateringVol : null,
-            isAM ? runoffCollected : null,
-            isAM ? runoffPct.toFixed(2) : null,
-            null,
-          ]
-        );
-        logCount++;
-      } catch (e) {
-        // Ignorar duplicatas
-      }
-    }
-  }
-  console.log(`  ✓ Estufa ${tentId}: ${logCount} logs inseridos`);
-}
-
-// ─── 11. TEMPLATES DE TAREFAS ───────────────────────────────────────────────
-console.log("\n✅ Inserindo templates de tarefas...");
-
-const taskTemplatesData = [
-  // MAINTENANCE
-  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Verificar plantas-mãe", description: "Inspecionar saúde geral, cor das folhas e sinais de pragas ou deficiências." },
-  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Rega das plantas-mãe", description: "Regar com solução nutritiva leve (EC 0.8-1.2). Verificar runoff." },
-  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Poda de manutenção", description: "Remover folhas velhas e amareladas. Manter estrutura aberta para circulação de ar." },
-  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Limpeza da estufa", description: "Limpar piso, paredes e equipamentos. Verificar filtro de carvão." },
-  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Verificar temperatura e umidade", description: "Registrar temp e UR. Ajustar ventilação se necessário." },
-
-  // CLONING
-  { context: "TENT_A", phase: "CLONING", weekNumber: 1, title: "Preparar clones", description: "Cortar galhos de 10-15cm das plantas-mãe. Aplicar hormônio de enraizamento. Colocar em cubo de lã de rocha." },
-  { context: "TENT_A", phase: "CLONING", weekNumber: 1, title: "Verificar umidade da clonadora", description: "Manter UR acima de 80%. Nebulizar se necessário." },
-  { context: "TENT_A", phase: "CLONING", weekNumber: 2, title: "Verificar enraizamento", description: "Inspecionar raízes nos cubos. Clones com raízes brancas estão prontos para transplante." },
-  { context: "TENT_A", phase: "CLONING", weekNumber: 2, title: "Selecionar clones viáveis", description: "Separar clones enraizados dos que ainda precisam de mais tempo." },
-
-  // VEGA
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 1, title: "Transplante e adaptação", description: "Transplantar clones para vasos definitivos. Rega leve de adaptação." },
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 1, title: "Configurar fotoperíodo 18/6", description: "Verificar timer. Confirmar 18h luz / 6h escuro." },
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 2, title: "Iniciar LST", description: "Aplicar Low Stress Training para abrir o dossel. Dobrar galhos principais com cuidado." },
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 2, title: "Rega com nutrientes vega", description: "Aplicar receita de vega semana 2. EC alvo: 1.4-1.6. pH: 5.8-6.2." },
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 3, title: "Topping / FIM", description: "Realizar topping ou FIM para multiplicar pontos de crescimento." },
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 3, title: "Verificar raízes e drenagem", description: "Checar se raízes estão saindo pelo fundo. Verificar drenagem adequada." },
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 4, title: "Defoliação leve", description: "Remover folhas grandes que bloqueiam luz para brotamentos inferiores." },
-  { context: "TENT_BC", phase: "VEGA", weekNumber: 4, title: "Avaliar transição para flora", description: "Verificar se plantas atingiram tamanho adequado para floração." },
-
-  // FLORA
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 1, title: "Mudar fotoperíodo para 12/12", description: "Ajustar timer para 12h luz / 12h escuro. Verificar ausência de vazamentos de luz." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 1, title: "Aumentar EC gradualmente", description: "Iniciar transição para receita de flora. EC alvo: 1.4-1.6." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 2, title: "Defoliação de flora", description: "Defoliação mais agressiva para maximizar penetração de luz nas colas." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 2, title: "Adicionar suportes para colas", description: "Instalar rede SCROG ou tutores para suportar peso das colas." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 3, title: "Verificar primeiros trichomas", description: "Usar lupa para verificar desenvolvimento de trichomas." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 4, title: "Aumentar EC para pico", description: "EC alvo: 1.8-2.0. Monitorar sinais de queima de nutrientes." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 5, title: "Avaliação de trichomas", description: "Verificar % de trichomas leitosos vs âmbar. Fotografar para comparação." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 5, title: "Monitorar umidade (prevenção de mofo)", description: "Manter UR abaixo de 50%. Aumentar ventilação se necessário." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 6, title: "Flush inicial (opcional)", description: "Avaliar necessidade de flush. Verificar cor das folhas." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 7, title: "Reduzir nutrientes", description: "Iniciar redução gradual de nutrientes para limpeza final." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 8, title: "Flush final", description: "Regar apenas com água pH ajustado por 7-10 dias antes da colheita." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 9, title: "Avaliar ponto de colheita", description: "80%+ trichomas leitosos, 10-20% âmbar = ponto ideal. Confirmar com lupa." },
-  { context: "TENT_BC", phase: "FLORA", weekNumber: 10, title: "Colheita", description: "Cortar plantas, remover folhas grandes. Pendurar para secagem." },
-
-  // DRYING
-  { context: "TENT_BC", phase: "DRYING", weekNumber: 1, title: "Configurar ambiente de secagem", description: "Temp 18-20°C, UR 55-60%, ventilação indireta. Sem luz direta." },
-  { context: "TENT_BC", phase: "DRYING", weekNumber: 1, title: "Verificar secagem diária", description: "Verificar firmeza dos galhos. Sem mofo ou odor estranho." },
-  { context: "TENT_BC", phase: "DRYING", weekNumber: 2, title: "Teste de secagem", description: "Galhos devem estalar ao dobrar. Flores não devem estar úmidas ao toque." },
-  { context: "TENT_BC", phase: "DRYING", weekNumber: 2, title: "Trim e cura", description: "Realizar trim final. Colocar em potes de vidro para cura. Abrir diariamente por 2 semanas." },
+const healthData = [
+  { plantId: plantMae1Id,      day: 12, status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Folhas verdes e brilhantes. Sem sinais de deficiência." },
+  { plantId: plantMae1Id,      day: 5,  status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Crescimento estável. Raízes saudáveis." },
+  { plantId: plantMae2Id,      day: 10, status: "STRESSED",   symptoms: "Pontas das folhas amarelando levemente",                 treatment: "Reduzido EC de 1.4 para 1.2",    notes: "Possível excesso de nutrientes." },
+  { plantId: plantMae2Id,      day: 4,  status: "RECOVERING", symptoms: null,                                                    treatment: "Flush com água pura",            notes: "Recuperando após ajuste de EC." },
+  { plantId: vegaPlantIds[0],  day: 11, status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Clone enraizou perfeitamente. Crescimento vigoroso." },
+  { plantId: vegaPlantIds[0],  day: 4,  status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Resposta excelente ao LST." },
+  { plantId: vegaPlantIds[1],  day: 10, status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Copa aberta após LST. Boa distribuição de luz." },
+  { plantId: vegaPlantIds[2],  day: 9,  status: "STRESSED",   symptoms: "Crescimento lento, folhas levemente curvadas para baixo", treatment: "pH ajustado de 6.8 para 6.0",  notes: "pH alto causando lockout de nutrientes." },
+  { plantId: vegaPlantIds[2],  day: 3,  status: "RECOVERING", symptoms: null,                                                    treatment: null,                             notes: "Recuperando após ajuste de pH. Crescimento retomado." },
+  { plantId: floraPlantIds[0], day: 8,  status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Semana 5 de flora. Buds compactos e resinosos." },
+  { plantId: floraPlantIds[0], day: 2,  status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Desenvolvimento excelente. Sem pragas." },
+  { plantId: floraPlantIds[1], day: 7,  status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Maior planta do ciclo. Colas principais com 15cm." },
+  { plantId: floraPlantIds[2], day: 6,  status: "STRESSED",   symptoms: "Folhas inferiores amarelando (senescência normal)",      treatment: "Removidas folhas amarelas",      notes: "Normal para semana 5 de flora." },
+  { plantId: floraPlantIds[2], day: 1,  status: "HEALTHY",    symptoms: null,                                                    treatment: null,                             notes: "Tricomas 60% leitosos. Colheita estimada em 3 semanas." },
 ];
-
-const taskTemplateIds = {};
-for (const t of taskTemplatesData) {
-  const [res] = await db.query(
-    "INSERT INTO taskTemplates (context, phase, weekNumber, title, description) VALUES (?, ?, ?, ?, ?)",
-    [t.context, t.phase, t.weekNumber, t.title, t.description]
+let healthCount = 0;
+for (const h of healthData) {
+  await conn.execute(
+    "INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, symptoms, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)",
+    [h.plantId, mysqlDate(daysAgo(h.day)), h.status, h.symptoms, h.treatment, h.notes]
   );
-  taskTemplateIds[`${t.phase}_${t.title}`] = res.insertId;
+  healthCount++;
 }
-console.log(`  ✓ ${taskTemplatesData.length} templates inseridos`);
+console.log(`  ✓ ${healthCount} registros de saúde inseridos`);
 
-// ─── 12. INSTÂNCIAS DE TAREFAS (últimas 2 semanas) ──────────────────────────
-console.log("\n📋 Inserindo instâncias de tarefas...");
+// ─── 10. TRICOMAS ────────────────────────────────────────────────────────────
+// Schema: plantId, logDate, trichomeStatus (CLEAR|CLOUDY|AMBER|MIXED),
+//         clearPercent, cloudyPercent, amberPercent, photoUrl, photoKey, notes
 
-let taskCount = 0;
+console.log("\n🔬 Inserindo registros de tricomas...");
+const trichomeData = [
+  { plantId: floraPlantIds[0], day: 14, clearPct: 40, cloudyPct: 55, amberPct: 5,  status: "CLOUDY", notes: "Início da floração. Tricomas principalmente clear." },
+  { plantId: floraPlantIds[0], day: 7,  clearPct: 15, cloudyPct: 70, amberPct: 10, status: "CLOUDY", notes: "Semana 5. Maioria leitosos. Ainda não no ponto." },
+  { plantId: floraPlantIds[1], day: 12, clearPct: 45, cloudyPct: 50, amberPct: 5,  status: "CLOUDY", notes: "Desenvolvimento normal para semana 3." },
+  { plantId: floraPlantIds[1], day: 5,  clearPct: 10, cloudyPct: 75, amberPct: 12, status: "CLOUDY", notes: "Quase no ponto. Aguardar mais 20% de amber." },
+  { plantId: floraPlantIds[2], day: 10, clearPct: 50, cloudyPct: 45, amberPct: 5,  status: "CLEAR",  notes: "Desenvolvimento um pouco mais lento." },
+  { plantId: floraPlantIds[2], day: 3,  clearPct: 20, cloudyPct: 65, amberPct: 12, status: "CLOUDY", notes: "Tricomas amadurecendo. Monitorar diariamente." },
+];
+let trichomeCount = 0;
+for (const t of trichomeData) {
+  await conn.execute(
+    "INSERT INTO plantTrichomeLogs (plantId, logDate, trichomeStatus, clearPercent, cloudyPercent, amberPercent, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [t.plantId, mysqlDate(daysAgo(t.day)), t.status, t.clearPct, t.cloudyPct, t.amberPct, t.notes]
+  );
+  trichomeCount++;
+}
+console.log(`  ✓ ${trichomeCount} registros de tricomas inseridos`);
 
-// Tarefas de MANUTENÇÃO (diárias/semanais nos últimos 14 dias)
-const maintTasks = taskTemplatesData.filter((t) => t.phase === "MAINTENANCE");
-for (let day = 14; day >= 1; day--) {
-  const taskDate = daysAgo(day);
-  // Rega e verificação são diárias
-  for (const t of maintTasks.filter((t) =>
-    ["Verificar temperatura e umidade", "Verificar plantas-mãe"].includes(t.title)
-  )) {
-    const tid = taskTemplateIds[`${t.phase}_${t.title}`];
-    const isDone = day > 1; // Hoje ainda não feito
-    try {
-      await db.query(
-        "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
-        [tentMaintId, tid, taskDate, isDone, isDone ? taskDate : null]
+// ─── 11. LST ─────────────────────────────────────────────────────────────────
+// Schema: plantId, logDate, technique, beforePhotoUrl, beforePhotoKey,
+//         afterPhotoUrl, afterPhotoKey, response, notes
+
+console.log("\n🌀 Inserindo registros de LST...");
+const lstData = [
+  { plantId: vegaPlantIds[0], day: 13, technique: "LST",         notes: "Primeira amarração para abrir copa.",           response: "Planta respondeu bem. Brotações laterais ativadas." },
+  { plantId: vegaPlantIds[0], day: 8,  technique: "Defoliation",  notes: "Remoção de folhas grandes que bloqueavam luz.",  response: "Boa penetração de luz nas brotações inferiores." },
+  { plantId: vegaPlantIds[1], day: 12, technique: "LST",          notes: "Amarração lateral para distribuir copa.",        response: "Crescimento lateral acelerado após 48h." },
+  { plantId: vegaPlantIds[1], day: 7,  technique: "Topping",      notes: "Topping no nó 5 para criar 2 colas principais.", response: "Recuperação em 3 dias. Duas colas principais formadas." },
+  { plantId: vegaPlantIds[2], day: 10, technique: "LST",          notes: "LST leve para estimular crescimento.",           response: "Crescimento retomado após ajuste de pH." },
+];
+let lstCount = 0;
+for (const l of lstData) {
+  await conn.execute(
+    "INSERT INTO plantLSTLogs (plantId, logDate, technique, response, notes) VALUES (?, ?, ?, ?, ?)",
+    [l.plantId, mysqlDate(daysAgo(l.day)), l.technique, l.response, l.notes]
+  );
+  lstCount++;
+}
+console.log(`  ✓ ${lstCount} registros de LST inseridos`);
+
+// ─── 12. LOGS DIÁRIOS ────────────────────────────────────────────────────────
+// Schema: tentId, logDate, turn (AM|PM), tempC, rhPct, ppfd, ph, ec,
+//         wateringVolume, runoffCollected, runoffPercentage, notes
+
+console.log("\n📊 Inserindo logs diários (14 dias × 3 estufas × 2 turnos)...");
+const phaseTargets = {
+  MAINTENANCE: { temp: [24, 26], rh: [55, 65], ppfd: [200, 300], ph: [5.9, 6.1], ec: [1.0, 1.2] },
+  VEGA:        { temp: [24, 26], rh: [55, 65], ppfd: [400, 600], ph: [5.8, 6.0], ec: [1.2, 1.4] },
+  FLORA:       { temp: [22, 24], rh: [45, 55], ppfd: [600, 800], ph: [6.0, 6.2], ec: [1.6, 1.8] },
+};
+const tentConfigs = [
+  { tentId: tentAId, phase: "MAINTENANCE" },
+  { tentId: tentBId, phase: "VEGA" },
+  { tentId: tentCId, phase: "FLORA" },
+];
+let logCount = 0;
+for (const tc of tentConfigs) {
+  const t = phaseTargets[tc.phase];
+  for (let day = 13; day >= 0; day--) {
+    for (const turn of ["AM", "PM"]) {
+      const hour = turn === "AM" ? 8 : 20;
+      const tempOffset = day % 5 === 0 ? rand(1.5, 3.0) : 0;
+      const rhOffset   = day % 7 === 0 ? rand(5, 12) : 0;
+      const wateringVol = turn === "AM" ? randInt(400, 600) : null;
+      const runoffVol   = wateringVol ? randInt(70, 130) : null;
+      const runoffPct   = wateringVol ? parseFloat(((runoffVol / wateringVol) * 100).toFixed(2)) : null;
+      await conn.execute(
+        "INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, ppfd, ph, ec, wateringVolume, runoffCollected, runoffPercentage, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          tc.tentId,
+          mysqlDate(daysAgo(day, hour)),
+          turn,
+          rand(t.temp[0] - 0.5 + tempOffset, t.temp[1] + 0.5 + tempOffset),
+          rand(t.rh[0]   - 2   + rhOffset,   t.rh[1]   + 2   + rhOffset),
+          randInt(t.ppfd[0], t.ppfd[1]),
+          rand(t.ph[0], t.ph[1], 1),
+          rand(t.ec[0], t.ec[1], 2),
+          wateringVol,
+          runoffVol,
+          runoffPct,
+          null
+        ]
       );
-      taskCount++;
-    } catch (e) {}
-  }
-  // Rega a cada 2 dias
-  if (day % 2 === 0) {
-    const t = maintTasks.find((t) => t.title === "Rega das plantas-mãe");
-    if (t) {
-      const tid = taskTemplateIds[`${t.phase}_${t.title}`];
-      const isDone = day > 2;
-      try {
-        await db.query(
-          "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
-          [tentMaintId, tid, taskDate, isDone, isDone ? taskDate : null]
-        );
-        taskCount++;
-      } catch (e) {}
+      logCount++;
     }
   }
 }
-// Poda semanal
-const podaTask = maintTasks.find((t) => t.title === "Poda de manutenção");
-if (podaTask) {
-  const tid = taskTemplateIds[`MAINTENANCE_Poda de manutenção`];
-  for (const day of [14, 7]) {
-    try {
-      await db.query(
-        "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
-        [tentMaintId, tid, daysAgo(day), true, daysAgo(day)]
-      );
-      taskCount++;
-    } catch (e) {}
-  }
-}
+console.log(`  ✓ ${logCount} logs diários inseridos`);
 
-// Tarefas de VEGA (semanas 1 e 2)
-const vegaTasks = taskTemplatesData.filter((t) => t.phase === "VEGA" && t.weekNumber && t.weekNumber <= 2);
-for (const t of vegaTasks) {
-  const tid = taskTemplateIds[`VEGA_${t.title}`];
-  const taskDay = t.weekNumber === 1 ? 14 : 7;
-  const isDone = taskDay > 1;
-  try {
-    await db.query(
-      "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
-      [tentVegaId, tid, daysAgo(taskDay), isDone, isDone ? daysAgo(taskDay) : null]
+// ─── 13. RUNOFF POR PLANTA ───────────────────────────────────────────────────
+// Schema: plantId, logDate, volumeIn (L), volumeOut (L), runoffPercent, notes
+
+console.log("\n💧 Inserindo registros de runoff por planta...");
+let runoffCount = 0;
+for (const plantId of allActivePlants) {
+  for (let day = 6; day >= 0; day--) {
+    const volumeIn  = parseFloat(rand(0.4, 0.6, 2).toFixed(2));
+    const volumeOut = parseFloat(rand(0.07, 0.13, 2).toFixed(2));
+    const runoffPct = parseFloat(((volumeOut / volumeIn) * 100).toFixed(2));
+    await conn.execute(
+      "INSERT INTO plantRunoffLogs (plantId, logDate, volumeIn, volumeOut, runoffPercent) VALUES (?, ?, ?, ?, ?)",
+      [plantId, mysqlDate(daysAgo(day)), volumeIn, volumeOut, runoffPct]
     );
-    taskCount++;
-  } catch (e) {}
-}
-
-// Rega vega a cada 2 dias
-const regaVegaTask = taskTemplatesData.find((t) => t.phase === "VEGA" && t.title === "Rega com nutrientes vega");
-if (regaVegaTask) {
-  const tid = taskTemplateIds[`VEGA_Rega com nutrientes vega`];
-  for (let day = 14; day >= 1; day -= 2) {
-    const isDone = day > 2;
-    try {
-      await db.query(
-        "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
-        [tentVegaId, tid, daysAgo(day), isDone, isDone ? daysAgo(day) : null]
-      );
-      taskCount++;
-    } catch (e) {}
+    runoffCount++;
   }
 }
+console.log(`  ✓ ${runoffCount} registros de runoff inseridos`);
 
-// Tarefas de FLORA (semanas 3, 4 e 5)
-const floraTasks = taskTemplatesData.filter(
-  (t) => t.phase === "FLORA" && t.weekNumber && t.weekNumber >= 3 && t.weekNumber <= 5
-);
-for (const t of floraTasks) {
-  const tid = taskTemplateIds[`FLORA_${t.title}`];
-  const weekOffset = { 3: 14, 4: 7, 5: 2 };
-  const taskDay = weekOffset[t.weekNumber] || 7;
-  const isDone = taskDay > 2;
-  try {
-    await db.query(
-      "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
-      [tentFloraId, tid, daysAgo(taskDay), isDone, isDone ? daysAgo(taskDay) : null]
-    );
-    taskCount++;
-  } catch (e) {}
+// ─── 14. WEEKLY TARGETS ──────────────────────────────────────────────────────
+// Schema: strainId, phase, weekNumber, tempMin, tempMax, rhMin, rhMax,
+//         ppfdMin, ppfdMax, photoperiod, phMin, phMax, ecMin, ecMax, notes
+
+console.log("\n🎯 Inserindo weekly targets...");
+const weeklyTargetsData = [];
+
+// Orange Punch — Vega (4 semanas)
+for (const [w, ppfdMin, ppfdMax] of [[1,300,400],[2,350,450],[3,400,500],[4,450,550]])
+  weeklyTargetsData.push({ strainId: strainMap["Orange Punch"], phase: "VEGA", weekNumber: w,
+    tempMin: 22, tempMax: 26, rhMin: w<=2?60:55, rhMax: w<=2?70:65,
+    ppfdMin, ppfdMax, photoperiod: "18/6", phMin: 5.8, phMax: 6.0, ecMin: w<=2?1.0:1.2, ecMax: w<=2?1.2:1.4 });
+
+// Orange Punch — Flora (9 semanas)
+for (const [w, ppfdMin, ppfdMax, rhMin, rhMax, tMax, ecMin, ecMax] of [
+  [1,550,650,50,60,25,1.3,1.5],[2,600,700,50,60,25,1.4,1.6],[3,650,750,45,55,25,1.5,1.7],
+  [4,700,800,45,55,24,1.6,1.8],[5,750,850,40,50,24,1.7,1.9],[6,750,850,40,50,24,1.7,1.9],
+  [7,700,800,40,50,23,1.5,1.7],[8,650,750,40,50,23,0.8,1.2],[9,550,650,40,50,23,0.3,0.5]
+])
+  weeklyTargetsData.push({ strainId: strainMap["Orange Punch"], phase: "FLORA", weekNumber: w,
+    tempMin: 20, tempMax: tMax, rhMin, rhMax, ppfdMin, ppfdMax,
+    photoperiod: "12/12", phMin: 6.0, phMax: 6.2, ecMin, ecMax });
+
+// 24K Gold — Vega (5 semanas)
+for (const [w, ppfdMin, ppfdMax] of [[1,300,400],[2,350,450],[3,400,500],[4,450,550],[5,500,600]])
+  weeklyTargetsData.push({ strainId: strainMap["24K Gold"], phase: "VEGA", weekNumber: w,
+    tempMin: 22, tempMax: 26, rhMin: w<=2?60:55, rhMax: w<=2?70:65,
+    ppfdMin, ppfdMax, photoperiod: "18/6", phMin: 5.8, phMax: 6.0, ecMin: w<=2?1.0:1.2, ecMax: w<=2?1.2:1.4 });
+
+// 24K Gold — Flora (10 semanas)
+for (const [w, ppfdMin, ppfdMax, rhMin, rhMax, tMax, ecMin, ecMax] of [
+  [1,550,650,50,60,25,1.3,1.5],[2,600,700,50,60,25,1.4,1.6],[3,650,750,45,55,25,1.5,1.7],
+  [4,700,800,45,55,24,1.6,1.8],[5,750,850,40,50,24,1.7,1.9],[6,750,850,40,50,24,1.7,1.9],
+  [7,700,800,40,50,23,1.5,1.7],[8,650,750,40,50,23,0.8,1.2],[9,600,700,40,50,23,0.5,0.8],
+  [10,550,650,40,50,23,0.3,0.5]
+])
+  weeklyTargetsData.push({ strainId: strainMap["24K Gold"], phase: "FLORA", weekNumber: w,
+    tempMin: 20, tempMax: tMax, rhMin, rhMax, ppfdMin, ppfdMax,
+    photoperiod: "12/12", phMin: 6.0, phMax: 6.2, ecMin, ecMax });
+
+let targetCount = 0;
+for (const t of weeklyTargetsData) {
+  await conn.execute(
+    "INSERT INTO weeklyTargets (strainId, phase, weekNumber, tempMin, tempMax, rhMin, rhMax, ppfdMin, ppfdMax, photoperiod, phMin, phMax, ecMin, ecMax) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [t.strainId, t.phase, t.weekNumber, t.tempMin, t.tempMax, t.rhMin, t.rhMax,
+     t.ppfdMin, t.ppfdMax, t.photoperiod, t.phMin, t.phMax, t.ecMin, t.ecMax]
+  );
+  targetCount++;
 }
+console.log(`  ✓ ${targetCount} weekly targets inseridos`);
 
-// Rega flora a cada 2 dias
-const regaFloraTask = taskTemplatesData.find((t) => t.phase === "FLORA" && t.weekNumber === 4 && t.title.includes("EC"));
-const regaFloraTask2 = taskTemplatesData.find((t) => t.phase === "FLORA" && t.weekNumber === 5 && t.title.includes("trichomas"));
-for (let day = 14; day >= 1; day -= 2) {
-  const isDone = day > 2;
-  // Usar template de verificação como proxy de rega diária
-  const t = taskTemplatesData.find((t) => t.phase === "FLORA" && t.weekNumber === 5 && t.title.includes("umidade"));
-  if (t) {
-    const tid = taskTemplateIds[`FLORA_${t.title}`];
-    try {
-      await db.query(
-        "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
-        [tentFloraId, tid, daysAgo(day), isDone, isDone ? daysAgo(day) : null]
-      );
-      taskCount++;
-    } catch (e) {}
-  }
-}
+// ─── 15. ALERTAS ─────────────────────────────────────────────────────────────
+// Schema: tentId, alertType (OUT_OF_RANGE|SAFETY_LIMIT|TREND),
+//         metric (TEMP|RH|PPFD|PH), logDate, turn, value, message,
+//         status (NEW|SEEN)
 
-console.log(`  ✓ ${taskCount} instâncias de tarefas inseridas`);
-
-// ─── 13. ALERTAS ────────────────────────────────────────────────────────────
 console.log("\n🚨 Inserindo alertas...");
-
 const alertsData = [
-  {
-    tentId: tentVegaId,
-    alertType: "OUT_OF_RANGE",
-    metric: "TEMP",
-    logDate: daysAgo(10),
-    turn: "PM",
-    value: 30.5,
-    message: "Temperatura acima do limite: 30.5°C (máx recomendado: 28°C)",
-    status: "SEEN",
-  },
-  {
-    tentId: tentFloraId,
-    alertType: "OUT_OF_RANGE",
-    metric: "RH",
-    logDate: daysAgo(5),
-    turn: "AM",
-    value: 62.0,
-    message: "Umidade relativa acima do limite em flora: 62% (máx recomendado: 55%). Risco de mofo.",
-    status: "SEEN",
-  },
-  {
-    tentId: tentFloraId,
-    alertType: "OUT_OF_RANGE",
-    metric: "TEMP",
-    logDate: daysAgo(2),
-    turn: "PM",
-    value: 29.2,
-    message: "Temperatura ligeiramente elevada: 29.2°C. Verificar ventilação.",
-    status: "NEW",
-  },
-  {
-    tentId: tentMaintId,
-    alertType: "OUT_OF_RANGE",
-    metric: "PH",
-    logDate: daysAgo(5),
-    turn: "AM",
-    value: 6.8,
-    message: "pH acima do ideal: 6.8 (ideal: 5.8-6.2). Ajustar na próxima rega.",
-    status: "SEEN",
-    // Note: PH is valid enum value
-  },
+  { tentId: tentBId, type: "OUT_OF_RANGE", metric: "TEMP", day: 9,  turn: "AM", value: 27.8, message: "Temperatura acima do ideal (27.8°C). Target: 22-26°C",       status: "SEEN" },
+  { tentId: tentCId, type: "OUT_OF_RANGE", metric: "RH",   day: 6,  turn: "PM", value: 36.2, message: "Umidade abaixo do ideal (36.2%). Target: 40-50%",             status: "SEEN" },
+  { tentId: tentCId, type: "SAFETY_LIMIT", metric: "TEMP", day: 2,  turn: "AM", value: 29.1, message: "Temperatura crítica (29.1°C). Limite de segurança: 28°C",     status: "NEW"  },
+  { tentId: tentBId, type: "OUT_OF_RANGE", metric: "PPFD", day: 1,  turn: "AM", value: 380,  message: "PPFD abaixo do target (380 µmol/m²/s). Target: 400-500",      status: "NEW"  },
+  { tentId: tentAId, type: "OUT_OF_RANGE", metric: "RH",   day: 3,  turn: "PM", value: 72.5, message: "Umidade alta na manutenção (72.5%). Target: 55-65%",          status: "SEEN" },
 ];
-
 for (const a of alertsData) {
-  await db.query(
-    `INSERT INTO alerts (tentId, alertType, metric, logDate, turn, value, message, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [a.tentId, a.alertType, a.metric, a.logDate, a.turn, a.value, a.message, a.status]
+  await conn.execute(
+    "INSERT INTO alerts (tentId, alertType, metric, logDate, turn, value, message, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [a.tentId, a.type, a.metric, mysqlDate(daysAgo(a.day, 8)), a.turn, a.value, a.message, a.status]
   );
 }
 console.log(`  ✓ ${alertsData.length} alertas inseridos`);
 
-// ─── 14. CONFIGURAÇÕES DE ALERTA ────────────────────────────────────────────
-for (const tentId of [tentMaintId, tentVegaId, tentFloraId]) {
-  await db.query(
-    "INSERT INTO alertSettings (tentId, alertsEnabled) VALUES (?, 1)",
-    [tentId]
+// ─── 16. CONFIGURAÇÕES DE ALERTA ─────────────────────────────────────────────
+// Schema: tentId, alertsEnabled, tempEnabled, rhEnabled, ppfdEnabled, phEnabled,
+//         tempMargin, rhMargin, ppfdMargin, phMargin
+
+console.log("\n⚙️  Inserindo configurações de alerta...");
+for (const tentId of [tentAId, tentBId, tentCId]) {
+  await conn.execute(
+    "INSERT INTO alertSettings (tentId, alertsEnabled, tempEnabled, rhEnabled, ppfdEnabled, phEnabled, tempMargin, rhMargin, ppfdMargin, phMargin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [tentId, 1, 1, 1, 1, 1, "2.0", "5.0", 50, "0.2"]
   );
 }
+console.log("  ✓ Configurações de alerta inseridas para 3 estufas");
 
-// ─── 15. REGISTROS DE RUNOFF POR PLANTA ─────────────────────────────────────
-console.log("\n💧 Inserindo registros de runoff...");
+// ─── 17. PRESETS DE FERTILIZAÇÃO ─────────────────────────────────────────────
+// Schema: name, waterVolume, targetEC, phase (VEGA|FLORA), weekNumber,
+//         irrigationsPerWeek, calculationMode (per-irrigation|per-week)
 
-const allActivePlants = [
-  ...vegaPlantIds.map((id) => ({ id, volIn: 0.6 })),
-  ...floraPlantIds.map((id) => ({ id, volIn: 1.2 })),
+console.log("\n🧪 Inserindo presets de fertilização...");
+const fertPresets = [
+  { name: "Vega Semana 2-3 (5L)",    waterVolume: 5.0, targetEC: 1.2, phase: "VEGA",  weekNumber: 3, irrigationsPerWeek: 3, calculationMode: "per-irrigation" },
+  { name: "Flora Semana 3-4 (5L)",   waterVolume: 5.0, targetEC: 1.5, phase: "FLORA", weekNumber: 4, irrigationsPerWeek: 4, calculationMode: "per-irrigation" },
+  { name: "Flora Semana 5-6 (5L)",   waterVolume: 5.0, targetEC: 1.7, phase: "FLORA", weekNumber: 5, irrigationsPerWeek: 4, calculationMode: "per-irrigation" },
+  { name: "Flora Semana 7-8 (5L)",   waterVolume: 5.0, targetEC: 1.8, phase: "FLORA", weekNumber: 7, irrigationsPerWeek: 5, calculationMode: "per-irrigation" },
+  { name: "Flush Pré-Colheita (5L)", waterVolume: 5.0, targetEC: 0.3, phase: "FLORA", weekNumber: 8, irrigationsPerWeek: 5, calculationMode: "per-irrigation" },
 ];
-
-for (const { id, volIn } of allActivePlants) {
-  for (let day = 12; day >= 2; day -= 3) {
-    const runoffPct = rand(15, 25);
-    const volOut = parseFloat((volIn * (runoffPct / 100)).toFixed(2));
-    try {
-      await db.query(
-        "INSERT INTO plantRunoffLogs (plantId, logDate, volumeIn, volumeOut, runoffPercent, notes) VALUES (?, ?, ?, ?, ?, ?)",
-        [id, daysAgo(day), volIn, volOut, runoffPct.toFixed(2), null]
-      );
-    } catch (e) {}
-  }
+for (const fp of fertPresets) {
+  await conn.execute(
+    "INSERT INTO fertilizationPresets (name, waterVolume, targetEC, phase, weekNumber, irrigationsPerWeek, calculationMode) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [fp.name, fp.waterVolume, fp.targetEC, fp.phase, fp.weekNumber, fp.irrigationsPerWeek, fp.calculationMode]
+  );
 }
-console.log(`  ✓ Runoff logs inseridos para ${allActivePlants.length} plantas`);
+console.log(`  ✓ ${fertPresets.length} presets de fertilização inseridos`);
 
-// ─── 16. WEEKLY TARGETS (Orange Punch e 24K) ────────────────────────────────
-console.log("\n🎯 Inserindo weekly targets...");
+// ─── 18. PRESETS DE REGA ─────────────────────────────────────────────────────
+// Schema: name, plantCount, potSize, targetRunoff, phase, weekNumber
 
-// Orange Punch - VEGA semanas 1-4
-const opVegaTargets = [
-  { week: 1, tempMin: 22, tempMax: 28, rhMin: 60, rhMax: 70, ppfdMin: 300, ppfdMax: 500, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.0, ecMax: 1.4 },
-  { week: 2, tempMin: 22, tempMax: 28, rhMin: 60, rhMax: 70, ppfdMin: 400, ppfdMax: 600, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.2, ecMax: 1.6 },
-  { week: 3, tempMin: 22, tempMax: 28, rhMin: 55, rhMax: 65, ppfdMin: 500, ppfdMax: 700, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.4, ecMax: 1.8 },
-  { week: 4, tempMin: 22, tempMax: 28, rhMin: 55, rhMax: 65, ppfdMin: 600, ppfdMax: 800, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.4, ecMax: 1.8 },
+console.log("\n💧 Inserindo presets de rega...");
+const waterPresets = [
+  { name: "Vega 3 plantas (5L)",  plantCount: 3, potSize: 5.0, targetRunoff: 20, phase: "VEGA",  weekNumber: 3 },
+  { name: "Flora 3 plantas (5L)", plantCount: 3, potSize: 5.0, targetRunoff: 20, phase: "FLORA", weekNumber: 5 },
+  { name: "Flush 3 plantas (5L)", plantCount: 3, potSize: 5.0, targetRunoff: 30, phase: "FLORA", weekNumber: 8 },
 ];
-
-for (const t of opVegaTargets) {
-  try {
-    await db.query(
-      `INSERT INTO weeklyTargets (strainId, phase, weekNumber, tempMin, tempMax, rhMin, rhMax, ppfdMin, ppfdMax, photoperiod, phMin, phMax, ecMin, ecMax)
-       VALUES (?, 'VEGA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [strainIds["Orange Punch"], t.week, t.tempMin, t.tempMax, t.rhMin, t.rhMax, t.ppfdMin, t.ppfdMax, t.photo, t.phMin, t.phMax, t.ecMin, t.ecMax]
-    );
-  } catch (e) {}
+for (const wp of waterPresets) {
+  await conn.execute(
+    "INSERT INTO wateringPresets (name, plantCount, potSize, targetRunoff, phase, weekNumber) VALUES (?, ?, ?, ?, ?, ?)",
+    [wp.name, wp.plantCount, wp.potSize, wp.targetRunoff, wp.phase, wp.weekNumber]
+  );
 }
+console.log(`  ✓ ${waterPresets.length} presets de rega inseridos`);
 
-// Orange Punch - FLORA semanas 1-9
-const opFloraTargets = [
-  { week: 1, tempMin: 22, tempMax: 26, rhMin: 50, rhMax: 60, ppfdMin: 600, ppfdMax: 800, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.4, ecMax: 1.6 },
-  { week: 2, tempMin: 22, tempMax: 26, rhMin: 50, rhMax: 60, ppfdMin: 700, ppfdMax: 900, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.6, ecMax: 1.8 },
-  { week: 3, tempMin: 22, tempMax: 26, rhMin: 45, rhMax: 55, ppfdMin: 700, ppfdMax: 900, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.6, ecMax: 2.0 },
-  { week: 4, tempMin: 22, tempMax: 26, rhMin: 45, rhMax: 55, ppfdMin: 800, ppfdMax: 1000, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.8, ecMax: 2.0 },
-  { week: 5, tempMin: 21, tempMax: 25, rhMin: 40, rhMax: 50, ppfdMin: 800, ppfdMax: 1000, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.8, ecMax: 2.0 },
-  { week: 6, tempMin: 21, tempMax: 25, rhMin: 40, rhMax: 50, ppfdMin: 800, ppfdMax: 1000, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.6, ecMax: 1.8 },
-  { week: 7, tempMin: 20, tempMax: 24, rhMin: 40, rhMax: 50, ppfdMin: 700, ppfdMax: 900, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.2, ecMax: 1.6 },
-  { week: 8, tempMin: 20, tempMax: 24, rhMin: 40, rhMax: 50, ppfdMin: 600, ppfdMax: 800, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 0.6, ecMax: 1.0 },
-  { week: 9, tempMin: 20, tempMax: 24, rhMin: 40, rhMax: 50, ppfdMin: 600, ppfdMax: 800, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 0.4, ecMax: 0.6 },
+// ─── 19. RECEITAS ────────────────────────────────────────────────────────────
+// Schema: tentId, logDate, turn, volumeTotalL, ecTarget, phTarget, productsJson, notes
+
+console.log("\n📋 Inserindo receitas de fertilização...");
+let recipeCount = 0;
+for (let day = 5; day >= 0; day--) {
+  const logDate = daysAgo(day);
+  const vegaProducts = JSON.stringify([
+    { name: "Flora Micro", mlPerL: 1.5, totalMl: 7.5 },
+    { name: "Flora Grow",  mlPerL: 2.5, totalMl: 12.5 },
+    { name: "Flora Bloom", mlPerL: 0.5, totalMl: 2.5 },
+    { name: "CalMag",      mlPerL: 1.0, totalMl: 5.0 },
+  ]);
+  await conn.execute(
+    "INSERT INTO recipes (tentId, logDate, turn, volumeTotalL, ecTarget, phTarget, productsJson, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [tentBId, mysqlDate(logDate), "AM", 5.0, 1.2, 5.9, vegaProducts, day === 5 ? "Receita padrão vega semana 3" : null]
+  );
+  recipeCount++;
+
+  const floraProducts = JSON.stringify([
+    { name: "Flora Micro", mlPerL: 1.5, totalMl: 7.5 },
+    { name: "Flora Grow",  mlPerL: 1.0, totalMl: 5.0 },
+    { name: "Flora Bloom", mlPerL: 3.0, totalMl: 15.0 },
+    { name: "CalMag",      mlPerL: 1.5, totalMl: 7.5 },
+    { name: "PK 13/14",    mlPerL: 1.0, totalMl: 5.0 },
+  ]);
+  await conn.execute(
+    "INSERT INTO recipes (tentId, logDate, turn, volumeTotalL, ecTarget, phTarget, productsJson, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    [tentCId, mysqlDate(logDate), "AM", 5.0, 1.7, 6.0, floraProducts, day === 5 ? "Receita padrão flora semana 5" : null]
+  );
+  recipeCount++;
+}
+console.log(`  ✓ ${recipeCount} receitas inseridas`);
+
+// ─── 20. TEMPLATES DE RECEITAS ───────────────────────────────────────────────
+// Schema: name, phase, weekNumber, volumeTotalL, ecTarget, phTarget, productsJson, notes
+
+console.log("\n📚 Inserindo templates de receitas...");
+const recipeTemplatesData = [
+  {
+    name: "Vega Base (GHE)", phase: "VEGA", weekNumber: 3, ecTarget: 1.2, phTarget: 5.9,
+    productsJson: JSON.stringify([
+      { name: "Flora Micro", mlPerL: 1.5 }, { name: "Flora Grow", mlPerL: 2.5 },
+      { name: "Flora Bloom", mlPerL: 0.5 }, { name: "CalMag",     mlPerL: 1.0 },
+    ]),
+    notes: "Receita base para vegetação semana 2-4",
+  },
+  {
+    name: "Flora Pico (GHE)", phase: "FLORA", weekNumber: 5, ecTarget: 1.7, phTarget: 6.0,
+    productsJson: JSON.stringify([
+      { name: "Flora Micro", mlPerL: 1.5 }, { name: "Flora Grow",  mlPerL: 1.0 },
+      { name: "Flora Bloom", mlPerL: 3.0 }, { name: "CalMag",      mlPerL: 1.5 },
+      { name: "PK 13/14",   mlPerL: 1.0 },
+    ]),
+    notes: "Receita de pico de floração semana 4-6",
+  },
+  {
+    name: "Flush Final", phase: "FLORA", weekNumber: 8, ecTarget: 0.3, phTarget: 6.2,
+    productsJson: JSON.stringify([{ name: "Água pura", mlPerL: 0 }]),
+    notes: "Flush com água pura para limpar sais antes da colheita",
+  },
 ];
-
-for (const t of opFloraTargets) {
-  try {
-    await db.query(
-      `INSERT INTO weeklyTargets (strainId, phase, weekNumber, tempMin, tempMax, rhMin, rhMax, ppfdMin, ppfdMax, photoperiod, phMin, phMax, ecMin, ecMax)
-       VALUES (?, 'FLORA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [strainIds["Orange Punch"], t.week, t.tempMin, t.tempMax, t.rhMin, t.rhMax, t.ppfdMin, t.ppfdMax, t.photo, t.phMin, t.phMax, t.ecMin, t.ecMax]
-    );
-  } catch (e) {}
+let templateCount = 0;
+for (const rt of recipeTemplatesData) {
+  await conn.execute(
+    "INSERT INTO recipeTemplates (name, phase, weekNumber, ecTarget, phTarget, productsJson, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [rt.name, rt.phase, rt.weekNumber, rt.ecTarget, rt.phTarget, rt.productsJson, rt.notes]
+  );
+  templateCount++;
 }
+console.log(`  ✓ ${templateCount} templates de receitas inseridos`);
 
-// 24K - VEGA semanas 1-5
-const k24VegaTargets = [
-  { week: 1, tempMin: 22, tempMax: 28, rhMin: 60, rhMax: 70, ppfdMin: 300, ppfdMax: 500, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.0, ecMax: 1.4 },
-  { week: 2, tempMin: 22, tempMax: 28, rhMin: 60, rhMax: 70, ppfdMin: 400, ppfdMax: 600, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.2, ecMax: 1.6 },
-  { week: 3, tempMin: 22, tempMax: 28, rhMin: 55, rhMax: 65, ppfdMin: 500, ppfdMax: 700, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.4, ecMax: 1.8 },
-  { week: 4, tempMin: 22, tempMax: 28, rhMin: 55, rhMax: 65, ppfdMin: 600, ppfdMax: 800, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.4, ecMax: 1.8 },
-  { week: 5, tempMin: 22, tempMax: 28, rhMin: 50, rhMax: 60, ppfdMin: 600, ppfdMax: 800, photo: "18/6", phMin: 5.8, phMax: 6.2, ecMin: 1.4, ecMax: 1.8 },
+// ─── 21. TEMPLATES DE TAREFAS ────────────────────────────────────────────────
+// Schema: context (TENT_A|TENT_BC), phase, weekNumber, title, description
+
+console.log("\n✅ Inserindo templates de tarefas...");
+const taskTemplatesData = [
+  // MANUTENÇÃO
+  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Regar plantas-mãe",          description: "Regar com EC 1.0-1.2 para manter crescimento vegetativo" },
+  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Fazer clones",               description: "Cortar e enraizar clones das plantas-mãe" },
+  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Podar plantas-mãe",          description: "Remover crescimento excessivo e manter tamanho controlado" },
+  { context: "TENT_A", phase: "MAINTENANCE", weekNumber: null, title: "Verificar pH e EC",          description: "pH: 5.8-6.2, EC: 1.0-1.2" },
+  // VEGA
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 1, title: "Verificar enraizamento",    description: "Confirmar que clones enraizaram bem" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 1, title: "Primeira rega nutritiva",   description: "EC 0.8-1.0, pH 5.8-6.0" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 2, title: "Verificar pH e EC",         description: "pH: 5.8-6.2, EC: 1.0-1.2" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 2, title: "Regar plantas",             description: "Regar com 15-20% de runoff" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 3, title: "Verificar pH e EC",         description: "pH: 5.8-6.2, EC: 1.2-1.4" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 3, title: "Regar plantas",             description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 3, title: "Aplicar LST se necessário", description: "Abrir copa para melhor penetração de luz" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 4, title: "Verificar pH e EC",         description: "pH: 5.8-6.2, EC: 1.2-1.4" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 4, title: "Regar plantas",             description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "VEGA", weekNumber: 4, title: "Avaliar transição para flora", description: "Verificar se plantas estão prontas para floração" },
+  // FLORA
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 1,  title: "Confirmar fotoperíodo 12/12",     description: "Verificar timer e ausência de vazamento de luz" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 1,  title: "Ajustar nutrição",                description: "Aumentar Flora Bloom, reduzir Flora Grow. EC: 1.3-1.5" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 2,  title: "Verificar pH e EC",               description: "pH: 6.0-6.2, EC: 1.4-1.6" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 2,  title: "Regar plantas",                   description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 2,  title: "Remover folhas baixas",           description: "Desfoliação leve para melhorar circulação de ar" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 3,  title: "Verificar pH e EC",               description: "pH: 6.0-6.2, EC: 1.6-1.8" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 3,  title: "Regar plantas",                   description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 4,  title: "Verificar pH e EC",               description: "pH: 6.0-6.2, EC: 1.8-2.0" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 4,  title: "Regar plantas",                   description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 4,  title: "Verificar tricomas",              description: "Inspecionar tricomas com lupa (60×) para monitorar maturação" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 5,  title: "Verificar pH e EC",               description: "pH: 6.0-6.2, EC: 1.8-2.0" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 5,  title: "Regar plantas",                   description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 5,  title: "Verificar tricomas",              description: "Monitorar maturação dos tricomas" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 5,  title: "Verificar pragas e mofo",         description: "Inspecionar buds para detectar mofo ou pragas" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 6,  title: "Verificar pH e EC",               description: "pH: 6.0-6.2, EC: 1.8-2.0" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 6,  title: "Regar plantas",                   description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 6,  title: "Verificar tricomas diariamente",  description: "Monitorar tricomas para decidir ponto de colheita" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 7,  title: "Verificar pH e EC",               description: "pH: 6.0-6.2, EC: 1.6-1.8 (reduzir nutrientes)" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 7,  title: "Regar plantas",                   description: "Regar com 20% de runoff" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 7,  title: "Verificar tricomas",              description: "Decidir ponto de colheita (70-90% leitosos)" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 8,  title: "Iniciar flush",                   description: "Regar apenas com água pH ajustado (sem nutrientes)" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 8,  title: "Regar com água pura",             description: "Flush com 30% de runoff para limpar sais" },
+  { context: "TENT_BC", phase: "FLORA", weekNumber: 8,  title: "Preparar para colheita",          description: "Organizar ferramentas e espaço de secagem" },
 ];
-
-for (const t of k24VegaTargets) {
-  try {
-    await db.query(
-      `INSERT INTO weeklyTargets (strainId, phase, weekNumber, tempMin, tempMax, rhMin, rhMax, ppfdMin, ppfdMax, photoperiod, phMin, phMax, ecMin, ecMax)
-       VALUES (?, 'VEGA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [strainIds["24K"], t.week, t.tempMin, t.tempMax, t.rhMin, t.rhMax, t.ppfdMin, t.ppfdMax, t.photo, t.phMin, t.phMax, t.ecMin, t.ecMax]
-    );
-  } catch (e) {}
+let taskTemplateCount = 0;
+for (const tt of taskTemplatesData) {
+  await conn.execute(
+    "INSERT INTO taskTemplates (context, phase, weekNumber, title, description) VALUES (?, ?, ?, ?, ?)",
+    [tt.context, tt.phase, tt.weekNumber, tt.title, tt.description]
+  );
+  taskTemplateCount++;
 }
+console.log(`  ✓ ${taskTemplateCount} templates de tarefas inseridos`);
 
-// 24K - FLORA semanas 1-10
-const k24FloraTargets = [
-  { week: 1, tempMin: 22, tempMax: 26, rhMin: 50, rhMax: 60, ppfdMin: 600, ppfdMax: 800, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.4, ecMax: 1.6 },
-  { week: 2, tempMin: 22, tempMax: 26, rhMin: 50, rhMax: 60, ppfdMin: 700, ppfdMax: 900, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.6, ecMax: 1.8 },
-  { week: 3, tempMin: 22, tempMax: 26, rhMin: 45, rhMax: 55, ppfdMin: 700, ppfdMax: 900, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.6, ecMax: 2.0 },
-  { week: 4, tempMin: 22, tempMax: 26, rhMin: 45, rhMax: 55, ppfdMin: 800, ppfdMax: 1000, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.8, ecMax: 2.0 },
-  { week: 5, tempMin: 21, tempMax: 25, rhMin: 40, rhMax: 50, ppfdMin: 800, ppfdMax: 1000, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.8, ecMax: 2.2 },
-  { week: 6, tempMin: 21, tempMax: 25, rhMin: 40, rhMax: 50, ppfdMin: 800, ppfdMax: 1000, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.8, ecMax: 2.0 },
-  { week: 7, tempMin: 20, tempMax: 24, rhMin: 40, rhMax: 50, ppfdMin: 700, ppfdMax: 900, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.6, ecMax: 1.8 },
-  { week: 8, tempMin: 20, tempMax: 24, rhMin: 40, rhMax: 50, ppfdMin: 700, ppfdMax: 900, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 1.2, ecMax: 1.6 },
-  { week: 9, tempMin: 20, tempMax: 24, rhMin: 40, rhMax: 50, ppfdMin: 600, ppfdMax: 800, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 0.6, ecMax: 1.0 },
-  { week: 10, tempMin: 20, tempMax: 24, rhMin: 40, rhMax: 50, ppfdMin: 600, ppfdMax: 800, photo: "12/12", phMin: 6.0, phMax: 6.5, ecMin: 0.4, ecMax: 0.6 },
-];
+// ─── 22. INSTÂNCIAS DE TAREFAS ───────────────────────────────────────────────
+// Schema: tentId, taskTemplateId, occurrenceDate, isDone, completedAt, notes
 
-for (const t of k24FloraTargets) {
-  try {
-    await db.query(
-      `INSERT INTO weeklyTargets (strainId, phase, weekNumber, tempMin, tempMax, rhMin, rhMax, ppfdMin, ppfdMax, photoperiod, phMin, phMax, ecMin, ecMax)
-       VALUES (?, 'FLORA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [strainIds["24K"], t.week, t.tempMin, t.tempMax, t.rhMin, t.rhMax, t.ppfdMin, t.ppfdMax, t.photo, t.phMin, t.phMax, t.ecMin, t.ecMax]
-    );
-  } catch (e) {}
+console.log("\n📋 Inserindo instâncias de tarefas...");
+const [vegaTemplates]  = await conn.execute("SELECT id FROM taskTemplates WHERE context = 'TENT_BC' AND phase = 'VEGA'  AND weekNumber = 3");
+const [floraTemplates] = await conn.execute("SELECT id FROM taskTemplates WHERE context = 'TENT_BC' AND phase = 'FLORA' AND weekNumber = 5");
+const [maintTemplates] = await conn.execute("SELECT id FROM taskTemplates WHERE context = 'TENT_A'  AND phase = 'MAINTENANCE'");
+
+let taskCount = 0;
+const weekEnd = mysqlDate(daysAgo(0));
+
+for (const tmpl of vegaTemplates) {
+  const isDone = Math.random() > 0.4 ? 1 : 0;
+  await conn.execute(
+    "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
+    [tentBId, tmpl.id, weekEnd, isDone, isDone ? mysqlDate(daysAgo(randInt(0, 3))) : null]
+  );
+  taskCount++;
 }
+for (const tmpl of floraTemplates) {
+  const isDone = Math.random() > 0.3 ? 1 : 0;
+  await conn.execute(
+    "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
+    [tentCId, tmpl.id, weekEnd, isDone, isDone ? mysqlDate(daysAgo(randInt(0, 3))) : null]
+  );
+  taskCount++;
+}
+for (const tmpl of maintTemplates) {
+  const isDone = Math.random() > 0.5 ? 1 : 0;
+  await conn.execute(
+    "INSERT INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone, completedAt) VALUES (?, ?, ?, ?, ?)",
+    [tentAId, tmpl.id, weekEnd, isDone, isDone ? mysqlDate(daysAgo(randInt(0, 3))) : null]
+  );
+  taskCount++;
+}
+console.log(`  ✓ ${taskCount} instâncias de tarefas inseridas`);
 
-console.log(`  ✓ Weekly targets inseridos para Orange Punch e 24K`);
+// ─── RESUMO ───────────────────────────────────────────────────────────────────
 
-// ─── RESUMO FINAL ────────────────────────────────────────────────────────────
-console.log("\n✅ Seed concluído com sucesso!");
-console.log("─────────────────────────────────────────");
-console.log(`🌿 Strains: ${strainsData.length}`);
-console.log(`🏠 Estufas: 3 (Manutenção, Vega, Flora)`);
-console.log(`🌱 Plantas: 8 total`);
-console.log(`   - 2 plantas-mãe (Manutenção)`);
-console.log(`   - 3 clones Orange Punch (Vega, semana 2)`);
-console.log(`   - 3 plantas 24K (Flora, semana 5)`);
-console.log(`📊 Logs diários: ~168 (14 dias × 3 estufas × 2 turnos)`);
-console.log(`✅ Templates de tarefas: ${taskTemplatesData.length}`);
-console.log(`📋 Instâncias de tarefas: ~${taskCount}`);
-console.log(`🚨 Alertas: ${alertsData.length}`);
-console.log("─────────────────────────────────────────");
-
-await db.end();
+await conn.end();
+console.log("\n═══════════════════════════════════════════");
+console.log("✅ SEED COMPLETO!");
+console.log("═══════════════════════════════════════════");
+console.log(`  🌿 ${strainsData.length} strains`);
+console.log(`  🏠 3 estufas (A Manutenção, B Vega, C Flora)`);
+console.log(`  🔄 2 ciclos ativos`);
+console.log(`  🌱 8 plantas (2 mãe + 3 vega + 3 flora)`);
+console.log(`  📊 ${logCount} logs diários`);
+console.log(`  💊 ${healthCount} registros de saúde`);
+console.log(`  🔬 ${trichomeCount} registros de tricomas`);
+console.log(`  🌀 ${lstCount} registros de LST`);
+console.log(`  📝 ${obsCount} observações`);
+console.log(`  💧 ${runoffCount} registros de runoff por planta`);
+console.log(`  🎯 ${targetCount} weekly targets`);
+console.log(`  🚨 ${alertsData.length} alertas`);
+console.log(`  🧪 ${fertPresets.length} presets de fertilização`);
+console.log(`  💧 ${waterPresets.length} presets de rega`);
+console.log(`  📋 ${recipeCount} receitas`);
+console.log(`  📚 ${templateCount} templates de receitas`);
+console.log(`  ✅ ${taskTemplateCount} templates de tarefas`);
+console.log(`  📋 ${taskCount} instâncias de tarefas`);
+console.log("═══════════════════════════════════════════");
