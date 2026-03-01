@@ -3873,3 +3873,13 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Escrito seed.mjs consolidado (22 seções: strains, estufas, ciclos, plantas, histórico, observações, saúde, tricomas, LST, logs diários, runoff, weekly targets, alertas, configs de alerta, presets, receitas, templates, tarefas)
 - [x] Seed testado com sucesso no banco: 84 logs, 14 registros de saúde, 37 templates de tarefas, 11 instâncias, etc.
 - [x] 33 arquivos .mjs obsoletos removidos da raiz — apenas seed.mjs mantido
+
+## Atualização Help.tsx com GUIA-USUARIO.md (28/02/2026)
+- [ ] Ler GUIA-USUARIO.md e mapear seções para o Help.tsx
+- [ ] Reescrever Help.tsx com conteúdo atualizado mantendo estrutura de acordeão
+
+## Atualização Help.tsx com GUIA-USUARIO.md (28/02/2026)
+- [x] Ler GUIA-USUARIO.md e mapear 17 seções para o Help.tsx
+- [x] Reescrever Help.tsx com conteúdo atualizado: 17 tópicos (vs 9 anteriores)
+- [x] Novas seções adicionadas: Fotos, Registro Rápido, Tricomas, LST, Dicas iPhone
+- [x] Chip de navegação rápida "iPhone" adicionado
