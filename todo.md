@@ -3854,3 +3854,10 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 
 ## Padronização de Headers com Ícone (28/02/2026)
 - [x] Aplicar ícone temático + título em todas as páginas do app (12 páginas: AlertHistory, AlertSettings, CalculatorMenu, HistoryTable, PlantsList, PlantArchivePage, ManageStrains, Settings, NewPlant, NotificationSettings, Backup, Nutrients)
+
+## Reescrita e Limpeza de Documentação (28/02/2026)
+- [x] Reescrever README.md com stack atual, funcionalidades, rotas e banco de dados
+- [x] Reescrever DEPLOY.md focado em Manus + desenvolvimento local (sem seções Vercel/Railway obsoletas)
+- [x] Reescrever GUIA-USUARIO.md com todas as funcionalidades atuais do app
+- [x] Remover arquivos obsoletos: COMO-OBTER-CODIGO.md, INSTALACAO.md, LEIA-ME-DEPLOY.md, PLANO-UX-DESIGN.md, RELATORIO_TESTES_FINAL.md
+- [x] Documentação final: README.md + DEPLOY.md + GUIA-USUARIO.md + todo.md

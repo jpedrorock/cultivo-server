@@ -1,476 +1,160 @@
-# Guia do Usuário - App Cultivo
+# Guia do Usuário — App Cultivo
 
-Manual completo de uso do App Cultivo para gerenciamento de estufas de cultivo indoor.
-
-## 📋 Índice
-
-1. [Introdução](#introdução)
-2. [Primeiros Passos](#primeiros-passos)
-3. [Gerenciamento de Estufas](#gerenciamento-de-estufas)
-4. [Gerenciamento de Plantas](#gerenciamento-de-plantas)
-5. [Calculadoras](#calculadoras)
-6. [Sistema de Alertas](#sistema-de-alertas)
-7. [Configurações](#configurações)
-8. [Dicas e Boas Práticas](#dicas-e-boas-práticas)
+Manual de uso do App Cultivo para gerenciamento de estufas de cultivo indoor.
 
 ---
 
-## 🌱 Introdução
+## Primeiros Passos
 
-O **App Cultivo** é um sistema completo para gerenciar estufas de cultivo indoor. Ele permite:
+Ao abrir o app pela primeira vez, você verá o painel principal com as suas estufas cadastradas. Se ainda não há estufas, clique em **Criar Nova Estufa** para começar.
 
-- Gerenciar até 3 estufas simultâneas
-- Acompanhar ciclos de cultivo (vegetativa, floração, secagem)
-- Registrar e monitorar parâmetros ambientais
-- Calcular fertilização e rega
-- Receber alertas automáticos
-- Gerenciar plantas individuais com fotos e histórico
+O app funciona como PWA (Progressive Web App). No iPhone, toque em **Compartilhar → Adicionar à Tela de Início** para instalar o app e ter acesso rápido sem abrir o navegador.
 
 ---
 
-## 🚀 Primeiros Passos
+## Painel Principal
 
-### 1. Acessar o Aplicativo
+O painel principal exibe um card para cada estufa cadastrada. Cada card mostra o nome e dimensões da estufa, a fase atual do ciclo (Manutenção, Vegetativa, Floração, Secagem), a semana atual, os parâmetros ambientais registrados na semana (Temperatura, Umidade Relativa, PPFD e Fotoperíodo), o número de plantas ativas e as tarefas pendentes da semana.
 
-Acesse o aplicativo pelo navegador em `https://seu-dominio.manus.space` (ou seu domínio customizado).
-
-### 2. Fazer Login
-
-1. Clique em "Login" ou acesse diretamente
-2. Faça login com sua conta Manus
-3. Você será redirecionado para a Home
-
-### 3. Conhecer a Interface
-
-**Desktop:**
-- **Sidebar** (esquerda): Menu de navegação principal
-- **Conteúdo** (centro): Página atual
-- **Header** (topo): Título da página e ações
-
-**Mobile:**
-- **Bottom Navigation**: Menu principal (Home, Plantas, Calculadoras, Mais)
-- **Header**: Título e menu hambúrguer
+O fotoperíodo é exibido automaticamente com base na fase: **18/6** para Manutenção, Vegetativa e Clonagem; **12/12** para Floração.
 
 ---
 
-## 🏠 Gerenciamento de Estufas
+## Estufas
 
-### Criar Nova Estufa
+### Criar uma Estufa
 
-1. Na **Home**, clique em "Criar Nova Estufa"
-2. Preencha os dados:
-   - **Nome**: Ex: "Estufa A"
-   - **Tipo**: A, B ou C
-   - **Dimensões**: Largura × Profundidade × Altura (cm)
-   - **Categoria**: Manutenção, Vegetativa, Floração ou Secagem
-3. Clique em "Criar Estufa"
+No painel principal, clique em **Criar Nova Estufa**. Preencha o nome, as dimensões (largura × comprimento × altura em cm) e o tipo. Após criar, você pode iniciar um ciclo de cultivo.
 
-### Iniciar Ciclo de Cultivo
+### Ciclos de Cultivo
 
-1. No card da estufa, clique em "Novo Ciclo"
-2. Configure:
-   - **Strain**: Selecione a variedade (ou use "Padrão")
-   - **Fase Inicial**: Vegetativa, Floração, Secagem ou Manutenção
-   - **Semana Atual**: Semana do ciclo (1-12)
-   - **Data de Início**: Data de início do ciclo
-3. Clique em "Iniciar Ciclo"
+Cada estufa tem um ciclo ativo. Para iniciar um ciclo, acesse os detalhes da estufa e clique em **Iniciar Ciclo**. Selecione a strain e a fase inicial. O sistema rastreia a semana atual automaticamente.
 
-### Registrar Parâmetros Diários
+As transições de fase disponíveis são:
 
-1. No card da estufa, clique em "Registrar Log"
-2. Preencha as medições:
-   - **Temperatura** (°C)
-   - **Umidade Relativa** (%)
-   - **PPFD** (µmol/m²/s)
-   - **pH**
-3. Adicione observações (opcional)
-4. Clique em "Salvar"
+| De | Para |
+|---|---|
+| Manutenção | Vegetativa |
+| Vegetativa | Floração |
+| Floração | Secagem (Colheita) |
+| Secagem | Concluído |
 
-### Editar Ciclo
+### Registrar Parâmetros
 
-1. No card da estufa, clique em "Editar Ciclo"
-2. Altere:
-   - Fase atual
-   - Semana atual
-   - Data de início
-3. Clique em "Salvar"
-
-### Finalizar Ciclo
-
-1. No card da estufa, clique em "Finalizar Ciclo"
-2. Confirme a ação
-3. O ciclo será marcado como concluído
-
-### Excluir Estufa
-
-1. Certifique-se de que não há ciclo ativo
-2. No card da estufa, clique em "Excluir Estufa"
-3. Confirme a ação
+Clique em **Registrar** no card da estufa. Preencha Temperatura (°C), Umidade Relativa (%) e PPFD (µmol/m²/s). O sistema compara automaticamente com os targets da strain e gera alertas se houver desvios.
 
 ---
 
-## 🌿 Gerenciamento de Plantas
+## Plantas
 
-### Adicionar Nova Planta
+### Lista de Plantas
 
-1. Acesse **Plantas** no menu
-2. Clique em "Nova Planta"
-3. Preencha:
-   - **Nome**: Ex: "Planta #1"
-   - **Código**: Ex: "A01"
-   - **Strain**: Selecione a variedade
-   - **Estufa**: Selecione a estufa
-4. Clique em "Criar Planta"
+Acesse **Plantas** no menu lateral. As plantas são agrupadas por estufa, com seções colapsáveis. Use a busca para filtrar por nome ou código, e os filtros para exibir apenas plantas Ativas, Colhidas ou Mortas.
 
-### Visualizar Detalhes da Planta
+### Cadastrar Nova Planta
 
-1. Na lista de plantas, clique no card da planta
-2. Você verá 4 abas:
-   - **Saúde**: Registros de saúde
-   - **Tricomas**: Status de maturação
-   - **LST**: Técnicas de treinamento
-   - **Observações**: Notas gerais
+Clique em **Nova Planta** e preencha nome, código identificador, strain, estufa atual e data de nascimento ou clonagem.
 
-### Aba de Saúde
+### Perfil da Planta
 
-**Adicionar Registro de Saúde:**
+Clique em qualquer planta para acessar seu perfil completo, organizado em abas:
 
-1. Clique em "Novo Registro"
-2. Preencha:
-   - **Data**: Data do registro
-   - **Status**: Saudável, Estressada, Doente ou Recuperando
-   - **Sintomas**: Descrição dos sintomas (se houver)
-   - **Tratamento**: Tratamento aplicado (se houver)
-   - **Notas**: Observações adicionais
-3. Faça upload de foto (opcional)
-4. Clique em "Salvar"
+**Saúde** — Registre o status de saúde (Saudável, Estressada, Doente, Recuperando), sintomas observados, tratamento aplicado e notas. Faça upload de fotos diretamente da câmera ou galeria.
 
-**Editar/Excluir Registro:**
+**Tricomas** — Registre a maturação dos tricomas com percentuais de Clear, Cloudy, Amber e Mixed. Adicione foto macro e a semana do ciclo correspondente.
 
-1. No accordion do histórico, clique no registro
-2. Clique em "Editar" ou "Excluir"
-3. Confirme a ação
+**LST** — Registre técnicas de Low Stress Training aplicadas: LST, Topping, FIM, Super Cropping, Lollipopping, Defoliação, Mainlining ou ScrOG. Registre também a resposta da planta ao treinamento.
 
-### Aba de Tricomas
+**Observações** — Notas gerais sobre a planta sem categorização específica.
 
-**Adicionar Registro de Tricomas:**
+**Fotos** — Galeria completa com lightbox (zoom, navegação entre fotos, download). A última foto é exibida no card da lista de plantas.
 
-1. Clique em "Novo Registro"
-2. Preencha:
-   - **Data**: Data da observação
-   - **Status**: Clear, Cloudy, Amber ou Mixed
-   - **Percentual Clear**: % de tricomas transparentes
-   - **Percentual Cloudy**: % de tricomas leitosos
-   - **Percentual Amber**: % de tricomas âmbar
-   - **Semana do Ciclo**: Semana atual
-3. Faça upload de foto macro (opcional)
-4. Clique em "Salvar"
+### Ações na Planta
 
-### Aba de LST (Low Stress Training)
+No header do perfil, o botão **Ações** oferece: mover para outra estufa, transplantar para floração, iniciar clonagem, registrar colheita, descartar planta e excluir permanentemente.
 
-**Adicionar Registro de LST:**
+### Arquivo de Plantas
 
-1. Clique em "Novo Registro"
-2. Selecione a técnica aplicada:
-   - LST (Low Stress Training)
-   - Topping
-   - FIM (Fuck I Missed)
-   - Super Cropping
-   - Lollipopping
-   - Defoliação
-   - Mainlining
-   - ScrOG (Screen of Green)
-3. Preencha:
-   - **Data**: Data da aplicação
-   - **Resposta da Planta**: Como a planta reagiu
-4. Clique em "Salvar"
-
-### Aba de Observações
-
-**Adicionar Observação:**
-
-1. Clique em "Nova Observação"
-2. Preencha:
-   - **Data**: Data da observação
-   - **Texto**: Sua observação
-3. Clique em "Salvar"
-
-### Upload de Fotos
-
-**Adicionar Foto:**
-
-1. Em qualquer aba, clique em "Upload de Foto"
-2. Selecione a imagem (JPEG, PNG, HEIC)
-3. A imagem será:
-   - Convertida para JPEG (se HEIC)
-   - Comprimida para 1080x1440 (aspect ratio 3:4)
-   - Enviada para S3
-4. A última foto aparecerá no card da planta na lista
-
-**Visualizar Galeria:**
-
-1. Clique na última foto no card da planta
-2. Use as setas para navegar
-3. Clique para ampliar (lightbox)
-4. Clique em "Download" para baixar
-
-### Mover Planta entre Estufas
-
-1. Nos detalhes da planta, clique em "Mover para Outra Estufa"
-2. Selecione a estufa de destino
-3. Confirme a ação
-4. O histórico de movimentação será registrado
-
-### Finalizar Planta (Harvest)
-
-1. Nos detalhes da planta, clique em "Finalizar Planta"
-2. Confirme a ação
-3. A planta será marcada como "Colhida"
+Acesse **Plantas → Arquivo** para visualizar o histórico completo de plantas colhidas, com data de colheita e peso registrado.
 
 ---
 
-## 🧮 Calculadoras
+## Tarefas
 
-### Calculadora de Fertilização
-
-**Calcular Receita de Sais Minerais:**
-
-1. Acesse **Calculadoras** → **Fertilização**
-2. Selecione:
-   - **Fase**: Vegetativa ou Floração
-   - **Semana**: 1-12
-   - **Volume**: Litros de solução
-3. O sistema calculará automaticamente:
-   - **Nitrato de Cálcio** (g)
-   - **Nitrato de Potássio** (g)
-   - **MKP** (Fosfato Monopotássico) (g)
-   - **Sulfato de Magnésio** (g)
-   - **Micronutrientes** (g)
-   - **NPK Total** (N-P-K em ppm)
-   - **Micronutrientes** (Ca, Mg, Fe, S em ppm)
-   - **EC Estimado** (mS/cm)
-
-**Salvar Receita:**
-
-1. Selecione a estufa
-2. Adicione observações (opcional)
-3. Clique em "Salvar Receita"
-
-**Ver Histórico:**
-
-1. Clique na aba "Histórico"
-2. Filtre por:
-   - Estufa
-   - Fase
-3. Veja todas as receitas salvas em accordion
-
-### Calculadora de Rega e Runoff
-
-**Calcular Volume de Rega:**
-
-1. Acesse **Calculadoras** → **Rega e Runoff**
-2. Preencha:
-   - **Fase**: Vegetativa ou Floração
-   - **Número de Plantas**: Quantidade
-   - **Tamanho do Vaso**: Litros
-3. O sistema calculará:
-   - **Volume por Planta** (L)
-   - **Volume Total** (L)
-   - **Runoff Ideal** (20-30%)
-
-**Registrar Runoff:**
-
-1. Após regar, meça o runoff
-2. Insira o valor em "Runoff Real (%)"
-3. O sistema mostrará recomendação:
-   - **Runoff < 20%**: Aumentar volume
-   - **Runoff 20-30%**: Ideal
-   - **Runoff > 30%**: Reduzir volume
-
-**Salvar Aplicação:**
-
-1. Selecione a estufa
-2. Adicione observações (opcional)
-3. Clique em "Salvar Receita"
-
-**Ver Histórico:**
-
-1. Clique na aba "Histórico"
-2. Filtre por estufa
-3. Veja todas as aplicações salvas
-
-### Conversor Lux → PPFD
-
-1. Acesse **Calculadoras** → **Conversor Lux → PPFD**
-2. Selecione o tipo de luz:
-   - LED Branco
-   - LED Full Spectrum
-   - HPS
-   - MH
-   - Luz Solar
-3. Insira o valor em Lux
-4. O sistema mostrará o PPFD equivalente
-
-### Conversor PPM ↔ EC
-
-1. Acesse **Calculadoras** → **Conversor PPM ↔ EC**
-2. Insira o valor em PPM ou EC
-3. O sistema converterá automaticamente
-
-### Calculadora de pH
-
-1. Acesse **Calculadoras** → **Calculadora de pH**
-2. Preencha:
-   - **pH Atual**: pH medido
-   - **pH Desejado**: pH ideal
-   - **Volume**: Litros de solução
-3. O sistema calculará:
-   - Quantidade de pH Down (ml)
-   - Quantidade de pH Up (ml)
+Acesse **Tarefas** no menu lateral para gerenciar as tarefas semanais de cada estufa. As tarefas são organizadas por estufa e por semana do ciclo. Marque as tarefas concluídas com o checkbox — o progresso é salvo automaticamente. Tarefas pendentes da semana atual também aparecem no card de cada estufa no painel principal.
 
 ---
 
-## 🔔 Sistema de Alertas
+## Calculadoras
 
-### Visualizar Alertas
+Acesse **Calculadoras** no menu lateral para abrir o menu de calculadoras disponíveis.
 
-1. Acesse **Alertas** no menu
-2. Veja todos os alertas:
-   - **Novos**: Alertas não visualizados
-   - **Vistos**: Alertas já visualizados
+**Rega e Runoff** — Calcule o volume ideal de rega por planta com base no tamanho do vaso e fase do ciclo. Registre o volume regado e o runoff coletado (em ml) para calcular o percentual de runoff. O histórico de aplicações é salvo por estufa.
 
-### Tipos de Alertas
+**Fertilização (Nutrientes)** — Calcule a receita de sais minerais (Nitrato de Cálcio, Sulfato de Potássio, MKP, Sulfato de Magnésio, micronutrientes) para a fase e semana atual. O app exibe o NPK resultante, o EC estimado e permite salvar receitas para reutilização.
 
-- **Temperatura Alta**: Temperatura acima do ideal
-- **Temperatura Baixa**: Temperatura abaixo do ideal
-- **Umidade Alta**: Umidade acima do ideal
-- **Umidade Baixa**: Umidade abaixo do ideal
-- **PPFD Baixo**: PPFD abaixo do target
+**Conversor Lux → PPFD** — Converta leituras de luxímetro para PPFD (µmol/m²/s) com um slider visual.
 
-### Marcar como Visto
+**Conversor PPM ↔ EC** — Converta valores entre PPM e EC (mS/cm) bidirecionalmente.
 
-1. Clique no alerta
-2. O status mudará para "Visto"
+**Calculadora de VPD** — Calcule o Vapor Pressure Deficit com base na temperatura e umidade relativa.
 
-### Configurar Alertas
-
-1. Acesse **Configurações** → **Alertas**
-2. Configure por estufa:
-   - **Temperatura Mínima** (°C)
-   - **Temperatura Máxima** (°C)
-   - **Umidade Mínima** (%)
-   - **Umidade Máxima** (%)
-   - **PPFD Mínimo** (µmol/m²/s)
-3. Clique em "Salvar"
-
-**Nota**: O sistema verifica automaticamente a cada hora.
+**Calculadora de pH** — Calcule os ajustes necessários de pH Up ou pH Down para atingir o pH alvo.
 
 ---
 
-## ⚙️ Configurações
+## Histórico
 
-### Alterar Tema
-
-1. Acesse **Configurações**
-2. Localize "Modo Escuro"
-3. Ative/desative o toggle
-
-### Gerenciar Strains
-
-1. Acesse **Gerenciar Strains** no menu
-2. Veja todas as strains cadastradas
-3. Clique em "Nova Strain" para adicionar
-4. Configure targets por fase e semana:
-   - Temperatura ideal (min/max)
-   - Umidade ideal (min/max)
-   - PPFD ideal
-
-### Backup do Banco de Dados
-
-**Exportar:**
-
-1. Acesse **Configurações**
-2. Localize "Backup do Banco de Dados"
-3. Clique em "Exportar"
-4. O arquivo SQL será baixado
-
-**Importar:**
-
-1. Acesse **Configurações**
-2. Localize "Importar Backup"
-3. Selecione o arquivo SQL
-4. Clique em "Importar"
-5. ⚠️ **Atenção**: Isso sobrescreverá todos os dados
+Acesse **Histórico** no menu lateral para visualizar todos os registros de parâmetros em formato de tabela, agrupados por estufa. Selecione a estufa no menu superior para filtrar o histórico e visualizar os gráficos de evolução temporal de Temperatura, Umidade e PPFD.
 
 ---
 
-## 💡 Dicas e Boas Práticas
+## Alertas
 
-### Gerenciamento de Estufas
+### Central de Alertas
 
-- **Registre diariamente**: Mantenha um histórico consistente de parâmetros
-- **Use strains específicas**: Configure targets ideais para cada variedade
-- **Monitore alertas**: Verifique alertas regularmente para evitar problemas
+Acesse **Alertas** no menu lateral para ver todos os alertas ativos. Os alertas são gerados automaticamente quando os parâmetros registrados desviam dos targets semanais da strain selecionada no ciclo. Cada alerta exibe o parâmetro afetado, o valor registrado, o target esperado e a diferença percentual.
 
-### Fertilização
+### Configurações de Alertas
 
-- **Siga as fases**: Use receitas específicas para vegetativa e floração
-- **Ajuste EC**: Monitore EC e ajuste conforme necessidade da planta
-- **Salve receitas**: Mantenha histórico para replicar sucessos
-
-### Rega
-
-- **Runoff ideal**: Mantenha 20-30% de runoff para evitar acúmulo de sais
-- **Ajuste volume**: Use recomendações do sistema para otimizar rega
-- **Registre sempre**: Mantenha histórico para identificar padrões
-
-### Plantas
-
-- **Fotos regulares**: Tire fotos semanalmente para acompanhar evolução
-- **Registre saúde**: Documente problemas e tratamentos
-- **Acompanhe tricomas**: Monitore maturação para colheita ideal
-
-### Backup
-
-- **Backup semanal**: Exporte banco de dados toda semana
-- **Armazene seguro**: Guarde backups em local seguro (nuvem, HD externo)
-- **Teste restauração**: Teste importação em ambiente de teste
+Acesse **Configurações → Alertas** para definir os limites de tolerância para cada parâmetro antes que um alerta seja gerado. Por padrão, desvios acima de 10% geram alertas de atenção e acima de 20% geram alertas críticos.
 
 ---
 
-## ❓ Perguntas Frequentes
+## Strains
 
-### Como adiciono mais de 3 estufas?
-
-O sistema atualmente suporta até 3 estufas. Para mais, entre em contato com o suporte.
-
-### Posso usar o app offline?
-
-Não. O app requer conexão com internet para funcionar.
-
-### Como faço para compartilhar receitas?
-
-Atualmente não há funcionalidade de compartilhamento. Você pode exportar o banco de dados e compartilhar o arquivo SQL.
-
-### O app funciona em celular?
-
-Sim! O app é responsivo e funciona perfeitamente em celulares. Você pode instalá-lo como PWA.
-
-### Como instalo como PWA?
-
-**Android**: Menu (⋮) → "Adicionar à tela inicial"  
-**iOS**: Compartilhar (□↑) → "Adicionar à Tela de Início"
+Acesse **Strains** no menu lateral para gerenciar as variedades cadastradas. Cada strain pode ter targets semanais definidos para cada fase do ciclo (Vegetativa e Floração), incluindo Temperatura mínima e máxima, Umidade Relativa mínima e máxima e PPFD alvo. Os targets são usados como referência para geração de alertas e exibição de desvios nos registros.
 
 ---
 
-## 📧 Suporte
+## Registro Rápido
 
-Para dúvidas, problemas ou sugestões:
-
-- **GitHub Issues**: [Repositório](https://github.com/seu-usuario/cultivo-architecture-docs)
-- **Email**: suporte@seu-dominio.com
-- **Documentação**: [README.md](./README.md)
+Acesse **Registro Rápido** no menu lateral para registrar parâmetros de múltiplas estufas em uma única tela, sem precisar navegar entre as páginas de cada estufa. Ideal para o registro diário rápido.
 
 ---
 
-**Desenvolvido com 🌱 para cultivadores**
+## Configurações
+
+Acesse **Configurações** no menu lateral para:
+
+**Notificações** — Ative notificações push para receber alertas no navegador quando parâmetros estiverem fora dos targets. Requer permissão do navegador.
+
+**Backup** — Exporte todos os dados do app em formato JSON para backup local. Importe um backup anterior para restaurar os dados.
+
+**Tema** — Alterne entre tema escuro, claro ou alto contraste.
+
+---
+
+## Dicas de Uso no iPhone
+
+O App Cultivo foi otimizado para uso no iPhone. Algumas dicas práticas:
+
+**Instale como PWA** — Toque em Compartilhar → Adicionar à Tela de Início para acesso rápido e experiência de app nativo, sem precisar abrir o navegador.
+
+**Teclado numérico** — Campos de temperatura, umidade e PPFD abrem automaticamente o teclado numérico para agilizar o registro.
+
+**Fotos** — Use a câmera diretamente no app para registrar o estado das plantas. As fotos são comprimidas automaticamente para aspect ratio 3:4 e armazenadas com segurança no S3.
+
+**Feedback tátil** — Os botões de ação têm vibração e animação ao toque para confirmar a interação. Ações destrutivas (excluir, descartar) têm vibração mais forte como aviso.
+
+**Scroll horizontal nas abas** — No perfil da planta, deslize horizontalmente para navegar entre as abas Saúde, Tricomas, LST, Observações e Fotos.
