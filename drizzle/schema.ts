@@ -22,12 +22,19 @@ export const users = mysqlTable("users", {
    * Use this for relations between tables.
    */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  /** Email do usuário - único e obrigatório */
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  /** Hash da senha (bcrypt) - obrigatório para autenticação local */
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  /** Nome do usuário */
   name: text("name"),
-  email: varchar("email", { length: 320 }),
+  /** Manus OAuth identifier (openId) - opcional, para compatibilidade com versão antiga */
+  openId: varchar("openId", { length: 64 }).unique(),
+  /** Método de login (email, google, apple, etc) */
   loginMethod: varchar("loginMethod", { length: 64 }),
+  /** Role do usuário */
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /** Timestamps */
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

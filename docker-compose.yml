@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cultivo-app
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=mysql://cultivo_user:cultivo_password@db:3306/cultivo
+      - JWT_SECRET=${JWT_SECRET:-seu-segredo-super-secreto-minimo-32-caracteres}
+      - S3_ENDPOINT=http://minio:9000
+      - S3_BUCKET=cultivo-fotos
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin
+      - S3_REGION=us-east-1
+      - NODE_ENV=development
+      - PORT=3000
+      - DOMAIN=localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - cultivo-network
+    command: npm run dev
+
+  db:
+    image: mysql:8.0
+    container_name: cultivo-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: cultivo
+      MYSQL_USER: cultivo_user
+      MYSQL_PASSWORD: cultivo_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - cultivo-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: cultivo-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - cultivo-network
+
+volumes:
+  mysql-data:
+    driver: local
+  minio-data:
+    driver: local
+
+networks:
+  cultivo-network:
+    driver: bridge
