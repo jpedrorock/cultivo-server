@@ -1,13 +1,34 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 146.88 146.88">
-  <!-- Generator: Adobe Illustrator 30.1.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 136)  -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <style>
-      .st0 {
-        fill: #049a03;
-      }
-    </style>
+    <!-- Sombra suave estilo iOS -->
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="18" flood-color="#a8d5d5" flood-opacity="0.4"/>
+    </filter>
+    <!-- Gradiente de fundo levemente azulado (igual ao original) -->
+    <radialGradient id="bgGrad" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e8f4f4"/>
+    </radialGradient>
   </defs>
-  <path class="st0" d="M118.86,71.77c0,24.12-19.55,43.68-43.68,43.68s-43.68-19.55-43.68-43.68,19.55-43.68,43.68-43.68,43.68,19.55,43.68,43.68ZM113.86,71.77c0-21.36-17.31-38.67-38.67-38.67s-38.67,17.31-38.67,38.67,17.31,38.67,38.67,38.67,38.67-17.31,38.67-38.67Z"/>
-  <path class="st0" d="M76.18,99.02c-.43.47-1.54.35-2.01.15l.44-10.77c-4.54,6.05-12.1,9.51-19.39,9.84,3.11-3.95,6.85-6.9,11.16-9.14-8.74-.54-16.58-6.02-22.12-12.54,5.42-1.48,10.76-1.23,15.97-.23l-2.23-3.47c-3.66-6.51-6.3-13.53-7.44-21.18,7.97,4.02,14.34,9.73,19.06,17.21-.24-9.45,1.57-18.83,5.59-27.77,3.95,8.81,5.78,18,5.6,27.7,4.71-7.3,11.1-13.23,19.08-17.11-1.5,8.99-4.65,17.23-9.77,24.66,5.3-1.08,10.6-1.28,15.99.19-5.48,6.45-13.51,12.06-22.08,12.54,4.25,2.24,8.03,5.17,11.11,9.12-7.51-.34-15.08-3.96-19.44-9.96l.48,10.74Z"/>
+
+  <!-- Fundo circular com gradiente e sombra -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGrad)" filter="url(#shadow)"/>
+
+  <!-- Sprout — duas folhas + caule, cor #22c55e -->
+  <!-- Caule central -->
+  <path d="M256 360 C256 320 256 295 256 270" stroke="#22c55e" stroke-width="30" stroke-linecap="round" fill="none"/>
+
+  <!-- Folha esquerda (menor, inclinada para baixo-esquerda) -->
+  <path d="M256 295
+    C240 278 208 265 200 230
+    C200 230 232 218 252 242
+    C258 250 258 268 256 275 Z"
+    fill="#22c55e"/>
+
+  <!-- Folha direita (maior, inclinada para cima-direita) -->
+  <path d="M256 278
+    C272 252 318 238 332 200
+    C332 200 296 190 272 218
+    C262 230 256 258 256 270 Z"
+    fill="#22c55e"/>
 </svg>
