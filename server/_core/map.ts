@@ -19,17 +19,16 @@ type MapsConfig = {
 };
 
 function getMapsConfig(): MapsConfig {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
 
-  if (!baseUrl || !apiKey) {
+  if (!apiKey) {
     throw new Error(
-      "Google Maps proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
+      "GOOGLE_MAPS_API_KEY n\u00e3o configurado. Configure no arquivo .env para usar funcionalidades de mapa."
     );
   }
 
   return {
-    baseUrl: baseUrl.replace(/\/+$/, ""),
+    baseUrl: "https://maps.googleapis.com",
     apiKey,
   };
 }
@@ -58,10 +57,10 @@ export async function makeRequest<T = unknown>(
 ): Promise<T> {
   const { baseUrl, apiKey } = getMapsConfig();
 
-  // Construct full URL: baseUrl + /v1/maps/proxy + endpoint
-  const url = new URL(`${baseUrl}/v1/maps/proxy${endpoint}`);
+  // Construct full URL: baseUrl + endpoint
+  const url = new URL(`${baseUrl}${endpoint}`);
 
-  // Add API key as query parameter (standard Google Maps API authentication)
+  // Autenticação via API key (Google Maps padrão)
   url.searchParams.append("key", apiKey);
 
   // Add other query parameters

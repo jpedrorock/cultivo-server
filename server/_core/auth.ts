@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import type { Request, Response } from 'express';
-import * as db from '../db';
+import { getUserById } from '../db-auth';
 import { ENV } from './env';
 
 export interface AuthPayload {
@@ -15,8 +15,7 @@ export interface AuthPayload {
  * Gera um hash seguro da senha usando bcrypt
  */
 export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 10;
-  return bcrypt.hash(password, saltRounds);
+  return bcrypt.hash(password, 10);
 }
 
 /**
@@ -33,7 +32,7 @@ export function createToken(userId: number, email: string, expiresIn: string = '
   return jwt.sign(
     { userId, email },
     ENV.jwtSecret,
-    { expiresIn, algorithm: 'HS256' }
+    { expiresIn, algorithm: 'HS256' } as jwt.SignOptions
   );
 }
 
@@ -58,9 +57,7 @@ export function verifyToken(token: string): AuthPayload | null {
 export function extractToken(req: Request): string | null {
   // Tentar obter do cookie
   const cookieToken = req.cookies?.auth_token;
-  if (cookieToken) {
-    return cookieToken;
-  }
+  if (cookieToken) return cookieToken;
 
   // Tentar obter do header Authorization
   const authHeader = req.headers.authorization;
@@ -72,23 +69,17 @@ export function extractToken(req: Request): string | null {
 }
 
 /**
- * Middleware para verificar autenticação
+ * Autentica a requisição e retorna o usuário, ou null se não autenticado
  */
 export async function authenticateRequest(req: Request) {
   const token = extractToken(req);
-  
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
 
   const payload = verifyToken(token);
-  if (!payload) {
-    return null;
-  }
+  if (!payload) return null;
 
   try {
-    const user = await db.getUserById(payload.userId);
-    return user || null;
+    return await getUserById(payload.userId);
   } catch (error) {
     console.warn('[Auth] Failed to fetch user', String(error));
     return null;
@@ -96,12 +87,16 @@ export async function authenticateRequest(req: Request) {
 }
 
 /**
- * Define o cookie de autenticação
+ * Define o cookie de autenticação HTTP-only
  */
-export function setAuthCookie(res: Response, token: string, maxAge: number = 7 * 24 * 60 * 60 * 1000) {
+export function setAuthCookie(
+  res: Response,
+  token: string,
+  maxAge: number = 7 * 24 * 60 * 60 * 1000
+) {
   res.cookie('auth_token', token, {
     httpOnly: true,
-    secure: ENV.nodeEnv === 'production',
+    secure: ENV.isProduction,
     sameSite: 'lax',
     maxAge,
     path: '/',
@@ -114,7 +109,7 @@ export function setAuthCookie(res: Response, token: string, maxAge: number = 7 *
 export function clearAuthCookie(res: Response) {
   res.clearCookie('auth_token', {
     httpOnly: true,
-    secure: ENV.nodeEnv === 'production',
+    secure: ENV.isProduction,
     sameSite: 'lax',
     path: '/',
   });

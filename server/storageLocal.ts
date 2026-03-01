@@ -1,132 +1,194 @@
 /**
  * Sistema de armazenamento local de arquivos
- * Alternativa ao S3 para deploy em servidores próprios
+ *
+ * Salva arquivos diretamente no disco do servidor.
+ * Não depende de nenhum serviço externo (S3, MinIO, etc.).
+ *
+ * Estrutura de pastas:
+ *   uploads/
+ *     plant-photos/     → fotos de plantas
+ *     health-logs/      → fotos de registros de saúde
+ *     daily-logs/       → fotos de registros diários
+ *     exports/          → arquivos exportados
+ *
+ * As imagens são servidas como arquivos estáticos via Express:
+ *   GET /uploads/plant-photos/123456.jpg
  */
 
 import fs from 'fs';
 import path from 'path';
-import { ENV } from './_core/env';
 
 // Diretório base para uploads (relativo à raiz do projeto)
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 
 /**
- * Garante que o diretório de uploads existe
+ * Garante que o diretório de uploads (e subdiretórios) existe
  */
-function ensureUploadsDirExists() {
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+function ensureDirExists(dirPath: string): void {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
   }
 }
 
 /**
- * Salva arquivo no storage local
- * @param relKey - Caminho relativo do arquivo (ex: "plants/1/health/123456.jpg")
+ * Normaliza a chave removendo barras iniciais
+ */
+function normalizeKey(relKey: string): string {
+  return relKey.replace(/^\/+/, '');
+}
+
+/**
+ * Salva arquivo no disco do servidor
+ * @param relKey - Caminho relativo do arquivo (ex: "plant-photos/123456.jpg")
  * @param data - Dados do arquivo (Buffer, Uint8Array ou string)
- * @param contentType - Tipo MIME do arquivo
- * @returns Objeto com key e url do arquivo
+ * @param contentType - Tipo MIME do arquivo (não usado no local, apenas para compatibilidade)
+ * @returns Objeto com key e url pública do arquivo
  */
 export async function storageLocalPut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream"
+  contentType = 'application/octet-stream'
 ): Promise<{ key: string; url: string }> {
-  ensureUploadsDirExists();
-
-  // Normalizar key (remover barras iniciais)
-  const key = relKey.replace(/^\/+/, "");
-  
-  // Caminho completo do arquivo
+  const key = normalizeKey(relKey);
   const filePath = path.join(UPLOADS_DIR, key);
-  
+
   // Criar diretórios intermediários se não existirem
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  
+  ensureDirExists(path.dirname(filePath));
+
   // Converter dados para Buffer se necessário
   let buffer: Buffer;
   if (typeof data === 'string') {
-    buffer = Buffer.from(data);
+    buffer = Buffer.from(data, 'base64');
   } else if (data instanceof Uint8Array) {
     buffer = Buffer.from(data);
   } else {
     buffer = data;
   }
-  
-  // Salvar arquivo
+
+  // Salvar arquivo no disco
   fs.writeFileSync(filePath, buffer);
-  
-  // Gerar URL pública
-  // Em produção, isso será servido pelo servidor web (ex: /uploads/plants/1/health/123456.jpg)
-  const url = `/uploads/${key}`;
-  
-  return { key, url };
+
+  console.log(`[StorageLocal] Saved: ${key} (${buffer.length} bytes)`);
+
+  return {
+    key,
+    url: `/uploads/${key}`,
+  };
 }
 
 /**
- * Obtém URL de um arquivo no storage local
+ * Obtém URL pública de um arquivo no disco
  * @param relKey - Caminho relativo do arquivo
- * @returns Objeto com key e url do arquivo
+ * @returns Objeto com key e url pública
  */
 export async function storageLocalGet(relKey: string): Promise<{ key: string; url: string }> {
-  const key = relKey.replace(/^\/+/, "");
-  const url = `/uploads/${key}`;
-  
-  return { key, url };
+  const key = normalizeKey(relKey);
+  return {
+    key,
+    url: `/uploads/${key}`,
+  };
 }
 
 /**
- * Deleta arquivo do storage local
+ * Deleta arquivo do disco do servidor
  * @param relKey - Caminho relativo do arquivo
  */
 export async function storageLocalDelete(relKey: string): Promise<void> {
-  const key = relKey.replace(/^\/+/, "");
+  const key = normalizeKey(relKey);
   const filePath = path.join(UPLOADS_DIR, key);
-  
+
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
+    console.log(`[StorageLocal] Deleted: ${key}`);
+  } else {
+    console.warn(`[StorageLocal] File not found for deletion: ${key}`);
   }
 }
 
 /**
- * Lista arquivos em um diretório do storage local
- * @param prefix - Prefixo do caminho (ex: "plants/1/")
+ * Lista arquivos em um diretório do disco
+ * @param prefix - Prefixo do caminho (ex: "plant-photos/")
  * @returns Array de objetos com key e url
  */
-export async function storageLocalList(prefix: string): Promise<Array<{ key: string; url: string }>> {
-  ensureUploadsDirExists();
-  
-  const normalizedPrefix = prefix.replace(/^\/+/, "");
+export async function storageLocalList(
+  prefix: string
+): Promise<Array<{ key: string; url: string }>> {
+  const normalizedPrefix = normalizeKey(prefix);
   const dirPath = path.join(UPLOADS_DIR, normalizedPrefix);
-  
+
   if (!fs.existsSync(dirPath)) {
     return [];
   }
-  
+
   const files: Array<{ key: string; url: string }> = [];
-  
+
   function walkDir(dir: string, basePrefix: string) {
     const items = fs.readdirSync(dir);
-    
     for (const item of items) {
       const fullPath = path.join(dir, item);
       const stat = fs.statSync(fullPath);
-      
       if (stat.isDirectory()) {
         walkDir(fullPath, path.join(basePrefix, item));
       } else {
         const key = path.join(basePrefix, item).replace(/\\/g, '/');
-        files.push({
-          key,
-          url: `/uploads/${key}`
-        });
+        files.push({ key, url: `/uploads/${key}` });
       }
     }
   }
-  
+
   walkDir(dirPath, normalizedPrefix);
-  
   return files;
+}
+
+/**
+ * Verifica se um arquivo existe no disco
+ * @param relKey - Caminho relativo do arquivo
+ */
+export function storageLocalExists(relKey: string): boolean {
+  const key = normalizeKey(relKey);
+  return fs.existsSync(path.join(UPLOADS_DIR, key));
+}
+
+/**
+ * Retorna o tamanho total em bytes do diretório de uploads
+ */
+export function storageLocalGetTotalSize(): number {
+  let total = 0;
+
+  function calcSize(dir: string) {
+    if (!fs.existsSync(dir)) return;
+    const items = fs.readdirSync(dir);
+    for (const item of items) {
+      const fullPath = path.join(dir, item);
+      const stat = fs.statSync(fullPath);
+      if (stat.isDirectory()) {
+        calcSize(fullPath);
+      } else {
+        total += stat.size;
+      }
+    }
+  }
+
+  calcSize(UPLOADS_DIR);
+  return total;
+}
+
+/**
+ * Inicializa a estrutura de diretórios de uploads
+ */
+export function initializeStorageDirectories(): void {
+  const dirs = [
+    'plant-photos',
+    'health-logs',
+    'daily-logs',
+    'exports',
+  ];
+
+  ensureDirExists(UPLOADS_DIR);
+
+  for (const dir of dirs) {
+    ensureDirExists(path.join(UPLOADS_DIR, dir));
+  }
+
+  console.log(`[StorageLocal] Storage initialized at: ${UPLOADS_DIR}`);
 }

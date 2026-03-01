@@ -1,3 +1,9 @@
+/**
+ * Variáveis de Ambiente — App Cultivo (Versão Servidor Independente)
+ *
+ * Não há dependências do Manus. Todas as configurações são via .env local.
+ */
+
 export const ENV = {
   // Aplicação
   nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -5,37 +11,43 @@ export const ENV = {
   domain: process.env.DOMAIN ?? 'localhost:3000',
 
   // Banco de Dados
-  databaseUrl: process.env.DATABASE_URL ?? 'mysql://user:password@localhost:3306/cultivo',
+  databaseUrl: process.env.DATABASE_URL ?? '',
 
   // Autenticação JWT
-  jwtSecret: process.env.JWT_SECRET ?? 'seu-segredo-super-secreto-minimo-32-caracteres',
+  jwtSecret: process.env.JWT_SECRET ?? 'cultivo-secret-change-in-production-32chars',
 
-  // S3 / MinIO
-  s3Endpoint: process.env.S3_ENDPOINT ?? 'http://localhost:9000',
-  s3Bucket: process.env.S3_BUCKET ?? 'cultivo-fotos',
-  s3AccessKey: process.env.S3_ACCESS_KEY ?? 'minioadmin',
-  s3SecretKey: process.env.S3_SECRET_KEY ?? 'minioadmin',
-  s3Region: process.env.S3_REGION ?? 'us-east-1',
+  // LLM (OpenAI ou compatível — opcional, para funcionalidades de IA)
+  openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+  openaiBaseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
+  llmModel: process.env.LLM_MODEL ?? 'gpt-4o-mini',
 
-  // Validações
+  // Armazenamento Local (pasta /uploads no servidor)
+  // Não precisa de configuração adicional — usa o sistema de arquivos do servidor
+
+  // Helpers
   isProduction: process.env.NODE_ENV === 'production',
-  isDevelopment: process.env.NODE_ENV === 'development',
+  isDevelopment: process.env.NODE_ENV !== 'production',
+
+  // Compatibilidade com código legado (não usados na versão servidor)
+  forgeApiUrl: process.env.OPENAI_BASE_URL ?? '',
+  forgeApiKey: process.env.OPENAI_API_KEY ?? '',
 };
 
 // Validar variáveis obrigatórias
 if (!ENV.databaseUrl) {
-  console.error('[ENV] DATABASE_URL is required');
+  console.error('[ENV] DATABASE_URL é obrigatório. Configure no arquivo .env');
   process.exit(1);
 }
 
 if (!ENV.jwtSecret || ENV.jwtSecret.length < 32) {
-  console.warn('[ENV] JWT_SECRET should be at least 32 characters long');
   if (ENV.isProduction) {
-    console.error('[ENV] JWT_SECRET must be set in production');
+    console.error('[ENV] JWT_SECRET deve ter pelo menos 32 caracteres em produção');
     process.exit(1);
+  } else {
+    console.warn('[ENV] JWT_SECRET curto — use uma chave mais longa em produção');
   }
 }
 
-if (!ENV.s3Endpoint || !ENV.s3AccessKey || !ENV.s3SecretKey) {
-  console.warn('[ENV] S3/MinIO configuration is incomplete');
+if (!ENV.openaiApiKey && ENV.isProduction) {
+  console.warn('[ENV] OPENAI_API_KEY não configurado — funcionalidades de IA estarão desabilitadas');
 }

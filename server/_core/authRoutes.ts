@@ -1,5 +1,9 @@
 import type { Express, Request, Response } from 'express';
-import * as db from '../db';
+import {
+  getUserByEmail,
+  createUser,
+  updateUserLastSignedIn,
+} from '../db-auth';
 import {
   hashPassword,
   comparePassword,
@@ -9,30 +13,23 @@ import {
   authenticateRequest,
 } from './auth';
 
-interface RegisterRequest {
-  email: string;
-  password: string;
-  name?: string;
-}
-
-interface LoginRequest {
-  email: string;
-  password: string;
-}
-
 /**
- * Registra as rotas de autenticação
+ * Registra as rotas de autenticação JWT
  */
 export function registerAuthRoutes(app: Express) {
+
   /**
    * POST /api/auth/register
-   * Registra um novo usuário
+   * Registra um novo usuário com email e senha
    */
   app.post('/api/auth/register', async (req: Request, res: Response) => {
     try {
-      const { email, password, name } = req.body as RegisterRequest;
+      const { email, password, name } = req.body as {
+        email: string;
+        password: string;
+        name?: string;
+      };
 
-      // Validação básica
       if (!email || !password) {
         res.status(400).json({ error: 'Email e senha são obrigatórios' });
         return;
@@ -43,18 +40,15 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      // Verificar se usuário já existe
-      const existingUser = await db.getUserByEmail(email);
-      if (existingUser) {
-        res.status(409).json({ error: 'Usuário com este email já existe' });
+      const existing = await getUserByEmail(email);
+      if (existing) {
+        res.status(409).json({ error: 'Já existe um usuário com este email' });
         return;
       }
 
-      // Hash da senha
       const passwordHash = await hashPassword(password);
 
-      // Criar usuário
-      const user = await db.createUser({
+      const user = await createUser({
         email,
         passwordHash,
         name: name || null,
@@ -62,20 +56,12 @@ export function registerAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      // Criar token
       const token = createToken(user.id, user.email);
-
-      // Definir cookie
       setAuthCookie(res, token);
 
       res.status(201).json({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
         token,
       });
     } catch (error) {
@@ -86,49 +72,37 @@ export function registerAuthRoutes(app: Express) {
 
   /**
    * POST /api/auth/login
-   * Faz login de um usuário
+   * Autentica um usuário com email e senha
    */
   app.post('/api/auth/login', async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body as LoginRequest;
+      const { email, password } = req.body as { email: string; password: string };
 
-      // Validação básica
       if (!email || !password) {
         res.status(400).json({ error: 'Email e senha são obrigatórios' });
         return;
       }
 
-      // Buscar usuário
-      const user = await db.getUserByEmail(email);
+      const user = await getUserByEmail(email);
       if (!user || !user.passwordHash) {
         res.status(401).json({ error: 'Email ou senha incorretos' });
         return;
       }
 
-      // Verificar senha
-      const isPasswordValid = await comparePassword(password, user.passwordHash);
-      if (!isPasswordValid) {
+      const valid = await comparePassword(password, user.passwordHash);
+      if (!valid) {
         res.status(401).json({ error: 'Email ou senha incorretos' });
         return;
       }
 
-      // Atualizar lastSignedIn
-      await db.updateUserLastSignedIn(user.id);
+      await updateUserLastSignedIn(user.id);
 
-      // Criar token
       const token = createToken(user.id, user.email);
-
-      // Definir cookie
       setAuthCookie(res, token);
 
       res.json({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
         token,
       });
     } catch (error) {
@@ -139,12 +113,11 @@ export function registerAuthRoutes(app: Express) {
 
   /**
    * GET /api/auth/me
-   * Retorna informações do usuário logado
+   * Retorna o usuário autenticado
    */
   app.get('/api/auth/me', async (req: Request, res: Response) => {
     try {
       const user = await authenticateRequest(req);
-
       if (!user) {
         res.status(401).json({ error: 'Não autenticado' });
         return;
@@ -152,30 +125,20 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
       });
     } catch (error) {
       console.error('[Auth] Me failed', error);
-      res.status(500).json({ error: 'Falha ao obter informações do usuário' });
+      res.status(500).json({ error: 'Falha ao obter dados do usuário' });
     }
   });
 
   /**
    * POST /api/auth/logout
-   * Faz logout do usuário
+   * Encerra a sessão do usuário
    */
   app.post('/api/auth/logout', (req: Request, res: Response) => {
-    try {
-      clearAuthCookie(res);
-      res.json({ success: true, message: 'Logout realizado com sucesso' });
-    } catch (error) {
-      console.error('[Auth] Logout failed', error);
-      res.status(500).json({ error: 'Falha ao fazer logout' });
-    }
+    clearAuthCookie(res);
+    res.json({ success: true, message: 'Logout realizado com sucesso' });
   });
 }

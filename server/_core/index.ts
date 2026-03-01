@@ -1,14 +1,16 @@
 import "dotenv/config";
+import cookieParser from "cookie-parser";
 import path from "path";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerAuthRoutes } from "./authRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import uploadRouter from "../uploadRouter";
+import { initializeStorageDirectories } from "../storageLocal";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -32,20 +34,34 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  
+
+  // Inicializar estrutura de diretórios de uploads
+  initializeStorageDirectories();
+
   // Inicializar cron job de verificação de alertas
   const { startAlertsCheckerCron } = await import("../cron/alertsChecker");
   startAlertsCheckerCron();
-  // Configure body parser with larger size limit for file uploads
+
+  // Body parser com limite maior para uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // Serve static files from uploads directory
+
+  // Cookie parser para autenticação JWT
+  app.use(cookieParser());
+
+  // Servir arquivos estáticos da pasta /uploads
   const uploadsPath = path.join(process.cwd(), 'uploads');
-  app.use('/uploads', express.static(uploadsPath));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
+  app.use('/uploads', express.static(uploadsPath, {
+    maxAge: '7d', // Cache de 7 dias para imagens
+    etag: true,
+  }));
+
+  // Rotas de autenticação JWT (registro, login, logout, me)
+  registerAuthRoutes(app);
+
   // Upload de imagens (multipart/form-data) — antes do tRPC
   app.use("/api/upload", uploadRouter);
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -54,7 +70,8 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+
+  // Desenvolvimento: Vite dev server | Produção: arquivos estáticos
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
@@ -69,8 +86,10 @@ async function startServer() {
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-    console.log(`[AlertsChecker] Cron job ativo: verificação automática a cada 1 hora`);
+    console.log(`\n🌱 App Cultivo Server rodando em http://localhost:${port}/`);
+    console.log(`📁 Uploads: ${uploadsPath}`);
+    console.log(`🔐 Auth: JWT (email/senha)`);
+    console.log(`⏰ AlertsChecker: Cron job ativo\n`);
   });
 }
 

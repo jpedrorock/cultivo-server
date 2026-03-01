@@ -1,10 +1,15 @@
 /**
- * Quick example (matches curl usage):
- *   await callDataApi("Youtube/search", {
- *     query: { gl: "US", hl: "en", q: "manus" },
- *   })
+ * Data API — Versão Servidor Independente
+ *
+ * Esta função era usada para chamar APIs externas via proxy do Manus.
+ * Na versão servidor independente, você pode chamar APIs externas diretamente
+ * usando fetch() com suas próprias chaves de API.
+ *
+ * Exemplo:
+ *   const response = await fetch('https://api.exemplo.com/endpoint', {
+ *     headers: { 'Authorization': `Bearer ${process.env.MINHA_API_KEY}` }
+ *   });
  */
-import { ENV } from "./env";
 
 export type DataApiCallOptions = {
   query?: Record<string, unknown>;
@@ -13,52 +18,16 @@ export type DataApiCallOptions = {
   formData?: Record<string, unknown>;
 };
 
+/**
+ * Stub para compatibilidade — não usado na versão servidor independente.
+ * Substitua por chamadas fetch() diretas às APIs que precisar.
+ */
 export async function callDataApi(
   apiId: string,
-  options: DataApiCallOptions = {}
+  _options: DataApiCallOptions = {}
 ): Promise<unknown> {
-  if (!ENV.forgeApiUrl) {
-    throw new Error("BUILT_IN_FORGE_API_URL is not configured");
-  }
-  if (!ENV.forgeApiKey) {
-    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
-  }
-
-  // Build the full URL by appending the service path to the base URL
-  const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
-  const fullUrl = new URL("webdevtoken.v1.WebDevService/CallApi", baseUrl).toString();
-
-  const response = await fetch(fullUrl, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      "connect-protocol-version": "1",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify({
-      apiId,
-      query: options.query,
-      body: options.body,
-      path_params: options.pathParams,
-      multipart_form_data: options.formData,
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(
-      `Data API request failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
-    );
-  }
-
-  const payload = await response.json().catch(() => ({}));
-  if (payload && typeof payload === "object" && "jsonData" in payload) {
-    try {
-      return JSON.parse((payload as Record<string, string>).jsonData ?? "{}");
-    } catch {
-      return (payload as Record<string, unknown>).jsonData;
-    }
-  }
-  return payload;
+  throw new Error(
+    `callDataApi("${apiId}") não está disponível na versão servidor independente. ` +
+    'Use fetch() diretamente com suas próprias chaves de API.'
+  );
 }
