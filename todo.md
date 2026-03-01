@@ -3883,3 +3883,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Reescrever Help.tsx com conteúdo atualizado: 17 tópicos (vs 9 anteriores)
 - [x] Novas seções adicionadas: Fotos, Registro Rápido, Tricomas, LST, Dicas iPhone
 - [x] Chip de navegação rápida "iPhone" adicionado
+
+## Script db:seed no package.json (28/02/2026)
+- [x] Substituir script "seed" obsoleto (seed-data.mjs) por "db:seed" (seed.mjs) no package.json
+- [x] Testado com sucesso: pnpm db:seed popula todas as tabelas sem erros

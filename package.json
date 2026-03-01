@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "db:push": "drizzle-kit push",
-    "seed": "node seed-data.mjs"
+    "db:seed": "node seed.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
