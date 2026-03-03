@@ -1,5 +1,6 @@
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
 import { z } from "zod";
 import { eq, and, or, desc, asc, sql, isNotNull, inArray } from "drizzle-orm";
 import * as db from "./db";
@@ -4637,10 +4638,51 @@ export const appRouter = router({
           await database.insert(wateringApplications).values(input.data.wateringApplications);
         }
 
-        return { success: true, message: "Backup restaurado com sucesso" };
+         return { success: true, message: "Backup restaurado com sucesso" };
       }),
   }),
 
-});
+  // Push Notifications (Web Push / VAPID)
+  push: router({
+    // Retorna a chave pública VAPID para o frontend
+    getVapidKey: publicProcedure.query(() => ({
+      publicKey: getVapidPublicKey(),
+      configured: isPushConfigured(),
+    })),
 
+    // Registrar subscription do dispositivo
+    subscribe: publicProcedure
+      .input(
+        z.object({
+          subscription: z.object({
+            endpoint: z.string(),
+            expirationTime: z.number().nullable().optional(),
+            keys: z.object({
+              p256dh: z.string(),
+              auth: z.string(),
+            }),
+          }),
+        })
+      )
+      .mutation(async ({ input }) => {
+        // userId fixo 1 para standalone (sem multi-user)
+        saveSubscription(1, input.subscription as any);
+        return { success: true };
+      }),
+
+    // Enviar notificação de teste
+    sendTest: publicProcedure.mutation(async () => {
+      if (!isPushConfigured()) {
+        throw new Error("Web Push não configurado. Adicione VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no .env");
+      }
+      await sendPushToUser(1, {
+        title: "🧪 Teste — App Cultivo",
+        body: "Notificações Push funcionando! 🌱",
+        url: "/",
+        tag: "test-push",
+      });
+      return { success: true };
+    }),
+  }),
+});
 export type AppRouter = typeof appRouter;

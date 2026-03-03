@@ -1,6 +1,6 @@
 /**
- * Push Notification Service
- * Handles browser push notifications for daily reminders and alerts
+ * Push Notification Service — App Cultivo
+ * Suporta Web Push (VAPID) para notificações em background no iPhone e Android
  */
 
 import { playNotificationSound } from './notificationSounds';
@@ -8,27 +8,31 @@ import { playNotificationSound } from './notificationSounds';
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'default';
 export type NotificationType = 'daily_reminder' | 'environment_alert' | 'task_reminder';
 
+// ─── Suporte ────────────────────────────────────────────────────────────────
+
 /**
- * Check if push notifications are supported in this browser
+ * Verifica se notificações são suportadas neste navegador/dispositivo
  */
 export function isNotificationSupported(): boolean {
   return 'Notification' in window && 'serviceWorker' in navigator;
 }
 
 /**
- * Get current notification permission status
+ * Retorna o status atual da permissão de notificações
  */
 export function getNotificationPermission(): NotificationPermissionStatus {
   if (!isNotificationSupported()) return 'denied';
   return Notification.permission;
 }
 
+// ─── Permissão ───────────────────────────────────────────────────────────────
+
 /**
- * Request notification permission from user
+ * Solicita permissão de notificações ao usuário
  */
 export async function requestNotificationPermission(): Promise<NotificationPermissionStatus> {
   if (!isNotificationSupported()) {
-    console.warn('Push notifications are not supported in this browser');
+    console.warn('[Notifications] Não suportado neste navegador');
     return 'denied';
   }
 
@@ -36,13 +40,70 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
     const permission = await Notification.requestPermission();
     return permission;
   } catch (error) {
-    console.error('Error requesting notification permission:', error);
+    console.error('[Notifications] Erro ao solicitar permissão:', error);
     return 'denied';
   }
 }
 
+// ─── Web Push (VAPID) ────────────────────────────────────────────────────────
+
 /**
- * Show a push notification
+ * Converte base64url para Uint8Array (necessário para VAPID)
+ */
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray.buffer;
+}
+
+/**
+ * Registra a subscription Web Push no servidor
+ * @param vapidPublicKey - Chave pública VAPID obtida do servidor
+ * @param onSubscribe - Callback para enviar a subscription ao servidor
+ */
+export async function registerPushSubscription(
+  vapidPublicKey: string,
+  onSubscribe: (sub: PushSubscriptionJSON) => Promise<void>
+): Promise<boolean> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[WebPush] PushManager não suportado');
+    return false;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+
+    // Verificar se já existe subscription
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      // Criar nova subscription
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+    }
+
+    // Enviar subscription para o servidor via callback
+    await onSubscribe(subscription.toJSON());
+    console.log('[WebPush] Subscription registrada com sucesso');
+    return true;
+  } catch (error) {
+    console.error('[WebPush] Erro ao registrar subscription:', error);
+    return false;
+  }
+}
+
+// ─── Exibição de Notificações ────────────────────────────────────────────────
+
+/**
+ * Exibe uma notificação local via Service Worker
+ * Para notificações em background, use Web Push (sendPushNotification)
  */
 export async function showNotification(
   title: string,
@@ -50,17 +111,17 @@ export async function showNotification(
   soundType?: NotificationType
 ): Promise<void> {
   if (getNotificationPermission() !== 'granted') {
-    console.warn('Notification permission not granted');
+    console.warn('[Notifications] Permissão não concedida');
     return;
   }
 
   try {
-    // Play notification sound if type is provided
+    // Tocar som se especificado
     if (soundType) {
       playNotificationSound(soundType);
     }
 
-    // If service worker is available, use it
+    // Usar Service Worker para exibir a notificação (funciona no iOS PWA)
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.ready;
       await registration.showNotification(title, {
@@ -69,20 +130,19 @@ export async function showNotification(
         ...options,
       });
     } else {
-      // Fallback to basic notification
+      // Fallback para notificação básica
       new Notification(title, {
         icon: '/icon-192.png',
         ...options,
       });
     }
   } catch (error) {
-    console.error('Error showing notification:', error);
+    console.error('[Notifications] Erro ao exibir notificação:', error);
   }
 }
 
-/**
- * Show daily reminder notification
- */
+// ─── Lembretes Diários ───────────────────────────────────────────────────────
+
 export async function showDailyReminder(): Promise<void> {
   await showNotification('📝 Hora de Registrar!', {
     body: 'Não esqueça de registrar os dados das suas estufas hoje.',
@@ -93,8 +153,45 @@ export async function showDailyReminder(): Promise<void> {
 }
 
 /**
- * Show alert notification for out-of-range values
+ * Agenda lembretes diários usando setTimeout (funciona apenas com app aberto)
+ * Para lembretes em background, o Service Worker com Web Push é necessário
  */
+export function scheduleDailyReminder(hour: number, minute: number): () => void {
+  const now = new Date();
+  const scheduledTime = new Date();
+  scheduledTime.setHours(hour, minute, 0, 0);
+
+  if (scheduledTime <= now) {
+    scheduledTime.setDate(scheduledTime.getDate() + 1);
+  }
+
+  const msUntilReminder = scheduledTime.getTime() - now.getTime();
+
+  const timeoutId = setTimeout(() => {
+    showDailyReminder();
+    scheduleDailyReminder(hour, minute);
+  }, msUntilReminder);
+
+  return () => clearTimeout(timeoutId);
+}
+
+export function scheduleMultipleDailyReminders(times: string[]): () => void {
+  const cleanupFunctions: Array<() => void> = [];
+
+  times.forEach((time) => {
+    const [hour, minute] = time.split(':').map(Number);
+    if (isNaN(hour) || isNaN(minute)) {
+      console.warn(`[Notifications] Formato de horário inválido: ${time}`);
+      return;
+    }
+    cleanupFunctions.push(scheduleDailyReminder(hour, minute));
+  });
+
+  return () => cleanupFunctions.forEach((fn) => fn());
+}
+
+// ─── Alertas de Ambiente ─────────────────────────────────────────────────────
+
 export async function showAlertNotification(
   tentName: string,
   metric: string,
@@ -115,80 +212,13 @@ export async function showAlertNotification(
   }, 'environment_alert');
 }
 
-/**
- * Schedule multiple daily reminders at specific times
- * Note: This uses setTimeout and will be reset on page reload
- * For persistent scheduling, use a backend service or service worker
- */
-export function scheduleMultipleDailyReminders(times: string[]): () => void {
-  const cleanupFunctions: Array<() => void> = [];
+// ─── Monitor de Registros Ausentes ───────────────────────────────────────────
 
-  times.forEach((time) => {
-    const [hour, minute] = time.split(':').map(Number);
-    if (isNaN(hour) || isNaN(minute)) {
-      console.warn(`Invalid time format: ${time}`);
-      return;
-    }
-    const cleanup = scheduleDailyReminder(hour, minute);
-    cleanupFunctions.push(cleanup);
-  });
-
-  // Return cleanup function that clears all scheduled reminders
-  return () => {
-    cleanupFunctions.forEach((cleanup) => cleanup());
-  };
-}
-
-/**
- * Schedule daily reminder at specific time
- * Note: This uses setTimeout and will be reset on page reload
- * For persistent scheduling, use a backend service or service worker
- */
-export function scheduleDailyReminder(hour: number, minute: number): () => void {
-  const now = new Date();
-  const scheduledTime = new Date();
-  scheduledTime.setHours(hour, minute, 0, 0);
-
-  // If time has passed today, schedule for tomorrow
-  if (scheduledTime <= now) {
-    scheduledTime.setDate(scheduledTime.getDate() + 1);
-  }
-
-  const msUntilReminder = scheduledTime.getTime() - now.getTime();
-
-  const timeoutId = setTimeout(() => {
-    showDailyReminder();
-    // Reschedule for next day
-    scheduleDailyReminder(hour, minute);
-  }, msUntilReminder);
-
-  // Return cleanup function
-  return () => clearTimeout(timeoutId);
-}
-
-/**
- * Migrate old single reminderTime to new reminderTimes array
- */
-export function migrateReminderConfig(config: any): any {
-  // If old format (reminderTime: string), convert to new format (reminderTimes: string[])
-  if (config.reminderTime && !config.reminderTimes) {
-    return {
-      ...config,
-      reminderTimes: [config.reminderTime],
-      reminderTime: undefined, // Remove old field
-    };
-  }
-  return config;
-}
-
-/**
- * Show notification for tent without recent reading (red badge)
- */
 export async function showMissingReadingAlert(
   tentName: string,
   hoursSinceLastReading: number
 ): Promise<void> {
-  await showNotification(`⚠️ ${tentName} - Sem Registro!`, {
+  await showNotification(`⚠️ ${tentName} — Sem Registro!`, {
     body: `Sem registro há ${hoursSinceLastReading}h. Clique para registrar agora.`,
     tag: `missing-reading-${tentName}`,
     requireInteraction: true,
@@ -196,66 +226,60 @@ export async function showMissingReadingAlert(
   }, 'environment_alert');
 }
 
-/**
- * Check all tents for missing readings and send notifications
- * Should be called periodically (e.g., every hour)
- */
 export async function checkAndNotifyMissingReadings(
   tents: Array<{ id: number; name: string; lastReadingAt: number | null }>
 ): Promise<void> {
   const now = Date.now();
   const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
   const notifiedKey = 'notifiedMissingReadings';
-
-  // Get list of already notified tents (to avoid duplicates)
   const notified = JSON.parse(localStorage.getItem(notifiedKey) || '{}');
 
   for (const tent of tents) {
     if (!tent.lastReadingAt) continue;
-
     const timeSinceReading = now - tent.lastReadingAt;
     const hoursSince = Math.floor(timeSinceReading / (60 * 60 * 1000));
 
-    // If more than 24h and not notified yet
     if (timeSinceReading > TWENTY_FOUR_HOURS_MS && !notified[tent.id]) {
       await showMissingReadingAlert(tent.name, hoursSince);
-      notified[tent.id] = now; // Mark as notified
+      notified[tent.id] = now;
     }
 
-    // Reset notification flag if reading was updated (less than 24h)
     if (timeSinceReading <= TWENTY_FOUR_HOURS_MS && notified[tent.id]) {
       delete notified[tent.id];
     }
   }
 
-  // Save updated notification state
   localStorage.setItem(notifiedKey, JSON.stringify(notified));
 }
 
-/**
- * Start periodic check for missing readings
- * Checks every hour
- */
 export function startMissingReadingsMonitor(
   getTents: () => Promise<Array<{ id: number; name: string; lastReadingAt: number | null }>>
 ): () => void {
-  const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
   const check = async () => {
     try {
       const tents = await getTents();
       await checkAndNotifyMissingReadings(tents);
     } catch (error) {
-      console.error('Error checking missing readings:', error);
+      console.error('[Notifications] Erro ao verificar registros ausentes:', error);
     }
   };
 
-  // Run first check immediately
   check();
-
-  // Schedule periodic checks
   const intervalId = setInterval(check, CHECK_INTERVAL_MS);
-
-  // Return cleanup function
   return () => clearInterval(intervalId);
+}
+
+// ─── Migração ────────────────────────────────────────────────────────────────
+
+export function migrateReminderConfig(config: any): any {
+  if (config.reminderTime && !config.reminderTimes) {
+    return {
+      ...config,
+      reminderTimes: [config.reminderTime],
+      reminderTime: undefined,
+    };
+  }
+  return config;
 }
