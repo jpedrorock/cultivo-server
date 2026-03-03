@@ -530,45 +530,74 @@
 }
 /* Print Styles */
 @media print {
-  /* Hide navigation elements */
+  /* Page setup: landscape for tables */
+  @page {
+    margin: 1cm;
+    size: landscape;
+  }
+
+  /* Hide navigation and interactive elements */
   nav,
   aside,
   .sidebar,
   [role="navigation"],
-  header button,
-  footer {
+  footer,
+  .no-print,
+  [data-no-print] {
     display: none !important;
   }
 
-  /* Optimize page layout for printing */
+  /* Hide all buttons */
+  button {
+    display: none !important;
+  }
+
+  /* Hide filter/action areas - show only data */
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Optimize page layout */
   body {
     background: white !important;
     color: black !important;
+    font-size: 10pt;
+  }
+
+  /* Remove sticky positioning from header */
+  header {
+    position: static !important;
+    border-bottom: 2px solid #000 !important;
+    padding: 0.5rem 0 !important;
+    margin-bottom: 0.5rem !important;
   }
 
   /* Ensure content fills the page */
   .container {
     max-width: 100% !important;
-    padding: 0 !important;
+    padding: 0.25rem !important;
   }
 
-  /* Optimize cards for printing */
+  /* Optimize cards */
   .card,
   [class*="card"] {
-    border: 1px solid #e5e7eb !important;
+    border: 1px solid #d1d5db !important;
     box-shadow: none !important;
     page-break-inside: avoid;
+    margin-bottom: 0.5rem !important;
   }
 
-  /* Ensure charts are visible */
+  /* Charts: allow them to render */
   svg {
     max-width: 100% !important;
     height: auto !important;
   }
 
-  /* Optimize tables for printing */
+  /* Tables: full width, bordered */
   table {
     page-break-inside: auto;
+    width: 100% !important;
+    border-collapse: collapse !important;
   }
 
   tr {
@@ -578,6 +607,18 @@
 
   thead {
     display: table-header-group;
+  }
+
+  th, td {
+    border: 1px solid #9ca3af !important;
+    padding: 3px 6px !important;
+    font-size: 8pt !important;
+    color: black !important;
+  }
+
+  th {
+    background: #f3f4f6 !important;
+    font-weight: bold !important;
   }
 
   /* Remove backgrounds and shadows */
@@ -591,31 +632,28 @@
     color: black !important;
   }
 
-  /* Preserve badge colors */
+  /* Badge appearance in print */
   .badge,
   [class*="badge"] {
     border: 1px solid #000 !important;
     background: white !important;
     color: black !important;
+    font-size: 7pt !important;
+    padding: 1px 3px !important;
   }
 
-  /* Ensure buttons are hidden in print */
-  button {
-    display: none !important;
-  }
-
-  /* Keep header visible but simplified */
-  header {
-    border-bottom: 2px solid #000 !important;
-    padding: 1rem 0 !important;
-    margin-bottom: 1rem !important;
+  /* Ensure table container doesn't clip */
+  .overflow-x-auto,
+  .overflow-auto {
+    overflow: visible !important;
   }
 
   /* Optimize spacing */
-  .py-8, .py-6, .py-4 {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-  }
+  .py-8 { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; }
+  .py-6 { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; }
+  .py-4 { padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; }
+  .space-y-8 > * + * { margin-top: 0.5rem !important; }
+  .space-y-4 > * + * { margin-top: 0.25rem !important; }
 }
 
 /* Custom Range Slider for Light Intensity */

@@ -125,24 +125,33 @@ export default function HistoryTable() {
 
   const exportToCSV = () => {
     if (!logsData?.logs || logsData.logs.length === 0) {
-      alert("Nenhum dado para exportar");
+      toast.error("Nenhum dado para exportar");
       return;
     }
 
+    // Helper: wrap field in quotes if it contains comma, newline or quote
+    const csvField = (value: any): string => {
+      const str = value !== null && value !== undefined ? String(value) : "-";
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
     // CSV headers
-    const headers = ["Data", "Turno", "Estufa", "Temp (°C)", "RH (%)", "PPFD", "pH", "EC", "Observações"];
+    const headers = ["Data", "Turno", "Estufa", "Temp (\u00b0C)", "RH (%)", "PPFD", "pH", "EC", "Observa\u00e7\u00f5es"];
     
     // CSV rows
     const rows = logsData.logs.map((log: any) => [
       new Date(log.logDate).toLocaleDateString("pt-BR"),
-      log.turn || "-",
-      log.tentName || "-",
-      log.tempC || "-",
-      log.rhPct || "-",
-      log.ppfd || "-",
-      log.ph || "-",
-      log.ec || "-",
-      log.notes ? `"${log.notes.replace(/"/g, '""')}"` : "-", // Escape quotes
+      csvField(log.turn),
+      csvField(log.tentName),
+      csvField(log.tempC),
+      csvField(log.rhPct),
+      csvField(log.ppfd),
+      csvField(log.ph),
+      csvField(log.ec),
+      csvField(log.notes),
     ]);
 
     // Combine headers and rows
@@ -161,6 +170,8 @@ export default function HistoryTable() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url); // Free memory
+    toast.success(`CSV exportado com ${logsData.logs.length} registro(s)!`);
   };
 
   const handlePreviousPage = () => {
@@ -222,7 +233,7 @@ export default function HistoryTable() {
       {/* Content */}
       <main className="container mx-auto px-4 py-8 space-y-8" id="history-table-container">
         {/* Tent Selector - Responsive: Dropdown on mobile, Tabs on desktop */}
-        <div className="space-y-4">
+        <div className="space-y-4 print-hide">
           {/* Mobile: Dropdown */}
           <div className="md:hidden">
             <Label htmlFor="tent-select-mobile" className="text-sm font-medium mb-2 block">
@@ -280,7 +291,7 @@ export default function HistoryTable() {
             )}
 
             {/* Filters and Table */}
-            <Card>
+            <Card className="print-hide">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Filter className="w-5 h-5" />
@@ -488,7 +499,7 @@ export default function HistoryTable() {
                         <TableHead className="text-right whitespace-nowrap">pH</TableHead>
                         <TableHead className="text-right whitespace-nowrap">EC</TableHead>
                         <TableHead className="whitespace-nowrap hidden md:table-cell">Observações</TableHead>
-                        <TableHead className="text-right whitespace-nowrap">Ações</TableHead>
+                        <TableHead className="text-right whitespace-nowrap print-hide">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -511,7 +522,7 @@ export default function HistoryTable() {
                           <TableCell className="max-w-xs truncate hidden md:table-cell" title={log.notes || ""}>
                             {log.notes || "-"}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right print-hide">
                             <div className="flex items-center justify-end gap-2">
                               <Button
                                 variant="ghost"
@@ -539,7 +550,7 @@ export default function HistoryTable() {
                 </div>
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between mt-6">
+                <div className="flex items-center justify-between mt-6 print-hide">
                   <Button
                     variant="outline"
                     onClick={handlePreviousPage}

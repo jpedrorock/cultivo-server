@@ -181,7 +181,7 @@ export default function TentDetails() {
               </div>
               <Badge className={`${phaseInfo.color} text-white border-0 text-xs md:text-sm`}>{phaseInfo.phase}</Badge>
             </div>
-            <div className="flex gap-2 md:ml-auto">
+            <div className="flex gap-2 md:ml-auto print-hide">
               <Button
                 variant="outline"
                 size="icon"
