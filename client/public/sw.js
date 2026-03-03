@@ -1,6 +1,6 @@
 // Service Worker para App Cultivo PWA
 // Versão do cache - incrementar para forçar atualização
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `app-cultivo-${CACHE_VERSION}`;
 
 // Assets para cache (estratégia Cache First)
@@ -8,8 +8,12 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://files.manuscdn.com/user_upload_by_module/session_file/90349683/sLzjsEnsstCyngjd.png',
-  'https://files.manuscdn.com/user_upload_by_module/session_file/90349683/OjdGdzwEDsrVqwqN.png',
+  '/favicon.svg',
+  '/favicon-32.png',
+  '/favicon.png',
+  '/apple-touch-icon.png',
+  '/icon-192.png',
+  '/icon-512.png',
 ];
 
 // Instalação do Service Worker
@@ -50,7 +54,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // Ignorar requisições de analytics e chrome-extension
-  if (url.origin.includes('umami') || url.protocol === 'chrome-extension:') {
+  if (url.protocol === 'chrome-extension:') {
     return;
   }
 
@@ -187,12 +191,12 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'App Cultivo';
   const options = {
     body: data.body || 'Nova notificação',
-    icon: 'https://files.manuscdn.com/user_upload_by_module/session_file/90349683/sLzjsEnsstCyngjd.png',
-    badge: 'https://files.manuscdn.com/user_upload_by_module/session_file/90349683/sLzjsEnsstCyngjd.png',
+    icon: '/icon-192.png',
+    badge: '/favicon-32.png',
     vibrate: [200, 100, 200],
     data: data.url || '/',
     actions: [
-      { action: 'open', title: 'Abrir', icon: 'https://files.manuscdn.com/user_upload_by_module/session_file/90349683/sLzjsEnsstCyngjd.png' },
+      { action: 'open', title: 'Abrir', icon: '/icon-192.png' },
       { action: 'close', title: 'Fechar' },
     ],
   };
