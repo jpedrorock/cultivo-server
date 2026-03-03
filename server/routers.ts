@@ -3739,7 +3739,7 @@ export const appRouter = router({
         symptoms: z.string().optional(),
         treatment: z.string().optional(),
         notes: z.string().optional(),
-        photoUrl: z.string().url().optional(),   // URL S3 pré-enviada via /api/upload/image
+        photoUrl: z.string().optional(),   // URL ou caminho relativo da foto enviada via /api/upload/image
         photoBase64: z.string().optional(),       // Legado: base64 (mantido para compatibilidade)
       }))
       .mutation(async ({ input }) => {
@@ -3797,7 +3797,7 @@ export const appRouter = router({
         symptoms: z.string().optional(),
         treatment: z.string().optional(),
         notes: z.string().optional(),
-        photoUrl: z.string().url().optional(),  // Nova foto pré-enviada via /api/upload/image
+        photoUrl: z.string().optional(),  // URL ou caminho relativo da foto enviada via /api/upload/image
         removePhoto: z.boolean().optional(),    // true = remover foto existente
         photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
       }))
@@ -3880,7 +3880,7 @@ export const appRouter = router({
         cloudyPercent: z.number().optional(),
         amberPercent: z.number().optional(),
         notes: z.string().optional(),
-        photoUrl: z.string().url().optional(),  // URL S3 pré-enviada via /api/upload/image
+        photoUrl: z.string().optional(),  // URL ou caminho relativo da foto enviada via /api/upload/image
         photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
       }))
       .mutation(async ({ input }) => {
