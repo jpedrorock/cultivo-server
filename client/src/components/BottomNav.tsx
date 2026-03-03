@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -56,8 +56,15 @@ export function BottomNav() {
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
 
+  // Buscar contagem de plantas aguardando secagem
+  const { data: harvestQueuePlants } = trpc.harvestQueue.list.useQuery(undefined, {
+    refetchInterval: 60_000,
+  });
+  const harvestQueueCount = harvestQueuePlants?.length || 0;
+
   const moreMenuItems: NavItem[] = [
     { href: "/plants", icon: Leaf, label: "Plantas" },
+    { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
     { href: "/history", icon: BarChart3, label: "Histórico" },
     { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },

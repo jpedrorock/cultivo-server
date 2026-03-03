@@ -16,6 +16,7 @@ import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
 import { FinishCloningDialog } from "@/components/FinishCloningDialog";
 import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
 import { EditTentDialog } from "@/components/EditTentDialog";
+import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ export default function TentDetails() {
   const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [editTentOpen, setEditTentOpen] = useState(false);
+  const [harvestQueueOpen, setHarvestQueueOpen] = useState(false);
 
   const openPhaseConfirm = (type: PhaseConfirmType) => {
     setPhaseConfirmType(type);
@@ -289,14 +291,25 @@ export default function TentDetails() {
                     </Button>
                   )}
                   {tent.category === "FLORA" && (
-                    <Button
-                      onClick={() => openPhaseConfirm("DRYING")}
-                      size="sm"
-                      className="bg-orange-500 hover:bg-orange-600 text-white"
-                    >
-                      <Wind className="w-4 h-4 mr-2" />
-                      Avançar para Secagem
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => setHarvestQueueOpen(true)}
+                        size="sm"
+                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                      >
+                        <Wind className="w-4 h-4 mr-2" />
+                        Colher → Aguardando Secagem
+                      </Button>
+                      <Button
+                        onClick={() => openPhaseConfirm("DRYING")}
+                        size="sm"
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                      >
+                        <Wind className="w-4 h-4 mr-2" />
+                        Ir direto para Secagem
+                      </Button>
+                    </>
                   )}
                 </div>
               )}
@@ -341,6 +354,12 @@ export default function TentDetails() {
                   cycleId={cycle.id}
                   currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
                   currentTentName={tent.name}
+                />
+                <MoveToHarvestQueueDialog
+                  open={harvestQueueOpen}
+                  onOpenChange={setHarvestQueueOpen}
+                  cycleId={cycle.id}
+                  tentName={tent.name}
                 />
               </>
             )}

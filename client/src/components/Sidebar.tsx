@@ -1,4 +1,4 @@
-import { Calculator, BarChart3, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen, AlertTriangle } from "lucide-react";
+import { Calculator, BarChart3, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen, AlertTriangle, Wind } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,12 @@ export function Sidebar() {
     {},
     { refetchInterval: 30_000 } // poll every 30s to detect new alerts
   );
+
+  // Buscar contagem de plantas aguardando secagem
+  const { data: harvestQueuePlants } = trpc.harvestQueue.list.useQuery(undefined, {
+    refetchInterval: 60_000,
+  });
+  const harvestQueueCount = harvestQueuePlants?.length || 0;
 
   // Track previous count to detect new alerts — badge shake
   const prevCountRef = useRef<number | null>(null);
@@ -49,6 +55,7 @@ export function Sidebar() {
   const navItems = [
     { href: "/", icon: TentIcon, label: "Estufas", enabled: true, badge: 0 },
     { href: "/plants", icon: Sprout, label: "Plantas", enabled: true, badge: 0 },
+    { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", enabled: true, badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas", enabled: true, badge: 0 },
     { href: "/calculators", icon: Calculator, label: "Calculadoras", enabled: true, badge: 0 },
     { href: "/history", icon: BarChart3, label: "Histórico", enabled: true, badge: 0 },

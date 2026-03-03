@@ -500,7 +500,9 @@ export const plants = mysqlTable(
     currentTentId: int("currentTentId")
       .references(() => tents.id),
     plantStage: mysqlEnum("plantStage", ["CLONE", "SEEDLING", "PLANT"]).default("SEEDLING").notNull(),
-    status: mysqlEnum("status", ["ACTIVE", "HARVESTED", "DEAD", "DISCARDED"]).default("ACTIVE").notNull(),
+    status: mysqlEnum("status", ["ACTIVE", "AWAITING_DRYING", "HARVESTED", "DEAD", "DISCARDED"]).default("ACTIVE").notNull(),
+    harvestQueueAt: timestamp("harvestQueueAt"), // Data em que entrou na fila de secagem
+    harvestQueueNotes: text("harvestQueueNotes"), // Notas da colheita ao entrar na fila
     finishedAt: timestamp("finishedAt"),
     finishReason: text("finishReason"),
     notes: text("notes"),

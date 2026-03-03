@@ -4642,6 +4642,228 @@ export const appRouter = router({
       }),
   }),
 
+  // Área Aguardando Secagem (Harvest Queue)
+  harvestQueue: router({
+    // Listar todas as plantas aguardando secagem
+    list: publicProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) throw new Error("DB não disponível");
+      const queuePlants = await database
+        .select()
+        .from(plants)
+        .where(eq(plants.status, "AWAITING_DRYING"))
+        .orderBy(asc(plants.harvestQueueAt));
+      return queuePlants;
+    }),
+
+    // Mover plantas de uma estufa FLORA para a fila de secagem
+    // Isso libera a estufa sem precisar de uma estufa de secagem disponível
+    moveToQueue: publicProcedure
+      .input(
+        z.object({
+          cycleId: z.number(),
+          harvestNotes: z.string().optional(),
+          harvestWeight: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("DB não disponível");
+
+        // Buscar ciclo
+        const [cycle] = await database
+          .select()
+          .from(cycles)
+          .where(eq(cycles.id, input.cycleId));
+
+        if (!cycle) throw new Error("Ciclo não encontrado");
+        if (!cycle.floraStartDate) throw new Error("Ciclo não está em floração");
+
+        // Buscar plantas ativas da estufa
+        const cyclePlants = await database
+          .select()
+          .from(plants)
+          .where(and(
+            eq(plants.currentTentId, cycle.tentId),
+            eq(plants.status, "ACTIVE")
+          ));
+
+        if (cyclePlants.length === 0) {
+          throw new Error("Nenhuma planta ativa encontrada nesta estufa");
+        }
+
+        const now = new Date();
+
+        // Mover plantas para a fila: status AWAITING_DRYING, sem estufa
+        await database
+          .update(plants)
+          .set({
+            status: "AWAITING_DRYING",
+            currentTentId: null, // Sai da estufa
+            harvestQueueAt: now,
+            harvestQueueNotes: input.harvestNotes || null,
+          })
+          .where(and(
+            eq(plants.currentTentId, cycle.tentId),
+            eq(plants.status, "ACTIVE")
+          ));
+
+        // Registrar histórico de saída da estufa
+        for (const plant of cyclePlants) {
+          await database.insert(plantTentHistory).values({
+            plantId: plant.id,
+            fromTentId: cycle.tentId,
+            toTentId: cycle.tentId, // Saiu da mesma estufa (sem destino ainda)
+            reason: `Colhida e movida para Aguardando Secagem. ${input.harvestNotes || ""}`.trim(),
+          });
+        }
+
+        // Finalizar ciclo e salvar dados de colheita
+        await database
+          .update(cycles)
+          .set({
+            status: "FINISHED",
+            harvestWeight: input.harvestWeight ? input.harvestWeight.toString() : null,
+            harvestNotes: input.harvestNotes || null,
+          })
+          .where(eq(cycles.id, input.cycleId));
+
+        // Resetar categoria da estufa para FLORA (vazia, pronta para receber novas plantas)
+        // A estufa fica sem ciclo ativo — disponível para receber plantas da Vega
+        await database
+          .update(tents)
+          .set({ category: "FLORA" })
+          .where(eq(tents.id, cycle.tentId));
+
+        return {
+          success: true,
+          plantsQueued: cyclePlants.length,
+          message: `${cyclePlants.length} planta(s) movida(s) para Aguardando Secagem. Estufa liberada.`,
+        };
+      }),
+
+    // Mover plantas da fila para uma estufa de secagem
+    moveToDrying: publicProcedure
+      .input(
+        z.object({
+          targetTentId: z.number(), // Estufa que vai virar secagem
+          plantIds: z.array(z.number()).optional(), // Se omitido, move todas
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("DB não disponível");
+
+        // Verificar se a estufa destino está vazia (sem ciclo ativo)
+        const [existingCycle] = await database
+          .select()
+          .from(cycles)
+          .where(and(
+            eq(cycles.tentId, input.targetTentId),
+            eq(cycles.status, "ACTIVE")
+          ));
+
+        if (existingCycle) {
+          const [targetTent] = await database.select().from(tents).where(eq(tents.id, input.targetTentId));
+          throw new Error(`Estufa ${targetTent?.name || "destino"} ainda tem um ciclo ativo. Finalize o ciclo primeiro.`);
+        }
+
+        // Buscar plantas a mover
+        let plantsToMove;
+        if (input.plantIds && input.plantIds.length > 0) {
+          plantsToMove = await database
+            .select()
+            .from(plants)
+            .where(and(
+              eq(plants.status, "AWAITING_DRYING"),
+              inArray(plants.id, input.plantIds)
+            ));
+        } else {
+          plantsToMove = await database
+            .select()
+            .from(plants)
+            .where(eq(plants.status, "AWAITING_DRYING"));
+        }
+
+        if (plantsToMove.length === 0) {
+          throw new Error("Nenhuma planta na fila de secagem");
+        }
+
+        const now = new Date();
+        const plantIdList = plantsToMove.map((p: any) => p.id);
+
+        // Mover plantas para a estufa de secagem
+        await database
+          .update(plants)
+          .set({
+            status: "ACTIVE",
+            currentTentId: input.targetTentId,
+            harvestQueueAt: null,
+            harvestQueueNotes: null,
+          })
+          .where(inArray(plants.id, plantIdList));
+
+        // Registrar histórico de movimentação
+        for (const plant of plantsToMove) {
+          await database.insert(plantTentHistory).values({
+            plantId: plant.id,
+            fromTentId: null, // Veio da fila (sem estufa)
+            toTentId: input.targetTentId,
+            reason: "Movida de Aguardando Secagem para estufa de secagem",
+          });
+        }
+
+        // Buscar strain das plantas para criar ciclo
+        const firstPlant = plantsToMove[0];
+
+        // Criar ciclo de secagem na estufa destino
+        await database.insert(cycles).values({
+          tentId: input.targetTentId,
+          strainId: firstPlant.strainId,
+          startDate: now,
+          status: "ACTIVE",
+        });
+
+        // Atualizar categoria da estufa para DRYING
+        await database
+          .update(tents)
+          .set({ category: "DRYING" })
+          .where(eq(tents.id, input.targetTentId));
+
+        // Aplicar limites de alerta para DRYING
+        await applyPhaseTransitionLimits(input.targetTentId, "DRYING");
+
+        return {
+          success: true,
+          plantsMoved: plantsToMove.length,
+          message: `${plantsToMove.length} planta(s) movida(s) para secagem.`,
+        };
+      }),
+
+    // Descartar plantas da fila (ex: perdas)
+    discard: publicProcedure
+      .input(
+        z.object({
+          plantIds: z.array(z.number()),
+          reason: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("DB não disponível");
+        await database
+          .update(plants)
+          .set({
+            status: "DISCARDED",
+            finishedAt: new Date(),
+            finishReason: input.reason || "Descartada da fila de secagem",
+            currentTentId: null,
+          })
+          .where(inArray(plants.id, input.plantIds));
+        return { success: true };
+      }),
+  }),
+
   // Push Notifications (Web Push / VAPID)
   push: router({
     // Retorna a chave pública VAPID para o frontend
