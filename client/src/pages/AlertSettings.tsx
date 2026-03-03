@@ -363,7 +363,7 @@ export default function AlertSettings() {
             </CardContent>
           </Card>
 
-          {/* Task Reminders Card */
+          {/* Task Reminders Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

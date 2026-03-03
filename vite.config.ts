@@ -21,7 +21,7 @@ export default defineConfig({
   },
   server: {
     host: true,
-    allowedHosts: "all",
+    allowedHosts: true,
     proxy: {
       "/api": {
         target: "http://localhost:3000",

@@ -1,7 +1,5 @@
 import { eq, and, desc, sql, isNotNull, or } from "drizzle-orm";
 import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
-import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
 import mysql from "mysql2/promise";
 import {
   InsertUser,
@@ -45,31 +43,25 @@ let _db: any = null;
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db) {
-    const connectionString = process.env.DATABASE_URL || "file:./local.db";
-    const isSQLite = connectionString.startsWith("file:");
-    
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      console.warn("[Database] DATABASE_URL não definido. Configure no arquivo .env");
+      return null;
+    }
     try {
-      if (isSQLite) {
-        // SQLite connection (local)
-        const dbPath = connectionString.replace("file:", "");
-        const sqlite = new Database(dbPath);
-        _db = drizzleSqlite(sqlite);
-        console.log(`[Database] Connected to SQLite: ${dbPath}`);
-      } else {
-        // MySQL connection (production) - using pool for auto-reconnection
-        const pool = mysql.createPool({
-          uri: connectionString,
-          waitForConnections: true,
-          connectionLimit: 10,
-          idleTimeout: 60000,
-          enableKeepAlive: true,
-          keepAliveInitialDelay: 30000,
-        });
-        _db = drizzleMysql(pool);
-        console.log(`[Database] Connected to MySQL (pool)`);
-      }
+      // MySQL connection - using pool for auto-reconnection
+      const pool = mysql.createPool({
+        uri: connectionString,
+        waitForConnections: true,
+        connectionLimit: 10,
+        idleTimeout: 60000,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 30000,
+      });
+      _db = drizzleMysql(pool);
+      console.log(`[Database] Conectado ao MySQL`);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Falha ao conectar:", error);
       _db = null;
     }
   }
@@ -77,8 +69,8 @@ export async function getDb() {
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
+  if (!user.email) {
+    throw new Error("User email is required for upsert");
   }
 
   const db = await getDb();
@@ -89,18 +81,24 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   try {
     const values: InsertUser = {
-      openId: user.openId,
+      email: user.email,
+      passwordHash: user.passwordHash ?? "",
     };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    if (user.openId !== undefined) {
+      values.openId = user.openId;
+      updateSet.openId = user.openId;
+    }
+
+    const textFields = ["name", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
       const value = user[field];
       if (value === undefined) return;
       const normalized = value ?? null;
-      values[field] = normalized;
+      (values as Record<string, unknown>)[field] = normalized;
       updateSet[field] = normalized;
     };
 
