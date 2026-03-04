@@ -76,7 +76,17 @@ export function BottomNav() {
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50 md:hidden">
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50 md:hidden"
+      style={{
+        // iOS Safari: backdrop-filter em elementos irmãos quebra position:fixed.
+        // translateZ(0) força um novo contexto de composição independente,
+        // garantindo que o menu fique fixo durante a rolagem.
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        willChange: 'transform',
+      }}
+    >
       <div className="max-w-screen-xl mx-auto px-4 py-3">
         <div className="flex justify-around items-center">
           {mainNavItems.map((item) => {

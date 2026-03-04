@@ -1231,3 +1231,13 @@ input[type="range"]::-moz-range-track {
 .animate-badge-shake {
   animation: badge-shake 0.6s ease-in-out;
 }
+
+/* iOS Safari fix: garante que o BottomNav (nav fixed) não seja afetado por
+   backdrop-filter de elementos irmãos, que quebra position:fixed no WebKit */
+@supports (-webkit-touch-callout: none) {
+  nav.fixed {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+  }
+}
