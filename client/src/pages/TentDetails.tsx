@@ -4,12 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil } from "lucide-react";
+import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer } from "lucide-react";
 import { Link, useParams, useLocation } from "wouter";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Printer } from "lucide-react";
 import { PageTransition } from "@/components/PageTransition";
 import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
 import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
@@ -138,6 +137,52 @@ export default function TentDetails() {
     window.print();
   };
 
+  const handleShare = async () => {
+    const phase = phaseInfo.phase;
+    const lastLog = logs?.[0];
+    const lines: string[] = [
+      `🌱 ${tent.name} — ${phase}`,
+    ];
+    if (cycle) {
+      const start = format(new Date(cycle.startDate), "dd/MM/yyyy", { locale: ptBR });
+      lines.push(`📅 Ciclo iniciado em ${start}`);
+    }
+    if (lastLog) {
+      const logDate = format(new Date(lastLog.logDate), "dd/MM HH:mm", { locale: ptBR });
+      lines.push(`\n📊 Último registro (${logDate}):`);
+      if (lastLog.tempC) lines.push(`🌡️ Temperatura: ${lastLog.tempC}°C`);
+      if (lastLog.rhPct) lines.push(`💧 Umidade: ${lastLog.rhPct}%`);
+      if (lastLog.ppfd) lines.push(`☀️ PPFD: ${lastLog.ppfd} µmol/m²/s`);
+      if (lastLog.ph) lines.push(`🧪 pH: ${lastLog.ph}`);
+      if (lastLog.ec) lines.push(`⚡ EC: ${lastLog.ec} mS/cm`);
+    }
+    if (avgTemp !== '--') lines.push(`\n📈 Médias (${dateRange} dias): Temp ${avgTemp}°C | UR ${avgRh}% | PPFD ${avgPpfd}`);
+    lines.push(`\n🔗 App Cultivo — cultivo.x.andy.plus`);
+
+    const text = lines.join('\n');
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `App Cultivo — ${tent.name}`,
+          text,
+        });
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          toast.error('Erro ao compartilhar');
+        }
+      }
+    } else {
+      // Fallback: copiar para clipboard
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success('Copiado para a área de transferência!');
+      } catch {
+        toast.error('Compartilhamento não suportado neste navegador');
+      }
+    }
+  };
+
   // Prepare chart data
   const chartData = logs?.map((log) => ({
     date: format(new Date(log.logDate), "dd/MM", { locale: ptBR }),
@@ -201,6 +246,10 @@ export default function TentDetails() {
                 title="Excluir estufa"
               >
                 <Trash2 className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" onClick={handleShare} className="flex-1 md:flex-none" title="Compartilhar">
+                <Share2 className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Compartilhar</span>
               </Button>
               <Button variant="outline" onClick={handlePrint} className="flex-1 md:flex-none">
                 <Printer className="w-4 h-4 md:mr-2" />

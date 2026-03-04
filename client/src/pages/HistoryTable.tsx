@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList } from "lucide-react";
+import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList, Share2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -123,6 +123,43 @@ export default function HistoryTable() {
     window.print();
   };
 
+  const handleShare = async () => {
+    if (!logsData?.logs || logsData.logs.length === 0) {
+      toast.error("Nenhum dado para compartilhar");
+      return;
+    }
+    const total = logsData.total || logsData.logs.length;
+    const tentsNames = Array.from(new Set(logsData.logs.map((l: any) => l.tentName).filter(Boolean))).join(', ');
+    const lastLog = logsData.logs[0];
+    const firstLog = logsData.logs[logsData.logs.length - 1];
+    const dateFrom = new Date(firstLog.logDate).toLocaleDateString('pt-BR');
+    const dateTo = new Date(lastLog.logDate).toLocaleDateString('pt-BR');
+
+    const text = [
+      `📊 Histórico de Cultivo`,
+      `🌱 Estufas: ${tentsNames || 'Todas'}`,
+      `📅 Período: ${dateFrom} — ${dateTo}`,
+      `📝 Total de registros: ${total}`,
+      ``,
+      `🔗 App Cultivo — cultivo.x.andy.plus`,
+    ].join('\n');
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Histórico App Cultivo', text });
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') toast.error('Erro ao compartilhar');
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success('Copiado para a área de transferência!');
+      } catch {
+        toast.error('Compartilhamento não suportado neste navegador');
+      }
+    }
+  };
+
   const exportToCSV = () => {
     if (!logsData?.logs || logsData.logs.length === 0) {
       toast.error("Nenhum dado para exportar");
@@ -220,6 +257,10 @@ export default function HistoryTable() {
               <Button variant="outline" onClick={handlePrint} disabled={!logsData?.logs || logsData.logs.length === 0} className="flex-1 md:flex-none">
                 <Printer className="w-4 h-4 md:mr-2" />
                 <span className="hidden md:inline">Imprimir</span>
+              </Button>
+              <Button variant="outline" onClick={handleShare} disabled={!logsData?.logs || logsData.logs.length === 0} className="flex-1 md:flex-none" title="Compartilhar">
+                <Share2 className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Compartilhar</span>
               </Button>
               <Button onClick={exportToCSV} disabled={!logsData?.logs || logsData.logs.length === 0} className="flex-1 md:flex-none">
                 <Download className="w-4 h-4 md:mr-2" />

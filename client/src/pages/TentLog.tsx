@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { useOfflineSync } from "@/hooks/useOfflineSync";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,26 +124,7 @@ export default function TentLog() {
     return null;
   }, [wateringVolume, runoffCollected]);
 
-  const utils = trpc.useUtils();
-  const createLog = trpc.dailyLogs.create.useMutation({
-    onSuccess: () => {
-      toast.success("Registro salvo com sucesso!");
-      // Limpar formulário
-      setTempC("");
-      setRhPct("");
-      setPpfd("400"); // Volta ao valor inicial realista
-      setPh("");
-      setEc("");
-      setWateringVolume("");
-      setRunoffCollected("");
-      setNotes("");
-      // Invalidar cache
-      utils.dailyLogs.list.invalidate();
-    },
-    onError: (error) => {
-      toast.error(`Erro ao salvar: ${error.message}`);
-    },
-  });
+  const { saveLog, pendingCount, isSyncing, syncNow, isLoading } = useOfflineSync();
 
   // Helper para classes de validação
   const getValidationClasses = (state: "valid" | "warning" | "invalid" | "neutral") => {
@@ -157,7 +140,7 @@ export default function TentLog() {
     }
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
     if (!tempC && !rhPct && !ppfd) {
@@ -165,17 +148,32 @@ export default function TentLog() {
       return;
     }
 
-    createLog.mutate({
-      tentId,
-      logDate: new Date(),
-      turn,
-      tempC: tempC ? tempC : undefined,
-      rhPct: rhPct ? rhPct : undefined,
-      ppfd: ppfd ? parseInt(ppfd) : undefined,
-      wateringVolume: wateringVolume ? parseInt(wateringVolume) : undefined,
-      runoffCollected: runoffCollected ? parseInt(runoffCollected) : undefined,
-      notes: notes || undefined,
-    });
+    try {
+      const destination = await saveLog({
+        tentId,
+        logDate: new Date(),
+        turn,
+        tempC: tempC ? tempC : undefined,
+        rhPct: rhPct ? rhPct : undefined,
+        ppfd: ppfd ? parseInt(ppfd) : undefined,
+        wateringVolume: wateringVolume ? parseInt(wateringVolume) : undefined,
+        runoffCollected: runoffCollected ? parseInt(runoffCollected) : undefined,
+        notes: notes || undefined,
+      });
+      if (destination === 'server') {
+        toast.success("Registro salvo com sucesso!");
+      }
+      setTempC("");
+      setRhPct("");
+      setPpfd("400");
+      setPh("");
+      setEc("");
+      setWateringVolume("");
+      setRunoffCollected("");
+      setNotes("");
+    } catch (error: any) {
+      toast.error(`Erro ao salvar: ${error?.message || 'Tente novamente'}`);
+    }
   };
 
   // Keyboard shortcuts
@@ -264,6 +262,9 @@ export default function TentLog() {
 
       {/* Main Content */}
       <main className="container py-8 max-w-5xl">
+        {/* Banner offline */}
+        <OfflineBanner onSync={syncNow} isSyncing={isSyncing} className="mb-4" />
+
         {/* Cycle Info */}
         {cycle && currentPhaseInfo && (
           <Card className="bg-card/90 backdrop-blur-sm mb-6">
@@ -642,8 +643,8 @@ export default function TentLog() {
 
               {/* Actions */}
               <div className="flex gap-3 pt-4">
-                <Button type="submit" className="flex-1" disabled={createLog.isPending}>
-                  {createLog.isPending ? (
+                <Button type="submit" className="flex-1" disabled={isLoading}>
+                  {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Salvando...
