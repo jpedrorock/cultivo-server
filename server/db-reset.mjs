@@ -3,18 +3,24 @@
  * Reseta completamente o banco de dados:
  *   1. Desabilita FK checks
  *   2. Dropa todas as tabelas (na ordem inversa das dependências)
- *   3. Reabilita FK checks
- *   4. Roda o drizzle-kit push para recriar o schema
+ *   3. Executa o schema-create.sql para recriar todas as tabelas
+ *   4. Reabilita FK checks
  *   5. Roda o seed para inserir dados iniciais
  *
  * Uso: pnpm db:restart
  */
 
 import mysql from "mysql2/promise";
-import { execSync } from "child_process";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import { config } from "dotenv";
+import { seed } from "./seed-fn.mjs";
 
-config(); // Carrega .env
+config();
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, "..");
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -77,40 +83,67 @@ async function reset() {
         console.warn(`   ⚠ ${table}: ${err.message}`);
       }
     }
+    console.log("✅ Todas as tabelas removidas!\n");
 
-    // 3. Reabilitar FK checks
-    console.log("\n▶  Reabilitando foreign key checks...");
+    // 3. Recriar schema via schema-create.sql
+    console.log("🏗  Recriando schema via schema-create.sql...");
+    const sqlFile = join(ROOT, "schema-create.sql");
+    const sqlContent = readFileSync(sqlFile, "utf-8");
+
+    // Dividir em statements individuais (separados por ;)
+    // Remover comentários de linha e statements vazios
+    const statements = sqlContent
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => {
+        if (!s) return false;
+        // Remover linhas que são só comentários
+        const lines = s.split("\n").filter((l) => !l.trim().startsWith("--"));
+        return lines.join("\n").trim().length > 0;
+      });
+
+    let created = 0;
+    for (const stmt of statements) {
+      const cleanStmt = stmt
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("--"))
+        .join("\n")
+        .trim();
+
+      if (!cleanStmt) continue;
+
+      try {
+        await conn.execute(cleanStmt);
+        if (cleanStmt.toUpperCase().startsWith("CREATE TABLE")) {
+          const match = cleanStmt.match(/CREATE TABLE.*?`(\w+)`/i);
+          if (match) {
+            console.log(`   ✓ ${match[1]}`);
+            created++;
+          }
+        }
+      } catch (err) {
+        if (!err.message.includes("already exists")) {
+          console.warn(`   ⚠ ${err.message.substring(0, 100)}`);
+        }
+      }
+    }
+
+    // 4. Reabilitar FK checks
     await conn.execute("SET FOREIGN_KEY_CHECKS = 1");
+    console.log(`\n✅ Schema recriado! (${created} tabelas criadas)\n`);
 
     await conn.end();
-    console.log("✅ Todas as tabelas removidas!\n");
   } catch (err) {
-    await conn.execute("SET FOREIGN_KEY_CHECKS = 1").catch(() => {});
+    try { await conn.execute("SET FOREIGN_KEY_CHECKS = 1"); } catch {}
     await conn.end();
     throw err;
   }
 
-  // 4. Recriar schema via drizzle-kit push
-  console.log("🏗  Recriando schema com drizzle-kit push...");
-  try {
-    execSync("pnpm drizzle-kit push", { stdio: "inherit" });
-    console.log("✅ Schema recriado!\n");
-  } catch (err) {
-    console.error("❌ Erro ao recriar schema:", err.message);
-    process.exit(1);
-  }
-
   // 5. Rodar seed
   console.log("🌱 Rodando seed...");
-  try {
-    execSync("node server/seed.mjs", { stdio: "inherit" });
-    console.log("✅ Seed concluído!\n");
-  } catch (err) {
-    console.error("❌ Erro ao rodar seed:", err.message);
-    process.exit(1);
-  }
+  await seed();
 
-  console.log("🎉 Reset completo! Banco de dados recriado do zero.");
+  console.log("\n🎉 Reset completo! Banco de dados recriado do zero.");
   process.exit(0);
 }
 
