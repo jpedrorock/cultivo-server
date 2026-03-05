@@ -77,19 +77,29 @@ export const appRouter = router({
       if (!database) throw new Error("DB not available");
       const tent = await db.getTentById(input.id);
       if (!tent) return undefined;
-      // Para estufas de manutenção, buscar último evento de clonagem
+      // Para estufas de manutenção, buscar último evento de clonagem e último ciclo com clonesProduced
       let lastCloningAt: number | null = null;
       let lastCloningCount: number | null = null;
       if (tent.category === 'MAINTENANCE') {
-        const lastCloning = await database
+        // lastCloningAt: data do último cloningEvent (quando a estufa foi para clonagem)
+        const lastCloningEvent = await database
           .select()
           .from(cloningEvents)
           .where(eq(cloningEvents.tentId, tent.id))
           .orderBy(desc(cloningEvents.startDate))
           .limit(1);
-        if (lastCloning[0]) {
-          lastCloningAt = new Date(lastCloning[0].startDate).getTime();
-          lastCloningCount = lastCloning[0].clonesProduced ?? null;
+        if (lastCloningEvent[0]) {
+          lastCloningAt = new Date(lastCloningEvent[0].startDate).getTime();
+        }
+        // lastCloningCount: número de clones produzidos no último ciclo com clonesProduced
+        const lastCycleWithClones = await database
+          .select({ clonesProduced: cycles.clonesProduced })
+          .from(cycles)
+          .where(and(eq(cycles.tentId, tent.id), isNotNull(cycles.clonesProduced)))
+          .orderBy(desc(cycles.createdAt))
+          .limit(1);
+        if (lastCycleWithClones[0]) {
+          lastCloningCount = lastCycleWithClones[0].clonesProduced ?? null;
         }
       }
       return { ...tent, lastCloningAt, lastCloningCount };
@@ -4021,10 +4031,7 @@ export const appRouter = router({
         
         await database
           .delete(fertilizationPresets)
-          .where(and(
-            eq(fertilizationPresets.id, input.id),
-            
-          ));
+          .where(eq(fertilizationPresets.id, input.id));
         
         return { success: true };
       }),
@@ -4055,10 +4062,7 @@ export const appRouter = router({
             irrigationsPerWeek: input.irrigationsPerWeek?.toString(),
             calculationMode: input.calculationMode,
           })
-          .where(and(
-            eq(fertilizationPresets.id, input.id),
-            
-          ));
+          .where(eq(fertilizationPresets.id, input.id));
         
         return { success: true };
       }),
@@ -4112,10 +4116,7 @@ export const appRouter = router({
         
         await database
           .delete(wateringPresets)
-          .where(and(
-            eq(wateringPresets.id, input.id),
-            
-          ));
+          .where(eq(wateringPresets.id, input.id));
         
         return { success: true };
       }),
@@ -4144,10 +4145,7 @@ export const appRouter = router({
             phase: input.phase,
             weekNumber: input.weekNumber,
           })
-          .where(and(
-            eq(wateringPresets.id, input.id),
-            
-          ));
+          .where(eq(wateringPresets.id, input.id));
         
         return { success: true };
       }),

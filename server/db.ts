@@ -165,19 +165,29 @@ export async function getAllTents(): Promise<(Tent & { plantCount: number; seedl
         .orderBy(desc(dailyLogs.logDate))
         .limit(1);
 
-      // Para estufas de manutenção, buscar último evento de clonagem
+      // Para estufas de manutenção, buscar último evento de clonagem e último ciclo com clonesProduced
       let lastCloningAt: number | null = null;
       let lastCloningCount: number | null = null;
       if (tent.category === 'MAINTENANCE') {
-        const lastCloning = await db
+        // lastCloningAt: data do último cloningEvent (quando a estufa foi para clonagem)
+        const lastCloningEvent = await db
           .select()
           .from(cloningEvents)
           .where(eq(cloningEvents.tentId, tent.id))
           .orderBy(desc(cloningEvents.startDate))
           .limit(1);
-        if (lastCloning[0]) {
-          lastCloningAt = new Date(lastCloning[0].startDate).getTime();
-          lastCloningCount = lastCloning[0].clonesProduced ?? null;
+        if (lastCloningEvent[0]) {
+          lastCloningAt = new Date(lastCloningEvent[0].startDate).getTime();
+        }
+        // lastCloningCount: número de clones produzidos no último ciclo com clonesProduced
+        const lastCycleWithClones = await db
+          .select({ clonesProduced: cycles.clonesProduced })
+          .from(cycles)
+          .where(and(eq(cycles.tentId, tent.id), isNotNull(cycles.clonesProduced)))
+          .orderBy(desc(cycles.createdAt))
+          .limit(1);
+        if (lastCycleWithClones[0]) {
+          lastCloningCount = lastCycleWithClones[0].clonesProduced ?? null;
         }
       }
       
