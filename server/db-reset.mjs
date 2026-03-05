@@ -32,6 +32,7 @@ if (!DATABASE_URL) {
 const TABLES_DROP_ORDER = [
   "alertHistory",
   "alertSettings",
+  "safetyLimits",
   "alerts",
   "taskInstances",
   "taskTemplates",
