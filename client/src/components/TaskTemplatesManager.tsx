@@ -17,9 +17,11 @@ import { toast } from "sonner";
 type Phase = "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
 type Context = "TENT_A" | "TENT_BC";
 
-// Mapeamento semântico: context representa o tipo de ciclo, não a estufa física
-// TENT_A = ciclos de Manutenção (estufas configuradas como MAINTENANCE)
-// TENT_BC = ciclos de Vega/Flora/Secagem (estufas configuradas como VEGA/FLORA/DRYING)
+// O context é derivado automaticamente da fase — o usuário não precisa escolher
+// MAINTENANCE → TENT_A | VEGA / FLORA / DRYING → TENT_BC
+function getContextFromPhase(phase: Phase): Context {
+  return phase === "MAINTENANCE" ? "TENT_A" : "TENT_BC";
+}
 
 interface TaskTemplate {
   id: number;
@@ -36,13 +38,6 @@ const PHASE_LABELS: Record<Phase, string> = {
   MAINTENANCE: "Manutenção",
   DRYING: "Secagem",
 };
-
-// Labels do contexto: mostra o tipo de ciclo, não o nome físico da estufa
-const CONTEXT_LABELS: Record<Context, string> = {
-  TENT_A: "Ciclo de Manutenção",
-  TENT_BC: "Ciclo Vega / Flora / Secagem",
-};
-
 
 const PHASE_COLORS: Record<Phase, string> = {
   VEGA: "bg-green-500/10 text-green-700 border-green-200",
@@ -63,7 +58,6 @@ export function TaskTemplatesManager() {
     description: "",
     phase: "VEGA" as Phase,
     weekNumber: 1,
-    context: "TENT_BC" as Context,
   });
 
   const { data: templates, isLoading } = trpc.taskTemplates.list.useQuery();
@@ -108,11 +102,10 @@ export function TaskTemplatesManager() {
         description: template.description || "",
         phase: template.phase,
         weekNumber: template.weekNumber || 1,
-        context: template.context,
       });
     } else {
       setEditingTemplate(null);
-      setFormData({ title: "", description: "", phase: "VEGA", weekNumber: 1, context: "TENT_BC" });
+      setFormData({ title: "", description: "", phase: "VEGA", weekNumber: 1 });
     }
     setDialogOpen(true);
   };
@@ -120,7 +113,7 @@ export function TaskTemplatesManager() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingTemplate(null);
-    setFormData({ title: "", description: "", phase: "VEGA", weekNumber: 1, context: "TENT_BC" });
+    setFormData({ title: "", description: "", phase: "VEGA", weekNumber: 1 });
   };
 
   const handleSubmit = () => {
@@ -128,9 +121,13 @@ export function TaskTemplatesManager() {
       toast.error("Título é obrigatório");
       return;
     }
+    // Context é derivado automaticamente da fase
     const payload = {
-      ...formData,
-      weekNumber: formData.phase === "MAINTENANCE" ? null : formData.weekNumber,
+      title: formData.title,
+      description: formData.description,
+      phase: formData.phase,
+      weekNumber: formData.phase === "MAINTENANCE" || formData.phase === "DRYING" ? null : formData.weekNumber,
+      context: getContextFromPhase(formData.phase),
     };
     if (editingTemplate) {
       updateMutation.mutate({ id: editingTemplate.id, ...payload });
@@ -181,7 +178,7 @@ export function TaskTemplatesManager() {
         <div className="min-w-0">
           <h2 className="text-xl font-bold text-foreground">Templates de Tarefas</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Crie, edite ou remova templates por fase e tipo de ciclo
+            Crie, edite ou remova templates por fase do ciclo
           </p>
         </div>
         <AnimatedButton
@@ -257,9 +254,6 @@ export function TaskTemplatesManager() {
                                 {template.description}
                               </p>
                             )}
-                            <p className="text-xs text-muted-foreground/70">
-                              {CONTEXT_LABELS[template.context as Context]}
-                            </p>
                           </div>
 
                           {/* Ações — touch targets 44px */}
@@ -319,11 +313,12 @@ export function TaskTemplatesManager() {
             <DialogDescription>
               {editingTemplate
                 ? "Atualize os dados do template"
-                : "Crie um novo template de tarefa para uma fase"}
+                : "Crie um novo template de tarefa para uma fase do ciclo"}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-1">
+            {/* Título */}
             <div className="space-y-1.5">
               <Label htmlFor="tmpl-title">Título *</Label>
               <Input
@@ -335,6 +330,7 @@ export function TaskTemplatesManager() {
               />
             </div>
 
+            {/* Descrição */}
             <div className="space-y-1.5">
               <Label htmlFor="tmpl-desc">Descrição</Label>
               <Textarea
@@ -346,60 +342,34 @@ export function TaskTemplatesManager() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="tmpl-phase">Fase *</Label>
-                <Select
-                  value={formData.phase}
-                  onValueChange={(v) => setFormData({ ...formData, phase: v as Phase })}
-                >
-                  <SelectTrigger id="tmpl-phase" className="h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="VEGA">Vegetativo</SelectItem>
-                    <SelectItem value="FLORA">Floração</SelectItem>
-                    <SelectItem value="MAINTENANCE">Manutenção</SelectItem>
-                    <SelectItem value="DRYING">Secagem</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="tmpl-context">Tipo de Ciclo *</Label>
-                <Select
-                  value={formData.context}
-                  onValueChange={(v) => setFormData({ ...formData, context: v as Context })}
-                >
-                  <SelectTrigger id="tmpl-context" className="h-11">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TENT_BC">
-                      <div className="flex flex-col">
-                        <span>Vega / Flora / Secagem</span>
-                        <span className="text-xs text-muted-foreground">Ciclos produtivos</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="TENT_A">
-                      <div className="flex flex-col">
-                        <span>Manutenção</span>
-                        <span className="text-xs text-muted-foreground">Ciclos de manutenção</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Fase — ocupa linha inteira */}
+            <div className="space-y-1.5">
+              <Label htmlFor="tmpl-phase">Fase do ciclo *</Label>
+              <Select
+                value={formData.phase}
+                onValueChange={(v) => setFormData({ ...formData, phase: v as Phase })}
+              >
+                <SelectTrigger id="tmpl-phase" className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="VEGA">Vegetativo</SelectItem>
+                  <SelectItem value="FLORA">Floração</SelectItem>
+                  <SelectItem value="DRYING">Secagem</SelectItem>
+                  <SelectItem value="MAINTENANCE">Manutenção</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {formData.phase !== "MAINTENANCE" && (
+            {/* Semana — apenas para Vega e Flora */}
+            {(formData.phase === "VEGA" || formData.phase === "FLORA") && (
               <div className="space-y-1.5">
-                <Label htmlFor="tmpl-week">Semana *</Label>
+                <Label htmlFor="tmpl-week">Semana do ciclo *</Label>
                 <Input
                   id="tmpl-week"
                   type="number"
                   min={1}
-                  max={12}
+                  max={16}
                   value={formData.weekNumber}
                   onChange={(e) =>
                     setFormData({ ...formData, weekNumber: parseInt(e.target.value) || 1 })
