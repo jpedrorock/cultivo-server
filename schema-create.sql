@@ -48,20 +48,24 @@ CREATE TABLE IF NOT EXISTS `strains` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. CYCLES (Ciclos de cultivo)
+-- NOTA: motherPlantId referencia plants, mas plants ainda não existe aqui.
+-- A FK é adicionada via ALTER TABLE após a criação de plants (veja abaixo).
 CREATE TABLE IF NOT EXISTS `cycles` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `tentId`          INT NOT NULL,
-  `strainId`        INT NOT NULL,
-  `startDate`       TIMESTAMP NOT NULL,
-  `floraStartDate`  TIMESTAMP,
-  `dryingStartDate` TIMESTAMP,
-  `endDate`         TIMESTAMP,
-  `status`          ENUM('ACTIVE', 'FINISHED') DEFAULT 'ACTIVE' NOT NULL,
-  `notes`           TEXT,
-  `createdAt`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  `updatedAt`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `tentId`           INT NOT NULL,
+  `strainId`         INT,
+  `startDate`        TIMESTAMP NOT NULL,
+  `cloningStartDate` TIMESTAMP,
+  `floraStartDate`   TIMESTAMP,
+  `motherPlantId`    INT,
+  `clonesProduced`   INT,
+  `harvestWeight`    DECIMAL(10,2),
+  `harvestNotes`     TEXT,
+  `status`           ENUM('ACTIVE', 'FINISHED') DEFAULT 'ACTIVE' NOT NULL,
+  `createdAt`        TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  `updatedAt`        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (`tentId`)   REFERENCES `tents`(`id`)   ON DELETE CASCADE,
-  FOREIGN KEY (`strainId`) REFERENCES `strains`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`strainId`) REFERENCES `strains`(`id`) ON DELETE SET NULL,
   INDEX `tentIdx`   (`tentId`),
   INDEX `strainIdx` (`strainId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -355,6 +359,11 @@ CREATE TABLE IF NOT EXISTS `plants` (
   INDEX `statusIdx` (`status`),
   INDEX `stageIdx`  (`plantStage`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Agora que plants existe, adicionar a FK de motherPlantId em cycles
+ALTER TABLE `cycles`
+  ADD CONSTRAINT `cycles_motherPlantId_plants_id_fk`
+  FOREIGN KEY (`motherPlantId`) REFERENCES `plants`(`id`) ON DELETE SET NULL;
 
 -- 22. PLANT TENT HISTORY
 CREATE TABLE IF NOT EXISTS `plantTentHistory` (
