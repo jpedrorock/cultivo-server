@@ -17,6 +17,10 @@ import { toast } from "sonner";
 type Phase = "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
 type Context = "TENT_A" | "TENT_BC";
 
+// Mapeamento semântico: context representa o tipo de ciclo, não a estufa física
+// TENT_A = ciclos de Manutenção (estufas configuradas como MAINTENANCE)
+// TENT_BC = ciclos de Vega/Flora/Secagem (estufas configuradas como VEGA/FLORA/DRYING)
+
 interface TaskTemplate {
   id: number;
   title: string;
@@ -32,6 +36,13 @@ const PHASE_LABELS: Record<Phase, string> = {
   MAINTENANCE: "Manutenção",
   DRYING: "Secagem",
 };
+
+// Labels do contexto: mostra o tipo de ciclo, não o nome físico da estufa
+const CONTEXT_LABELS: Record<Context, string> = {
+  TENT_A: "Ciclo de Manutenção",
+  TENT_BC: "Ciclo Vega / Flora / Secagem",
+};
+
 
 const PHASE_COLORS: Record<Phase, string> = {
   VEGA: "bg-green-500/10 text-green-700 border-green-200",
@@ -170,7 +181,7 @@ export function TaskTemplatesManager() {
         <div className="min-w-0">
           <h2 className="text-xl font-bold text-foreground">Templates de Tarefas</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Crie, edite ou remova templates por fase e estufa
+            Crie, edite ou remova templates por fase e tipo de ciclo
           </p>
         </div>
         <AnimatedButton
@@ -247,7 +258,7 @@ export function TaskTemplatesManager() {
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground/70">
-                              {template.context === "TENT_A" ? "Estufa A" : "Estufas B/C"}
+                              {CONTEXT_LABELS[template.context as Context]}
                             </p>
                           </div>
 
@@ -355,7 +366,7 @@ export function TaskTemplatesManager() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="tmpl-context">Estufa *</Label>
+                <Label htmlFor="tmpl-context">Tipo de Ciclo *</Label>
                 <Select
                   value={formData.context}
                   onValueChange={(v) => setFormData({ ...formData, context: v as Context })}
@@ -364,8 +375,18 @@ export function TaskTemplatesManager() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="TENT_A">Estufa A</SelectItem>
-                    <SelectItem value="TENT_BC">Estufas B/C</SelectItem>
+                    <SelectItem value="TENT_BC">
+                      <div className="flex flex-col">
+                        <span>Vega / Flora / Secagem</span>
+                        <span className="text-xs text-muted-foreground">Ciclos produtivos</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="TENT_A">
+                      <div className="flex flex-col">
+                        <span>Manutenção</span>
+                        <span className="text-xs text-muted-foreground">Ciclos de manutenção</span>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>

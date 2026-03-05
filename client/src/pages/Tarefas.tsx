@@ -71,7 +71,7 @@ export default function Tarefas() {
   // Filtrar tarefas
   const filteredTasks =
     tasks?.filter((task) => {
-      if (selectedTent !== "all" && !task.tentName.includes(selectedTent)) return false;
+      if (selectedTent !== "all" && task.tentName !== selectedTent) return false;
       if (showOnlyPending && task.isDone) return false;
       return true;
     }) || [];
@@ -153,24 +153,17 @@ export default function Tarefas() {
                     >
                       Todas
                     </Button>
-                    {tentNames.map((tentName) => {
-                      const tentLetter = tentName.includes("A")
-                        ? "A"
-                        : tentName.includes("B")
-                          ? "B"
-                          : "C";
-                      return (
-                        <Button
-                          key={tentName}
-                          variant={selectedTent === tentLetter ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setSelectedTent(tentLetter)}
-                          className="shrink-0 h-9"
-                        >
-                          Estufa {tentLetter}
-                        </Button>
-                      );
-                    })}
+                    {tentNames.map((tentName) => (
+                      <Button
+                        key={tentName}
+                        variant={selectedTent === tentName ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedTent(tentName)}
+                        className="shrink-0 h-9"
+                      >
+                        {tentName}
+                      </Button>
+                    ))}
                   </div>
                 </div>
 
