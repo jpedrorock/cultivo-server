@@ -13,6 +13,7 @@ import { EditTentDialog } from "@/components/EditTentDialog";
 import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
 import { FinishCloningDialog } from "@/components/FinishCloningDialog";
 import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
+import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
 import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -727,6 +728,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const [selectedClonesCount, setSelectedClonesCount] = useState<number>(10);
   const [finishCloningOpen, setFinishCloningOpen] = useState(false);
   const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
+  const [harvestQueueOpen, setHarvestQueueOpen] = useState(false);
 
   // Mini-modal de confirmação de fase
   const [phaseConfirmOpen, setPhaseConfirmOpen] = useState(false);
@@ -1257,17 +1259,28 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   </Button>
                 )}
 
-                {/* Botão "Avançar para Secagem" — laranja, apenas em FLORA */}
+                {/* Botões FLORA: Aguardando Secagem (principal) + Ir direto para Secagem */}
                 {cycle && tent.category === "FLORA" && (
-                  <Button
-                    onClick={() => openPhaseConfirm("DRYING")}
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                  >
-                    <Wind className="w-4 h-4 mr-2" />
-                    Avançar para Secagem
-                  </Button>
+                  <>
+                    <Button
+                      onClick={() => setHarvestQueueOpen(true)}
+                      variant="default"
+                      size="sm"
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      <Wind className="w-4 h-4 mr-2" />
+                      Colher → Aguardando Secagem
+                    </Button>
+                    <Button
+                      onClick={() => openPhaseConfirm("DRYING")}
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-orange-300 text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-950"
+                    >
+                      <Wind className="w-4 h-4 mr-2" />
+                      Ir direto para Secagem
+                    </Button>
+                  </>
                 )}
 
                 {/* Botão "Finalizar Clonagem" — azul, apenas em CLONING */}
@@ -1363,6 +1376,16 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           cycleId={cycle.id}
           currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
           currentTentName={tent.name}
+        />
+      )}
+
+      {/* Harvest Queue Dialog */}
+      {cycle && (
+        <MoveToHarvestQueueDialog
+          open={harvestQueueOpen}
+          onOpenChange={setHarvestQueueOpen}
+          cycleId={cycle.id}
+          tentName={tent.name}
         />
       )}
     </Card>
