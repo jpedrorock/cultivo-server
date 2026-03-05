@@ -1232,12 +1232,60 @@ input[type="range"]::-moz-range-track {
   animation: badge-shake 0.6s ease-in-out;
 }
 
-/* iOS Safari fix: garante que o BottomNav (nav fixed) não seja afetado por
-   backdrop-filter de elementos irmãos, que quebra position:fixed no WebKit */
+/* Safe area utilities para iOS com notch/home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* ============================================================
+   FIX: position:fixed + backdrop-filter no iOS Safari / WebKit
+   
+   Problema: backdrop-filter em qualquer ancestral ou irmão de um
+   elemento fixed cria um novo stacking context no WebKit, fazendo
+   o elemento fixed rolar junto com a página.
+   
+   Solução:
+   1. O BottomNav usa position:fixed com translateZ(0) para forçar
+      composição independente na GPU.
+   2. O wrapper de conteúdo (.content-wrapper) usa isolation:isolate
+      para conter os stacking contexts internos sem afetar o BottomNav.
+   3. Os headers sticky com backdrop-blur são envolvidos por
+      .sticky-header-wrapper que também usa isolation:isolate.
+   ============================================================ */
+
+/* Garante que o BottomNav fique sempre fixo na GPU, independente
+   de backdrop-filter em elementos irmãos */
+nav[class*="fixed"],
+.bottom-nav-fixed {
+  position: fixed !important;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  /* Força contexto de composição próprio na GPU */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  /* Isola do stacking context dos pais */
+  isolation: isolate;
+  z-index: 50;
+}
+
+/* No iOS Safari, backdrop-blur em sticky headers quebra position:fixed.
+   Removemos o backdrop-blur nos headers sticky apenas no mobile iOS. */
 @supports (-webkit-touch-callout: none) {
-  nav.fixed {
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
-    will-change: transform;
+  /* Remove backdrop-blur de headers sticky no iOS para não quebrar o fixed nav */
+  header.sticky,
+  [class*="sticky"][class*="backdrop"],
+  .sticky.backdrop-blur-sm,
+  .sticky.backdrop-blur {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    /* Compensa com fundo sólido para manter legibilidade */
+    background-color: hsl(var(--card)) !important;
   }
 }

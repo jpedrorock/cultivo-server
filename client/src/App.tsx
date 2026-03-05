@@ -115,7 +115,10 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Sidebar />
-          <div className="pb-16 md:pb-0 md:pl-64">
+          <div
+            className="pb-16 md:pb-0 md:pl-64"
+            style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+          >
             <Router />
           </div>
           <BottomNav />

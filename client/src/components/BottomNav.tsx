@@ -80,11 +80,15 @@ export function BottomNav() {
       className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50 md:hidden"
       style={{
         // iOS Safari: backdrop-filter em elementos irmãos quebra position:fixed.
-        // translateZ(0) força um novo contexto de composição independente,
-        // garantindo que o menu fique fixo durante a rolagem.
-        transform: 'translateZ(0)',
-        WebkitTransform: 'translateZ(0)',
+        // translate3d(0,0,0) força um novo contexto de composição na GPU,
+        // garantindo que o menu fique fixo durante a rolação.
+        transform: 'translate3d(0, 0, 0)',
+        WebkitTransform: 'translate3d(0, 0, 0)',
         willChange: 'transform',
+        WebkitBackfaceVisibility: 'hidden',
+        backfaceVisibility: 'hidden',
+        // Padding bottom para safe-area (iPhone com notch/home indicator)
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
       <div className="max-w-screen-xl mx-auto px-4 py-3">
