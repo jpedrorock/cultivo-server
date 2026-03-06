@@ -31,9 +31,36 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+async function ensurePushSubscriptionsTable() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`pushSubscriptions\` (
+        \`id\`              INT AUTO_INCREMENT PRIMARY KEY,
+        \`endpoint\`        TEXT NOT NULL,
+        \`keysJson\`        TEXT NOT NULL,
+        \`reminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`reminderTimes\`   TEXT,
+        \`createdAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        \`updatedAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.end();
+    console.log("[DB] Tabela pushSubscriptions OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao criar pushSubscriptions:", err?.message);
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // Garantir que a tabela pushSubscriptions existe (migration incremental)
+  await ensurePushSubscriptionsTable();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();

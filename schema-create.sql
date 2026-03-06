@@ -607,6 +607,18 @@ CREATE TABLE IF NOT EXISTS `wateringApplications` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
+-- 33. PUSH SUBSCRIPTIONS (Subscriptions Web Push para notificações em background)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `pushSubscriptions` (
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `endpoint`        TEXT NOT NULL,
+  `keysJson`        TEXT NOT NULL,
+  `reminderEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `reminderTimes`   TEXT,
+  `createdAt`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  `updatedAt`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- ============================================================
 -- DADOS INICIAIS (seed mínimo para o app funcionar)
 -- ============================================================
 
