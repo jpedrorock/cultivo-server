@@ -4631,45 +4631,61 @@ export const appRouter = router({
         await database.delete(strains);
         await database.delete(tents);
 
-        // Inserir dados do backup
+        // Função auxiliar: converte strings ISO de data para objetos Date
+        // O Drizzle ORM com MySQL exige objetos Date para campos timestamp
+        const sanitizeDates = (rows: any[]): any[] =>
+          rows.map((row) => {
+            const out: Record<string, any> = {};
+            for (const [k, v] of Object.entries(row)) {
+              if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)) {
+                const d = new Date(v);
+                out[k] = isNaN(d.getTime()) ? v : d;
+              } else {
+                out[k] = v;
+              }
+            }
+            return out;
+          });
+
+        // Inserir dados do backup (com datas convertidas)
         if (input.data.tents && input.data.tents.length > 0) {
-          await database.insert(tents).values(input.data.tents);
+          await database.insert(tents).values(sanitizeDates(input.data.tents));
         }
         if (input.data.strains && input.data.strains.length > 0) {
-          await database.insert(strains).values(input.data.strains);
+          await database.insert(strains).values(sanitizeDates(input.data.strains));
         }
         if (input.data.cycles && input.data.cycles.length > 0) {
-          await database.insert(cycles).values(input.data.cycles);
+          await database.insert(cycles).values(sanitizeDates(input.data.cycles));
         }
         if (input.data.plants && input.data.plants.length > 0) {
-          await database.insert(plants).values(input.data.plants);
+          await database.insert(plants).values(sanitizeDates(input.data.plants));
         }
         if (input.data.dailyLogs && input.data.dailyLogs.length > 0) {
-          await database.insert(dailyLogs).values(input.data.dailyLogs);
+          await database.insert(dailyLogs).values(sanitizeDates(input.data.dailyLogs));
         }
         if (input.data.taskTemplates && input.data.taskTemplates.length > 0) {
-          await database.insert(taskTemplates).values(input.data.taskTemplates);
+          await database.insert(taskTemplates).values(sanitizeDates(input.data.taskTemplates));
         }
         if (input.data.alertSettings && input.data.alertSettings.length > 0) {
-          await database.insert(alertSettings).values(input.data.alertSettings);
+          await database.insert(alertSettings).values(sanitizeDates(input.data.alertSettings));
         }
         if (input.data.alerts && input.data.alerts.length > 0) {
-          await database.insert(alerts).values(input.data.alerts);
+          await database.insert(alerts).values(sanitizeDates(input.data.alerts));
         }
         if (input.data.plantPhotos && input.data.plantPhotos.length > 0) {
-          await database.insert(plantPhotos).values(input.data.plantPhotos);
+          await database.insert(plantPhotos).values(sanitizeDates(input.data.plantPhotos));
         }
         if (input.data.plantHealthLogs && input.data.plantHealthLogs.length > 0) {
-          await database.insert(plantHealthLogs).values(input.data.plantHealthLogs);
+          await database.insert(plantHealthLogs).values(sanitizeDates(input.data.plantHealthLogs));
         }
         if (input.data.recipeTemplates && input.data.recipeTemplates.length > 0) {
-          await database.insert(recipeTemplates).values(input.data.recipeTemplates);
+          await database.insert(recipeTemplates).values(sanitizeDates(input.data.recipeTemplates));
         }
         if (input.data.nutrientApplications && input.data.nutrientApplications.length > 0) {
-          await database.insert(nutrientApplications).values(input.data.nutrientApplications);
+          await database.insert(nutrientApplications).values(sanitizeDates(input.data.nutrientApplications));
         }
         if (input.data.wateringApplications && input.data.wateringApplications.length > 0) {
-          await database.insert(wateringApplications).values(input.data.wateringApplications);
+          await database.insert(wateringApplications).values(sanitizeDates(input.data.wateringApplications));
         }
 
          return { success: true, message: "Backup restaurado com sucesso" };
