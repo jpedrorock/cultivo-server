@@ -4922,7 +4922,7 @@ export const appRouter = router({
       configured: isPushConfigured(),
     })),
 
-    // Registrar subscription do dispositivo
+    // Registrar subscription do dispositivo (persiste no banco)
     subscribe: publicProcedure
       .input(
         z.object({
@@ -4934,11 +4934,39 @@ export const appRouter = router({
               auth: z.string(),
             }),
           }),
+          reminderEnabled: z.boolean().optional(),
+          reminderTimes: z.array(z.string()).optional(),
         })
       )
       .mutation(async ({ input }) => {
-        // userId fixo 1 para standalone (sem multi-user)
-        saveSubscription(1, input.subscription as any);
+        await saveSubscription(
+          input.subscription as any,
+          input.reminderEnabled,
+          input.reminderTimes
+        );
+        return { success: true };
+      }),
+
+    // Atualizar configurações de lembrete para um endpoint específico
+    updateReminderSettings: publicProcedure
+      .input(
+        z.object({
+          endpoint: z.string(),
+          reminderEnabled: z.boolean(),
+          reminderTimes: z.array(z.string()),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        const { pushSubscriptions } = await import("../drizzle/schema");
+        await database
+          .update(pushSubscriptions)
+          .set({
+            reminderEnabled: input.reminderEnabled,
+            reminderTimes: JSON.stringify(input.reminderTimes),
+          })
+          .where(eq(pushSubscriptions.endpoint, input.endpoint));
         return { success: true };
       }),
 
@@ -4947,7 +4975,8 @@ export const appRouter = router({
       if (!isPushConfigured()) {
         throw new Error("Web Push não configurado. Adicione VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no .env");
       }
-      await sendPushToUser(1, {
+      const { sendPushToAll } = await import("./pushService");
+      await sendPushToAll({
         title: "🧪 Teste — App Cultivo",
         body: "Notificações Push funcionando! 🌱",
         url: "/",

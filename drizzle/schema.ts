@@ -882,3 +882,24 @@ export const wateringApplications = mysqlTable("wateringApplications", {
 
 export type WateringApplication = typeof wateringApplications.$inferSelect;
 export type InsertWateringApplication = typeof wateringApplications.$inferInsert;
+
+/**
+ * Push Subscriptions — persiste subscriptions Web Push no banco
+ * Evita perda de subscriptions quando o servidor reinicia
+ */
+export const pushSubscriptions = mysqlTable("pushSubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  // Endpoint único da subscription (identifica o dispositivo)
+  endpoint: varchar("endpoint", { length: 512 }).notNull().unique(),
+  // Chaves da subscription (JSON serializado)
+  keysJson: text("keysJson").notNull(),
+  // Horários de lembrete configurados para este dispositivo (JSON array: ["08:00","20:00"])
+  reminderTimes: text("reminderTimes"),
+  // Lembrete diário ativado
+  reminderEnabled: boolean("reminderEnabled").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;

@@ -104,35 +104,9 @@ export default function QuickLog() {
   // Save daily log mutation
   const saveDailyLogMutation = trpc.dailyLogs.create.useMutation({
     onSuccess: () => {
-      if (plants.length === 0) {
-        // No plants in tent
-        toast.success("✅ Registro da estufa salvo com sucesso!");
-        resetForm();
-        setTimeout(() => setLocation("/"), 1500);
-      } else if (recordPlantHealth === false) {
-        // User initially said no, but ask again
-        toast.success("✅ Registro da estufa salvo!", {
-          description: "Deseja registrar saúde das plantas agora?",
-          action: {
-            label: "Sim, registrar",
-            onClick: () => {
-              setRecordPlantHealth(true);
-              setCurrentStep(9); // Go to plant health
-            },
-          },
-          cancel: {
-            label: "Não, voltar",
-            onClick: () => {
-              resetForm();
-              setLocation("/");
-            },
-          },
-        });
-      } else {
-        // Continue to plant health
-        toast.success("✅ Registro da estufa salvo!");
-        setCurrentStep(9); // Go to first plant health step
-      }
+      // Log saved — advance to plant health question (step 9)
+      // Step 9 shows confirmation + option to record plant health
+      setCurrentStep(9);
     },
     onError: (error) => {
       toast.error(`Erro ao salvar: ${error.message}`);
@@ -767,6 +741,9 @@ export default function QuickLog() {
             {/* Step 9: Plant health question */}
             {currentStep === 9 && recordPlantHealth === null && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
+                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                  ✅ Registro da estufa salvo! Deseja também registrar a saúde das plantas?
+                </p>
                 <Button
                   onClick={() => setRecordPlantHealth(true)}
                   className="w-full h-16 text-lg font-semibold rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 shadow-lg"
@@ -775,23 +752,16 @@ export default function QuickLog() {
                   Registrar Saúde das Plantas
                 </Button>
                 <Button
-                  onClick={handleSaveDailyLog}
-                  disabled={saveDailyLogMutation.isPending}
+                  onClick={() => {
+                    resetForm();
+                    setLocation("/");
+                  }}
                   variant="outline"
                   className="w-full h-16 text-lg font-semibold rounded-2xl border-2"
                 >
-                  {saveDailyLogMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <SkipForward className="mr-2 h-6 w-6" />
-                      Pular e Finalizar
-                </>  
-              )}
-            </Button>
+                  <SkipForward className="mr-2 h-6 w-6" />
+                  Finalizar
+                </Button>
               </div>
             )}
 
@@ -978,17 +948,27 @@ export default function QuickLog() {
           </Button>
         )}
 
-        {/* Continue button on summary */}
+        {/* Continue button on summary - saves daily log first */}
         {currentStep === 8 && (
           <Button
             onClick={() => {
               triggerHaptic('medium');
-              setCurrentStep(9);
+              handleSaveDailyLog();
             }}
+            disabled={saveDailyLogMutation.isPending}
             className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
           >
-            <Check className="mr-2 h-5 w-5" />
-            Continuar
+            {saveDailyLogMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Check className="mr-2 h-5 w-5" />
+                Salvar Registro
+              </>
+            )}
           </Button>
         )}
 

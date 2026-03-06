@@ -42,6 +42,10 @@ async function startServer() {
   const { startAlertsCheckerCron } = await import("../cron/alertsChecker");
   startAlertsCheckerCron();
 
+  // Inicializar cron job de lembretes diários (verifica a cada minuto)
+  const { startDailyReminderCron } = await import("../cron/dailyReminder");
+  startDailyReminderCron();
+
   // Body parser com limite maior para uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -89,7 +93,8 @@ async function startServer() {
     console.log(`\n🌱 App Cultivo Server rodando em http://localhost:${port}/`);
     console.log(`📁 Uploads: ${uploadsPath}`);
     console.log(`🔐 Auth: JWT (email/senha)`);
-    console.log(`⏰ AlertsChecker: Cron job ativo\n`);
+    console.log(`⏰ AlertsChecker: Cron job ativo`);
+  console.log(`🔔 DailyReminder: Cron job ativo\n`);
   });
 }
 

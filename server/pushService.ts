@@ -1,6 +1,7 @@
 /**
  * Web Push Service — App Cultivo
  * Gerencia subscriptions e envio de notificações push via VAPID
+ * Subscriptions são persistidas no banco para sobreviver a restarts do servidor
  */
 import webpush from "web-push";
 
@@ -15,37 +16,110 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   console.warn("[PushService] VAPID keys not configured — Web Push disabled");
 }
 
-// Armazenamento em memória das subscriptions (por userId)
-// Em produção, persistir no banco de dados
-const subscriptions = new Map<number, webpush.PushSubscription[]>();
-
 /**
- * Registrar ou atualizar subscription de um usuário
+ * Salvar ou atualizar subscription no banco de dados
  */
-export function saveSubscription(userId: number, subscription: webpush.PushSubscription): void {
-  const existing = subscriptions.get(userId) || [];
-  // Evitar duplicatas pelo endpoint
-  const filtered = existing.filter((s) => s.endpoint !== subscription.endpoint);
-  subscriptions.set(userId, [...filtered, subscription]);
-  console.log(`[PushService] Subscription saved for user ${userId}`);
+export async function saveSubscription(
+  subscription: webpush.PushSubscription,
+  reminderEnabled?: boolean,
+  reminderTimes?: string[]
+): Promise<void> {
+  try {
+    const { getDb } = await import("./db");
+    const { pushSubscriptions } = await import("../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const database = await getDb();
+    if (!database) {
+      console.warn("[PushService] Database not available, subscription not persisted");
+      return;
+    }
+
+    const keysJson = JSON.stringify((subscription as any).keys || {});
+    const reminderTimesJson = reminderTimes ? JSON.stringify(reminderTimes) : null;
+
+    // Verificar se já existe
+    const existing = await database
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
+      .limit(1);
+
+    if (existing.length > 0) {
+      // Atualizar
+      await database
+        .update(pushSubscriptions)
+        .set({
+          keysJson,
+          reminderEnabled: reminderEnabled ?? existing[0].reminderEnabled,
+          reminderTimes: reminderTimesJson ?? existing[0].reminderTimes,
+        })
+        .where(eq(pushSubscriptions.endpoint, subscription.endpoint));
+    } else {
+      // Inserir novo
+      await database.insert(pushSubscriptions).values({
+        endpoint: subscription.endpoint,
+        keysJson,
+        reminderEnabled: reminderEnabled ?? false,
+        reminderTimes: reminderTimesJson,
+      });
+    }
+
+    console.log(`[PushService] Subscription saved to DB: ${subscription.endpoint.slice(-20)}`);
+  } catch (error) {
+    console.error("[PushService] Error saving subscription:", error);
+  }
 }
 
 /**
- * Remover subscription de um usuário
+ * Remover subscription do banco
  */
-export function removeSubscription(userId: number, endpoint: string): void {
-  const existing = subscriptions.get(userId) || [];
-  subscriptions.set(
-    userId,
-    existing.filter((s) => s.endpoint !== endpoint)
-  );
+export async function removeSubscription(endpoint: string): Promise<void> {
+  try {
+    const { getDb } = await import("./db");
+    const { pushSubscriptions } = await import("../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const database = await getDb();
+    if (!database) return;
+
+    await database
+      .delete(pushSubscriptions)
+      .where(eq(pushSubscriptions.endpoint, endpoint));
+
+    console.log(`[PushService] Subscription removed: ${endpoint.slice(-20)}`);
+  } catch (error) {
+    console.error("[PushService] Error removing subscription:", error);
+  }
 }
 
 /**
- * Enviar notificação push para um usuário
+ * Buscar todas as subscriptions do banco
  */
-export async function sendPushToUser(
-  userId: number,
+async function getAllSubscriptions(): Promise<Array<{
+  endpoint: string;
+  keysJson: string;
+  reminderEnabled: boolean;
+  reminderTimes: string | null;
+}>> {
+  try {
+    const { getDb } = await import("./db");
+    const { pushSubscriptions } = await import("../drizzle/schema");
+
+    const database = await getDb();
+    if (!database) return [];
+
+    return await database.select().from(pushSubscriptions);
+  } catch (error) {
+    console.error("[PushService] Error fetching subscriptions:", error);
+    return [];
+  }
+}
+
+/**
+ * Enviar notificação push para todos os dispositivos registrados
+ */
+export async function sendPushToAll(
   payload: { title: string; body: string; url?: string; tag?: string }
 ): Promise<void> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
@@ -53,9 +127,9 @@ export async function sendPushToUser(
     return;
   }
 
-  const userSubs = subscriptions.get(userId);
-  if (!userSubs || userSubs.length === 0) {
-    console.log(`[PushService] No subscriptions for user ${userId}`);
+  const allSubs = await getAllSubscriptions();
+  if (allSubs.length === 0) {
+    console.log("[PushService] No subscriptions found");
     return;
   }
 
@@ -66,31 +140,38 @@ export async function sendPushToUser(
     tag: payload.tag || "cultivo-notification",
   });
 
-  const results = await Promise.allSettled(
-    userSubs.map((sub) =>
-      webpush.sendNotification(sub, payloadStr, {
-        TTL: 86400, // 24 horas
-      })
-    )
-  );
+  for (const sub of allSubs) {
+    try {
+      let keys: any = {};
+      try { keys = JSON.parse(sub.keysJson); } catch {}
 
-  // Remover subscriptions inválidas (expiradas ou canceladas)
-  const valid: webpush.PushSubscription[] = [];
-  results.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      valid.push(userSubs[index]);
-    } else {
-      const err = result.reason as any;
+      const pushSub: webpush.PushSubscription = {
+        endpoint: sub.endpoint,
+        keys,
+      };
+
+      await webpush.sendNotification(pushSub, payloadStr, { TTL: 86400 });
+    } catch (err: any) {
       if (err?.statusCode === 410 || err?.statusCode === 404) {
-        console.log(`[PushService] Removing expired subscription for user ${userId}`);
+        // Subscription expirada — remover do banco
+        await removeSubscription(sub.endpoint);
+        console.log(`[PushService] Removed expired subscription: ${sub.endpoint.slice(-20)}`);
       } else {
-        // Manter subscription se o erro for temporário
-        valid.push(userSubs[index]);
-        console.error(`[PushService] Push error for user ${userId}:`, err?.message);
+        console.error(`[PushService] Push error:`, err?.message);
       }
     }
-  });
-  subscriptions.set(userId, valid);
+  }
+}
+
+/**
+ * Enviar notificação push para um endpoint específico (legado — mantido para compatibilidade)
+ */
+export async function sendPushToUser(
+  _userId: number,
+  payload: { title: string; body: string; url?: string; tag?: string }
+): Promise<void> {
+  // Redireciona para sendPushToAll pois não temos userId por dispositivo
+  await sendPushToAll(payload);
 }
 
 /**
@@ -105,4 +186,59 @@ export function getVapidPublicKey(): string {
  */
 export function isPushConfigured(): boolean {
   return !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+}
+
+/**
+ * Verificar e enviar lembretes diários para dispositivos com horários configurados
+ * Chamado a cada minuto pelo cron job
+ */
+export async function checkAndSendDailyReminders(): Promise<void> {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+
+  const now = new Date();
+  const currentHour = now.getHours().toString().padStart(2, "0");
+  const currentMinute = now.getMinutes().toString().padStart(2, "0");
+  const currentTime = `${currentHour}:${currentMinute}`;
+
+  const allSubs = await getAllSubscriptions();
+  let sent = 0;
+
+  for (const sub of allSubs) {
+    if (!sub.reminderEnabled || !sub.reminderTimes) continue;
+
+    let times: string[] = [];
+    try { times = JSON.parse(sub.reminderTimes); } catch { continue; }
+
+    if (!times.includes(currentTime)) continue;
+
+    try {
+      let keys: any = {};
+      try { keys = JSON.parse(sub.keysJson); } catch {}
+
+      const pushSub: webpush.PushSubscription = {
+        endpoint: sub.endpoint,
+        keys,
+      };
+
+      const payload = JSON.stringify({
+        title: "📝 Hora de Registrar!",
+        body: "Não esqueça de registrar os dados das suas estufas.",
+        url: "/quick-log",
+        tag: "daily-reminder",
+      });
+
+      await webpush.sendNotification(pushSub, payload, { TTL: 3600 });
+      sent++;
+    } catch (err: any) {
+      if (err?.statusCode === 410 || err?.statusCode === 404) {
+        await removeSubscription(sub.endpoint);
+      } else {
+        console.error(`[PushService] Reminder push error:`, err?.message);
+      }
+    }
+  }
+
+  if (sent > 0) {
+    console.log(`[PushService] Sent ${sent} daily reminder(s) at ${currentTime}`);
+  }
 }

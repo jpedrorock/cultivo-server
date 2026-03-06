@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, BellOff, Clock, AlertTriangle, CheckSquare, ArrowLeft } from "lucide-react";
+import { Bell, BellOff, Clock, AlertTriangle, CheckSquare, ArrowLeft, Save } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 import {
   isNotificationSupported,
   getNotificationPermission,
@@ -35,10 +36,14 @@ export default function AlertSettings() {
   const [config, setConfig] = useState<NotificationConfig>(DEFAULT_CONFIG);
   const [newReminderTime, setNewReminderTime] = useState<string>("08:00");
   const [permission, setPermission] = useState<string>(getNotificationPermission());
+  const [isSyncing, setIsSyncing] = useState(false);
   // Ref para controlar se já carregou do localStorage (evita salvar no primeiro render)
   const loadedRef = useRef(false);
   // Ref para o cleanup dos lembretes agendados
   const cleanupRemindersRef = useRef<(() => void) | null>(null);
+
+  // Mutation para sincronizar configurações de lembrete com o banco
+  const updateReminderMutation = trpc.push.updateReminderSettings.useMutation();
 
   // ── Carregar configurações do localStorage apenas uma vez ──────────────────
   useEffect(() => {
@@ -177,13 +182,53 @@ export default function AlertSettings() {
       return { ...prev, reminderTimes: newTimes };
     });
   }, []);
-
   const handlePresetTimes = useCallback(() => {
     setConfig((prev) => ({ ...prev, reminderTimes: ["08:00", "20:00"] }));
     toast.success("Horários 8h e 20h configurados!");
   }, []);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Sincronizar configurações de lembrete com o servidor (para push em background)
+  const handleSyncToServer = useCallback(async () => {
+    if (permission !== "granted") {
+      toast.error("Ative as notificações primeiro!");
+      return;
+    }
+    if (config.reminderTimes.length === 0 && config.dailyReminderEnabled) {
+      toast.error("Adicione pelo menos um horário de lembrete!");
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      // Obter a subscription atual do Service Worker
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        toast.error("Push não suportado neste navegador");
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        toast.error("Dispositivo não registrado para push. Ative as notificações na página de Notificações.");
+        return;
+      }
+
+      await updateReminderMutation.mutateAsync({
+        endpoint: subscription.endpoint,
+        reminderEnabled: config.dailyReminderEnabled,
+        reminderTimes: config.reminderTimes,
+      });
+
+      toast.success("✅ Lembretes sincronizados com o servidor! Você receberá notificações mesmo com o app fechado.");
+    } catch (error: any) {
+      toast.error(`Erro ao sincronizar: ${error?.message || "Tente novamente"}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [permission, config.dailyReminderEnabled, config.reminderTimes, updateReminderMutation]);
+
+  // ── Render ────────────────────────────────────────────────────────────────────────────────────
 
   if (!isNotificationSupported()) {
     return (
@@ -383,6 +428,29 @@ export default function AlertSettings() {
                           Adicionar
                         </Button>
                       </div>
+                    </div>
+
+                    {/* Sync to Server */}
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        🔔 Para receber notificações mesmo com o app fechado, sincronize com o servidor:
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={handleSyncToServer}
+                        disabled={isSyncing}
+                        className="w-full"
+                        variant="default"
+                      >
+                        {isSyncing ? (
+                          "Sincronizando..."
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Salvar Lembretes no Servidor
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 )}
