@@ -92,8 +92,8 @@ export function BottomNav() {
         backfaceVisibility: 'hidden',
         // Padding bottom para safe-area (iPhone com notch/home indicator)
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        // Garantir que fica acima de tudo
-        zIndex: 9999,
+        // zIndex 100: acima dos headers sticky (z-10/z-40) mas abaixo dos modais/sheets (z-[200]+)
+        zIndex: 100,
       }}
     >
       <div className="max-w-screen-xl mx-auto px-4 py-3">
