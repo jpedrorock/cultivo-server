@@ -13,7 +13,8 @@
     "db:push": "drizzle-kit push",
     "db:seed": "node server/seed.mjs",
     "db:reset": "node server/seed.mjs",
-    "db:restart": "node server/db-reset.mjs"
+    "db:restart": "node server/db-reset.mjs",
+    "postbuild": "node server/db-reset.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
