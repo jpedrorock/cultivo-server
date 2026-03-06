@@ -793,6 +793,10 @@ export const notificationSettings = mysqlTable("notificationSettings", {
   // Habilitar notificações para lembretes de tarefas
   taskRemindersEnabled: boolean("taskRemindersEnabled").default(true).notNull(),
   
+  // Lembrete diário de registro
+  dailyReminderEnabled: boolean("dailyReminderEnabled").default(false).notNull(),
+  reminderTimes: text("reminderTimes").default("[]"), // JSON array de strings HH:MM
+
   // Habilitar resumo diário
   dailySummaryEnabled: boolean("dailySummaryEnabled").default(false).notNull(),
   dailySummaryTime: varchar("dailySummaryTime", { length: 5 }).default("09:00"), // HH:MM format

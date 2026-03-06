@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, BellOff, Clock, AlertTriangle, CheckSquare, ArrowLeft, Save } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -14,34 +14,26 @@ import {
   requestNotificationPermission,
   showNotification,
   scheduleMultipleDailyReminders,
-  migrateReminderConfig,
   registerPushSubscription,
 } from "@/lib/notifications";
 import { PageTransition } from "@/components/PageTransition";
 
-interface NotificationConfig {
-  dailyReminderEnabled: boolean;
-  reminderTimes: string[];
-  alertsEnabled: boolean;
-  taskRemindersEnabled: boolean;
-}
-
-const DEFAULT_CONFIG: NotificationConfig = {
-  dailyReminderEnabled: false,
-  reminderTimes: [],
-  alertsEnabled: false,
-  taskRemindersEnabled: false,
-};
-
 export default function AlertSettings() {
-  const [config, setConfig] = useState<NotificationConfig>(DEFAULT_CONFIG);
   const [newReminderTime, setNewReminderTime] = useState<string>("08:00");
   const [permission, setPermission] = useState<string>(getNotificationPermission());
   const [isSyncing, setIsSyncing] = useState(false);
-  // Ref para controlar se já carregou do localStorage (evita salvar no primeiro render)
-  const loadedRef = useRef(false);
-  // Ref para o cleanup dos lembretes agendados
   const cleanupRemindersRef = useRef<(() => void) | null>(null);
+
+  // ── Fonte de verdade: banco de dados ──────────────────────────────────────
+  const { data: dbSettings, isLoading, refetch } = trpc.alerts.getNotificationSettings.useQuery(
+    undefined,
+    { retry: false, staleTime: 0 }
+  );
+
+  const updateMutation = trpc.alerts.updateNotificationSettings.useMutation({
+    onSuccess: () => refetch(),
+    onError: (err: any) => toast.error(`Erro ao salvar: ${err.message}`),
+  });
 
   // Query para obter a chave pública VAPID do servidor
   const { data: vapidData } = trpc.push.getVapidKey.useQuery(undefined, { retry: false });
@@ -49,81 +41,54 @@ export default function AlertSettings() {
   // Mutation para registrar subscription no banco
   const subscribeMutation = trpc.push.subscribe.useMutation();
 
-  // Mutation para sincronizar configurações de lembrete com o banco
+  // Mutation para sincronizar configurações de lembrete com o banco (pushSubscriptions)
   const updateReminderMutation = trpc.push.updateReminderSettings.useMutation();
 
-  // Função para garantir que a subscription push está registrada no servidor
-  const ensurePushSubscription = async (): Promise<string | null> => {
-    if (!vapidData?.configured || !vapidData.publicKey) return null;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  // Valores derivados do banco (com fallback)
+  const dailyReminderEnabled = dbSettings?.dailyReminderEnabled ?? false;
+  const reminderTimes: string[] = (() => {
+    try { return JSON.parse(dbSettings?.reminderTimes ?? "[]"); } catch { return []; }
+  })();
+  const alertsEnabled = dbSettings?.tempAlertsEnabled ?? true;
+  const taskRemindersEnabled = dbSettings?.taskRemindersEnabled ?? true;
 
-    try {
-      let endpoint: string | null = null;
-      await registerPushSubscription(
-        vapidData.publicKey,
-        async (sub) => {
-          await subscribeMutation.mutateAsync({
-            subscription: sub as any,
-            reminderEnabled: config.dailyReminderEnabled,
-            reminderTimes: config.reminderTimes,
-          });
-          endpoint = sub.endpoint ?? null;
-        }
-      );
-      return endpoint;
-    } catch (e) {
-      console.error("[AlertSettings] Erro ao registrar subscription:", e);
-      return null;
-    }
-  };
-
-  // ── Carregar configurações do localStorage apenas uma vez ──────────────────
+  // Atualizar permissão ao montar
   useEffect(() => {
-    const saved = localStorage.getItem("notificationConfig");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const migrated = migrateReminderConfig(parsed);
-        setConfig(migrated);
-      } catch (e) {
-        console.error("Error parsing notification config:", e);
-      }
-    }
-    if ("Notification" in window) {
-      setPermission(Notification.permission);
-    }
-    loadedRef.current = true;
-  }, []); // apenas uma vez
+    if ("Notification" in window) setPermission(Notification.permission);
+  }, []);
 
-  // Nota: o salvamento no localStorage é feito diretamente em cada handler
-  // para evitar race condition com o useEffect de carregamento.
-
-  // ── Agendar lembretes apenas quando os horários mudarem ───────────────────
+  // Agendar lembretes quando os dados do banco mudarem
   useEffect(() => {
-    // Limpar lembretes anteriores
     if (cleanupRemindersRef.current) {
       cleanupRemindersRef.current();
       cleanupRemindersRef.current = null;
     }
-
-    if (config.dailyReminderEnabled && permission === "granted" && config.reminderTimes.length > 0) {
-      cleanupRemindersRef.current = scheduleMultipleDailyReminders(config.reminderTimes);
+    if (dailyReminderEnabled && permission === "granted" && reminderTimes.length > 0) {
+      cleanupRemindersRef.current = scheduleMultipleDailyReminders(reminderTimes);
     }
-
     return () => {
       if (cleanupRemindersRef.current) {
         cleanupRemindersRef.current();
         cleanupRemindersRef.current = null;
       }
     };
-  }, [config.dailyReminderEnabled, config.reminderTimes, permission]);
+  }, [dailyReminderEnabled, reminderTimes, permission]);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  const saveToDb = useCallback((patch: Record<string, unknown>) => {
+    updateMutation.mutate(patch as any);
+  }, [updateMutation]);
+
+  const saveTimesToDb = useCallback((times: string[]) => {
+    updateMutation.mutate({ reminderTimes: JSON.stringify(times) } as any);
+  }, [updateMutation]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleRequestPermission = useCallback(async () => {
     const result = await requestNotificationPermission();
     setPermission(result);
-
     if (result === "granted") {
       toast.success("Notificações ativadas!");
       await showNotification("🧪 Teste - App Cultivo", {
@@ -137,48 +102,44 @@ export default function AlertSettings() {
 
   const handleToggleDailyReminder = useCallback(async (enabled: boolean) => {
     if (enabled && permission !== "granted") {
-      // Pede permissão e, se concedida, ativa o toggle
       const result = await requestNotificationPermission();
       setPermission(result);
       if (result === "granted") {
         toast.success("Notificações ativadas!");
-        const newConfig = { ...config, dailyReminderEnabled: true };
-        setConfig(newConfig);
-        localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+        saveToDb({ dailyReminderEnabled: true });
       } else if (result === "denied") {
         toast.error("Permissão negada. Ative nas configurações do navegador.");
       }
       return;
     }
-    const newConfig = { ...config, dailyReminderEnabled: enabled };
-    setConfig(newConfig);
-    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+    saveToDb({ dailyReminderEnabled: enabled });
     if (!enabled) toast.info("Lembrete diário desativado.");
-  }, [permission, config]);
+  }, [permission, saveToDb]);
 
   const handleToggleAlerts = useCallback((enabled: boolean) => {
     if (enabled && permission !== "granted") {
       handleRequestPermission();
       return;
     }
-    const newConfig = { ...config, alertsEnabled: enabled };
-    setConfig(newConfig);
-    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+    saveToDb({
+      tempAlertsEnabled: enabled,
+      rhAlertsEnabled: enabled,
+      ppfdAlertsEnabled: enabled,
+      phAlertsEnabled: enabled,
+    });
     if (enabled) toast.success("Alertas automáticos ativados!");
     else toast.info("Alertas automáticos desativados.");
-  }, [permission, config, handleRequestPermission]);
+  }, [permission, saveToDb, handleRequestPermission]);
 
   const handleToggleTaskReminders = useCallback((enabled: boolean) => {
     if (enabled && permission !== "granted") {
       handleRequestPermission();
       return;
     }
-    const newConfig = { ...config, taskRemindersEnabled: enabled };
-    setConfig(newConfig);
-    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+    saveToDb({ taskRemindersEnabled: enabled });
     if (enabled) toast.success("Lembretes de tarefas ativados!");
     else toast.info("Lembretes de tarefas desativados.");
-  }, [permission, config, handleRequestPermission]);
+  }, [permission, saveToDb, handleRequestPermission]);
 
   const handleTestNotification = useCallback(async () => {
     if (permission === "granted") {
@@ -194,49 +155,35 @@ export default function AlertSettings() {
 
   const handleAddReminderTime = useCallback(() => {
     if (!newReminderTime) return;
-    if (config.reminderTimes.includes(newReminderTime)) {
+    if (reminderTimes.includes(newReminderTime)) {
       toast.error("Este horário já está configurado");
       return;
     }
-    const newTimes = [...config.reminderTimes, newReminderTime].sort();
-    const newConfig = { ...config, reminderTimes: newTimes };
-    setConfig(newConfig);
-    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+    const newTimes = [...reminderTimes, newReminderTime].sort();
+    saveTimesToDb(newTimes);
     toast.success(`Lembrete adicionado: ${newReminderTime}`);
-  }, [newReminderTime, config]);
+  }, [newReminderTime, reminderTimes, saveTimesToDb]);
 
   const handleRemoveReminderTime = useCallback((index: number) => {
-    const newTimes = config.reminderTimes.filter((_, i) => i !== index);
-    const newConfig = { ...config, reminderTimes: newTimes };
-    setConfig(newConfig);
-    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
-  }, [config]);
+    const newTimes = reminderTimes.filter((_, i) => i !== index);
+    saveTimesToDb(newTimes);
+  }, [reminderTimes, saveTimesToDb]);
 
-  const handleEditReminderTime = useCallback((index: number, value: string) => {
-    setConfig((prev) => {
-      const newTimes = [...prev.reminderTimes];
-      newTimes[index] = value;
-      return { ...prev, reminderTimes: newTimes };
-    });
-  }, []);
   const handlePresetTimes = useCallback(() => {
-    const newConfig = { ...config, reminderTimes: ["08:00", "20:00"] };
-    setConfig(newConfig);
-    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+    saveTimesToDb(["08:00", "20:00"]);
     toast.success("Horários 8h e 20h configurados!");
-  }, [config]);
+  }, [saveTimesToDb]);
 
-  // Sincronizar configurações de lembrete com o servidor (para push em background)
+  // Sincronizar com servidor push (para notificações com app fechado)
   const handleSyncToServer = useCallback(async () => {
     if (permission !== "granted") {
       toast.error("Ative as notificações primeiro!");
       return;
     }
-    if (config.reminderTimes.length === 0 && config.dailyReminderEnabled) {
+    if (reminderTimes.length === 0 && dailyReminderEnabled) {
       toast.error("Adicione pelo menos um horário de lembrete!");
       return;
     }
-
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       toast.error("Push não suportado neste navegador");
       return;
@@ -244,31 +191,38 @@ export default function AlertSettings() {
 
     setIsSyncing(true);
     try {
-      // Verificar se já existe subscription
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
       let endpoint = subscription?.endpoint ?? null;
 
       if (!subscription) {
-        // Tentar registrar automaticamente via VAPID
         if (!vapidData?.configured || !vapidData.publicKey) {
           toast.error("Servidor VAPID não configurado. Contate o suporte.");
           return;
         }
         toast.info("Registrando dispositivo para push...");
-        endpoint = await ensurePushSubscription();
+        await registerPushSubscription(
+          vapidData.publicKey,
+          async (sub) => {
+            await subscribeMutation.mutateAsync({
+              subscription: sub as any,
+              reminderEnabled: dailyReminderEnabled,
+              reminderTimes,
+            });
+            endpoint = sub.endpoint ?? null;
+          }
+        );
         if (!endpoint) {
           toast.error("Não foi possível registrar o dispositivo. Tente novamente.");
           return;
         }
+      } else {
+        await updateReminderMutation.mutateAsync({
+          endpoint: endpoint!,
+          reminderEnabled: dailyReminderEnabled,
+          reminderTimes,
+        });
       }
-
-      // Atualizar os horários no banco
-      await updateReminderMutation.mutateAsync({
-        endpoint: endpoint!,
-        reminderEnabled: config.dailyReminderEnabled,
-        reminderTimes: config.reminderTimes,
-      });
 
       toast.success("✅ Lembretes salvos! Você receberá notificações mesmo com o app fechado.");
     } catch (error: any) {
@@ -276,9 +230,9 @@ export default function AlertSettings() {
     } finally {
       setIsSyncing(false);
     }
-  }, [permission, config.dailyReminderEnabled, config.reminderTimes, updateReminderMutation, vapidData, ensurePushSubscription]);
+  }, [permission, dailyReminderEnabled, reminderTimes, updateReminderMutation, vapidData, subscribeMutation]);
 
-  // ── Render ────────────────────────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (!isNotificationSupported()) {
     return (
@@ -398,111 +352,116 @@ export default function AlertSettings() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="daily-reminder">Ativar lembrete diário</Label>
-                  <Switch
-                    id="daily-reminder"
-                    checked={config.dailyReminderEnabled}
-                    onCheckedChange={handleToggleDailyReminder}
-                  />
-                </div>
-                {permission !== "granted" && (
-                  <p className="text-xs text-muted-foreground">
-                    Ao ativar, será solicitada permissão de notificação.
-                  </p>
-                )}
-
-                {config.dailyReminderEnabled && (
-                  <div className="space-y-4 pl-4 border-l-2 border-primary/20">
-                    {/* Preset Button */}
-                    <div className="space-y-2">
-                      <Label>Configuração Rápida</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handlePresetTimes}
-                        className="w-full"
-                      >
-                        ☀️ AM (8h) + 🌙 PM (20h)
-                      </Button>
+                {isLoading ? (
+                  <p className="text-sm text-muted-foreground">Carregando configurações...</p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="daily-reminder">Ativar lembrete diário</Label>
+                      <Switch
+                        id="daily-reminder"
+                        checked={dailyReminderEnabled}
+                        onCheckedChange={handleToggleDailyReminder}
+                        disabled={updateMutation.isPending}
+                      />
+                    </div>
+                    {permission !== "granted" && (
                       <p className="text-xs text-muted-foreground">
-                        Aplica lembretes para turno da manhã e noite
+                        Ao ativar, será solicitada permissão de notificação.
                       </p>
-                    </div>
+                    )}
 
-                    {/* List of Reminder Times */}
-                    <div className="space-y-2">
-                      <Label>Horários Configurados ({config.reminderTimes.length})</Label>
-                      {config.reminderTimes.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Nenhum horário configurado</p>
-                      ) : (
+                    {dailyReminderEnabled && (
+                      <div className="space-y-4 pl-4 border-l-2 border-primary/20">
+                        {/* Preset Button */}
                         <div className="space-y-2">
-                          {config.reminderTimes.map((time, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <Input
-                                type="time"
-                                value={time}
-                                onChange={(e) => handleEditReminderTime(index, e.target.value)}
-                                className="flex-1"
-                              />
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleRemoveReminderTime(index)}
-                              >
-                                Remover
-                              </Button>
-                            </div>
-                          ))}
+                          <Label>Configuração Rápida</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handlePresetTimes}
+                            className="w-full"
+                            disabled={updateMutation.isPending}
+                          >
+                            ☀️ AM (8h) + 🌙 PM (20h)
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            Aplica lembretes para turno da manhã e noite
+                          </p>
                         </div>
-                      )}
-                    </div>
 
-                    {/* Add New Reminder Time */}
-                    <div className="space-y-2">
-                      <Label htmlFor="new-reminder-time">Adicionar Novo Horário</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="new-reminder-time"
-                          type="time"
-                          value={newReminderTime}
-                          onChange={(e) => setNewReminderTime(e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          onClick={handleAddReminderTime}
-                        >
-                          Adicionar
-                        </Button>
+                        {/* List of Reminder Times */}
+                        <div className="space-y-2">
+                          <Label>Horários Configurados ({reminderTimes.length})</Label>
+                          {reminderTimes.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nenhum horário configurado</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {reminderTimes.map((time, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <span className="flex-1 text-sm font-mono bg-muted px-3 py-2 rounded-md">{time}</span>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleRemoveReminderTime(index)}
+                                    disabled={updateMutation.isPending}
+                                  >
+                                    Remover
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Add New Reminder Time */}
+                        <div className="space-y-2">
+                          <Label htmlFor="new-reminder-time">Adicionar Novo Horário</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="new-reminder-time"
+                              type="time"
+                              value={newReminderTime}
+                              onChange={(e) => setNewReminderTime(e.target.value)}
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              onClick={handleAddReminderTime}
+                              disabled={updateMutation.isPending}
+                            >
+                              Adicionar
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Sync to Server */}
+                        <div className="pt-2 border-t border-border">
+                          <p className="text-xs text-muted-foreground mb-2">
+                            🔔 Para receber notificações mesmo com o app fechado, sincronize com o servidor:
+                          </p>
+                          <Button
+                            type="button"
+                            onClick={handleSyncToServer}
+                            disabled={isSyncing}
+                            className="w-full"
+                            variant="default"
+                          >
+                            {isSyncing ? (
+                              "Sincronizando..."
+                            ) : (
+                              <>
+                                <Save className="w-4 h-4 mr-2" />
+                                Salvar Lembretes no Servidor
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Sync to Server */}
-                    <div className="pt-2 border-t border-border">
-                      <p className="text-xs text-muted-foreground mb-2">
-                        🔔 Para receber notificações mesmo com o app fechado, sincronize com o servidor:
-                      </p>
-                      <Button
-                        type="button"
-                        onClick={handleSyncToServer}
-                        disabled={isSyncing}
-                        className="w-full"
-                        variant="default"
-                      >
-                        {isSyncing ? (
-                          "Sincronizando..."
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4 mr-2" />
-                            Salvar Lembretes no Servidor
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -523,8 +482,9 @@ export default function AlertSettings() {
                   <Label htmlFor="alerts">Ativar alertas automáticos</Label>
                   <Switch
                     id="alerts"
-                    checked={config.alertsEnabled}
+                    checked={alertsEnabled}
                     onCheckedChange={handleToggleAlerts}
+                    disabled={updateMutation.isPending}
                   />
                 </div>
                 {permission !== "granted" && (
@@ -551,8 +511,9 @@ export default function AlertSettings() {
                   <Label htmlFor="task-reminders">Ativar lembretes de tarefas</Label>
                   <Switch
                     id="task-reminders"
-                    checked={config.taskRemindersEnabled}
+                    checked={taskRemindersEnabled}
                     onCheckedChange={handleToggleTaskReminders}
+                    disabled={updateMutation.isPending}
                   />
                 </div>
                 {permission !== "granted" && (
@@ -571,12 +532,12 @@ export default function AlertSettings() {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2">
-                    {config.dailyReminderEnabled && permission === "granted" ? (
+                    {dailyReminderEnabled && permission === "granted" ? (
                       <>
                         <Bell className="w-4 h-4 text-green-600" />
                         <span className="text-primary font-medium">
                           Lembretes diários ativos
-                          {config.reminderTimes.length > 0 && ` (${config.reminderTimes.join(", ")})`}
+                          {reminderTimes.length > 0 && ` (${reminderTimes.join(", ")})`}
                         </span>
                       </>
                     ) : (
@@ -587,7 +548,7 @@ export default function AlertSettings() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {config.alertsEnabled && permission === "granted" ? (
+                    {alertsEnabled && permission === "granted" ? (
                       <>
                         <AlertTriangle className="w-4 h-4 text-orange-600" />
                         <span className="text-primary font-medium">Alertas automáticos ativos</span>
@@ -600,7 +561,7 @@ export default function AlertSettings() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {config.taskRemindersEnabled && permission === "granted" ? (
+                    {taskRemindersEnabled && permission === "granted" ? (
                       <>
                         <CheckSquare className="w-4 h-4 text-blue-600" />
                         <span className="text-primary font-medium">Lembretes de tarefas ativos</span>

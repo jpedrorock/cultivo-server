@@ -1932,6 +1932,8 @@ export const appRouter = router({
           taskRemindersEnabled: z.boolean().optional(),
           dailySummaryEnabled: z.boolean().optional(),
           dailySummaryTime: z.string().optional(),
+          dailyReminderEnabled: z.boolean().optional(),
+          reminderTimes: z.string().optional(), // JSON array serializado
         })
       )
       .mutation(async ({ input }) => {

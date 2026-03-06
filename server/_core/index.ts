@@ -55,12 +55,34 @@ async function ensurePushSubscriptionsTable() {
   }
 }
 
+async function ensureNotificationSettingsColumns() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    // Adicionar colunas se não existirem (migration incremental)
+    await conn.execute(`
+      ALTER TABLE \`notificationSettings\`
+        ADD COLUMN IF NOT EXISTS \`dailyReminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS \`reminderTimes\` TEXT DEFAULT '[]'
+    `).catch(() => {}); // ignora se já existir
+    await conn.end();
+    console.log("[DB] Colunas notificationSettings OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao migrar notificationSettings:", err?.message);
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
 
   // Garantir que a tabela pushSubscriptions existe (migration incremental)
   await ensurePushSubscriptionsTable();
+
+  // Garantir que as colunas de lembrete diário existem na tabela notificationSettings
+  await ensureNotificationSettingsColumns();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();
