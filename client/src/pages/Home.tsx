@@ -348,7 +348,7 @@ export default function Home() {
               <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
                 <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">Gerenciamento de Estufas</h1>
+              <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">Gerenciamento<br className="sm:hidden" /> de Estufas</h1>
             </div>
             <div className="flex items-center gap-3">
               <Link href="/quick-log" className="!hidden md:!inline-block">

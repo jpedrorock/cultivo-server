@@ -464,19 +464,19 @@ export default function Nutrients() {
               </Card>
               
               {/* Ações */}
-              <div className="flex gap-3">
-                <Button onClick={exportRecipe} variant="outline" className="flex-1">
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar Receita (TXT)
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button onClick={exportRecipe} variant="outline" className="w-full sm:flex-1">
+                  <Download className="w-4 h-4 mr-2 shrink-0" />
+                  <span className="truncate">Exportar Receita (TXT)</span>
                 </Button>
                 <Button 
                   onClick={saveRecipe} 
                   disabled={recordApplication.isPending}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="w-full sm:flex-1 bg-green-600 hover:bg-green-700"
                 >
                   {recordApplication.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin shrink-0" />
                       Salvando...
                     </>
                   ) : (
