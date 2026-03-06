@@ -963,12 +963,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
             <div 
               className={`rounded-lg p-4 space-y-2 border ${
                 tent.category === 'VEGA'
-                  ? 'bg-green-500/8 border-green-500/20 dark:bg-green-500/10 dark:border-green-500/25'
+                  ? 'bg-green-500/8 border-green-500/20 dark:bg-green-500/8 dark:border-green-500/15'
                   : tent.category === 'FLORA'
-                  ? 'bg-purple-500/8 border-purple-500/20 dark:bg-purple-500/10 dark:border-purple-500/25'
+                  ? 'bg-purple-500/8 border-purple-500/20 dark:bg-purple-500/8 dark:border-purple-500/15'
                   : tent.category === 'DRYING'
-                  ? 'bg-amber-500/8 border-amber-500/20 dark:bg-amber-500/10 dark:border-amber-500/25'
-                  : 'bg-blue-500/8 border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-500/25'
+                  ? 'bg-amber-500/8 border-amber-500/20 dark:bg-amber-500/8 dark:border-amber-500/15'
+                  : 'bg-blue-500/8 border-blue-500/20 dark:bg-blue-500/8 dark:border-blue-500/15'
               }`}
             >
               <div className="flex justify-between items-center">
