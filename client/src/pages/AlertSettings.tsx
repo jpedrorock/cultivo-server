@@ -15,6 +15,7 @@ import {
   showNotification,
   scheduleMultipleDailyReminders,
   migrateReminderConfig,
+  registerPushSubscription,
 } from "@/lib/notifications";
 import { PageTransition } from "@/components/PageTransition";
 
@@ -42,8 +43,39 @@ export default function AlertSettings() {
   // Ref para o cleanup dos lembretes agendados
   const cleanupRemindersRef = useRef<(() => void) | null>(null);
 
+  // Query para obter a chave pública VAPID do servidor
+  const { data: vapidData } = trpc.push.getVapidKey.useQuery(undefined, { retry: false });
+
+  // Mutation para registrar subscription no banco
+  const subscribeMutation = trpc.push.subscribe.useMutation();
+
   // Mutation para sincronizar configurações de lembrete com o banco
   const updateReminderMutation = trpc.push.updateReminderSettings.useMutation();
+
+  // Função para garantir que a subscription push está registrada no servidor
+  const ensurePushSubscription = async (): Promise<string | null> => {
+    if (!vapidData?.configured || !vapidData.publicKey) return null;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+
+    try {
+      let endpoint: string | null = null;
+      await registerPushSubscription(
+        vapidData.publicKey,
+        async (sub) => {
+          await subscribeMutation.mutateAsync({
+            subscription: sub as any,
+            reminderEnabled: config.dailyReminderEnabled,
+            reminderTimes: config.reminderTimes,
+          });
+          endpoint = sub.endpoint ?? null;
+        }
+      );
+      return endpoint;
+    } catch (e) {
+      console.error("[AlertSettings] Erro ao registrar subscription:", e);
+      return null;
+    }
+  };
 
   // ── Carregar configurações do localStorage apenas uma vez ──────────────────
   useEffect(() => {
@@ -198,35 +230,46 @@ export default function AlertSettings() {
       return;
     }
 
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      toast.error("Push não suportado neste navegador");
+      return;
+    }
+
     setIsSyncing(true);
     try {
-      // Obter a subscription atual do Service Worker
-      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-        toast.error("Push não suportado neste navegador");
-        return;
-      }
-
+      // Verificar se já existe subscription
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      let subscription = await registration.pushManager.getSubscription();
+      let endpoint = subscription?.endpoint ?? null;
 
       if (!subscription) {
-        toast.error("Dispositivo não registrado para push. Ative as notificações na página de Notificações.");
-        return;
+        // Tentar registrar automaticamente via VAPID
+        if (!vapidData?.configured || !vapidData.publicKey) {
+          toast.error("Servidor VAPID não configurado. Contate o suporte.");
+          return;
+        }
+        toast.info("Registrando dispositivo para push...");
+        endpoint = await ensurePushSubscription();
+        if (!endpoint) {
+          toast.error("Não foi possível registrar o dispositivo. Tente novamente.");
+          return;
+        }
       }
 
+      // Atualizar os horários no banco
       await updateReminderMutation.mutateAsync({
-        endpoint: subscription.endpoint,
+        endpoint: endpoint!,
         reminderEnabled: config.dailyReminderEnabled,
         reminderTimes: config.reminderTimes,
       });
 
-      toast.success("✅ Lembretes sincronizados com o servidor! Você receberá notificações mesmo com o app fechado.");
+      toast.success("✅ Lembretes salvos! Você receberá notificações mesmo com o app fechado.");
     } catch (error: any) {
       toast.error(`Erro ao sincronizar: ${error?.message || "Tente novamente"}`);
     } finally {
       setIsSyncing(false);
     }
-  }, [permission, config.dailyReminderEnabled, config.reminderTimes, updateReminderMutation]);
+  }, [permission, config.dailyReminderEnabled, config.reminderTimes, updateReminderMutation, vapidData, ensurePushSubscription]);
 
   // ── Render ────────────────────────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Bell, BellOff, Clock, AlertTriangle, Volume2 } from "lucide-react";
+import { Link } from "wouter";
 import { testSound, saveSoundConfig } from "@/lib/notificationSounds";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -279,9 +280,9 @@ export function NotificationSettings() {
                 Você pode configurar múltiplos horários de lembrete diário (por exemplo: 8h AM e 20h PM) na página de Alertas.
               </p>
               <Button asChild>
-                <a href="/settings/alerts">
+                <Link href="/settings/alerts">
                   Configurar Lembretes
-                </a>
+                </Link>
               </Button>
             </CardContent>
           </Card>
