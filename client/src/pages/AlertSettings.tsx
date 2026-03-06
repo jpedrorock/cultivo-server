@@ -151,31 +151,50 @@ export default function AlertSettings() {
     }
   }, []);
 
-  const handleToggleDailyReminder = useCallback((enabled: boolean) => {
+  const handleToggleDailyReminder = useCallback(async (enabled: boolean) => {
     if (enabled && permission !== "granted") {
-      handleRequestPermission();
+      // Pede permissão e, se concedida, ativa o toggle
+      const result = await requestNotificationPermission();
+      setPermission(result);
+      if (result === "granted") {
+        toast.success("Notificações ativadas!");
+        const newConfig = { ...config, dailyReminderEnabled: true };
+        setConfig(newConfig);
+        localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+      } else if (result === "denied") {
+        toast.error("Permissão negada. Ative nas configurações do navegador.");
+      }
       return;
     }
-    setConfig((prev) => ({ ...prev, dailyReminderEnabled: enabled }));
-  }, [permission, handleRequestPermission]);
+    const newConfig = { ...config, dailyReminderEnabled: enabled };
+    setConfig(newConfig);
+    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+    if (!enabled) toast.info("Lembrete diário desativado.");
+  }, [permission, config]);
 
   const handleToggleAlerts = useCallback((enabled: boolean) => {
     if (enabled && permission !== "granted") {
       handleRequestPermission();
       return;
     }
-    setConfig((prev) => ({ ...prev, alertsEnabled: enabled }));
+    const newConfig = { ...config, alertsEnabled: enabled };
+    setConfig(newConfig);
+    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
     if (enabled) toast.success("Alertas automáticos ativados!");
-  }, [permission, handleRequestPermission]);
+    else toast.info("Alertas automáticos desativados.");
+  }, [permission, config, handleRequestPermission]);
 
   const handleToggleTaskReminders = useCallback((enabled: boolean) => {
     if (enabled && permission !== "granted") {
       handleRequestPermission();
       return;
     }
-    setConfig((prev) => ({ ...prev, taskRemindersEnabled: enabled }));
+    const newConfig = { ...config, taskRemindersEnabled: enabled };
+    setConfig(newConfig);
+    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
     if (enabled) toast.success("Lembretes de tarefas ativados!");
-  }, [permission, handleRequestPermission]);
+    else toast.info("Lembretes de tarefas desativados.");
+  }, [permission, config, handleRequestPermission]);
 
   const handleTestNotification = useCallback(async () => {
     if (permission === "granted") {
@@ -196,16 +215,18 @@ export default function AlertSettings() {
       return;
     }
     const newTimes = [...config.reminderTimes, newReminderTime].sort();
-    setConfig((prev) => ({ ...prev, reminderTimes: newTimes }));
+    const newConfig = { ...config, reminderTimes: newTimes };
+    setConfig(newConfig);
+    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
     toast.success(`Lembrete adicionado: ${newReminderTime}`);
-  }, [newReminderTime, config.reminderTimes]);
+  }, [newReminderTime, config]);
 
   const handleRemoveReminderTime = useCallback((index: number) => {
-    setConfig((prev) => ({
-      ...prev,
-      reminderTimes: prev.reminderTimes.filter((_, i) => i !== index),
-    }));
-  }, []);
+    const newTimes = config.reminderTimes.filter((_, i) => i !== index);
+    const newConfig = { ...config, reminderTimes: newTimes };
+    setConfig(newConfig);
+    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
+  }, [config]);
 
   const handleEditReminderTime = useCallback((index: number, value: string) => {
     setConfig((prev) => {
@@ -215,9 +236,11 @@ export default function AlertSettings() {
     });
   }, []);
   const handlePresetTimes = useCallback(() => {
-    setConfig((prev) => ({ ...prev, reminderTimes: ["08:00", "20:00"] }));
+    const newConfig = { ...config, reminderTimes: ["08:00", "20:00"] };
+    setConfig(newConfig);
+    localStorage.setItem("notificationConfig", JSON.stringify(newConfig));
     toast.success("Horários 8h e 20h configurados!");
-  }, []);
+  }, [config]);
 
   // Sincronizar configurações de lembrete com o servidor (para push em background)
   const handleSyncToServer = useCallback(async () => {
