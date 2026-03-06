@@ -61,12 +61,23 @@ async function ensureNotificationSettingsColumns() {
     if (!connectionString) return;
     const mysql = await import("mysql2/promise");
     const conn = await mysql.default.createConnection(connectionString);
-    // Adicionar colunas se não existirem (migration incremental)
-    await conn.execute(`
-      ALTER TABLE \`notificationSettings\`
-        ADD COLUMN IF NOT EXISTS \`dailyReminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS \`reminderTimes\` TEXT DEFAULT '[]'
-    `).catch(() => {}); // ignora se já existir
+
+    // Verificar quais colunas já existem (compatível com MySQL 5.7+)
+    const [rows]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notificationSettings'`
+    );
+    const existingCols = rows.map((r: any) => r.COLUMN_NAME);
+
+    if (!existingCols.includes('dailyReminderEnabled')) {
+      await conn.execute(`ALTER TABLE \`notificationSettings\` ADD COLUMN \`dailyReminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0`);
+      console.log("[DB] Coluna dailyReminderEnabled adicionada");
+    }
+    if (!existingCols.includes('reminderTimes')) {
+      await conn.execute(`ALTER TABLE \`notificationSettings\` ADD COLUMN \`reminderTimes\` TEXT DEFAULT '[]'`);
+      console.log("[DB] Coluna reminderTimes adicionada");
+    }
+
     await conn.end();
     console.log("[DB] Colunas notificationSettings OK");
   } catch (err: any) {

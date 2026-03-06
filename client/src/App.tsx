@@ -117,7 +117,10 @@ function App() {
           <Sidebar />
           <div
             className="pb-16 md:pb-0 md:pl-64"
-            style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+            style={{
+              paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+              isolation: 'isolate',  // Cria contexto de empilhamento separado para não interferir no BottomNav fixed
+            }}
           >
             <Router />
           </div>
