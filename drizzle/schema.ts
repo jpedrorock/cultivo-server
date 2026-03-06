@@ -532,8 +532,7 @@ export const plantTentHistory = mysqlTable(
       .references(() => plants.id, { onDelete: "cascade" }),
     fromTentId: int("fromTentId").references(() => tents.id),
     toTentId: int("toTentId")
-      .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id), // nullable: planta pode sair para fila sem estufa destino
     movedAt: timestamp("movedAt").defaultNow().notNull(),
     reason: text("reason"),
   },

@@ -744,6 +744,27 @@ export const appRouter = router({
           
           // Ajustar margens de alerta automaticamente para DRYING
           await applyPhaseTransitionLimits(input.targetTentId, "DRYING");
+          
+          // Resetar categoria da estufa original para FLORA (vazia, disponível)
+          await database
+            .update(tents)
+            .set({ category: "FLORA" })
+            .where(eq(tents.id, cycle.tentId));
+        } else {
+          // Sem estufa destino: a estufa original vira DRYING na mesma estufa
+          await database
+            .update(tents)
+            .set({ category: "DRYING" })
+            .where(eq(tents.id, cycle.tentId));
+          // Criar novo ciclo de secagem na mesma estufa
+          await database.insert(cycles).values({
+            tentId: cycle.tentId,
+            strainId: cycle.strainId,
+            startDate: input.dryingStartDate,
+            status: "ACTIVE",
+          });
+          // Ajustar margens de alerta automaticamente para DRYING
+          await applyPhaseTransitionLimits(cycle.tentId, "DRYING");
         }
         
         return { success: true, plantsHarvested: cyclePlants.length };
@@ -1243,6 +1264,18 @@ export const appRouter = router({
             .set({ category: targetCategory })
             .where(eq(tents.id, input.targetTentId));
           
+          // Aplicar limites de alerta para a nova fase na estufa destino
+          await applyPhaseTransitionLimits(input.targetTentId, input.targetPhase);
+          
+          // Resetar categoria da estufa original para VEGA (vazia, disponível)
+          // Se estava em VEGA e foi para FLORA, a estufa original fica como VEGA vazia
+          // Se estava em FLORA e foi para DRYING, a estufa original fica como FLORA vazia
+          const sourceCategory = input.targetPhase === "FLORA" ? "VEGA" : "FLORA";
+          await database
+            .update(tents)
+            .set({ category: sourceCategory })
+            .where(eq(tents.id, cycle.tentId));
+          
           // Finalizar ciclo antigo
           await database
             .update(cycles)
@@ -1273,6 +1306,9 @@ export const appRouter = router({
             .update(tents)
             .set({ category: targetCategory })
             .where(eq(tents.id, cycle.tentId));
+          
+          // Aplicar limites de alerta para a nova fase
+          await applyPhaseTransitionLimits(cycle.tentId, input.targetPhase);
           
           return {
             success: true,
@@ -4711,7 +4747,7 @@ export const appRouter = router({
           await database.insert(plantTentHistory).values({
             plantId: plant.id,
             fromTentId: cycle.tentId,
-            toTentId: cycle.tentId, // Saiu da mesma estufa (sem destino ainda)
+            toTentId: null, // Sem estufa destino: planta vai para fila de aguardando secagem
             reason: `Colhida e movida para Aguardando Secagem. ${input.harvestNotes || ""}`.trim(),
           });
         }

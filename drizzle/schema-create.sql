@@ -406,7 +406,7 @@ CREATE TABLE IF NOT EXISTS `plantTentHistory` (
   `id`         INT AUTO_INCREMENT PRIMARY KEY,
   `plantId`    INT NOT NULL,
   `fromTentId` INT,
-  `toTentId`   INT NOT NULL,
+  `toTentId`   INT NULL,   -- nullable: planta pode sair para fila sem estufa destino
   `movedAt`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `reason`     TEXT,
   FOREIGN KEY (`plantId`)    REFERENCES `plants`(`id`) ON DELETE CASCADE,
