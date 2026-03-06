@@ -698,17 +698,17 @@ function LuxPPFDCalculator() {
   const lightGradient = "linear-gradient(to right, #3b82f6 0%, #3b82f6 16.67%, #10b981 16.67%, #10b981 50%, #eab308 50%, #eab308 75%, #ef4444 75%, #ef4444 100%)";
 
   const luxLabels = [
-    { position: 0, label: "7k-14k", sublabel: "Clonagem", icon: "🌱", color: "#3b82f6" },
-    { position: 28, label: "28k-42k", sublabel: "Vega", icon: "🌿", color: "#10b981" },
-    { position: 50, label: "42k-63k", sublabel: "Flora", icon: "🌸", color: "#eab308" },
-    { position: 75, label: "70k-84k", sublabel: "Máximo", icon: "⚡", color: "#ef4444" },
+    { position: 0, label: "Clonagem", sublabel: "7k-14k", icon: "🌱", color: "#3b82f6" },
+    { position: 28, label: "Vega", sublabel: "28k-42k", icon: "🌿", color: "#10b981" },
+    { position: 50, label: "Flora", sublabel: "42k-63k", icon: "🌸", color: "#eab308" },
+    { position: 75, label: "Máximo", sublabel: "70k-84k", icon: "⚡", color: "#ef4444" },
   ];
 
   const ppfdLabels = [
-    { position: 0, label: "100-200", sublabel: "Clonagem", icon: "🌱", color: "#3b82f6" },
-    { position: 33, label: "400-600", sublabel: "Vega", icon: "🌿", color: "#10b981" },
-    { position: 58, label: "600-900", sublabel: "Flora", icon: "🌸", color: "#eab308" },
-    { position: 83, label: "1000-1200", sublabel: "Máximo", icon: "⚡", color: "#ef4444" },
+    { position: 0, label: "Clonagem", sublabel: "100-200", icon: "🌱", color: "#3b82f6" },
+    { position: 33, label: "Vega", sublabel: "400-600", icon: "🌿", color: "#10b981" },
+    { position: 58, label: "Flora", sublabel: "600-900", icon: "🌸", color: "#eab308" },
+    { position: 83, label: "Máximo", sublabel: "1000-1200", icon: "⚡", color: "#ef4444" },
   ];
 
   return (

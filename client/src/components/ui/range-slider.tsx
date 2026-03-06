@@ -159,20 +159,25 @@ export function RangeSlider({
 
       {/* Labels */}
       {labels && labels.length > 0 && (
-        <div className="relative mt-1 h-10">
+        <div className="relative mt-2" style={{ height: "3.5rem" }}>
           {labels.map((lbl, i) => (
             <div
               key={i}
-              className="absolute flex flex-col items-center text-xs text-muted-foreground"
+              className="absolute flex flex-col items-center gap-0.5 text-xs"
               style={{
                 left: `${lbl.position}%`,
                 transform: "translateX(-50%)",
                 color: lbl.color,
+                whiteSpace: "nowrap",
               }}
             >
-              {lbl.icon && <span className="text-sm leading-none mb-0.5">{lbl.icon}</span>}
-              {lbl.sublabel && <span className="leading-none opacity-70">{lbl.sublabel}</span>}
-              <span className="font-medium leading-none mt-0.5">{lbl.label}</span>
+              {lbl.icon && (
+                <span className="text-base leading-none">{lbl.icon}</span>
+              )}
+              <span className="font-semibold leading-none">{lbl.label}</span>
+              {lbl.sublabel && (
+                <span className="leading-none opacity-75 text-[10px]">{lbl.sublabel}</span>
+              )}
             </div>
           ))}
         </div>
