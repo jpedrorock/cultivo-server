@@ -95,27 +95,11 @@ export default function AlertSettings() {
     loadedRef.current = true;
   }, []); // apenas uma vez
 
-  // ── Salvar no localStorage com debounce (500ms) ───────────────────────────
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    // Não salvar antes de carregar
-    if (!loadedRef.current) return;
-
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      localStorage.setItem("notificationConfig", JSON.stringify(config));
-    }, 500);
-
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, [config]);
+  // Nota: o salvamento no localStorage é feito diretamente em cada handler
+  // para evitar race condition com o useEffect de carregamento.
 
   // ── Agendar lembretes apenas quando os horários mudarem ───────────────────
   useEffect(() => {
-    if (!loadedRef.current) return;
-
     // Limpar lembretes anteriores
     if (cleanupRemindersRef.current) {
       cleanupRemindersRef.current();
