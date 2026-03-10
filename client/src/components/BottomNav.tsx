@@ -26,9 +26,15 @@ type NavItem = {
   badge?: number;
 };
 
+// Rotas onde o BottomNav deve ficar oculto (telas de foco total)
+const HIDDEN_NAV_ROUTES = ["/quick-log"];
+
 export function BottomNav() {
   const [location] = useLocation();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
+  // Ocultar nav em telas de foco (ex: registro rápido) para dar mais espaço e cara de app nativo
+  if (HIDDEN_NAV_ROUTES.includes(location)) return null;
   
   // Buscar contagem de alertas não lidos
   const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
