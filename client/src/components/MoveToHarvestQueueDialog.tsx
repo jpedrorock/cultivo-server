@@ -90,9 +90,8 @@ export function MoveToHarvestQueueDialog({
             </Label>
             <Input
               id="harvest-weight"
-              type="number"
-              min="0"
-              step="0.1"
+              type="text"
+              inputMode="decimal"
               placeholder="Ex: 450"
               value={harvestWeight}
               onChange={(e) => setHarvestWeight(e.target.value)}

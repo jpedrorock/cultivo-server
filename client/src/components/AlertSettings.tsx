@@ -176,8 +176,8 @@ export function AlertSettings() {
                         </Label>
                         <Input
                           id={`${phase}-temp`}
-                          type="number"
-                          step="0.1"
+                          type="text"
+                          inputMode="decimal"
                           value={margins.tempMargin ?? ''}
                           onChange={(e) => handleMarginChange(phase, 'tempMargin', e.target.value)}
                           placeholder="Ex: 2.0"
@@ -195,8 +195,8 @@ export function AlertSettings() {
                         </Label>
                         <Input
                           id={`${phase}-rh`}
-                          type="number"
-                          step="0.1"
+                          type="text"
+                          inputMode="decimal"
                           value={margins.rhMargin ?? ''}
                           onChange={(e) => handleMarginChange(phase, 'rhMargin', e.target.value)}
                           placeholder="Ex: 5.0"
@@ -216,8 +216,8 @@ export function AlertSettings() {
                         </Label>
                         <Input
                           id={`${phase}-ppfd`}
-                          type="number"
-                          step="10"
+                          type="text"
+                          inputMode="numeric"
                           value={margins.ppfdMargin ?? ''}
                           onChange={(e) => handleMarginChange(phase, 'ppfdMargin', e.target.value)}
                           placeholder="Ex: 50"
@@ -235,8 +235,8 @@ export function AlertSettings() {
                         </Label>
                         <Input
                           id={`${phase}-ph`}
-                          type="number"
-                          step="0.1"
+                          type="text"
+                          inputMode="decimal"
                           value={margins.phMargin ?? ''}
                           onChange={(e) => handleMarginChange(phase, 'phMargin', e.target.value)}
                           placeholder={phase === "DRYING" ? "N/A" : "Ex: 0.2"}

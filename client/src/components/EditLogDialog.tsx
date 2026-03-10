@@ -132,7 +132,8 @@ export function EditLogDialog({ log, open, onOpenChange, onSuccess }: EditLogDia
               </Label>
               <Input
                 id="ppfd"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={ppfd}
                 onChange={(e) => setPpfd(e.target.value)}
                 className="col-span-3"

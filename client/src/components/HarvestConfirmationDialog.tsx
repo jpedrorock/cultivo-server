@@ -185,7 +185,8 @@ export function HarvestConfirmationDialog({
               </Label>
               <Input
                 id="estimatedWeight"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="Ex: 450"
                 value={estimatedWeight}
                 onChange={(e) => setEstimatedWeight(e.target.value)}

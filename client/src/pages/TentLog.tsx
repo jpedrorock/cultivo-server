@@ -587,7 +587,8 @@ export default function TentLog() {
                       </Label>
                       <Input
                         id="wateringVolume"
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         placeholder="Ex: 1000"
                         value={wateringVolume}
                         onChange={(e) => setWateringVolume(e.target.value)}
@@ -603,7 +604,8 @@ export default function TentLog() {
                       </Label>
                       <Input
                         id="runoffCollected"
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         placeholder="Ex: 200"
                         value={runoffCollected}
                         onChange={(e) => setRunoffCollected(e.target.value)}

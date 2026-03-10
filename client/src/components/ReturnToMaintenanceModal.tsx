@@ -66,8 +66,8 @@ export function ReturnToMaintenanceModal({ open, onClose, cycleId, cycleName }: 
             <Label htmlFor="clonesProduced">Clones Produzidos (opcional)</Label>
             <Input
               id="clonesProduced"
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
               placeholder="Ex: 10"
               value={clonesProduced}
               onChange={(e) => setClonesProduced(e.target.value)}

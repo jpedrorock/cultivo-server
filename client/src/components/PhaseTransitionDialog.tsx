@@ -295,8 +295,8 @@ export function PhaseTransitionDialog({
                 </Label>
                 <Input
                   id="clonesProduced"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="Ex: 18"
                   value={clonesProduced}
                   onChange={(e) => setClonesProduced(e.target.value)}

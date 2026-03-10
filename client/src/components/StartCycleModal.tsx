@@ -114,9 +114,8 @@ export default function StartCycleModal({ tentId, tentName, open, onOpenChange }
               <Label htmlFor="vegaWeeks">Fase Vegetativa (semanas)</Label>
               <Input
                 id="vegaWeeks"
-                type="number"
-                min="1"
-                max="12"
+                type="text"
+                inputMode="numeric"
                 value={vegaWeeks}
                 onChange={(e) => setVegaWeeks(e.target.value)}
               />
@@ -127,9 +126,8 @@ export default function StartCycleModal({ tentId, tentName, open, onOpenChange }
               <Label htmlFor="floraWeeks">Fase de Floração (semanas)</Label>
               <Input
                 id="floraWeeks"
-                type="number"
-                min="1"
-                max="16"
+                type="text"
+                inputMode="numeric"
                 value={floraWeeks}
                 onChange={(e) => setFloraWeeks(e.target.value)}
               />

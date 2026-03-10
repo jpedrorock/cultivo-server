@@ -421,7 +421,8 @@ function WateringRunoffCalculator() {
                 </Label>
                 <Input
                   id="lastRunoff"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   placeholder="Ex: 15"
                   value={lastRunoff}
                   onChange={(e) => setLastRunoff(e.target.value)}
@@ -468,7 +469,8 @@ function WateringRunoffCalculator() {
                   <Label htmlFor="volumeIn">Volume Aplicado (L)</Label>
                   <Input
                     id="volumeIn"
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="Ex: 3.5"
                     value={volumeIn}
                     onChange={(e) => setVolumeIn(e.target.value)}
@@ -479,7 +481,8 @@ function WateringRunoffCalculator() {
                   <Label htmlFor="volumeOut">Volume Coletado (L)</Label>
                   <Input
                     id="volumeOut"
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="Ex: 0.7"
                     value={volumeOut}
                     onChange={(e) => setVolumeOut(e.target.value)}
@@ -767,7 +770,8 @@ function LuxPPFDCalculator() {
               <Label htmlFor="lux-input" className="text-xs text-muted-foreground">Ou digite o valor exato:</Label>
               <Input
                 id="lux-input"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 placeholder="Ex: 50000"
                 value={lux}
                 onChange={(e) => setLux(e.target.value)}
@@ -799,7 +803,8 @@ function LuxPPFDCalculator() {
               <Label htmlFor="ppfd-input" className="text-xs text-muted-foreground">Ou digite o valor exato:</Label>
               <Input
                 id="ppfd-input"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 placeholder="Ex: 750"
                 value={ppfd}
                 onChange={(e) => setPpfd(e.target.value)}
@@ -941,7 +946,8 @@ function PPMECConverter() {
           </Label>
           <Input
             id="ppm-ec-input"
-            type="number"
+            type="text"
+            inputMode="decimal"
             placeholder={conversionType === "ppm-to-ec" ? "Ex: 1000" : "Ex: 2.0"}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -1070,7 +1076,8 @@ function PHAdjustCalculator() {
           <Label htmlFor="waterVolumePH" className="text-base font-semibold">Volume de Água (litros)</Label>
           <Input
             id="waterVolumePH"
-            type="number"
+            type="text"
+            inputMode="decimal"
             placeholder="Ex: 10"
             value={waterVolume}
             onChange={(e) => setWaterVolume(e.target.value)}
@@ -1208,11 +1215,11 @@ function RunoffCalculator() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Volume Aplicado (L)</Label>
-            <Input type="number" placeholder="Ex: 3.5" value={volumeIn} onChange={(e) => setVolumeIn(e.target.value)} />
+            <Input type="text" inputMode="decimal" placeholder="Ex: 3.5" value={volumeIn} onChange={(e) => setVolumeIn(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Volume Coletado (L)</Label>
-            <Input type="number" placeholder="Ex: 0.7" value={volumeOut} onChange={(e) => setVolumeOut(e.target.value)} />
+            <Input type="text" inputMode="decimal" placeholder="Ex: 0.7" value={volumeOut} onChange={(e) => setVolumeOut(e.target.value)} />
           </div>
         </div>
         {runoffResult && (

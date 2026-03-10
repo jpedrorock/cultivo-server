@@ -96,11 +96,10 @@ export function FinishCloningDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium">Número de Mudas</label>
             <input
-              type="number"
-              min="1"
-              max="50"
+              type="text"
+              inputMode="numeric"
               value={seedlingCount}
-              onChange={(e) => setSeedlingCount(parseInt(e.target.value) || 1)}
+              onChange={(e) => setSeedlingCount(parseInt(e.target.value.replace(/\D/g, '')) || 1)}
               className="w-full px-3 py-2 border rounded-md"
             />
             <p className="text-xs text-muted-foreground">

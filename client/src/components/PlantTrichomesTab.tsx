@@ -265,8 +265,8 @@ export default function PlantTrichomesTab({
                 <div className="space-y-1.5 w-24">
                   <Label className="text-sm">Semana *</Label>
                   <Input
-                    type="number"
-                    min="1"
+                    type="text"
+                    inputMode="numeric"
                     placeholder="Ex: 8"
                     value={weekNumber}
                     onChange={(e) => setWeekNumber(e.target.value)}
@@ -304,9 +304,8 @@ export default function PlantTrichomesTab({
                 <div className="grid grid-cols-3 gap-2">
                   <div className="relative">
                     <Input
-                      type="number"
-                      min="0"
-                      max="100"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="Transp."
                       value={clearPercent}
                       onChange={(e) => setClearPercent(e.target.value)}
@@ -318,9 +317,8 @@ export default function PlantTrichomesTab({
                   </div>
                   <div className="relative">
                     <Input
-                      type="number"
-                      min="0"
-                      max="100"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="Leitoso"
                       value={cloudyPercent}
                       onChange={(e) => setCloudyPercent(e.target.value)}
@@ -332,9 +330,8 @@ export default function PlantTrichomesTab({
                   </div>
                   <div className="relative">
                     <Input
-                      type="number"
-                      min="0"
-                      max="100"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="Âmbar"
                       value={amberPercent}
                       onChange={(e) => setAmberPercent(e.target.value)}

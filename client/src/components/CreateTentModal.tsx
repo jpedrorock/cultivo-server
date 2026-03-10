@@ -132,7 +132,8 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
                 <Label htmlFor="width">Largura (cm) *</Label>
                 <Input
                   id="width"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="45"
                   value={formData.width}
                   onChange={(e) => setFormData({ ...formData, width: e.target.value })}
@@ -143,7 +144,8 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
                 <Label htmlFor="depth">Profundidade (cm) *</Label>
                 <Input
                   id="depth"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="75"
                   value={formData.depth}
                   onChange={(e) => setFormData({ ...formData, depth: e.target.value })}
@@ -154,7 +156,8 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
                 <Label htmlFor="height">Altura (cm) *</Label>
                 <Input
                   id="height"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="90"
                   value={formData.height}
                   onChange={(e) => setFormData({ ...formData, height: e.target.value })}
@@ -168,7 +171,8 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
               <Label htmlFor="powerW">Potência da Luz (W)</Label>
               <Input
                 id="powerW"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 placeholder="Ex: 600"
                 value={formData.powerW}
                 onChange={(e) => setFormData({ ...formData, powerW: e.target.value })}
