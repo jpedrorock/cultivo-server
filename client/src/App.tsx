@@ -116,10 +116,11 @@ function App() {
           <Toaster />
           <Sidebar />
           <div
-            className="pb-16 md:pb-0 md:pl-64"
+            className="md:pl-64"
             style={{
-              paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
-              isolation: 'isolate',  // Cria contexto de empilhamento separado para não interferir no BottomNav fixed
+              // No mobile: reservar espaço para o BottomNav (56px de py-3 + ícones) + safe-area do iPhone
+              // No desktop: sem padding-bottom (sem BottomNav)
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem)',
             }}
           >
             <Router />
