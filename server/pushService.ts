@@ -195,16 +195,23 @@ export function isPushConfigured(): boolean {
 export async function checkAndSendDailyReminders(): Promise<void> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
 
+  // Usar horário de Brasília (UTC-3) independente do fuso do servidor
   const now = new Date();
-  const currentHour = now.getHours().toString().padStart(2, "0");
-  const currentMinute = now.getMinutes().toString().padStart(2, "0");
+  const brasiliaOffset = -3 * 60; // UTC-3 em minutos
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const brasiliaMinutes = ((utcMinutes + brasiliaOffset) % (24 * 60) + 24 * 60) % (24 * 60);
+  const currentHour = Math.floor(brasiliaMinutes / 60).toString().padStart(2, "0");
+  const currentMinute = (brasiliaMinutes % 60).toString().padStart(2, "0");
   const currentTime = `${currentHour}:${currentMinute}`;
+
+  console.log(`[DailyReminder] Verificando horário Brasília: ${currentTime} (UTC: ${now.getUTCHours().toString().padStart(2,'0')}:${now.getUTCMinutes().toString().padStart(2,'0')})`);
 
   const allSubs = await getAllSubscriptions();
   let sent = 0;
 
   for (const sub of allSubs) {
-    if (!sub.reminderEnabled || !sub.reminderTimes) continue;
+    // Enviar se tiver horários configurados (reminderEnabled é opcional — a presença de horários é suficiente)
+    if (!sub.reminderTimes) continue;
 
     let times: string[] = [];
     try { times = JSON.parse(sub.reminderTimes); } catch { continue; }
