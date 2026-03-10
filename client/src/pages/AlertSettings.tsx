@@ -15,7 +15,6 @@ import {
   requestNotificationPermission,
   showNotification,
   scheduleMultipleDailyReminders,
-  registerPushSubscription,
 } from "@/lib/notifications";
 import { PageTransition } from "@/components/PageTransition";
 
@@ -85,30 +84,40 @@ export default function AlertSettings() {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      let subscription = await registration.pushManager.getSubscription();
+
+      // Se não existe subscription no browser, criar uma nova primeiro
+      if (!subscription && vapidData?.configured && vapidData.publicKey) {
+        // Tentar criar subscription diretamente
+        try {
+          const padding = "=".repeat((4 - (vapidData.publicKey.length % 4)) % 4);
+          const base64 = (vapidData.publicKey + padding).replace(/-/g, "+").replace(/_/g, "/");
+          const rawData = window.atob(base64);
+          const outputArray = new Uint8Array(rawData.length);
+          for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: outputArray.buffer,
+          });
+        } catch (subErr) {
+          console.warn("[Push] Não foi possível criar subscription:", subErr);
+        }
+      }
 
       if (subscription) {
+        const subJson = subscription.toJSON();
+        const keysJson = subJson.keys ? JSON.stringify(subJson.keys) : undefined;
         await updateReminderMutation.mutateAsync({
           endpoint: subscription.endpoint,
           reminderEnabled: times.length > 0,
           reminderTimes: times,
+          keysJson,
         });
-      } else if (vapidData?.configured && vapidData.publicKey) {
-        await registerPushSubscription(
-          vapidData.publicKey,
-          async (sub) => {
-            await subscribeMutation.mutateAsync({
-              subscription: sub as any,
-              reminderEnabled: times.length > 0,
-              reminderTimes: times,
-            });
-          }
-        );
       }
     } catch {
       // Silencioso — o banco já foi salvo, push é best-effort
     }
-  }, [permission, vapidData, updateReminderMutation, subscribeMutation]);
+  }, [permission, vapidData, updateReminderMutation]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 

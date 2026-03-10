@@ -4949,26 +4949,51 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Atualizar configurações de lembrete para um endpoint específico
+    // Atualizar configurações de lembrete para um endpoint específico (UPSERT)
     updateReminderSettings: publicProcedure
       .input(
         z.object({
           endpoint: z.string(),
           reminderEnabled: z.boolean(),
           reminderTimes: z.array(z.string()),
+          // Dados completos da subscription (necessários para UPSERT caso não exista no banco)
+          keysJson: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         const { pushSubscriptions } = await import("../drizzle/schema");
-        await database
-          .update(pushSubscriptions)
-          .set({
+        const reminderTimesJson = JSON.stringify(input.reminderTimes);
+
+        // Verificar se já existe
+        const existing = await database
+          .select({ id: pushSubscriptions.id })
+          .from(pushSubscriptions)
+          .where(eq(pushSubscriptions.endpoint, input.endpoint))
+          .limit(1);
+
+        if (existing.length > 0) {
+          // Atualizar registro existente
+          await database
+            .update(pushSubscriptions)
+            .set({
+              reminderEnabled: input.reminderEnabled,
+              reminderTimes: reminderTimesJson,
+            })
+            .where(eq(pushSubscriptions.endpoint, input.endpoint));
+        } else if (input.keysJson) {
+          // Inserir novo registro (UPSERT) — só possível se temos as chaves
+          await database.insert(pushSubscriptions).values({
+            endpoint: input.endpoint,
+            keysJson: input.keysJson,
             reminderEnabled: input.reminderEnabled,
-            reminderTimes: JSON.stringify(input.reminderTimes),
-          })
-          .where(eq(pushSubscriptions.endpoint, input.endpoint));
+            reminderTimes: reminderTimesJson,
+          });
+          console.log(`[PushService] UPSERT: nova subscription criada via updateReminderSettings`);
+        } else {
+          console.warn(`[PushService] updateReminderSettings: endpoint não encontrado no banco e keysJson não fornecido — horários não salvos na subscription push`);
+        }
         return { success: true };
       }),
 
