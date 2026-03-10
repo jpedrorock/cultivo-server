@@ -13,6 +13,7 @@ export function FertilizationCalculator() {
   const [phase, setPhase] = useState<"vega" | "flora">("vega");
   const [weekNumber, setWeekNumber] = useState(1);
   const [volume, setVolume] = useState(10);
+  const [volumeStr, setVolumeStr] = useState("10");
   const [useCustomEC, setUseCustomEC] = useState(false);
   const [customEC, setCustomEC] = useState<number | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -258,12 +259,25 @@ export function FertilizationCalculator() {
             <Label htmlFor="volume" className="text-base font-semibold">Volume de Preparo (litros)</Label>
             <Input
               id="volume"
-              type="number"
-              value={volume || ''}
-              onChange={(e) => setVolume(e.target.value === '' ? 0 : parseFloat(e.target.value))}
+              type="text"
+              inputMode="decimal"
+              value={volumeStr}
+              onChange={(e) => {
+                const val = e.target.value;
+                const sanitized = val.replace(',', '.');
+                if (sanitized === '' || /^\d*\.?\d*$/.test(sanitized)) {
+                  setVolumeStr(sanitized);
+                  const num = parseFloat(sanitized);
+                  if (!isNaN(num) && num > 0) setVolume(num);
+                }
+              }}
+              onBlur={() => {
+                const num = parseFloat(volumeStr);
+                const safe = isNaN(num) || num <= 0 ? 1 : num;
+                setVolumeStr(String(safe));
+                setVolume(safe);
+              }}
               placeholder="Ex: 10"
-              min="0"
-              step="0.1"
               className="text-[1.5rem] sm:text-[2rem] h-14 sm:h-16 px-4 font-bold text-center"
             />
           </div>
@@ -305,10 +319,16 @@ export function FertilizationCalculator() {
             {useCustomEC && (
               <Input
                 id="ec"
-                type="number"
-                step="0.1"
-                value={customEC || ""}
-                onChange={(e) => setCustomEC(parseFloat(e.target.value) || null)}
+                type="text"
+                inputMode="decimal"
+                value={customEC !== null ? String(customEC) : ""}
+                onChange={(e) => {
+                  const val = e.target.value.replace(',', '.');
+                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                    const num = parseFloat(val);
+                    setCustomEC(val === '' ? null : isNaN(num) ? null : num);
+                  }
+                }}
                 placeholder="Digite o EC desejado"
               />
             )}

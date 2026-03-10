@@ -89,6 +89,7 @@ export default function Nutrients() {
   const [phase, setPhase] = useState<Phase>("VEGA");
   const [week, setWeek] = useState(1);
   const [volumeL, setVolumeL] = useState(10);
+  const [volumeStr, setVolumeStr] = useState("10");
   
   // Estados para filtros do histórico
   const [historyTentFilter, setHistoryTentFilter] = useState<string>("all");
@@ -336,21 +337,27 @@ export default function Nutrients() {
               <CardContent>
                 <div className="flex items-center gap-4">
                   <Input
-                    type="number"
-                    value={volumeL}
+                    type="text"
+                    inputMode="decimal"
+                    value={volumeStr}
                     onChange={(e) => {
                       const val = e.target.value;
-                      // Remove leading zeros and convert to number
-                      const num = val === '' ? 0 : parseInt(val, 10);
-                      setVolumeL(isNaN(num) ? 0 : num);
+                      // Permite string vazia, números e ponto/vírgula decimal
+                      const sanitized = val.replace(',', '.');
+                      if (sanitized === '' || /^\d*\.?\d*$/.test(sanitized)) {
+                        setVolumeStr(sanitized);
+                        const num = parseFloat(sanitized);
+                        if (!isNaN(num) && num > 0) setVolumeL(num);
+                      }
                     }}
-                    onBlur={(e) => {
-                      // Ensure minimum value of 1 on blur
-                      if (volumeL < 1) setVolumeL(1);
+                    onBlur={() => {
+                      // Ao sair do campo, normaliza: mínimo 0.1
+                      const num = parseFloat(volumeStr);
+                      const safe = isNaN(num) || num < 0.1 ? 1 : num;
+                      setVolumeStr(String(safe));
+                      setVolumeL(safe);
                     }}
                     className="text-4xl h-20 text-center font-bold"
-                    min={1}
-                    max={1000}
                   />
                   <span className="text-4xl font-bold text-foreground">Litros</span>
                 </div>
@@ -398,61 +405,7 @@ export default function Nutrients() {
                 )}
               </div>
               
-              {/* NPK Total */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-lg">NPK Total</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <Card className="bg-purple-500/10 dark:bg-purple-500/20 border-purple-500/30">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-muted-foreground">Nitrogênio (N):</p>
-                      <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{npkTotal.n} ppm</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-blue-500/10 dark:bg-blue-500/20 border-blue-500/30">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-muted-foreground">Fósforo (P):</p>
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{npkTotal.p} ppm</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-green-500/10 dark:bg-green-500/20 border-green-500/30">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-muted-foreground">Potássio (K):</p>
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{npkTotal.k} ppm</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-              
-              {/* Micronutrientes */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-lg">Micronutrientes</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Card className="bg-orange-500/10 dark:bg-orange-500/20 border-orange-500/30">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-muted-foreground">Cálcio (Ca):</p>
-                      <p className="text-xl font-bold text-orange-600 dark:text-orange-400">{microsTotal.ca} ppm</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/30">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-muted-foreground">Magnésio (Mg):</p>
-                      <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{microsTotal.mg} ppm</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-yellow-500/10 dark:bg-yellow-500/20 border-yellow-500/30">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-muted-foreground">Ferro (Fe):</p>
-                      <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{microsTotal.fe} ppm</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/30">
-                    <CardContent className="pt-4">
-                      <p className="text-sm text-muted-foreground">Enxofre (S):</p>
-                      <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{microsTotal.s} ppm</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
+
               
               {/* EC */}
               <Card className="bg-blue-500/10 dark:bg-blue-500/20 border-blue-500/30">
