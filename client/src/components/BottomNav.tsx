@@ -3,13 +3,6 @@ import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
-
-// Haptic feedback helper
-const triggerHapticFeedback = () => {
-  if ('vibrate' in navigator) {
-    navigator.vibrate(10); // 10ms light vibration
-  }
-};
 import { trpc } from "@/lib/trpc";
 import {
   Sheet,
@@ -18,6 +11,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+
+// Haptic feedback helper
+const triggerHapticFeedback = () => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(10); // 10ms light vibration
+  }
+};
 
 type NavItem = {
   href: string;
@@ -33,16 +33,11 @@ export function BottomNav() {
   const [location] = useLocation();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
 
-  // Ocultar nav em telas de foco (ex: registro rápido) para dar mais espaço e cara de app nativo
-  if (HIDDEN_NAV_ROUTES.includes(location)) return null;
-  
-  // Buscar contagem de alertas não lidos
+  // TODOS os hooks devem ser chamados antes de qualquer return condicional (regra do React)
   const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
     {},
-    { refetchInterval: 30_000 } // poll every 30s to detect new alerts
+    { refetchInterval: 30_000 }
   );
-
-  // Track previous count to detect new alerts
   const prevCountRef = useRef<number | null>(null);
   const [badgeShaking, setBadgeShaking] = useState(false);
 
@@ -56,17 +51,19 @@ export function BottomNav() {
     prevCountRef.current = current;
   }, [alertCount]);
 
+  const { data: harvestQueuePlants } = trpc.harvestQueue.list.useQuery(undefined, {
+    refetchInterval: 60_000,
+  });
+  const harvestQueueCount = harvestQueuePlants?.length || 0;
+
+  // Ocultar nav em telas de foco (ex: registro rápido) — após todos os hooks
+  const isHidden = HIDDEN_NAV_ROUTES.includes(location);
+
   const mainNavItems: NavItem[] = [
     { href: "/quick-log", icon: Plus, label: "Registro" },
     { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
-
-  // Buscar contagem de plantas aguardando secagem
-  const { data: harvestQueuePlants } = trpc.harvestQueue.list.useQuery(undefined, {
-    refetchInterval: 60_000,
-  });
-  const harvestQueueCount = harvestQueuePlants?.length || 0;
 
   const moreMenuItems: NavItem[] = [
     { href: "/plants", icon: Leaf, label: "Plantas" },
@@ -80,6 +77,8 @@ export function BottomNav() {
   ];
 
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
+
+  if (isHidden) return null;
 
   return (
     <nav
