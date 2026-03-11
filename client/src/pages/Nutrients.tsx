@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,26 +42,23 @@ const PHASE_ICONS: Record<Phase, string> = {
   DRYING: "💨",
 };
 
-// Cores por produto para o layout colorido
+// Cores por produto para o layout colorido no app
 const PRODUCT_COLORS: Record<string, { bg: string; border: string; badge: string; dot: string }> = {
-  "Nitrato de Cálcio":          { bg: "bg-blue-50 dark:bg-blue-950/40",   border: "border-blue-200 dark:border-blue-800",   badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",   dot: "bg-blue-500" },
-  "Nitrato de Potássio":        { bg: "bg-purple-50 dark:bg-purple-950/40", border: "border-purple-200 dark:border-purple-800", badge: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300", dot: "bg-purple-500" },
-  "MKP (Fosfato Monopotássico)":{ bg: "bg-orange-50 dark:bg-orange-950/40", border: "border-orange-200 dark:border-orange-800", badge: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300", dot: "bg-orange-500" },
-  "Sulfato de Magnésio":        { bg: "bg-teal-50 dark:bg-teal-950/40",   border: "border-teal-200 dark:border-teal-800",   badge: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",   dot: "bg-teal-500" },
-  "Micronutrientes":            { bg: "bg-rose-50 dark:bg-rose-950/40",   border: "border-rose-200 dark:border-rose-800",   badge: "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300",   dot: "bg-rose-500" },
+  "Nitrato de Cálcio":           { bg: "bg-blue-50 dark:bg-blue-950/40",    border: "border-blue-200 dark:border-blue-800",    badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",    dot: "bg-blue-500"   },
+  "Nitrato de Potássio":         { bg: "bg-purple-50 dark:bg-purple-950/40", border: "border-purple-200 dark:border-purple-800", badge: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300", dot: "bg-purple-500" },
+  "MKP (Fosfato Monopotássico)": { bg: "bg-orange-50 dark:bg-orange-950/40", border: "border-orange-200 dark:border-orange-800", badge: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300", dot: "bg-orange-500" },
+  "Sulfato de Magnésio":         { bg: "bg-teal-50 dark:bg-teal-950/40",    border: "border-teal-200 dark:border-teal-800",    badge: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",    dot: "bg-teal-500"   },
+  "Micronutrientes":             { bg: "bg-rose-50 dark:bg-rose-950/40",    border: "border-rose-200 dark:border-rose-800",    badge: "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300",    dot: "bg-rose-500"   },
 };
-
 const DEFAULT_COLOR = { bg: "bg-gray-50 dark:bg-gray-900", border: "border-gray-200 dark:border-gray-700", badge: "bg-gray-100 text-gray-700", dot: "bg-gray-400" };
 
 const getProductsByPhaseWeek = (phase: Phase, week: number) => {
-  if (phase === "CLONING") {
-    return [
-      { name: "Nitrato de Cálcio",           gPerLiter: 0.3,  npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-      { name: "Nitrato de Potássio",          gPerLiter: 0.2,  npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.1,  npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "Sulfato de Magnésio",          gPerLiter: 0.2,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-    ];
-  }
+  if (phase === "CLONING") return [
+    { name: "Nitrato de Cálcio",           gPerLiter: 0.3,  npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+    { name: "Nitrato de Potássio",          gPerLiter: 0.2,  npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+    { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.1,  npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+    { name: "Sulfato de Magnésio",          gPerLiter: 0.2,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+  ];
   if (phase === "VEGA") {
     const m = 0.7 + (Math.min(week, 4) / 4) * 0.3;
     return [
@@ -82,16 +79,168 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
       { name: "Micronutrientes",              gPerLiter: 0.05 * m, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
     ];
   }
-  if (phase === "MAINTENANCE") {
-    return [
-      { name: "Nitrato de Cálcio",           gPerLiter: 0.5,  npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-      { name: "Nitrato de Potássio",          gPerLiter: 0.3,  npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.15, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "Sulfato de Magnésio",          gPerLiter: 0.3,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-    ];
-  }
-  return [];
+  if (phase === "MAINTENANCE") return [
+    { name: "Nitrato de Cálcio",           gPerLiter: 0.5,  npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+    { name: "Nitrato de Potássio",          gPerLiter: 0.3,  npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+    { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.15, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+    { name: "Sulfato de Magnésio",          gPerLiter: 0.3,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+  ];
+  return []; // DRYING — flush
 };
+
+// ── Gera PNG da nota fiscal via Canvas API puro (58mm = ~220px a 96dpi) ──
+function generateReceiptImage(
+  phase: Phase,
+  week: number,
+  volumeL: number,
+  calculatedProducts: Array<{ name: string; gPerLiter: number; totalG: number }>,
+  ecEstimated: number,
+  ppmApprox: number,
+): string {
+  // 58mm a 203dpi (resolução típica de impressora térmica portátil) = ~464px
+  // Usamos 2× para qualidade: 464 * 2 = 928px
+  const DPI_SCALE = 2;
+  const W = 464 * DPI_SCALE; // ~58mm
+  const PAD = 12 * DPI_SCALE;
+  const FS = 14 * DPI_SCALE;         // font-size base
+  const FS_SM = 12 * DPI_SCALE;
+  const FS_XS = 10 * DPI_SCALE;
+  const LH = FS * 1.7;               // line height
+  const LH_SM = FS_SM * 1.6;
+  const LH_XS = FS_XS * 1.5;
+  const MONO = `'Courier New', Courier, monospace`;
+
+  // Pré-calcular altura total
+  const itemLines = calculatedProducts.length === 0 ? 1 : calculatedProducts.length * 2;
+  const H = Math.ceil(
+    PAD +
+    LH * 2 +       // APP CULTIVO + subtítulo
+    LH * 0.5 +     // espaço
+    LH_SM * 4 +    // data/hora/fase/volume
+    LH * 0.5 +
+    LH * 1 +       // header tabela
+    itemLines * LH_SM +
+    LH * 0.5 +
+    LH_SM * 2 +    // EC / PPM
+    LH * 0.5 +
+    LH_XS * 2 +    // instruções
+    PAD
+  );
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  // Fundo branco
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#000";
+
+  let y = PAD + LH;
+
+  // ── Helpers ──
+  const textCenter = (text: string, font: string) => {
+    ctx.font = font;
+    ctx.fillStyle = "#000";
+    ctx.fillText(text, (W - ctx.measureText(text).width) / 2, y);
+    y += parseFloat(font) * 1.7;
+  };
+
+  const textRow = (left: string, right: string, font: string, rightBold = false) => {
+    ctx.font = font;
+    ctx.fillStyle = "#000";
+    ctx.fillText(left, PAD, y);
+    ctx.font = rightBold ? font.replace(/^(\d+)/, (m) => m) : font;
+    if (rightBold) ctx.font = `bold ${font}`;
+    const rw = ctx.measureText(right).width;
+    ctx.fillText(right, W - PAD - rw, y);
+    y += parseFloat(font) * 1.65;
+  };
+
+  const line = (thick = false, dashed = false) => {
+    ctx.beginPath();
+    ctx.setLineDash(dashed ? [6 * DPI_SCALE, 4 * DPI_SCALE] : []);
+    ctx.lineWidth = thick ? 2 * DPI_SCALE : 1 * DPI_SCALE;
+    ctx.strokeStyle = dashed ? "#aaa" : "#000";
+    ctx.moveTo(PAD, y);
+    ctx.lineTo(W - PAD, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    y += LH * 0.45;
+  };
+
+  // ── Cabeçalho ──
+  textCenter("APP CULTIVO", `bold ${FS}px ${MONO}`);
+  textCenter("RECEITA DE FERTILIZACAO", `${FS_SM}px ${MONO}`);
+  y += LH * 0.3;
+  line(true);
+
+  // ── Dados ──
+  const now = new Date();
+  textRow("Data:", now.toLocaleDateString("pt-BR"), `${FS_SM}px ${MONO}`, true);
+  textRow("Hora:", now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), `${FS_SM}px ${MONO}`, true);
+  textRow("Fase:", `${PHASE_NAMES[phase]} Sem.${week}`, `${FS_SM}px ${MONO}`, true);
+  textRow("Volume:", `${volumeL} L`, `${FS_SM}px ${MONO}`, true);
+  y += LH * 0.3;
+  line(false, true);
+
+  // ── Cabeçalho tabela ──
+  ctx.font = `bold ${FS_SM}px ${MONO}`;
+  ctx.fillStyle = "#000";
+  ctx.fillText("PRODUTO", PAD, y);
+  const qw = ctx.measureText("QTDE").width;
+  ctx.fillText("QTDE", W - PAD - qw, y);
+  y += LH_SM;
+  line(true);
+
+  // ── Itens ──
+  if (calculatedProducts.length === 0) {
+    ctx.font = `${FS_SM}px ${MONO}`;
+    const flush = "FLUSH - APENAS AGUA";
+    ctx.fillText(flush, (W - ctx.measureText(flush).width) / 2, y);
+    y += LH_SM;
+  } else {
+    calculatedProducts.forEach((prod, idx) => {
+      // Linha principal: nome + gramas
+      ctx.font = `bold ${FS_SM}px ${MONO}`;
+      ctx.fillStyle = "#000";
+      ctx.fillText(`${idx + 1}. ${prod.name}`, PAD, y);
+      const grams = `${prod.totalG.toFixed(1)}g`;
+      ctx.font = `bold ${FS}px ${MONO}`;
+      const gw = ctx.measureText(grams).width;
+      ctx.fillText(grams, W - PAD - gw, y);
+      y += LH_SM;
+
+      // Linha secundária: dose por litro
+      ctx.font = `${FS_XS}px ${MONO}`;
+      ctx.fillStyle = "#555";
+      ctx.fillText(`   ${prod.gPerLiter.toFixed(2)} g/L x ${volumeL} L`, PAD, y);
+      ctx.fillStyle = "#000";
+      y += LH_XS;
+      line(false, true);
+    });
+  }
+
+  // ── Rodapé EC/PPM ──
+  y += LH * 0.2;
+  line(true);
+  textRow("EC Estimado:", `${ecEstimated} mS/cm`, `bold ${FS_SM}px ${MONO}`, false);
+  textRow("PPM Aprox.:", `${ppmApprox} ppm`, `${FS_SM}px ${MONO}`, false);
+  y += LH * 0.3;
+  line(false, true);
+
+  // ── Instruções ──
+  ctx.font = `${FS_XS}px ${MONO}`;
+  ctx.fillStyle = "#555";
+  const i1 = "Adicionar na ordem listada";
+  const i2 = "Ajustar pH para 5.8 - 6.2";
+  ctx.fillText(i1, (W - ctx.measureText(i1).width) / 2, y);
+  y += LH_XS;
+  ctx.fillText(i2, (W - ctx.measureText(i2).width) / 2, y);
+
+  return canvas.toDataURL("image/png");
+}
 
 export default function Nutrients() {
   const [phase, setPhase] = useState<Phase>("VEGA");
@@ -99,12 +248,8 @@ export default function Nutrients() {
   const [volumeL, setVolumeL] = useState(10);
   const [volumeStr, setVolumeStr] = useState("10");
   const [isSavingImage, setIsSavingImage] = useState(false);
-
   const [historyTentFilter, setHistoryTentFilter] = useState<string>("all");
   const [historyPhaseFilter, setHistoryPhaseFilter] = useState<Phase | "all">("all");
-
-  // Ref para o bloco da nota fiscal (usado para gerar imagem)
-  const receiptRef = useRef<HTMLDivElement>(null);
 
   const tents = trpc.tents.list.useQuery();
   const applications = trpc.nutrients.listApplications.useQuery({
@@ -120,10 +265,9 @@ export default function Nutrients() {
     let ppm = 0;
     calculatedProducts.forEach(prod => {
       const [n, p, k] = prod.npk.split("-").map(Number);
-      const g = prod.gPerLiter;
-      ppm += ((n + p + k) / 100) * g * 1000;
-      ppm += (prod.ca / 100) * g * 1000;
-      ppm += (prod.mg / 100) * g * 1000;
+      ppm += ((n + p + k) / 100) * prod.gPerLiter * 1000;
+      ppm += (prod.ca / 100) * prod.gPerLiter * 1000;
+      ppm += (prod.mg / 100) * prod.gPerLiter * 1000;
     });
     return Math.round((ppm / 700) * 100) / 100;
   };
@@ -161,12 +305,10 @@ export default function Nutrients() {
     });
   };
 
-  // ── IMPRIMIR: abre janela com nota fiscal monocromática ──
+  // ── IMPRIMIR: abre janela com nota fiscal para impressora 58mm ──
   const printRecipe = () => {
     const now = new Date();
-    const dateStr = now.toLocaleDateString("pt-BR");
-    const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    const W = 40;
+    const W = 32; // colunas para 58mm
     const hr = "-".repeat(W);
     const dhr = "=".repeat(W);
     const center = (s: string) => " ".repeat(Math.max(0, Math.floor((W - s.length) / 2))) + s;
@@ -174,11 +316,11 @@ export default function Nutrients() {
 
     const lines: string[] = [
       center("APP CULTIVO"),
-      center("RECEITA DE FERTILIZACAO"),
+      center("RECEITA FERTILIZACAO"),
       dhr,
-      row("Data:", dateStr),
-      row("Hora:", timeStr),
-      row("Fase:", `${PHASE_NAMES[phase]} Sem.${week}`),
+      row("Data:", now.toLocaleDateString("pt-BR")),
+      row("Hora:", now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })),
+      row("Fase:", `${PHASE_NAMES[phase]} S.${week}`),
       row("Volume:", `${volumeL} L`),
       dhr,
       center("PRODUTOS"),
@@ -194,35 +336,28 @@ export default function Nutrients() {
         const maxName = W - num.length - grams.length - 2;
         const name = prod.name.length > maxName ? prod.name.slice(0, maxName - 1) + "." : prod.name;
         lines.push(row(`${num} ${name}`, grams));
-        lines.push(`   (${prod.gPerLiter.toFixed(2)} g/L x ${volumeL} L)`);
+        lines.push(`   ${prod.gPerLiter.toFixed(2)}g/L x ${volumeL}L`);
       });
     }
 
-    lines.push(hr, row("EC Estimado:", `${ecEstimated} mS/cm`), row("PPM Aprox.:", `${ppmApprox} ppm`), dhr, center("Adicionar na ordem listada"), center("Ajustar pH para 5.8-6.2"), dhr, "");
+    lines.push(hr, row("EC:", `${ecEstimated} mS/cm`), row("PPM:", `${ppmApprox} ppm`), dhr, center("Adicionar na ordem"), center("pH: 5.8 - 6.2"), dhr, "");
 
-    const win = window.open("", "_blank", "width=400,height=600");
+    const win = window.open("", "_blank", "width=320,height=600");
     if (!win) { showToast.error("Permita pop-ups para imprimir"); return; }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receita</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;line-height:1.5;background:#fff;color:#000;padding:8px;width:80mm}pre{white-space:pre-wrap;word-break:break-word}@media print{body{width:80mm;padding:0}@page{margin:4mm;size:80mm auto}}</style></head><body><pre>${lines.join("\n")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receita</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:11px;line-height:1.5;background:#fff;color:#000;padding:4px;width:58mm}pre{white-space:pre-wrap;word-break:break-word}@media print{body{width:58mm;padding:0}@page{margin:2mm;size:58mm auto}}</style></head><body><pre>${lines.join("\n")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}<\/script></body></html>`);
     win.document.close();
   };
 
-  // ── SALVAR IMAGEM: gera PNG da nota fiscal ──
-  const saveAsImage = async () => {
-    if (!receiptRef.current) return;
+  // ── SALVAR IMAGEM: gera PNG 58mm via Canvas API puro ──
+  const saveAsImage = () => {
     setIsSavingImage(true);
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(receiptRef.current, {
-        backgroundColor: "#ffffff",
-        scale: 3, // alta resolução
-        useCORS: true,
-        logging: false,
-      });
+      const dataUrl = generateReceiptImage(phase, week, volumeL, calculatedProducts, ecEstimated, ppmApprox);
       const link = document.createElement("a");
-      link.download = `receita-${PHASE_NAMES[phase].toLowerCase()}-sem${week}-${volumeL}L.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.download = `receita-${PHASE_NAMES[phase].toLowerCase().replace(/\s/g, "-")}-sem${week}-${volumeL}L.png`;
+      link.href = dataUrl;
       link.click();
-      showToast.success("Imagem salva!");
+      showToast.success("Imagem salva! Envie para a impressora.");
     } catch (e) {
       showToast.error("Erro ao gerar imagem");
     } finally {
@@ -233,16 +368,9 @@ export default function Nutrients() {
   return (
     <PageTransition>
       <div className="container py-6 max-w-5xl">
-        <Breadcrumb
-          items={[
-            { label: "Home", href: "/" },
-            { label: "Calculadoras", href: "/calculators" },
-            { label: "Fertilização" },
-          ]}
-        />
+        <Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Calculadoras", href: "/calculators" }, { label: "Fertilização" }]} />
         <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="mb-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
+          <ArrowLeft className="w-4 h-4 mr-2" />Voltar
         </Button>
         <div className="flex items-center gap-3 mb-6">
           <Beaker className="w-8 h-8 text-green-600" />
@@ -340,7 +468,7 @@ export default function Nutrients() {
                 <CardDescription className="text-green-100">Adicione os produtos na ordem listada abaixo</CardDescription>
               </CardHeader>
               <CardContent className="pt-5 space-y-3">
-                {/* Métricas EC/PPM */}
+                {/* EC / PPM */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
                     <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center shrink-0">
@@ -374,32 +502,23 @@ export default function Nutrients() {
                     {calculatedProducts.map((prod, idx) => {
                       const colors = PRODUCT_COLORS[prod.name] ?? DEFAULT_COLOR;
                       return (
-                        <div
-                          key={idx}
-                          className={`flex items-center gap-3 rounded-xl border p-3 ${colors.bg} ${colors.border}`}
-                        >
-                          {/* Número */}
+                        <div key={idx} className={`flex items-center gap-3 rounded-xl border p-3 ${colors.bg} ${colors.border}`}>
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${colors.dot}`}>
                             {idx + 1}
                           </div>
-                          {/* Nome e dose */}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold truncate">{prod.name}</p>
                             <p className="text-xs text-muted-foreground">{prod.gPerLiter.toFixed(2)} g/L × {volumeL} L</p>
                           </div>
-                          {/* Quantidade em destaque */}
-                          <div className="text-right shrink-0">
-                            <span className={`inline-block px-2.5 py-1 rounded-lg text-sm font-bold ${colors.badge}`}>
-                              {prod.totalG.toFixed(1)} g
-                            </span>
-                          </div>
+                          <span className={`inline-block px-2.5 py-1 rounded-lg text-sm font-bold shrink-0 ${colors.badge}`}>
+                            {prod.totalG.toFixed(1)} g
+                          </span>
                         </div>
                       );
                     })}
                   </div>
                 )}
 
-                {/* Dica */}
                 <p className="text-xs text-muted-foreground text-center pt-1">
                   Ajustar pH para <strong>5.8 – 6.2</strong> após diluição
                 </p>
@@ -408,7 +527,7 @@ export default function Nutrients() {
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button onClick={printRecipe} variant="outline" className="w-full sm:flex-1">
                     <Printer className="w-4 h-4 mr-2 shrink-0" />
-                    Imprimir Receita
+                    Imprimir
                   </Button>
                   <Button
                     onClick={saveAsImage}
@@ -419,7 +538,7 @@ export default function Nutrients() {
                     {isSavingImage ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin shrink-0" />Gerando...</>
                     ) : (
-                      <><Download className="w-4 h-4 mr-2 shrink-0" />Salvar como Imagem</>
+                      <><Download className="w-4 h-4 mr-2 shrink-0" />Salvar Imagem (58mm)</>
                     )}
                   </Button>
                   <Button
@@ -429,89 +548,11 @@ export default function Nutrients() {
                   >
                     {recordApplication.isPending ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin shrink-0" />Salvando...</>
-                    ) : (
-                      "Salvar Receita"
-                    )}
+                    ) : "Salvar Receita"}
                   </Button>
                 </div>
               </CardContent>
             </Card>
-
-            {/* ── NOTA FISCAL OCULTA (usada para gerar imagem PNG) ── */}
-            {/* Renderizada fora da tela, capturada pelo html2canvas */}
-            <div
-              style={{
-                position: "fixed",
-                left: "-9999px",
-                top: 0,
-                width: "320px",
-                background: "#ffffff",
-                padding: "0",
-                zIndex: -1,
-              }}
-            >
-              <div
-                ref={receiptRef}
-                style={{
-                  fontFamily: "'Courier New', Courier, monospace",
-                  fontSize: "13px",
-                  lineHeight: "1.6",
-                  background: "#ffffff",
-                  color: "#000000",
-                  padding: "16px",
-                  width: "320px",
-                }}
-              >
-                {/* Cabeçalho */}
-                <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: "8px", marginBottom: "8px" }}>
-                  <div style={{ fontWeight: "bold", fontSize: "15px" }}>APP CULTIVO</div>
-                  <div style={{ fontSize: "11px" }}>RECEITA DE FERTILIZACAO</div>
-                </div>
-                {/* Dados */}
-                <div style={{ fontSize: "11px", borderBottom: "1px dashed #999", paddingBottom: "6px", marginBottom: "6px" }}>
-                  {[
-                    ["Data:", new Date().toLocaleDateString("pt-BR")],
-                    ["Hora:", new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })],
-                    ["Fase:", `${PHASE_NAMES[phase]} — Semana ${week}`],
-                    ["Volume:", `${volumeL} L`],
-                  ].map(([l, r]) => (
-                    <div key={l} style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>{l}</span><span style={{ fontWeight: "bold" }}>{r}</span>
-                    </div>
-                  ))}
-                </div>
-                {/* Cabeçalho tabela */}
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "11px", borderBottom: "1px solid #000", paddingBottom: "4px", marginBottom: "4px" }}>
-                  <span>PRODUTO</span><span>QTDE</span>
-                </div>
-                {/* Itens */}
-                {calculatedProducts.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "12px 0", fontSize: "12px" }}>FLUSH — APENAS ÁGUA</div>
-                ) : calculatedProducts.map((prod, idx) => (
-                  <div key={idx} style={{ borderBottom: "1px dotted #ccc", paddingBottom: "4px", marginBottom: "4px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span style={{ fontSize: "11px", fontWeight: "600" }}>{idx + 1}. {prod.name}</span>
-                      <span style={{ fontSize: "13px", fontWeight: "bold", marginLeft: "8px", whiteSpace: "nowrap" }}>{prod.totalG.toFixed(1)} g</span>
-                    </div>
-                    <div style={{ fontSize: "10px", color: "#666", paddingLeft: "12px" }}>
-                      {prod.gPerLiter.toFixed(2)} g/L × {volumeL} L
-                    </div>
-                  </div>
-                ))}
-                {/* Rodapé */}
-                <div style={{ borderTop: "2px solid #000", marginTop: "8px", paddingTop: "6px", fontSize: "11px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
-                    <span>EC Estimado:</span><span>{ecEstimated} mS/cm</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>PPM Aprox.:</span><span>{ppmApprox} ppm</span>
-                  </div>
-                </div>
-                <div style={{ textAlign: "center", fontSize: "10px", color: "#666", marginTop: "10px", borderTop: "1px dashed #ccc", paddingTop: "6px" }}>
-                  Adicionar na ordem listada<br />Ajustar pH para 5.8 – 6.2
-                </div>
-              </div>
-            </div>
           </TabsContent>
 
           {/* ── HISTÓRICO ── */}
