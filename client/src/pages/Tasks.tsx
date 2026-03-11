@@ -50,7 +50,7 @@ export default function Tasks() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <Link href="/">
               <Button variant="ghost" size="sm">
@@ -102,7 +102,7 @@ export default function Tasks() {
     <>
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-card border-b border-border sticky top-0 z-10">
+      <div className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/">
             <Button variant="ghost" size="sm">

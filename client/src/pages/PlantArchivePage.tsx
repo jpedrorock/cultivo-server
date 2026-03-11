@@ -324,7 +324,7 @@ export default function PlantArchivePage() {
     <PageTransition>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="border-b bg-card sticky top-0 z-10">
+        <header className="border-b bg-card sticky top-0 z-10 pt-safe">
           <div className="container py-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

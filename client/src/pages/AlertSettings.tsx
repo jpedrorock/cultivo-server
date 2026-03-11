@@ -216,7 +216,7 @@ export default function AlertSettings() {
   if (!isNotificationSupported()) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border sticky top-0 z-10">
+        <header className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="icon">
@@ -247,7 +247,7 @@ export default function AlertSettings() {
     <PageTransition>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="bg-card border-b border-border sticky top-0 z-10">
+        <header className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="icon">

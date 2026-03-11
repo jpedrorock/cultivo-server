@@ -181,7 +181,7 @@ export default function ManageStrains() {
     <PageTransition>
         <div className="min-h-screen bg-background">
       {/* Header — sticky, compacto no mobile */}
-      <header className="bg-card border-b border-border sticky top-0 z-10">
+      <header className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
         <div className="container mx-auto px-4 py-3 flex items-center gap-3">
           <Button
             variant="ghost"

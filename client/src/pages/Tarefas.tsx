@@ -51,7 +51,7 @@ export default function Tarefas() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
           <div className="container mx-auto px-4 py-3 flex items-center gap-3">
             <Link href="/">
               <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0">
@@ -95,7 +95,7 @@ export default function Tarefas() {
     <PageTransition>
     <div className="min-h-screen bg-background">
       {/* Header sticky */}
-      <div className="bg-card border-b border-border sticky top-0 z-10">
+      <div className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
         <div className="container mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/">
             <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" aria-label="Voltar">

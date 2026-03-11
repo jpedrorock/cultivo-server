@@ -267,7 +267,7 @@ export default function PlantDetail() {
     <PageTransition>
       <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-10">
+      <header className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
         <div className="container py-3 md:py-6">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
             {/* Esquerda: voltar + ícone + nome */}

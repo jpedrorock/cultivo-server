@@ -472,7 +472,7 @@
   body {
     @apply bg-background text-foreground;
     /* iOS: compensar status bar translúcida (black-translucent + viewport-fit=cover) */
-    padding-top: env(safe-area-inset-top, 0px);
+
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -1239,7 +1239,6 @@ input[type="range"]::-moz-range-track {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* ============================================================
