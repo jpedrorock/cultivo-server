@@ -88,7 +88,7 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
   return []; // DRYING — flush
 };
 
-// ── Gera PNG da nota fiscal via Canvas API puro (58mm = ~220px a 96dpi) ──
+// ── Gera PNG da nota fiscal via Canvas API puro otimizado para 58mm ──
 function generateReceiptImage(
   phase: Phase,
   week: number,
@@ -97,72 +97,80 @@ function generateReceiptImage(
   ecEstimated: number,
   ppmApprox: number,
 ): string {
-  // 58mm a 203dpi (resolução típica de impressora térmica portátil) = ~464px
-  // Usamos 2× para qualidade: 464 * 2 = 928px
-  const DPI_SCALE = 2;
-  const W = 464 * DPI_SCALE; // ~58mm
-  const PAD = 12 * DPI_SCALE;
-  const FS = 14 * DPI_SCALE;         // font-size base
-  const FS_SM = 12 * DPI_SCALE;
-  const FS_XS = 10 * DPI_SCALE;
-  const LH = FS * 1.7;               // line height
-  const LH_SM = FS_SM * 1.6;
-  const LH_XS = FS_XS * 1.5;
-  const MONO = `'Courier New', Courier, monospace`;
+  // 58mm a 203dpi × 2 para qualidade = ~928px
+  const S = 2; // scale
+  const W = 464 * S;
+  const PAD = 12 * S;
+  const MONO = "'Courier New', Courier, monospace";
 
-  // Pré-calcular altura total
-  const itemLines = calculatedProducts.length === 0 ? 1 : calculatedProducts.length * 2;
-  const H = Math.ceil(
-    PAD +
-    LH * 2 +       // APP CULTIVO + subtítulo
-    LH * 0.5 +     // espaço
-    LH_SM * 4 +    // data/hora/fase/volume
+  // Tamanhos de fonte em px (já escalados)
+  const FS_LG = 28 * S;  // título
+  const FS = 24 * S;     // normal
+  const FS_SM = 22 * S;  // pequeno
+  const FS_XS = 18 * S;  // micro
+
+  // Line heights fixos (não dependem de parseFloat)
+  const LH_LG = 44 * S;
+  const LH = 38 * S;
+  const LH_SM = 34 * S;
+  const LH_XS = 28 * S;
+
+  // Calcular altura total
+  const nItems = calculatedProducts.length;
+  const H =
+    PAD * 2 +
+    LH_LG +          // APP CULTIVO
+    LH_SM +          // subtítulo
+    LH * 0.5 +       // espaço
+    LH_SM * 4 +      // data/hora/fase/volume
     LH * 0.5 +
-    LH * 1 +       // header tabela
-    itemLines * LH_SM +
+    LH +             // header tabela
+    (nItems === 0 ? LH_SM : nItems * (LH_SM + LH_XS + LH * 0.4)) +
     LH * 0.5 +
-    LH_SM * 2 +    // EC / PPM
+    LH_SM * 2 +      // EC / PPM
     LH * 0.5 +
-    LH_XS * 2 +    // instruções
-    PAD
-  );
+    LH_XS * 2 +      // instruções
+    PAD;
 
   const canvas = document.createElement("canvas");
   canvas.width = W;
-  canvas.height = H;
+  canvas.height = Math.ceil(H);
   const ctx = canvas.getContext("2d")!;
 
   // Fundo branco
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, canvas.height);
 
-  let y = PAD + LH;
+  let y = PAD;
 
   // ── Helpers ──
-  const textCenter = (text: string, font: string) => {
-    ctx.font = font;
-    ctx.fillStyle = "#000";
+  const setFont = (size: number, bold = false) => {
+    ctx.font = `${bold ? "bold " : ""}${size}px ${MONO}`;
+  };
+
+  const drawCenter = (text: string, size: number, bold = false, lh = LH) => {
+    setFont(size, bold);
+    ctx.fillStyle = "#000000";
+    y += size; // baseline offset
     ctx.fillText(text, (W - ctx.measureText(text).width) / 2, y);
-    y += parseFloat(font) * 1.7;
+    y += lh - size;
   };
 
-  const textRow = (left: string, right: string, font: string, rightBold = false) => {
-    ctx.font = font;
-    ctx.fillStyle = "#000";
+  const drawRow = (left: string, right: string, size: number, boldLeft = false, boldRight = true, lh = LH_SM) => {
+    y += size;
+    setFont(size, boldLeft);
+    ctx.fillStyle = "#000000";
     ctx.fillText(left, PAD, y);
-    ctx.font = rightBold ? font.replace(/^(\d+)/, (m) => m) : font;
-    if (rightBold) ctx.font = `bold ${font}`;
-    const rw = ctx.measureText(right).width;
-    ctx.fillText(right, W - PAD - rw, y);
-    y += parseFloat(font) * 1.65;
+    setFont(size, boldRight);
+    ctx.fillText(right, W - PAD - ctx.measureText(right).width, y);
+    y += lh - size;
   };
 
-  const line = (thick = false, dashed = false) => {
+  const drawLine = (thick = false, dashed = false) => {
     ctx.beginPath();
-    ctx.setLineDash(dashed ? [6 * DPI_SCALE, 4 * DPI_SCALE] : []);
-    ctx.lineWidth = thick ? 2 * DPI_SCALE : 1 * DPI_SCALE;
-    ctx.strokeStyle = dashed ? "#aaa" : "#000";
+    ctx.setLineDash(dashed ? [6 * S, 4 * S] : []);
+    ctx.lineWidth = thick ? 2 * S : 1 * S;
+    ctx.strokeStyle = dashed ? "#aaaaaa" : "#000000";
     ctx.moveTo(PAD, y);
     ctx.lineTo(W - PAD, y);
     ctx.stroke();
@@ -171,68 +179,72 @@ function generateReceiptImage(
   };
 
   // ── Cabeçalho ──
-  textCenter("APP CULTIVO", `bold ${FS}px ${MONO}`);
-  textCenter("RECEITA DE FERTILIZACAO", `${FS_SM}px ${MONO}`);
+  drawCenter("APP CULTIVO", FS_LG, true, LH_LG);
+  drawCenter("RECEITA DE FERTILIZACAO", FS_SM, false, LH_SM);
   y += LH * 0.3;
-  line(true);
+  drawLine(true);
 
   // ── Dados ──
   const now = new Date();
-  textRow("Data:", now.toLocaleDateString("pt-BR"), `${FS_SM}px ${MONO}`, true);
-  textRow("Hora:", now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), `${FS_SM}px ${MONO}`, true);
-  textRow("Fase:", `${PHASE_NAMES[phase]} Sem.${week}`, `${FS_SM}px ${MONO}`, true);
-  textRow("Volume:", `${volumeL} L`, `${FS_SM}px ${MONO}`, true);
+  drawRow("Data:", now.toLocaleDateString("pt-BR"), FS_SM);
+  drawRow("Hora:", now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), FS_SM);
+  drawRow("Fase:", `${PHASE_NAMES[phase]} Sem.${week}`, FS_SM);
+  drawRow("Volume:", `${volumeL} L`, FS_SM);
   y += LH * 0.3;
-  line(false, true);
+  drawLine(false, true);
 
   // ── Cabeçalho tabela ──
-  ctx.font = `bold ${FS_SM}px ${MONO}`;
-  ctx.fillStyle = "#000";
+  y += FS;
+  setFont(FS, true);
+  ctx.fillStyle = "#000000";
   ctx.fillText("PRODUTO", PAD, y);
-  const qw = ctx.measureText("QTDE").width;
-  ctx.fillText("QTDE", W - PAD - qw, y);
-  y += LH_SM;
-  line(true);
+  ctx.fillText("QTDE", W - PAD - ctx.measureText("QTDE").width, y);
+  y += LH - FS;
+  drawLine(true);
 
   // ── Itens ──
-  if (calculatedProducts.length === 0) {
-    ctx.font = `${FS_SM}px ${MONO}`;
+  if (nItems === 0) {
+    y += FS_SM;
+    setFont(FS_SM, false);
+    ctx.fillStyle = "#000000";
     const flush = "FLUSH - APENAS AGUA";
     ctx.fillText(flush, (W - ctx.measureText(flush).width) / 2, y);
-    y += LH_SM;
+    y += LH_SM - FS_SM;
   } else {
     calculatedProducts.forEach((prod, idx) => {
-      // Linha principal: nome + gramas
-      ctx.font = `bold ${FS_SM}px ${MONO}`;
-      ctx.fillStyle = "#000";
+      // Nome + gramas
+      y += FS_SM;
+      setFont(FS_SM, true);
+      ctx.fillStyle = "#000000";
       ctx.fillText(`${idx + 1}. ${prod.name}`, PAD, y);
       const grams = `${prod.totalG.toFixed(1)}g`;
-      ctx.font = `bold ${FS}px ${MONO}`;
-      const gw = ctx.measureText(grams).width;
-      ctx.fillText(grams, W - PAD - gw, y);
-      y += LH_SM;
+      setFont(FS, true);
+      ctx.fillText(grams, W - PAD - ctx.measureText(grams).width, y);
+      y += LH_SM - FS_SM;
 
-      // Linha secundária: dose por litro
-      ctx.font = `${FS_XS}px ${MONO}`;
-      ctx.fillStyle = "#555";
+      // Dose por litro
+      y += FS_XS;
+      setFont(FS_XS, false);
+      ctx.fillStyle = "#555555";
       ctx.fillText(`   ${prod.gPerLiter.toFixed(2)} g/L x ${volumeL} L`, PAD, y);
-      ctx.fillStyle = "#000";
-      y += LH_XS;
-      line(false, true);
+      ctx.fillStyle = "#000000";
+      y += LH_XS - FS_XS;
+      drawLine(false, true);
     });
   }
 
-  // ── Rodapé EC/PPM ──
+  // ── EC / PPM ──
   y += LH * 0.2;
-  line(true);
-  textRow("EC Estimado:", `${ecEstimated} mS/cm`, `bold ${FS_SM}px ${MONO}`, false);
-  textRow("PPM Aprox.:", `${ppmApprox} ppm`, `${FS_SM}px ${MONO}`, false);
+  drawLine(true);
+  drawRow("EC Estimado:", `${ecEstimated} mS/cm`, FS_SM, true, true);
+  drawRow("PPM Aprox.:", `${ppmApprox} ppm`, FS_SM, false, false);
   y += LH * 0.3;
-  line(false, true);
+  drawLine(false, true);
 
   // ── Instruções ──
-  ctx.font = `${FS_XS}px ${MONO}`;
-  ctx.fillStyle = "#555";
+  y += FS_XS;
+  setFont(FS_XS, false);
+  ctx.fillStyle = "#555555";
   const i1 = "Adicionar na ordem listada";
   const i2 = "Ajustar pH para 5.8 - 6.2";
   ctx.fillText(i1, (W - ctx.measureText(i1).width) / 2, y);
@@ -460,12 +472,14 @@ export default function Nutrients() {
 
             {/* ── RECEITA COLORIDA (layout do app) ── */}
             <Card className="border-green-500/40 overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-500 text-white">
-                <CardTitle className="flex items-center gap-2 text-white">
+              <CardHeader
+                style={{ background: "linear-gradient(to right, #16a34a, #10b981)", color: "#fff" }}
+              >
+                <CardTitle className="flex items-center gap-2" style={{ color: "#fff" }}>
                   <FlaskConical className="w-5 h-5" />
                   {PHASE_ICONS[phase]} Receita — {PHASE_NAMES[phase]} Semana {week} — {volumeL}L
                 </CardTitle>
-                <CardDescription className="text-green-100">Adicione os produtos na ordem listada abaixo</CardDescription>
+                <CardDescription style={{ color: "#d1fae5" }}>Adicione os produtos na ordem listada abaixo</CardDescription>
               </CardHeader>
               <CardContent className="pt-5 space-y-3">
                 {/* EC / PPM */}
