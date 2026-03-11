@@ -471,17 +471,23 @@ export default function Nutrients() {
             </div>
 
             {/* ── RECEITA COLORIDA (layout do app) ── */}
-            <Card className="border-green-500/40 overflow-hidden">
-              <CardHeader
-                style={{ background: "linear-gradient(to right, #16a34a, #10b981)", color: "#fff" }}
-              >
-                <CardTitle className="flex items-center gap-2" style={{ color: "#fff" }}>
-                  <FlaskConical className="w-5 h-5" />
-                  {PHASE_ICONS[phase]} Receita — {PHASE_NAMES[phase]} Semana {week} — {volumeL}L
-                </CardTitle>
-                <CardDescription style={{ color: "#d1fae5" }}>Adicione os produtos na ordem listada abaixo</CardDescription>
+            <Card className="border-green-500/40">
+              <CardHeader className="pb-3">
+                {/* Box arredondado verde em vez de tarja */}
+                <div
+                  className="rounded-2xl px-4 py-3 flex flex-col gap-1"
+                  style={{ background: "linear-gradient(135deg, #16a34a, #10b981)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="w-5 h-5 text-white shrink-0" />
+                    <span className="text-base font-bold text-white leading-tight">
+                      {PHASE_ICONS[phase]} Receita — {PHASE_NAMES[phase]} Semana {week} — {volumeL}L
+                    </span>
+                  </div>
+                  <p className="text-sm" style={{ color: "#d1fae5" }}>Adicione os produtos na ordem listada abaixo</p>
+                </div>
               </CardHeader>
-              <CardContent className="pt-5 space-y-3">
+              <CardContent className="pt-0 space-y-3">
                 {/* EC / PPM */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
