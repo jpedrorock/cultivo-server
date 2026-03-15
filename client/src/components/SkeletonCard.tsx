@@ -9,7 +9,7 @@ export function SkeletonCard({ className, lines = 3 }: SkeletonCardProps) {
   return (
     <div
       className={cn(
-        "bg-white dark:bg-gray-800 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 animate-pulse",
+        "bg-card rounded-2xl p-4 border border-border animate-pulse",
         className
       )}
     >

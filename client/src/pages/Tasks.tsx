@@ -247,7 +247,7 @@ export default function Tasks() {
                           className={`flex items-start gap-3 p-4 rounded-lg border transition-all ${
                             task.isDone
                               ? "bg-primary/10 border-primary/20"
-                              : "bg-white border-gray-200 hover:border-green-300"
+                              : "bg-card border-border hover:border-green-300"
                           }`}
                         >
                           <Checkbox

@@ -82,7 +82,7 @@ export function AddToHomeScreenPrompt() {
 
   return (
     <div className="fixed bottom-20 left-4 right-4 z-[100] animate-in slide-in-from-bottom-5 duration-500">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl border border-border p-4">
         <button
           onClick={handleDismiss}
           className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"

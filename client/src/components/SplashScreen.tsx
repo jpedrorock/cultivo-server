@@ -29,7 +29,7 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
         {/* Logo com animação de pulso */}
         <div className="relative">
           <div className="absolute inset-0 bg-green-400/20 dark:bg-green-500/20 rounded-full blur-2xl animate-pulse" />
-          <div className="relative bg-white dark:bg-gray-900 rounded-full p-8 shadow-2xl animate-bounce-slow">
+          <div className="relative bg-card rounded-full p-8 shadow-2xl animate-bounce-slow">
             <Sprout className="w-20 h-20 text-green-600 dark:text-green-400" strokeWidth={2.5} />
           </div>
         </div>
@@ -46,9 +46,9 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
 
         {/* Loading indicator */}
         <div className="flex gap-2 mt-4 animate-in fade-in duration-700 delay-500">
-          <div className="w-2 h-2 bg-white dark:bg-green-400 rounded-full animate-bounce [animation-delay:0ms]" />
-          <div className="w-2 h-2 bg-white dark:bg-green-400 rounded-full animate-bounce [animation-delay:150ms]" />
-          <div className="w-2 h-2 bg-white dark:bg-green-400 rounded-full animate-bounce [animation-delay:300ms]" />
+          <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0ms]" />
+          <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:150ms]" />
+          <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:300ms]" />
         </div>
       </div>
     </div>

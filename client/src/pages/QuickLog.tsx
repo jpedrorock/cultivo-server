@@ -318,7 +318,7 @@ export default function QuickLog() {
 
   if (tentsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-green-600" />
       </div>
     );
@@ -345,7 +345,7 @@ export default function QuickLog() {
           <div className="bg-card dark:bg-card rounded-2xl shadow-lg p-6 space-y-6 relative max-h-[85vh] overflow-y-auto w-full">
           {/* Decorative animated circle */}
           {currentStep < 9 && currentStepData && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-dashed border-gray-200 dark:border-gray-600 rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
           )}
 
           {/* Step content */}
@@ -378,8 +378,8 @@ export default function QuickLog() {
             {/* Title */}
             {currentStep < 9 && currentStepData && (
               <div className="text-center space-y-2 animate-[slide-in-from-bottom_0.7s_ease-out]">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{currentStepData.title}</h2>
-                <p className="text-lg text-gray-500">
+                <h2 className="text-3xl font-bold text-foreground">{currentStepData.title}</h2>
+                <p className="text-lg text-muted-foreground">
                   {currentStep === 0 && "Selecione a estufa"}
                   {currentStep === 1 && "Qual a temperatura atual?"}
                   {currentStep === 2 && "Qual a umidade relativa?"}
@@ -395,16 +395,16 @@ export default function QuickLog() {
 
             {currentStep === 9 && recordPlantHealth === null && (
               <div className="text-center space-y-2 animate-[slide-in-from-bottom_0.7s_ease-out]">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Saúde das Plantas</h2>
-                <p className="text-lg text-gray-500">Deseja registrar a saúde das plantas?</p>
-                <p className="text-sm text-gray-400">Você pode registrar a saúde das plantas desta estufa agora ou pular esta etapa.</p>
+                <h2 className="text-3xl font-bold text-foreground">Saúde das Plantas</h2>
+                <p className="text-lg text-muted-foreground">Deseja registrar a saúde das plantas?</p>
+                <p className="text-sm text-muted-foreground">Você pode registrar a saúde das plantas desta estufa agora ou pular esta etapa.</p>
               </div>
             )}
 
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
               <div className="text-center space-y-2 animate-[slide-in-from-bottom_0.7s_ease-out]">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{plants[currentPlantIndex].name}</h2>
-                <p className="text-lg text-gray-500">Como está a saúde?</p>
+                <h2 className="text-3xl font-bold text-foreground">{plants[currentPlantIndex].name}</h2>
+                <p className="text-lg text-muted-foreground">Como está a saúde?</p>
               </div>
             )}
 
@@ -418,7 +418,7 @@ export default function QuickLog() {
                     className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
                       tentId === tent.id
                         ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-xl scale-105"
-                        : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:border-green-300 hover:shadow-lg"
+                        : "bg-card text-card-foreground border-border hover:border-green-300 hover:shadow-lg"
                     }`}
                   >
                     <div className="font-bold text-xl">{tent.name}</div>
@@ -450,11 +450,11 @@ export default function QuickLog() {
                     placeholder="25"
                     className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
                       tempC
-                        ? 'border-green-500 dark:border-green-400 ring-2 ring-green-200 dark:ring-green-900'
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-4 focus:ring-orange-100'
+                        ? 'border-green-500 ring-2 ring-green-500/20'
+                        : 'border-border focus:ring-4 focus:ring-orange-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-gray-400">°C</span>
+                  <span className="text-4xl font-bold text-muted-foreground">°C</span>
                 </div>
               </div>
             )}
@@ -476,11 +476,11 @@ export default function QuickLog() {
                     placeholder="60"
                     className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
                       rhPct
-                        ? 'border-green-500 dark:border-green-400 ring-2 ring-green-200 dark:ring-green-900'
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-4 focus:ring-blue-100'
+                        ? 'border-green-500 ring-2 ring-green-500/20'
+                        : 'border-border focus:ring-4 focus:ring-blue-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-gray-400">%</span>
+                  <span className="text-4xl font-bold text-muted-foreground">%</span>
                 </div>
               </div>
             )}
@@ -502,11 +502,11 @@ export default function QuickLog() {
                     placeholder="2000"
                     className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
                       wateringVolume
-                        ? 'border-green-500 dark:border-green-400 ring-2 ring-green-200 dark:ring-green-900'
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-4 focus:ring-green-100'
+                        ? 'border-green-500 ring-2 ring-green-500/20'
+                        : 'border-border focus:ring-4 focus:ring-green-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-gray-400">ml</span>
+                  <span className="text-4xl font-bold text-muted-foreground">ml</span>
                 </div>
               </div>
             )}
@@ -528,17 +528,17 @@ export default function QuickLog() {
                     placeholder="300"
                     className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
                       runoffCollected
-                        ? 'border-green-500 dark:border-green-400 ring-2 ring-green-200 dark:ring-green-900'
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-4 focus:ring-teal-100'
+                        ? 'border-green-500 ring-2 ring-green-500/20'
+                        : 'border-border focus:ring-4 focus:ring-teal-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-gray-400">ml</span>
+                  <span className="text-4xl font-bold text-muted-foreground">ml</span>
                 </div>
                 {runoffPercentage && (
                   <div className="text-center p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl border border-teal-200 animate-[slide-in-from-bottom_0.9s_ease-out]">
-                    <div className="text-sm text-gray-600">Porcentagem de Runoff</div>
+                    <div className="text-sm text-foreground/80">Porcentagem de Runoff</div>
                     <div className="text-3xl font-bold text-teal-600 dark:text-teal-400">{runoffPercentage}%</div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {parseFloat(runoffPercentage) >= 15 && parseFloat(runoffPercentage) <= 20
                         ? "✓ Ideal"
                         : parseFloat(runoffPercentage) < 15
@@ -567,11 +567,11 @@ export default function QuickLog() {
                     placeholder="6.0"
                     className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
                       ph
-                        ? 'border-green-500 dark:border-green-400 ring-2 ring-green-200 dark:ring-green-900'
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-4 focus:ring-purple-100'
+                        ? 'border-green-500 ring-2 ring-green-500/20'
+                        : 'border-border focus:ring-4 focus:ring-purple-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-gray-400">pH</span>
+                  <span className="text-4xl font-bold text-muted-foreground">pH</span>
                 </div>
               </div>
             )}
@@ -593,11 +593,11 @@ export default function QuickLog() {
                     placeholder="1.5"
                     className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
                       ec
-                        ? 'border-green-500 dark:border-green-400 ring-2 ring-green-200 dark:ring-green-900'
-                        : 'border-gray-300 dark:border-gray-600 focus:ring-4 focus:ring-yellow-100'
+                        ? 'border-green-500 ring-2 ring-green-500/20'
+                        : 'border-border focus:ring-4 focus:ring-yellow-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-gray-400">mS/cm</span>
+                  <span className="text-4xl font-bold text-muted-foreground">mS/cm</span>
                 </div>
               </div>
             )}
@@ -618,7 +618,7 @@ export default function QuickLog() {
                     className={`px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
                       lightUnit === "ppfd"
                         ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-md scale-105"
-                        : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-200 border border-gray-300 dark:border-gray-600"
+                        : "bg-card text-card-foreground border border-border"
                     }`}
                   >
                     PPFD
@@ -634,7 +634,7 @@ export default function QuickLog() {
                     className={`px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
                       lightUnit === "lux"
                         ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-md scale-105"
-                        : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-200 border border-gray-300 dark:border-gray-600"
+                        : "bg-card text-card-foreground border border-border"
                     }`}
                   >
                     Lux
@@ -648,7 +648,7 @@ export default function QuickLog() {
                     className={`px-8 py-3 rounded-xl font-semibold transition-all duration-300 ${
                       turn === "AM"
                         ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg scale-105"
-                        : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-600"
+                        : "bg-card text-card-foreground border-2 border-border"
                     }`}
                   >
                     ☀️ AM
@@ -658,7 +658,7 @@ export default function QuickLog() {
                     className={`px-8 py-3 rounded-xl font-semibold transition-all duration-300 ${
                       turn === "PM"
                         ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg scale-105"
-                        : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-600"
+                        : "bg-card text-card-foreground border-2 border-border"
                     }`}
                   >
                     🌙 PM
@@ -694,7 +694,7 @@ export default function QuickLog() {
                         className="-mx-4"
                       />
                       {luxValue > 0 && (
-                        <div className="text-xs text-gray-400 text-center mt-2">≈ {Math.round(luxValue * 0.0185)} μmol/m²/s</div>
+                        <div className="text-xs text-muted-foreground text-center mt-2">≈ {Math.round(luxValue * 0.0185)} μmol/m²/s</div>
                       )}
                     </>
                   )}
@@ -707,44 +707,44 @@ export default function QuickLog() {
               <div className="space-y-3 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 {tempC && (
                   <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 rounded-xl border-l-4 border-orange-500">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Temperatura</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{tempC}°C</div>
+                    <div className="text-sm text-muted-foreground">Temperatura</div>
+                    <div className="text-2xl font-bold text-foreground">{tempC}°C</div>
                   </div>
                 )}
                 {rhPct && (
                   <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 rounded-xl border-l-4 border-blue-500">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Umidade</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{rhPct}%</div>
+                    <div className="text-sm text-muted-foreground">Umidade</div>
+                    <div className="text-2xl font-bold text-foreground">{rhPct}%</div>
                   </div>
                 )}
                 {wateringVolume && (
                   <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 rounded-xl border-l-4 border-green-500">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Volume de Rega</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{wateringVolume} ml</div>
+                    <div className="text-sm text-muted-foreground">Volume de Rega</div>
+                    <div className="text-2xl font-bold text-foreground">{wateringVolume} ml</div>
                   </div>
                 )}
                 {runoffCollected && (
                   <div className="p-4 bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-950 dark:to-cyan-950 rounded-xl border-l-4 border-teal-500">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Runoff Coletado</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{runoffCollected} ml ({runoffPercentage}%)</div>
+                    <div className="text-sm text-muted-foreground">Runoff Coletado</div>
+                    <div className="text-2xl font-bold text-foreground">{runoffCollected} ml ({runoffPercentage}%)</div>
                   </div>
                 )}
                 {ph && (
                   <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-xl border-l-4 border-purple-500">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">pH</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{ph}</div>
+                    <div className="text-sm text-muted-foreground">pH</div>
+                    <div className="text-2xl font-bold text-foreground">{ph}</div>
                   </div>
                 )}
                 {ec && (
                   <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950 dark:to-orange-950 rounded-xl border-l-4 border-yellow-500">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">EC</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{ec} mS/cm</div>
+                    <div className="text-sm text-muted-foreground">EC</div>
+                    <div className="text-2xl font-bold text-foreground">{ec} mS/cm</div>
                   </div>
                 )}
                 {ppfd > 0 && (
                   <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 rounded-xl border-l-4 border-amber-500">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">PPFD ({turn})</div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{ppfd} μmol/m²/s</div>
+                    <div className="text-sm text-muted-foreground">PPFD ({turn})</div>
+                    <div className="text-2xl font-bold text-foreground">{ppfd} μmol/m²/s</div>
                   </div>
                 )}
               </div>
@@ -753,7 +753,7 @@ export default function QuickLog() {
             {/* Step 9: Plant health question */}
             {currentStep === 9 && recordPlantHealth === null && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-center text-sm text-muted-foreground dark:text-muted-foreground">
                   ✅ Registro da estufa salvo! Deseja também registrar a saúde das plantas?
                 </p>
                 <Button
@@ -782,9 +782,9 @@ export default function QuickLog() {
               <div className="space-y-4">
                 {/* Plant info */}
                 <div className="p-4 bg-card rounded-xl shadow-lg border-l-4 border-emerald-500 mb-6">
-                  <div className="text-sm text-gray-500">Planta {currentPlantIndex + 1} de {plants.length}</div>
-                  <div className="font-bold text-lg text-gray-900 dark:text-gray-100">{plants[currentPlantIndex].name}</div>
-                  <div className="text-sm text-gray-600">{plants[currentPlantIndex].code}</div>
+                  <div className="text-sm text-muted-foreground">Planta {currentPlantIndex + 1} de {plants.length}</div>
+                  <div className="font-bold text-lg text-foreground">{plants[currentPlantIndex].name}</div>
+                  <div className="text-sm text-foreground/80">{plants[currentPlantIndex].code}</div>
                 </div>
 
                 <Accordion type="multiple" defaultValue={["health"]} className="space-y-3">
@@ -799,7 +799,7 @@ export default function QuickLog() {
                     <AccordionContent className="px-4 pb-4 space-y-4">
                       {/* Status selection */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">Status</label>
                         <div className="grid grid-cols-3 gap-2">
                           {["healthy", "attention", "sick"].map((status) => (
                             <button
@@ -812,7 +812,7 @@ export default function QuickLog() {
                                     : status === "attention"
                                     ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg"
                                     : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg"
-                                  : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-600"
+                                  : "bg-card text-card-foreground border-2 border-border"
                               }`}
                             >
                               {status === "healthy" ? "✓ Saudável" : status === "attention" ? "⚠️ Atenção" : "✗ Doente"}
@@ -823,7 +823,7 @@ export default function QuickLog() {
 
                       {/* Symptoms */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Sintomas (opcional)</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">Sintomas (opcional)</label>
                         <Input
                           value={plantHealthRecords.get(plants[currentPlantIndex].id)?.symptoms || ""}
                           onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "symptoms", e.target.value)}
@@ -834,7 +834,7 @@ export default function QuickLog() {
 
                       {/* Notes */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">Notas (opcional)</label>
                         <Textarea
                           value={plantHealthRecords.get(plants[currentPlantIndex].id)?.notes || ""}
                           onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "notes", e.target.value)}
@@ -849,7 +849,7 @@ export default function QuickLog() {
                   <AccordionItem value="photo" className="border border-border rounded-xl bg-card shadow-sm">
                     <AccordionTrigger className="px-4 py-3 hover:no-underline">
                       <div className="flex items-center gap-2">
-                        <Camera className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                        <Camera className="h-5 w-5 text-foreground/80 dark:text-muted-foreground" />
                         <span className="font-semibold">Foto (opcional)</span>
                       </div>
                     </AccordionTrigger>
@@ -885,9 +885,9 @@ export default function QuickLog() {
                             <span className="text-xs text-green-500 mt-1">{uploadProgress.progress}%</span>
                           </div>
                         ) : (
-                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-950 transition-colors">
-                            <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                            <span className="text-sm text-gray-500">Tirar foto ou selecionar</span>
+                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-500/5 transition-colors">
+                            <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                            <span className="text-sm text-muted-foreground">Tirar foto ou selecionar</span>
                             <input
                               type="file"
                               accept="image/*"
