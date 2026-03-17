@@ -4,7 +4,7 @@
   "description": "Sistema completo para gerenciamento de cultivo de cannabis: controle de estufas, plantas, ambiente e análises.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#10b981",
   "theme_color": "#10b981",
   "orientation": "portrait-primary",
   "icons": [
