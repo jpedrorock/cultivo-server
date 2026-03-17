@@ -326,7 +326,7 @@ export default function QuickLog() {
 
   return (
     <PageTransition>
-        <div className="h-screen overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
+        <div className="h-screen overflow-hidden bg-background flex flex-col">
       {/* Botão fechar — fixo no canto superior direito */}
       <button
         onClick={() => {
@@ -342,7 +342,7 @@ export default function QuickLog() {
       {/* Content */}
       <div className="flex-1 flex items-center justify-center overflow-hidden pb-24">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">
-          <div className="bg-card dark:bg-card rounded-2xl shadow-lg p-6 space-y-6 relative max-h-[85vh] overflow-y-auto w-full">
+          <div className="bg-card rounded-2xl shadow-lg p-6 space-y-6 relative max-h-[85vh] overflow-y-auto w-full">
           {/* Decorative animated circle */}
           {currentStep < 9 && currentStepData && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
@@ -448,7 +448,7 @@ export default function QuickLog() {
                       setTempC(newValue);
                     }}
                     placeholder="25"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
                       tempC
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-orange-500/10'
@@ -474,7 +474,7 @@ export default function QuickLog() {
                       setRhPct(newValue);
                     }}
                     placeholder="60"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
                       rhPct
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-blue-500/10'
@@ -500,7 +500,7 @@ export default function QuickLog() {
                       setWateringVolume(newValue);
                     }}
                     placeholder="2000"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
                       wateringVolume
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-green-500/10'
@@ -526,7 +526,7 @@ export default function QuickLog() {
                       setRunoffCollected(newValue);
                     }}
                     placeholder="300"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
                       runoffCollected
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-teal-500/10'
@@ -535,9 +535,9 @@ export default function QuickLog() {
                   <span className="text-4xl font-bold text-muted-foreground">ml</span>
                 </div>
                 {runoffPercentage && (
-                  <div className="text-center p-4 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl border border-teal-200 animate-[slide-in-from-bottom_0.9s_ease-out]">
+                  <div className="text-center p-4 bg-muted rounded-xl border border-border animate-[slide-in-from-bottom_0.9s_ease-out]">
                     <div className="text-sm text-foreground/80">Porcentagem de Runoff</div>
-                    <div className="text-3xl font-bold text-teal-600 dark:text-teal-400">{runoffPercentage}%</div>
+                    <div className="text-3xl font-bold text-teal-500">{runoffPercentage}%</div>
                     <div className="text-xs text-muted-foreground mt-1">
                       {parseFloat(runoffPercentage) >= 15 && parseFloat(runoffPercentage) <= 20
                         ? "✓ Ideal"
@@ -565,7 +565,7 @@ export default function QuickLog() {
                       setPh(newValue);
                     }}
                     placeholder="6.0"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
                       ph
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-purple-500/10'
@@ -591,7 +591,7 @@ export default function QuickLog() {
                       setEc(newValue);
                     }}
                     placeholder="1.5"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card dark:bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
                       ec
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-yellow-500/10'
@@ -706,43 +706,43 @@ export default function QuickLog() {
             {currentStep === 8 && (
               <div className="space-y-3 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 {tempC && (
-                  <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 rounded-xl border-l-4 border-orange-500">
+                  <div className="p-4 bg-orange-500/10 rounded-xl border-l-4 border-orange-500">
                     <div className="text-sm text-muted-foreground">Temperatura</div>
                     <div className="text-2xl font-bold text-foreground">{tempC}°C</div>
                   </div>
                 )}
                 {rhPct && (
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 rounded-xl border-l-4 border-blue-500">
+                  <div className="p-4 bg-blue-500/10 rounded-xl border-l-4 border-blue-500">
                     <div className="text-sm text-muted-foreground">Umidade</div>
                     <div className="text-2xl font-bold text-foreground">{rhPct}%</div>
                   </div>
                 )}
                 {wateringVolume && (
-                  <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 rounded-xl border-l-4 border-green-500">
+                  <div className="p-4 bg-green-500/10 rounded-xl border-l-4 border-green-500">
                     <div className="text-sm text-muted-foreground">Volume de Rega</div>
                     <div className="text-2xl font-bold text-foreground">{wateringVolume} ml</div>
                   </div>
                 )}
                 {runoffCollected && (
-                  <div className="p-4 bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-950 dark:to-cyan-950 rounded-xl border-l-4 border-teal-500">
+                  <div className="p-4 bg-teal-500/10 rounded-xl border-l-4 border-teal-500">
                     <div className="text-sm text-muted-foreground">Runoff Coletado</div>
                     <div className="text-2xl font-bold text-foreground">{runoffCollected} ml ({runoffPercentage}%)</div>
                   </div>
                 )}
                 {ph && (
-                  <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-xl border-l-4 border-purple-500">
+                  <div className="p-4 bg-purple-500/10 rounded-xl border-l-4 border-purple-500">
                     <div className="text-sm text-muted-foreground">pH</div>
                     <div className="text-2xl font-bold text-foreground">{ph}</div>
                   </div>
                 )}
                 {ec && (
-                  <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950 dark:to-orange-950 rounded-xl border-l-4 border-yellow-500">
+                  <div className="p-4 bg-yellow-500/10 rounded-xl border-l-4 border-yellow-500">
                     <div className="text-sm text-muted-foreground">EC</div>
                     <div className="text-2xl font-bold text-foreground">{ec} mS/cm</div>
                   </div>
                 )}
                 {ppfd > 0 && (
-                  <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-yellow-950 rounded-xl border-l-4 border-amber-500">
+                  <div className="p-4 bg-amber-500/10 rounded-xl border-l-4 border-amber-500">
                     <div className="text-sm text-muted-foreground">PPFD ({turn})</div>
                     <div className="text-2xl font-bold text-foreground">{ppfd} μmol/m²/s</div>
                   </div>
@@ -753,7 +753,7 @@ export default function QuickLog() {
             {/* Step 9: Plant health question */}
             {currentStep === 9 && recordPlantHealth === null && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <p className="text-center text-sm text-muted-foreground dark:text-muted-foreground">
+                <p className="text-center text-sm text-muted-foreground">
                   ✅ Registro da estufa salvo! Deseja também registrar a saúde das plantas?
                 </p>
                 <Button
@@ -849,7 +849,7 @@ export default function QuickLog() {
                   <AccordionItem value="photo" className="border border-border rounded-xl bg-card shadow-sm">
                     <AccordionTrigger className="px-4 py-3 hover:no-underline">
                       <div className="flex items-center gap-2">
-                        <Camera className="h-5 w-5 text-foreground/80 dark:text-muted-foreground" />
+                        <Camera className="h-5 w-5 text-muted-foreground" />
                         <span className="font-semibold">Foto (opcional)</span>
                       </div>
                     </AccordionTrigger>
@@ -879,9 +879,9 @@ export default function QuickLog() {
                             </Button>
                           </div>
                         ) : uploadProgress.isUploading ? (
-                          <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-green-400 dark:border-green-600 rounded-xl bg-green-50 dark:bg-green-950">
+                          <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-green-500 rounded-xl bg-green-500/10">
                             <Loader2 className="h-8 w-8 text-green-500 animate-spin mb-2" />
-                            <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enviando foto...</span>
+                            <span className="text-sm text-green-500 font-medium">Enviando foto...</span>
                             <span className="text-xs text-green-500 mt-1">{uploadProgress.progress}%</span>
                           </div>
                         ) : (
