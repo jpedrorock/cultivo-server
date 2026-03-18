@@ -21,14 +21,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="App Cultivo" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.json" />    
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Anti-flash: garantir fundo verde durante splash (antes do React montar) -->
+    <!-- A classe splash-loading no body define background verde via CSS -->
+    <!-- O ThemeProvider remove essa classe quando o tema é aplicado -->
+
     <!-- Google Fonts: Geist (modern, technical, premium) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
 
-  <body>
+  <body class="splash-loading">
     <div id="root" style="min-height:100vh;"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

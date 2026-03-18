@@ -32,14 +32,32 @@ export function ThemeProvider({
 
   useEffect(() => {
     const root = document.documentElement;
+
+    // Desabilitar transições durante a troca de tema para evitar flash
+    root.classList.add('no-transitions');
+
     // Remove all theme classes
     root.classList.remove("light", "dark", "forest", "highcontrast", "highcontrast-dark", "apple");
     // Add current theme class
     root.classList.add(theme);
+    // Remover a classe splash-loading do body para permitir que o CSS do tema assuma
+    if (document.body) {
+      document.body.classList.remove('splash-loading');
+    }
+    // Remover inline styles que foram definidos durante a splash
+    root.style.removeProperty('background-color');
+    root.style.removeProperty('color');
 
     if (switchable) {
       localStorage.setItem("theme", theme);
     }
+
+    // Reabilitar transições após o frame ser pintado
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.classList.remove('no-transitions');
+      });
+    });
   }, [theme, switchable]);
 
   const toggleTheme = switchable

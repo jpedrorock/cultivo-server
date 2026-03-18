@@ -102,16 +102,14 @@ function App() {
     setShowSplash(false);
   };
 
-  if (showSplash) {
-    return <SplashScreen onFinish={handleSplashFinish} />;
-  }
-
   return (
     <ErrorBoundary>
       <ThemeProvider
         defaultTheme="light"
         switchable
       >
+        {/* Splash screen por cima do app (z-index alto) - app já monta atrás */}
+        {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
         <TooltipProvider>
           <Toaster />
           <Sidebar />
