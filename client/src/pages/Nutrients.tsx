@@ -260,10 +260,16 @@ export default function Nutrients() {
   const [volumeL, setVolumeL] = useState(10);
   const [volumeStr, setVolumeStr] = useState("10");
   const [isSavingImage, setIsSavingImage] = useState(false);
+  const [selectedTentId, setSelectedTentId] = useState<string>("");
   const [historyTentFilter, setHistoryTentFilter] = useState<string>("all");
   const [historyPhaseFilter, setHistoryPhaseFilter] = useState<Phase | "all">("all");
 
   const tents = trpc.tents.list.useQuery();
+
+  // Auto-selecionar a primeira estufa quando carregar
+  const firstTentId = tents.data?.[0]?.id?.toString();
+  const effectiveTentId = selectedTentId || firstTentId || "";
+
   const applications = trpc.nutrients.listApplications.useQuery({
     tentId: historyTentFilter !== "all" ? Number(historyTentFilter) : undefined,
     phase: historyPhaseFilter !== "all" ? historyPhaseFilter : undefined,
@@ -293,8 +299,13 @@ export default function Nutrients() {
   });
 
   const saveRecipe = () => {
+    const tentId = Number(effectiveTentId);
+    if (!tentId) {
+      showToast.error("Selecione uma estufa antes de salvar");
+      return;
+    }
     recordApplication.mutate({
-      tentId: 1,
+      tentId,
       cycleId: null,
       recipeTemplateId: null,
       recipeName: `${PHASE_NAMES[phase]} Semana ${week}`,
@@ -542,6 +553,24 @@ export default function Nutrients() {
                 <p className="text-xs text-muted-foreground text-center pt-1">
                   Ajustar pH para <strong>5.8 – 6.2</strong> após diluição
                 </p>
+
+                {/* Seletor de estufa para salvar receita */}
+                {tents.data && tents.data.length > 1 && (
+                  <div className="pt-2">
+                    <Select value={effectiveTentId} onValueChange={setSelectedTentId}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecionar estufa para salvar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tents.data.map((tent: any) => (
+                          <SelectItem key={tent.id} value={tent.id.toString()}>
+                            {tent.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Ações */}
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">

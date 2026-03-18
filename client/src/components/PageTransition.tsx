@@ -6,40 +6,22 @@ interface PageTransitionProps {
   className?: string;
 }
 
-// IMPORTANTE: Não usar opacity nem filter aqui.
-// Qualquer propriedade que cria stacking context (opacity, filter, transform)
-// faz com que position:sticky nos filhos seja contido nesse contexto,
-// tornando os headers sticky transparentes durante a animação.
-// Usamos apenas translateY para o slide suave.
-const pageVariants = {
-  initial: {
-    y: 6,
-  },
-  animate: {
-    y: 0,
-  },
-  exit: {
-    y: -6,
-  },
-};
-
-const pageTransition = {
-  duration: 0.15,
-  ease: "easeOut" as const,
-};
-
+/**
+ * PageTransition — wrapper de transição entre páginas.
+ *
+ * IMPORTANTE: Não usar opacity, filter ou transform aqui.
+ * Qualquer uma dessas propriedades cria um stacking context que:
+ * 1. Faz position:sticky filhos ficarem contidos no motion.div (não na viewport)
+ * 2. Faz headers sticky ficarem sem background visível durante a animação
+ *
+ * Solução: renderizar diretamente sem animação no wrapper.
+ * Animações de entrada são feitas via CSS animate-in nos elementos filhos.
+ */
 export function PageTransition({ children, className }: PageTransitionProps) {
   return (
-    <motion.div
-      className={className}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      variants={pageVariants}
-      transition={pageTransition}
-    >
+    <div className={className}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 

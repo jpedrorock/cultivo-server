@@ -190,8 +190,19 @@ const sections: Section[] = [
           <div className="space-y-1">
             <InfoRow label="Manutenção → Vegetativa" value="Início do ciclo produtivo" />
             <InfoRow label="Vegetativa → Floração" value="Mudança para 12/12" />
-            <InfoRow label="Floração → Secagem" value="Colheita e início da secagem" />
+            <InfoRow label="Floração → Colheita" value="Plantas vão para Aguardando Secagem" />
+            <InfoRow label="Aguardando Secagem" value="Fila de espera por estufa livre" />
+            <InfoRow label="Secagem" value="Ciclo de secagem em estufa dedicada" />
             <InfoRow label="Secagem → Concluído" value="Encerramento do ciclo" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="font-medium">Fluxo do ciclo perpétuo:</p>
+          <div className="space-y-1">
+            <InfoRow label="1. Colheita" value="Planta colhida vai para a fila Aguardando Secagem" />
+            <InfoRow label="2. Estufa livre" value="Quando uma estufa ficar vazia, mova as plantas para lá" />
+            <InfoRow label="3. Secagem" value="Estufa inicia ciclo de Secagem com as plantas colhidas" />
+            <InfoRow label="4. Nova veg" value="Estufa de Floração recebe novas plantas da Vegetativa" />
           </div>
         </div>
         <div className="space-y-2">
@@ -235,11 +246,11 @@ const sections: Section[] = [
             <InfoRow label="Mover" value="Transferir para outra estufa" />
             <InfoRow label="Transplantar" value="Promover para fase de Floração" />
             <InfoRow label="Clonar" value="Iniciar processo de clonagem" />
-            <InfoRow label="Colher" value="Registrar colheita e arquivar" />
+            <InfoRow label="Colher" value="Planta vai para a fila Aguardando Secagem" />
             <InfoRow label="Descartar" value="Registrar descarte da planta" />
           </div>
         </div>
-        <Tip text="Ao finalizar uma planta (colheita), ela vai automaticamente para o Arquivo de Plantas, preservando todo o histórico para consulta futura." />
+        <Tip text="Ao colher uma planta, ela vai para a fila Aguardando Secagem (no menu Mais). Quando uma estufa ficar livre, mova as plantas para lá e inicie o ciclo de Secagem." />
       </div>
     ),
   },

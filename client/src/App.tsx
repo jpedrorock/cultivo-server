@@ -45,8 +45,7 @@ function Router() {
   // make sure to consider if you need authentication for certain routes
   const [location] = useLocation();
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <Switch key={location}>
+    <Switch key={location}>
       <Route path={"/"} component={Home} />
 
       <Route path={"/strains"} component={ManageStrains} />
@@ -81,7 +80,6 @@ function Router() {
       {/* Final fallback route */}
       <Route component={NotFound} />
       </Switch>
-    </AnimatePresence>
   );
 }
 

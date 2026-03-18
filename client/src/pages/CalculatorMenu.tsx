@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { Calculator, Droplets, Sun, Beaker, TestTube } from "lucide-react";
-import { PageTransition } from "@/components/PageTransition";
+import { PageLayout } from "@/components/PageLayout";
 
 export default function CalculatorMenu() {
   const calculators = [
@@ -57,23 +57,21 @@ export default function CalculatorMenu() {
   ];
 
   return (
-    <PageTransition>
-        <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container mx-auto px-4 py-6">
+    <PageLayout
+      header={
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
-              <Calculator className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+              <Calculator className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-foreground">Calculadoras</h1>
-              <p className="text-sm text-muted-foreground">Ferramentas para cultivo</p>
+              <h1 className="text-xl font-bold text-foreground">Calculadoras</h1>
+              <p className="text-xs text-muted-foreground">Ferramentas para cultivo</p>
             </div>
           </div>
         </div>
-      </header>
-
+      }
+    >
       {/* Content */}
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
@@ -145,7 +143,6 @@ export default function CalculatorMenu() {
           </CardContent>
         </Card>
       </main>
-    </div>
-    </PageTransition>
+    </PageLayout>
   );
 }
