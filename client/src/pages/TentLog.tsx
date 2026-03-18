@@ -238,7 +238,7 @@ export default function TentLog() {
     <PageTransition>
         <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
+      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
         <div className="container py-6">
           <div className="flex items-center gap-4">
             <Button asChild variant="ghost" size="icon">

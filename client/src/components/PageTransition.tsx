@@ -6,23 +6,25 @@ interface PageTransitionProps {
   className?: string;
 }
 
+// IMPORTANTE: Não usar opacity nem filter aqui.
+// Qualquer propriedade que cria stacking context (opacity, filter, transform)
+// faz com que position:sticky nos filhos seja contido nesse contexto,
+// tornando os headers sticky transparentes durante a animação.
+// Usamos apenas translateY para o slide suave.
 const pageVariants = {
   initial: {
-    opacity: 0,
-    x: 16,
+    y: 6,
   },
   animate: {
-    opacity: 1,
-    x: 0,
+    y: 0,
   },
   exit: {
-    opacity: 0,
-    x: -16,
+    y: -6,
   },
 };
 
 const pageTransition = {
-  duration: 0.18,
+  duration: 0.15,
   ease: "easeOut" as const,
 };
 

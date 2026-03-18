@@ -466,7 +466,7 @@
   /* Show scrollbar for tabs with many items */
   .scrollable-tabs {
     scrollbar-width: thin; /* Firefox */
-    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-color: var(--border) transparent;
   }
   .scrollable-tabs::-webkit-scrollbar {
     display: block;
@@ -476,11 +476,11 @@
     background: transparent;
   }
   .scrollable-tabs::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--border));
+    background-color: var(--border);
     border-radius: 3px;
   }
   .scrollable-tabs::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground));
+    background-color: var(--muted-foreground);
   }
 
   * {
@@ -681,7 +681,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 24px;
   border-radius: 50%;
   background: white;
-  border: 3px solid hsl(var(--primary));
+  border: 3px solid var(--primary);
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -691,7 +691,7 @@ input[type="range"]::-moz-range-thumb {
   height: 24px;
   border-radius: 50%;
   background: white;
-  border: 3px solid hsl(var(--primary));
+  border: 3px solid var(--primary);
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -1293,6 +1293,15 @@ nav[class*="fixed"],
   z-index: 50;
 }
 
+/* Garantir que headers sticky sempre tenham background opaco.
+   O PageTransition usa transform que cria stacking context, e elementos
+   sticky filhos podem ficar sem background visível. */
+header[class*="sticky"],
+div[class*="sticky"][class*="bg-card"],
+div[class*="sticky"][class*="bg-background"] {
+  background-color: var(--card);
+}
+
 /* No iOS Safari, backdrop-blur em sticky headers quebra position:fixed.
    Removemos o backdrop-blur nos headers sticky apenas no mobile iOS. */
 @supports (-webkit-touch-callout: none) {
@@ -1304,6 +1313,6 @@ nav[class*="fixed"],
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     /* Compensa com fundo sólido para manter legibilidade */
-    background-color: hsl(var(--card)) !important;
+    background-color: var(--card) !important;
   }
 }

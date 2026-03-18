@@ -12,7 +12,7 @@ export default function Settings() {
     <PageTransition>
         <div className="min-h-screen bg-background">
       {/* Header — sticky, compacto no mobile */}
-      <header className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
+      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
         <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex items-center gap-3">
             <Button asChild variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10">

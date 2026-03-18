@@ -208,7 +208,7 @@ export default function TentDetails() {
     <PageTransition>
         <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-10 pt-safe">
+      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
         <div className="container py-4 md:py-6">
           <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
             <div className="flex items-center gap-4">
