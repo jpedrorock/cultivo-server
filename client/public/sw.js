@@ -1,6 +1,6 @@
 // Service Worker para App Cultivo PWA
 // Versão do cache - incrementar para forçar atualização
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `app-cultivo-${CACHE_VERSION}`;
 
 // Assets para cache (estratégia Cache First)
@@ -55,6 +55,11 @@ self.addEventListener('fetch', (event) => {
 
   // Ignorar requisições de analytics e chrome-extension
   if (url.protocol === 'chrome-extension:') {
+    return;
+  }
+
+  // Não interceptar rotas de autenticação (OAuth redirects precisam ser nativos do browser)
+  if (url.pathname.startsWith('/api/auth/')) {
     return;
   }
 
