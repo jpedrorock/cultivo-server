@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -820,23 +821,7 @@ function TentPlantsTab({ tentId, tentName }: { tentId: number; tentName: string 
     return strains?.find((s) => s.id === strainId)?.name || "--";
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ACTIVE": return "bg-green-500/10 text-green-600 border-green-500/30";
-      case "HARVESTED": return "bg-blue-500/10 text-blue-600 border-blue-500/30";
-      case "DEAD": return "bg-red-500/10 text-red-600 border-red-500/30";
-      default: return "bg-gray-500/10 text-gray-600 border-gray-500/30";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "ACTIVE": return "Ativa";
-      case "HARVESTED": return "Colhida";
-      case "DEAD": return "Morta";
-      default: return status;
-    }
-  };
+  // getStatusColor e getStatusLabel importados de @/lib/plantUtils
 
   const getHealthIcon = (status?: string) => {
     switch (status) {

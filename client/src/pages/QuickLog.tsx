@@ -92,9 +92,9 @@ export default function QuickLog() {
   const { data: tents = [], isLoading: tentsLoading } = trpc.tents.list.useQuery();
 
   // Fetch plants for selected tent (load when reaching step 9)
-  const { data: plants = [] } = trpc.plants.list.useQuery(
-    {},
-    { 
+  const { data: plants = [], isLoading: plantsLoading } = trpc.plants.list.useQuery(
+    { status: "ACTIVE" },
+    {
       enabled: !!tentId && currentStep >= 9,
       select: (data) => data.filter(p => p.currentTentId === tentId)
     }
@@ -231,32 +231,23 @@ export default function QuickLog() {
     const plant = plants[currentPlantIndex];
     const record = plantHealthRecords.get(plant.id);
 
-    if (!record) {
-      toast.error("Nenhum dado para salvar");
-      return;
-    }
+    // Se o usuário não interagiu com o formulário, usa o padrão "HEALTHY" (Saudável)
+    const healthStatusMap: Record<string, "HEALTHY" | "STRESSED" | "SICK"> = {
+      healthy: "HEALTHY",
+      attention: "STRESSED",
+      sick: "SICK",
+    };
+
+    const status = record?.status || "healthy";
 
     try {
-      // Save health status WITH photo (same as PlantHealthTab)
-      const healthStatusMap: Record<string, "HEALTHY" | "STRESSED" | "SICK"> = {
-        healthy: "HEALTHY",
-        attention: "STRESSED",
-        sick: "SICK",
-      };
-
-      console.log('[QuickLog] Saving health log with photo:', {
-        plantId: plant.id,
-        hasPhoto: !!record.photoUrl,
-        status: healthStatusMap[record.status]
-      });
-
       await savePlantHealthMutation.mutateAsync({
         plantId: plant.id,
-        healthStatus: healthStatusMap[record.status] || "HEALTHY",
-        symptoms: record.symptoms || undefined,
+        healthStatus: healthStatusMap[status] || "HEALTHY",
+        symptoms: record?.symptoms || undefined,
         treatment: undefined,
-        notes: record.notes || undefined,
-        photoUrl: record.photoUrl || undefined, // URL S3 pré-enviada
+        notes: record?.notes || undefined,
+        photoUrl: record?.photoUrl || undefined,
       });
 
       // Trichomes and LST save logic removed - available in individual plant pages
@@ -334,22 +325,21 @@ export default function QuickLog() {
   return (
     <PageTransition>
         <div className="h-screen overflow-hidden bg-background flex flex-col">
-      {/* Botão fechar — fixo no canto superior direito */}
-      <button
-        onClick={() => {
-          triggerHaptic('light');
-          setLocation('/');
-        }}
-        aria-label="Cancelar registro"
-        className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] right-4 z-[200] w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-sm text-white hover:bg-black/35 active:scale-95 transition-all"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
       {/* Content */}
       <div className="flex-1 flex items-center justify-center overflow-hidden pb-24">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">
-          <div className="bg-card rounded-2xl shadow-lg h-[85vh] overflow-hidden w-full flex flex-col">
+          <div className="bg-card rounded-2xl shadow-lg h-[85vh] overflow-hidden w-full flex flex-col relative">
+          {/* Botão fechar — dentro do card, canto superior direito */}
+          <button
+            onClick={() => {
+              triggerHaptic('light');
+              setLocation('/');
+            }}
+            aria-label="Cancelar registro"
+            className="absolute top-4 right-4 z-[200] w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-sm text-white hover:bg-black/35 active:scale-95 transition-all"
+          >
+            <X className="w-5 h-5" />
+          </button>
           {/* Step content */}
           <div className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out]">
           <div className="min-h-full flex flex-col justify-center p-6 space-y-6">
@@ -780,6 +770,26 @@ export default function QuickLog() {
                   className="w-full h-16 text-lg font-semibold rounded-2xl border-2"
                 >
                   <SkipForward className="mr-2 h-6 w-6" />
+                  Finalizar
+                </Button>
+              </div>
+            )}
+
+            {/* Step 9+: No active plants in tent */}
+            {currentStep >= 9 && recordPlantHealth === true && !plantsLoading && plants.length === 0 && (
+              <div className="flex flex-col items-center gap-4 py-6 animate-[slide-in-from-bottom_0.6s_ease-out]">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                  <Sprout className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-foreground">Nenhuma planta ativa</p>
+                  <p className="text-sm text-muted-foreground mt-1">Esta estufa não tem plantas ativas no momento.</p>
+                </div>
+                <Button
+                  onClick={() => { resetForm(); setLocation("/"); }}
+                  className="h-14 px-8 text-lg font-medium rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+                >
+                  <Check className="mr-2 h-5 w-5" />
                   Finalizar
                 </Button>
               </div>

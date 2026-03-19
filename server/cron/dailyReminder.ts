@@ -6,8 +6,8 @@ import { checkAndSendDailyReminders } from "../pushService";
  * Executa a cada minuto e verifica se algum dispositivo tem lembrete configurado para o horário atual
  */
 export function startDailyReminderCron() {
-  // Executa a cada minuto
-  const task = cron.schedule("* * * * *", async () => {
+  // Executa a cada hora (no minuto zero)
+  const task = cron.schedule("0 * * * *", async () => {
     try {
       await checkAndSendDailyReminders();
     } catch (error) {
@@ -15,6 +15,6 @@ export function startDailyReminderCron() {
     }
   });
 
-  console.log("[DailyReminder] Cron job iniciado: verificação de lembretes a cada minuto");
+  console.log("[DailyReminder] Cron job iniciado: verificação de lembretes a cada hora");
   return task;
 }

@@ -47,28 +47,36 @@ export function CyclesDashboard() {
         {cycles.map((cycle: any) => {
           // Determinar ícone, cor e badge baseado na fase
           let PhaseIcon = Sprout;
-          let phaseColor = 'text-green-600';
-          let phaseBg = 'bg-green-50';
-          let phaseBorder = 'border-green-200';
+          let phaseColor = 'text-green-600 dark:text-green-400';
+          let phaseBg = 'bg-green-500/10';
+          let phaseBorder = 'border-green-500/30';
+          let phaseProgressBg = 'bg-green-500/20';
+          let phaseProgressBar = 'bg-green-500';
           let phaseLabel = 'Vegetativa';
-          
+
           if (cycle.phase === 'MAINTENANCE') {
             PhaseIcon = Leaf;
-            phaseColor = 'text-blue-600';
-            phaseBg = 'bg-blue-50';
-            phaseBorder = 'border-blue-200';
+            phaseColor = 'text-blue-600 dark:text-blue-400';
+            phaseBg = 'bg-blue-500/10';
+            phaseBorder = 'border-blue-500/30';
+            phaseProgressBg = 'bg-blue-500/20';
+            phaseProgressBar = 'bg-blue-500';
             phaseLabel = 'Manutenção';
           } else if (cycle.phase === 'CLONING') {
             PhaseIcon = Scissors;
-            phaseColor = 'text-cyan-600';
-            phaseBg = 'bg-cyan-50';
-            phaseBorder = 'border-cyan-200';
+            phaseColor = 'text-cyan-600 dark:text-cyan-400';
+            phaseBg = 'bg-cyan-500/10';
+            phaseBorder = 'border-cyan-500/30';
+            phaseProgressBg = 'bg-cyan-500/20';
+            phaseProgressBar = 'bg-cyan-500';
             phaseLabel = 'Clonagem';
           } else if (cycle.phase === 'FLORA') {
             PhaseIcon = Leaf;
-            phaseColor = 'text-purple-600';
-            phaseBg = 'bg-purple-50';
-            phaseBorder = 'border-purple-200';
+            phaseColor = 'text-purple-600 dark:text-purple-400';
+            phaseBg = 'bg-purple-500/10';
+            phaseBorder = 'border-purple-500/30';
+            phaseProgressBg = 'bg-purple-500/20';
+            phaseProgressBar = 'bg-purple-500';
             phaseLabel = 'Floração';
           } else {
             // VEGA (padrão)
@@ -106,7 +114,7 @@ export function CyclesDashboard() {
                   )}
                 </div>
                 {(cycle.phase === 'VEGA' || cycle.phase === 'FLORA') && (
-                  <Progress value={cycle.progress} className="h-2" />
+                  <Progress value={cycle.progress} className={`h-2 ${phaseProgressBg}`} indicatorClassName={phaseProgressBar} />
                 )}
               </div>
 

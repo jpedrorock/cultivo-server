@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useRoute, Link } from "wouter";
+import { ErrorState } from "@/components/ErrorState";
+import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,7 +68,7 @@ export default function PlantDetail() {
   const [discardReason, setDiscardReason] = useState("");
   const haptic = useTactileFeedback();
 
-  const { data: plant, isLoading, refetch } = trpc.plants.getById.useQuery({ id: plantId });
+  const { data: plant, isLoading, isError, refetch } = trpc.plants.getById.useQuery({ id: plantId });
   const { data: strain } = trpc.strains.getById.useQuery(
     { id: plant?.strainId || 0 },
     { enabled: !!plant?.strainId }
@@ -215,6 +217,10 @@ export default function PlantDetail() {
     );
   }
 
+  if (isError) {
+    return <ErrorState fullPage onRetry={refetch} />;
+  }
+
   if (!plant) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -231,35 +237,7 @@ export default function PlantDetail() {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "bg-green-500/10 text-green-600 border-green-500/30";
-      case "HARVESTED":
-        return "bg-blue-500/10 text-blue-600 border-blue-500/30";
-      case "DEAD":
-        return "bg-red-500/10 text-red-600 border-red-500/30";
-      case "DISCARDED":
-        return "bg-orange-500/10 text-orange-600 border-orange-500/30";
-      default:
-        return "bg-gray-500/10 text-gray-600 border-gray-500/30";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "Ativa";
-      case "HARVESTED":
-        return "Colhida";
-      case "DEAD":
-        return "Morta";
-      case "DISCARDED":
-        return "Descartada";
-      default:
-        return status;
-    }
-  };
+  // getStatusColor e getStatusLabel importados de @/lib/plantUtils
 
 
 
@@ -269,9 +247,9 @@ export default function PlantDetail() {
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
         <div className="container py-3 md:py-6">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div className="flex items-center justify-between gap-2">
             {/* Esquerda: voltar + ícone + nome */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <Button variant="ghost" size="icon" className="shrink-0" asChild>
                 <Link href="/plants">
                   <ArrowLeft className="w-5 h-5" />
@@ -285,18 +263,18 @@ export default function PlantDetail() {
                   : tent?.category === 'DRYING'
                   ? 'from-amber-500 to-orange-600'
                   : 'from-blue-500 to-cyan-600'
-              }`} style={{ flexShrink: 0 }}>
+              }`}>
                 <Sprout className="w-5 h-5 text-white" />
               </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <h1 className="text-base md:text-2xl font-bold text-foreground leading-tight" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plant.name}</h1>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base md:text-2xl font-bold text-foreground leading-tight truncate">{plant.name}</h1>
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {plant.code && (
                     <p className="text-xs text-muted-foreground font-mono">{plant.code}</p>
                   )}
                   {/* Badge de fase - inline no mobile */}
                   {(plant.cyclePhase || tent) && (
-                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${
                       (plant.cyclePhase === 'VEGA' || tent?.category === 'VEGA')
                         ? 'bg-green-500/15 text-green-600 dark:text-green-400'
                         : (plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA')
@@ -304,7 +282,7 @@ export default function PlantDetail() {
                         : tent?.category === 'DRYING'
                         ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                         : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
-                    }`} style={{ flexShrink: 0 }}>
+                    }`}>
                       {plant.cyclePhase === 'VEGA' ? '🌱 Veg' :
                        plant.cyclePhase === 'FLORA' ? '🌸 Flora' :
                        tent?.category === 'VEGA' ? '🌱 Veg' :
@@ -318,7 +296,7 @@ export default function PlantDetail() {
               </div>
             </div>
             {/* Direita: ações - apenas ícone MoreVertical no mobile, botões no desktop */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            <div className="flex items-center gap-1 shrink-0">
               {/* Desktop: botões individuais com animação de toque */}
               <PressButton variant="outline" size="sm" className="hidden md:flex" onClick={handleEditClick}>
                 <Edit className="w-4 h-4 mr-2" />
@@ -343,7 +321,7 @@ export default function PlantDetail() {
               {/* Dropdown de Ações - ícone no mobile, texto no desktop */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <PressButton variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2" style={{ flexShrink: 0 }}>
+                  <PressButton variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2 shrink-0">
                     <MoreVertical className="w-4 h-4" />
                     <span className="hidden md:inline">Ações</span>
                   </PressButton>

@@ -19,6 +19,8 @@ import {
 import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
 import { useLocation } from "wouter";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
@@ -44,7 +46,7 @@ export default function PlantsList() {
   const [batchMoveDialog, setBatchMoveDialog] = useState(false);
   const [batchTargetTentId, setBatchTargetTentId] = useState<number | undefined>();
 
-  const { data: plants, isLoading } = trpc.plants.list.useQuery({
+  const { data: plants, isLoading, isError, refetch } = trpc.plants.list.useQuery({
     status: filterStatus,
   });
 
@@ -179,35 +181,7 @@ export default function PlantsList() {
     return tents?.find((t) => t.id === tentId)?.name || "Unknown";
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "bg-green-500/10 text-green-600 border-green-500/30";
-      case "HARVESTED":
-        return "bg-blue-500/10 text-blue-600 border-blue-500/30";
-      case "DEAD":
-        return "bg-red-500/10 text-red-600 border-red-500/30";
-      case "DISCARDED":
-        return "bg-orange-500/10 text-orange-600 border-orange-500/30";
-      default:
-        return "bg-gray-500/10 text-gray-600 border-gray-500/30";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return "Ativa";
-      case "HARVESTED":
-        return "Colhida";
-      case "DEAD":
-        return "Morta";
-      case "DISCARDED":
-        return "Descartada";
-      default:
-        return status;
-    }
-  };
+  // getStatusColor e getStatusLabel importados de @/lib/plantUtils
 
   const togglePlantSelection = (plantId: number) => {
     setSelectedPlants(prev => {
@@ -362,7 +336,9 @@ export default function PlantsList() {
         </Card>
 
         {/* Plants Grouped by Tent */}
-        {isLoading ? (
+        {isError ? (
+          <ErrorState onRetry={refetch} />
+        ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <PlantCardSkeleton key={i} />
@@ -555,6 +531,20 @@ export default function PlantsList() {
               );
             })}
           </div>
+        ) : filterStatus || searchTerm ? (
+          <EmptyState
+            icon={Sprout}
+            title="Nenhuma planta encontrada"
+            description={
+              filterStatus && searchTerm
+                ? `Nenhuma planta com status "${{ ACTIVE: 'Ativa', HARVESTED: 'Colhida', DEAD: 'Morta', DISCARDED: 'Descartada' }[filterStatus]}" corresponde a "${searchTerm}".`
+                : filterStatus
+                ? `Nenhuma planta com status "${{ ACTIVE: 'Ativa', HARVESTED: 'Colhida', DEAD: 'Morta', DISCARDED: 'Descartada' }[filterStatus]}" encontrada.`
+                : `Nenhuma planta corresponde a "${searchTerm}".`
+            }
+            actionLabel="Limpar filtros"
+            onAction={() => { setFilterStatus(undefined); setSearchTerm(""); }}
+          />
         ) : (
           <EmptyState
             icon={Sprout}

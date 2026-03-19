@@ -155,7 +155,7 @@ export default function NotificationSettings() {
   return (
     <div className="container py-8 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Notificações</h1>
+        <h1 className="text-2xl font-bold mb-2">Notificações</h1>
         <p className="text-muted-foreground">
           Configure lembretes e alertas para não perder nenhum registro ou problema nas estufas
         </p>

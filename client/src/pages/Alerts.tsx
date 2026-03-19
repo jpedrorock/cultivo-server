@@ -7,13 +7,22 @@ import { trpc } from "@/lib/trpc";
 import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, ArrowLeft, FlaskConical, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+const ALERTS_PER_PAGE = 10;
+
 export default function Alerts() {
   const [, navigate] = useLocation();
   const [selectedTentId, setSelectedTentId] = useState<number | undefined>(undefined);
+  const [visibleCount, setVisibleCount] = useState(ALERTS_PER_PAGE);
+
+  const handleSelectTent = (id: number | undefined) => {
+    setSelectedTentId(id);
+    setVisibleCount(ALERTS_PER_PAGE);
+  };
   const utils = trpc.useUtils();
 
   // Marcar alerta individual como visto ao clicar
@@ -33,7 +42,7 @@ export default function Alerts() {
   };
 
   // Buscar estufas
-  const { data: tents, isLoading: loadingTents } = trpc.tents.list.useQuery();
+  const { data: tents, isLoading: loadingTents, isError: errorTents, refetch: refetchTents } = trpc.tents.list.useQuery();
 
   // Buscar alertas
   const { data: alertList, isLoading: loadingAlerts } = trpc.alerts.list.useQuery(
@@ -47,6 +56,10 @@ export default function Alerts() {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (errorTents) {
+    return <ErrorState fullPage onRetry={refetchTents} />;
   }
 
   const currentTent = tents?.find(t => t.id === selectedTentId);
@@ -99,7 +112,7 @@ export default function Alerts() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Button
                   variant={selectedTentId === undefined ? "default" : "outline"}
-                  onClick={() => setSelectedTentId(undefined)}
+                  onClick={() => handleSelectTent(undefined)}
                   className="h-auto py-3 justify-start"
                 >
                   <div className="text-left">
@@ -111,7 +124,7 @@ export default function Alerts() {
                   <Button
                     key={tent.id}
                     variant={selectedTentId === tent.id ? "default" : "outline"}
-                    onClick={() => setSelectedTentId(tent.id)}
+                    onClick={() => handleSelectTent(tent.id)}
                     className="h-auto py-3 justify-start"
                   >
                     <div className="text-left">
@@ -149,8 +162,9 @@ export default function Alerts() {
                     <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
                 ) : alertList && alertList.length > 0 ? (
-                  <StaggerList className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                    {alertList.map((alert: any) => {
+                  <div className="space-y-3">
+                    <StaggerList className="space-y-3">
+                    {alertList.slice(0, visibleCount).map((alert: any) => {
                       const isNew = alert.status === "NEW";
                       const isPending = markAsSeen.isPending && markAsSeen.variables?.alertId === alert.id;
 
@@ -243,6 +257,21 @@ export default function Alerts() {
                       );
                     })}
                   </StaggerList>
+                  {visibleCount < alertList.length && (
+                    <div className="pt-2 text-center">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Mostrando {visibleCount} de {alertList.length} alertas
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVisibleCount(v => v + ALERTS_PER_PAGE)}
+                      >
+                        Ver mais {Math.min(ALERTS_PER_PAGE, alertList.length - visibleCount)}
+                      </Button>
+                    </div>
+                  )}
+                  </div>
                 ) : (
                   <EmptyState
                     icon={Bell}

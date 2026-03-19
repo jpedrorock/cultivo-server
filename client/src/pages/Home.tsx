@@ -41,6 +41,7 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import { PageTransition, StaggerList, ListItemAnimation, CardAnimation, AnimatedCounter } from "@/components/PageTransition";
 import { SkeletonLoader } from "@/components/SkeletonLoader";
 import { TentCardSkeleton } from "@/components/TentCardSkeleton";
+import { ErrorState } from "@/components/ErrorState";
 
 
 export default function Home() {
@@ -68,7 +69,7 @@ export default function Home() {
   );
 
   
-  const { data: tents, isLoading } = trpc.tents.list.useQuery();
+  const { data: tents, isLoading, isError, refetch } = trpc.tents.list.useQuery();
   const { data: activeCycles } = trpc.cycles.listActive.useQuery();
   const { data: notifSettings, refetch: refetchNotifSettings } = trpc.alerts.getNotificationSettings.useQuery();
   const systemPaused = notifSettings?.systemPaused ?? false;
@@ -288,10 +289,36 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
+          <div className="container py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
+                  <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
+                </div>
+                <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">Gerenciamento<br className="sm:hidden" /> de Estufas</h1>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="container py-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="h-8 w-24 bg-muted rounded animate-pulse" />
+            <div className="h-9 w-36 bg-muted rounded animate-pulse" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <TentCardSkeleton key={i} />
+            ))}
+          </div>
+        </main>
       </div>
     );
+  }
+
+  if (isError) {
+    return <ErrorState fullPage onRetry={refetch} />;
   }
 
   const getTentCycle = (tentId: number) => {
@@ -300,7 +327,7 @@ export default function Home() {
 
   const getPhaseInfo = (category: string, cycle: any) => {
     if (!cycle) {
-      return { phase: "Inativo", color: "bg-muted0", icon: Wind };
+      return { phase: "Inativo", color: "bg-muted", icon: Wind };
     }
 
     if (category === "MAINTENANCE") {
