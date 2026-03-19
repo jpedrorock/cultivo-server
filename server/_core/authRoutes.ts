@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import {
   getUserByEmail,
+  getUserByOpenId,
   createUser,
   updateUserLastSignedIn,
 } from '../db-auth';
@@ -12,6 +13,7 @@ import {
   clearAuthCookie,
   authenticateRequest,
 } from './auth';
+import { ENV } from './env';
 
 /**
  * Registra as rotas de autenticação JWT
@@ -140,5 +142,110 @@ export function registerAuthRoutes(app: Express) {
   app.post('/api/auth/logout', (req: Request, res: Response) => {
     clearAuthCookie(res);
     res.json({ success: true, message: 'Logout realizado com sucesso' });
+  });
+
+  /**
+   * GET /api/auth/google
+   * Inicia o fluxo OAuth com o Google
+   */
+  app.get('/api/auth/google', (req: Request, res: Response) => {
+    if (!ENV.googleClientId) {
+      res.status(503).json({ error: 'Google OAuth não configurado. Adicione GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no .env' });
+      return;
+    }
+    const protocol = ENV.isProduction ? 'https' : 'http';
+    const redirectUri = `${protocol}://${ENV.domain}/api/auth/google/callback`;
+    const params = new URLSearchParams({
+      client_id: ENV.googleClientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'online',
+    });
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  });
+
+  /**
+   * GET /api/auth/google/callback
+   * Recebe o código do Google e autentica o usuário
+   */
+  app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
+    const { code, error } = req.query as { code?: string; error?: string };
+
+    if (error || !code) {
+      res.redirect('/login?error=google_cancelled');
+      return;
+    }
+
+    try {
+      const protocol = ENV.isProduction ? 'https' : 'http';
+      const redirectUri = `${protocol}://${ENV.domain}/api/auth/google/callback`;
+
+      // Trocar código por access token
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: ENV.googleClientId,
+          client_secret: ENV.googleClientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }),
+      });
+
+      if (!tokenRes.ok) {
+        console.error('[Auth] Google token exchange failed', await tokenRes.text());
+        res.redirect('/login?error=google_failed');
+        return;
+      }
+
+      const tokenData = await tokenRes.json() as { access_token: string };
+
+      // Buscar dados do usuário no Google
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+
+      if (!userRes.ok) {
+        res.redirect('/login?error=google_failed');
+        return;
+      }
+
+      const googleUser = await userRes.json() as {
+        id: string;
+        email: string;
+        name?: string;
+        picture?: string;
+      };
+
+      // Buscar ou criar usuário
+      let user = await getUserByOpenId(googleUser.id);
+
+      if (!user) {
+        // Verificar se já existe conta com o mesmo email
+        user = await getUserByEmail(googleUser.email);
+        if (!user) {
+          // Criar novo usuário
+          user = await createUser({
+            email: googleUser.email,
+            name: googleUser.name ?? null,
+            role: 'user',
+            lastSignedIn: new Date(),
+            openId: googleUser.id,
+            loginMethod: 'google',
+          });
+        }
+      }
+
+      await updateUserLastSignedIn(user.id);
+
+      const token = createToken(user.id, user.email);
+      setAuthCookie(res, token);
+      res.redirect('/');
+    } catch (err) {
+      console.error('[Auth] Google callback error', err);
+      res.redirect('/login?error=google_failed');
+    }
   });
 }

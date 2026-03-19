@@ -24,6 +24,11 @@ export const ENV = {
   // Gere um segredo seguro: openssl rand -base64 32
   jwtSecret: process.env.JWT_SECRET ?? 'cultivo-secret-change-in-production-32chars',
 
+  // Google OAuth 2.0
+  // Configure em https://console.cloud.google.com → APIs & Services → Credentials
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+
   // Helpers
   isProduction: process.env.NODE_ENV === 'production',
   isDevelopment: process.env.NODE_ENV !== 'production',

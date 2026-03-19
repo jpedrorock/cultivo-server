@@ -1,5 +1,5 @@
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { protectedProcedure, router } from "./_core/trpc";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
 import { z } from "zod";
 import { eq, and, or, desc, asc, sql, isNotNull, inArray } from "drizzle-orm";
@@ -40,13 +40,13 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     // Simplified auth for standalone deployment
-    me: publicProcedure.query(() => ({ id: 1, name: "Local User", email: "user@local" })),
-    logout: publicProcedure.mutation(() => ({ success: true })),
+    me: protectedProcedure.query(() => ({ id: 1, name: "Local User", email: "user@local" })),
+    logout: protectedProcedure.mutation(() => ({ success: true })),
   }),
 
   // Weather (Clima)
   weather: router({
-    getCurrent: publicProcedure
+    getCurrent: protectedProcedure
       .input(z.object({ lat: z.number(), lon: z.number() }))
       .query(async ({ input }) => {
         const { lat, lon } = input;
@@ -69,10 +69,10 @@ export const appRouter = router({
 
   // Tents (Estufas)
   tents: router({
-    list: publicProcedure.query(async () => {
+    list: protectedProcedure.query(async () => {
       return db.getAllTents();
     }),
-    getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+    getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       const database = await getDb();
       if (!database) throw new Error("DB not available");
       const tent = await db.getTentById(input.id);
@@ -104,7 +104,7 @@ export const appRouter = router({
       }
       return { ...tent, lastCloningAt, lastCloningCount };
     }),
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1).max(50),
@@ -131,7 +131,7 @@ export const appRouter = router({
         
         return { success: true, id: result.insertId };
       }),
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -179,7 +179,7 @@ export const appRouter = router({
         
         return { success: true };
       }),
-    getDeletePreview: publicProcedure
+    getDeletePreview: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -260,7 +260,7 @@ export const appRouter = router({
             plantHistoryCount.count,
         };
       }),
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -351,13 +351,13 @@ export const appRouter = router({
 
   // Strains (Variedades)
   strains: router({
-    list: publicProcedure.query(async () => {
+    list: protectedProcedure.query(async () => {
       return db.getAllStrains();
     }),
-    getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+    getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       return db.getStrainById(input.id);
     }),
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1).max(100),
@@ -381,7 +381,7 @@ export const appRouter = router({
         await database.insert(strains).values(input);
         return { success: true };
       }),
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -401,7 +401,7 @@ export const appRouter = router({
         await database.update(strains).set(updateData).where(eq(strains.id, id));
         return { success: true };
       }),
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -424,7 +424,7 @@ export const appRouter = router({
         await database.delete(strains).where(eq(strains.id, input.id));
         return { success: true };
       }),
-    duplicate: publicProcedure
+    duplicate: protectedProcedure
       .input(
         z.object({
           sourceStrainId: z.number(),
@@ -482,11 +482,11 @@ export const appRouter = router({
 
   // Cycles (Ciclos)
   cycles: router({
-    listActive: publicProcedure.query(async () => {
+    listActive: protectedProcedure.query(async () => {
       const allCycles = await db.getAllCycles();
       return allCycles.filter(c => c.status === "ACTIVE");
     }),
-    getActiveCyclesWithProgress: publicProcedure.query(async () => {
+    getActiveCyclesWithProgress: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) {
         throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
@@ -569,10 +569,10 @@ export const appRouter = router({
         };
       });
     }),
-    getByTent: publicProcedure.input(z.object({ tentId: z.number() })).query(async ({ input }) => {
+    getByTent: protectedProcedure.input(z.object({ tentId: z.number() })).query(async ({ input }) => {
       return db.getCycleByTentId(input.tentId);
     }),
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -588,7 +588,7 @@ export const appRouter = router({
         await database.insert(cycles).values(input);
         return { success: true };
       }),
-    transitionToFlora: publicProcedure
+    transitionToFlora: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -651,7 +651,7 @@ export const appRouter = router({
         
         return { success: true };
       }),
-    finalize: publicProcedure
+    finalize: protectedProcedure
       .input(z.object({ cycleId: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -664,7 +664,7 @@ export const appRouter = router({
           .where(eq(cycles.id, input.cycleId));
         return { success: true };
       }),
-    transitionToDrying: publicProcedure
+    transitionToDrying: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -771,7 +771,7 @@ export const appRouter = router({
       }),
     
     // Transição MAINTENANCE → CLONING
-    transitionToCloning: publicProcedure
+    transitionToCloning: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -810,7 +810,7 @@ export const appRouter = router({
       }),
     
     // Transição CLONING → MAINTENANCE
-    transitionToMaintenance: publicProcedure
+    transitionToMaintenance: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -873,7 +873,7 @@ export const appRouter = router({
         return { success: true, seedlingsCreated: input.clonesProduced || 0 };
       }),
     
-    initiate: publicProcedure
+    initiate: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -929,7 +929,7 @@ export const appRouter = router({
         
         return { success: true };
       }),
-    edit: publicProcedure
+    edit: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -1035,7 +1035,7 @@ export const appRouter = router({
       }),
     
     // Finalizar clonagem e gerar mudas
-    finishCloning: publicProcedure
+    finishCloning: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -1166,7 +1166,7 @@ export const appRouter = router({
       }),
     
     // Promover fase (VEGA→FLORA ou FLORA→DRYING)
-    promotePhase: publicProcedure
+    promotePhase: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -1317,7 +1317,7 @@ export const appRouter = router({
         }
       }),
     
-    getReportData: publicProcedure
+    getReportData: protectedProcedure
       .input(z.object({ cycleId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -1379,7 +1379,7 @@ export const appRouter = router({
 
   // Daily Logs (Registros Diários)
   dailyLogs: router({
-    list: publicProcedure
+    list: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -1390,7 +1390,7 @@ export const appRouter = router({
         return db.getDailyLogs(input.tentId, input.limit);
       }),
     // getHistoricalWithTargets removido - usar getDailyLogs diretamente
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -1462,7 +1462,7 @@ export const appRouter = router({
         
         return { success: true };
       }),
-    getLatestByTent: publicProcedure
+    getLatestByTent: protectedProcedure
       .input(z.object({ tentId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -1476,7 +1476,7 @@ export const appRouter = router({
         return result[0] || null;
       }),
     
-    getWeeklyData: publicProcedure
+    getWeeklyData: protectedProcedure
       .input(z.object({ tentId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -1515,7 +1515,7 @@ export const appRouter = router({
         }));
       }),
     
-    listAll: publicProcedure
+    listAll: protectedProcedure
       .input(
         z.object({
           tentId: z.number().optional(),
@@ -1590,7 +1590,7 @@ export const appRouter = router({
         };
       }),
     
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -1618,7 +1618,7 @@ export const appRouter = router({
         return { success: true };
       }),
     
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -1637,7 +1637,7 @@ export const appRouter = router({
   // Alerts (Alertas)
   alerts: router({
     // Configurações de alertas
-    getSettings: publicProcedure
+    getSettings: protectedProcedure
       .input(z.object({ tentId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -1650,13 +1650,13 @@ export const appRouter = router({
         return settings[0] || null;
       }),
     
-    getIdealValues: publicProcedure
+    getIdealValues: protectedProcedure
       .input(z.object({ tentId: z.number() }))
       .query(async ({ input }) => {
         return db.getIdealValuesByTent(input.tentId);
       }),
     
-    updateSettings: publicProcedure
+    updateSettings: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -1720,7 +1720,7 @@ export const appRouter = router({
       }),
     
     // Histórico de alertas
-    getHistory: publicProcedure
+    getHistory: protectedProcedure
       .input(
         z.object({
           tentId: z.number().optional(),
@@ -1747,7 +1747,7 @@ export const appRouter = router({
           .limit(input.limit);
       }),
     
-    list: publicProcedure
+    list: protectedProcedure
       .input(
         z.object({
           tentId: z.number().optional(),
@@ -1757,12 +1757,12 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return db.getAlerts(input.tentId, input.status);
       }),
-    getNewCount: publicProcedure
+    getNewCount: protectedProcedure
       .input(z.object({ tentId: z.number().optional() }))
       .query(async ({ input }) => {
         return db.getNewAlertsCount(input.tentId);
       }),
-    markAsSeen: publicProcedure
+    markAsSeen: protectedProcedure
       .input(z.object({ alertId: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -1773,7 +1773,7 @@ export const appRouter = router({
         return { success: true };
       }),
     
-    markAllAsSeen: publicProcedure
+    markAllAsSeen: protectedProcedure
       .input(z.object({ tentId: z.number().optional() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -1791,27 +1791,27 @@ export const appRouter = router({
         return { success: true, updated: result[0]?.affectedRows ?? 0 };
       }),
 
-    checkAlerts: publicProcedure
+    checkAlerts: protectedProcedure
       .input(z.object({ tentId: z.number() }))
       .mutation(async ({ input }) => {
         return db.checkAlertsForTent(input.tentId);
       }),
     
-    checkAllTents: publicProcedure
+    checkAllTents: protectedProcedure
       .mutation(async () => {
         const { checkAllTentsAlerts } = await import("./cron/alertsChecker");
         return checkAllTentsAlerts();
       }),
     
     // Phase Alert Margins (Margens de Alertas por Fase)
-    getPhaseMargins: publicProcedure.query(async () => {
+    getPhaseMargins: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) return [];
       const { phaseAlertMargins } = await import("../drizzle/schema");
       return database.select().from(phaseAlertMargins).orderBy(phaseAlertMargins.phase);
     }),
     
-    updatePhaseMargin: publicProcedure
+    updatePhaseMargin: protectedProcedure
       .input(
         z.object({
           phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]),
@@ -1843,7 +1843,7 @@ export const appRouter = router({
       }),
     
     // Restaurar margens de uma fase para os valores padrão do sistema
-    resetPhaseMarginToDefault: publicProcedure
+    resetPhaseMarginToDefault: protectedProcedure
       .input(
         z.object({
           phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]),
@@ -1888,7 +1888,7 @@ export const appRouter = router({
       }),
 
     // Notification Settings (Configurações de Notificações)
-    getNotificationSettings: publicProcedure.query(async () => {
+    getNotificationSettings: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) return null;
       const { notificationSettings } = await import("../drizzle/schema");
@@ -1902,7 +1902,7 @@ export const appRouter = router({
       return settings[0] || null;
     }),
     
-    toggleSystemPaused: publicProcedure
+    toggleSystemPaused: protectedProcedure
       .mutation(async () => {
         const database = await getDb();
         if (!database) throw new Error("Banco de dados não inicializado.");
@@ -1921,7 +1921,7 @@ export const appRouter = router({
         }
       }),
 
-    updateNotificationSettings: publicProcedure
+    updateNotificationSettings: protectedProcedure
       .input(
         z.object({
           systemPaused: z.boolean().optional(),
@@ -1967,7 +1967,7 @@ export const appRouter = router({
 
   // Weekly Targets (Padrões Semanais)
   weeklyTargets: router({
-    get: publicProcedure
+    get: protectedProcedure
       .input(
         z.object({
           phase: z.enum(["vega", "flora"]),
@@ -2019,7 +2019,7 @@ export const appRouter = router({
           targetEC,
         };
       }),
-    getTargetsByWeek: publicProcedure
+    getTargetsByWeek: protectedProcedure
       .input(
         z.object({
           strainId: z.number(),
@@ -2046,7 +2046,7 @@ export const appRouter = router({
         return targets[0] || null;
       }),
     // Busca targets por estufa - calcula média das strains das plantas ativas
-    getTargetsByTent: publicProcedure
+    getTargetsByTent: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -2130,7 +2130,7 @@ export const appRouter = router({
           _strainCount: uniqueStrainIds.length,
         };
       }),
-    getCurrentWeekTargets: publicProcedure.query(async () => {
+    getCurrentWeekTargets: protectedProcedure.query(async () => {
       // Busca os targets da semana atual de todos os ciclos ativos
       const database = await getDb();
       if (!database) return [];
@@ -2222,10 +2222,10 @@ export const appRouter = router({
         }];
       }
     }),
-    getByStrain: publicProcedure.input(z.object({ strainId: z.number() })).query(async ({ input }) => {
+    getByStrain: protectedProcedure.input(z.object({ strainId: z.number() })).query(async ({ input }) => {
       return db.getWeeklyTargetsByStrain(input.strainId);
     }),
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           strainId: z.number(),
@@ -2257,7 +2257,7 @@ export const appRouter = router({
 
   // Task Instances (Tarefas)
   tasks: router({
-    list: publicProcedure
+    list: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -2266,7 +2266,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return db.getTaskInstances(input.tentId);
       }),
-    getTasksByTent: publicProcedure
+    getTasksByTent: protectedProcedure
       .input(z.object({ tentId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -2397,7 +2397,7 @@ export const appRouter = router({
 
         return tasks;
       }),
-    getPendingTasks: publicProcedure.query(async () => {
+    getPendingTasks: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
 
@@ -2443,7 +2443,7 @@ export const appRouter = router({
 
       return pendingTasks;
     }),
-    getCurrentWeekTasks: publicProcedure.query(async () => {
+    getCurrentWeekTasks: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
 
@@ -2594,7 +2594,7 @@ export const appRouter = router({
 
       return allTasks;
     }),
-    markAsDone: publicProcedure
+    markAsDone: protectedProcedure
       .input(
         z.object({
           taskId: z.number(),
@@ -2612,7 +2612,7 @@ export const appRouter = router({
           .where(eq(taskInstances.id, input.taskId));
         return { success: true };
       }),
-    toggleTask: publicProcedure
+    toggleTask: protectedProcedure
       .input(z.object({ taskId: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -2640,7 +2640,7 @@ export const appRouter = router({
         
         return { success: true, isDone: newIsDone };
       }),
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ taskId: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -2655,10 +2655,10 @@ export const appRouter = router({
 
   // Tent A (Estufa A - Clonagem)
   tentA: router({
-    getState: publicProcedure.input(z.object({ tentId: z.number() })).query(async ({ input }) => {
+    getState: protectedProcedure.input(z.object({ tentId: z.number() })).query(async ({ input }) => {
       return db.getTentAState(input.tentId);
     }),
-    startCloning: publicProcedure
+    startCloning: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -2700,12 +2700,12 @@ export const appRouter = router({
 
   // Database (Exportação de Banco de Dados)
   database: router({
-    export: publicProcedure.query(async () => {
+    export: protectedProcedure.query(async () => {
       const { generateSQLDump } = await import("./databaseExport");
       const sqlDump = await generateSQLDump();
       return { sql: sqlDump };
     }),
-    import: publicProcedure
+    import: protectedProcedure
       .input(z.object({ sqlContent: z.string() }))
       .mutation(async ({ input }) => {
         const { importSQLDump } = await import("./databaseImport");
@@ -2716,7 +2716,7 @@ export const appRouter = router({
 
   // Notifications (Notificações)
   notifications: router({
-    getHistory: publicProcedure.query(async () => {
+    getHistory: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
       const history = await database
@@ -2726,7 +2726,7 @@ export const appRouter = router({
         .limit(100);
       return history;
     }),
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           type: z.enum(["daily_reminder", "environment_alert", "task_reminder"]),
@@ -2748,7 +2748,7 @@ export const appRouter = router({
           });
         return notification;
       }),
-    markAsRead: publicProcedure
+    markAsRead: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -2764,7 +2764,7 @@ export const appRouter = router({
   // Plants (Plantas Individuais)
   plants: router({
     // Criar nova planta
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         name: z.string(),
         code: z.string().optional(),
@@ -2790,7 +2790,7 @@ export const appRouter = router({
       }),
 
     // Listar plantas (apenas ACTIVE por padrão)
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({
         tentId: z.number().optional(),
         strainId: z.number().optional(),
@@ -2885,7 +2885,7 @@ export const appRouter = router({
       }),
 
     // Obter planta por ID
-    getById: publicProcedure
+    getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -2900,7 +2900,7 @@ export const appRouter = router({
       }),
 
     // Atualizar planta
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -2945,7 +2945,7 @@ export const appRouter = router({
       }),
 
     // Mover planta para outra estufa
-    moveTent: publicProcedure
+    moveTent: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         toTentId: z.number(),
@@ -2981,7 +2981,7 @@ export const appRouter = router({
       }),
 
     // Mover todas as plantas de uma estufa para outra
-    moveAllPlants: publicProcedure
+    moveAllPlants: protectedProcedure
       .input(z.object({
         fromTentId: z.number(),
         toTentId: z.number(),
@@ -3036,7 +3036,7 @@ export const appRouter = router({
       }),
 
     // Mover plantas específicas (seleção manual)
-    moveSelectedPlants: publicProcedure
+    moveSelectedPlants: protectedProcedure
       .input(z.object({
         plantIds: z.array(z.number()),
         toTentId: z.number(),
@@ -3079,7 +3079,7 @@ export const appRouter = router({
       }),
 
     // Transplantar para Flora (encontra automaticamente estufa de Flora)
-    transplantToFlora: publicProcedure
+    transplantToFlora: protectedProcedure
       .input(z.object({
         plantId: z.number(),
       }))
@@ -3131,7 +3131,7 @@ export const appRouter = router({
       }),
 
     // Finalizar planta (harvest)
-    finish: publicProcedure
+    finish: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         status: z.enum(["HARVESTED", "DEAD"]),
@@ -3149,7 +3149,7 @@ export const appRouter = router({
       }),
 
     // Promover muda para planta (SEEDLING → PLANT)
-    promoteToPlant: publicProcedure
+    promoteToPlant: protectedProcedure
       .input(z.object({
         plantId: z.number(),
       }))
@@ -3181,7 +3181,7 @@ export const appRouter = router({
       }),
 
     // Promover múltiplas mudas para plantas (ação em lote)
-    bulkPromote: publicProcedure
+    bulkPromote: protectedProcedure
       .input(z.object({
         plantIds: z.array(z.number()),
       }))
@@ -3210,7 +3210,7 @@ export const appRouter = router({
       }),
 
     // Mover múltiplas plantas para outra estufa (ação em lote)
-    bulkMove: publicProcedure
+    bulkMove: protectedProcedure
       .input(z.object({
         plantIds: z.array(z.number()),
         targetTentId: z.number(),
@@ -3239,7 +3239,7 @@ export const appRouter = router({
       }),
 
     // Marcar múltiplas plantas como colhidas (ação em lote)
-    bulkHarvest: publicProcedure
+    bulkHarvest: protectedProcedure
       .input(z.object({
         plantIds: z.array(z.number()),
       }))
@@ -3260,7 +3260,7 @@ export const appRouter = router({
       }),
 
     // Descartar múltiplas plantas (ação em lote)
-    bulkDiscard: publicProcedure
+    bulkDiscard: protectedProcedure
       .input(z.object({
         plantIds: z.array(z.number()),
         reason: z.string().optional(),
@@ -3283,7 +3283,7 @@ export const appRouter = router({
       }),
 
     // Descartar planta (doente ou com problemas)
-    discard: publicProcedure
+    discard: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         reason: z.string().optional(),
@@ -3305,7 +3305,7 @@ export const appRouter = router({
       }),
 
     // Excluir planta permanentemente
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -3327,7 +3327,7 @@ export const appRouter = router({
       }),
 
     // Excluir múltiplas plantas em massa
-    bulkDelete: publicProcedure
+    bulkDelete: protectedProcedure
       .input(z.object({ plantIds: z.array(z.number()) }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -3350,7 +3350,7 @@ export const appRouter = router({
       }),
 
     // Buscar histórico de movimentação entre estufas
-    getTentHistory: publicProcedure
+    getTentHistory: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -3381,7 +3381,7 @@ export const appRouter = router({
       }),
 
     // Buscar fotos da planta
-    getPhotos: publicProcedure
+    getPhotos: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -3397,7 +3397,7 @@ export const appRouter = router({
       }),
 
     // Upload foto da planta
-    uploadPhoto: publicProcedure
+    uploadPhoto: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         imageData: z.string(), // base64
@@ -3430,7 +3430,7 @@ export const appRouter = router({
       }),
 
     // Excluir foto da planta
-    deletePhoto: publicProcedure
+    deletePhoto: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -3444,7 +3444,7 @@ export const appRouter = router({
       }),
 
     // Arquivar planta (marcar como HARVESTED ou DISCARDED)
-    archive: publicProcedure
+    archive: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         status: z.enum(["HARVESTED", "DISCARDED"]),
@@ -3483,7 +3483,7 @@ export const appRouter = router({
       }),
 
     // Desarquivar planta (voltar para ACTIVE)
-    unarchive: publicProcedure
+    unarchive: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         targetTentId: z.number(),
@@ -3529,7 +3529,7 @@ export const appRouter = router({
       }),
 
     // Listar plantas arquivadas
-    listArchived: publicProcedure
+    listArchived: protectedProcedure
       .input(z.object({
         status: z.enum(["HARVESTED", "DISCARDED", "DEAD"]).optional(),
       }))
@@ -3615,7 +3615,7 @@ export const appRouter = router({
       }),
 
     // Excluir planta permanentemente (apenas para erros de cadastro)
-    deletePermanently: publicProcedure
+    deletePermanently: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -3639,7 +3639,7 @@ export const appRouter = router({
 
   // Plant Observations
   plantObservations: router({
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         content: z.string(),
@@ -3656,7 +3656,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -3672,7 +3672,7 @@ export const appRouter = router({
 
   // Plant Photos
   plantPhotos: router({
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -3685,7 +3685,7 @@ export const appRouter = router({
           .orderBy(desc(plantPhotos.photoDate));
       }),
     
-    upload: publicProcedure
+    upload: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         photoBase64: z.string(), // Base64 data URL
@@ -3725,7 +3725,7 @@ export const appRouter = router({
         return { success: true, photoUrl };
       }),
     
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ photoId: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -3741,7 +3741,7 @@ export const appRouter = router({
 
   // Plant Runoff Logs
   plantRunoff: router({
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         volumeIn: z.number(),
@@ -3765,7 +3765,7 @@ export const appRouter = router({
         return { success: true, runoffPercent };
       }),
 
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -3781,7 +3781,7 @@ export const appRouter = router({
 
   // Plant Health Logs
   plantHealth: router({
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         healthStatus: z.enum(["HEALTHY", "STRESSED", "SICK", "RECOVERING"]),
@@ -3826,7 +3826,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -3839,7 +3839,7 @@ export const appRouter = router({
           .orderBy(desc(plantHealthLogs.logDate));
       }),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(z.object({
         id: z.number(),
         healthStatus: z.enum(["HEALTHY", "STRESSED", "SICK", "RECOVERING"]).optional(),
@@ -3897,7 +3897,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -3920,7 +3920,7 @@ export const appRouter = router({
 
   // Plant Trichome Logs
   plantTrichomes: router({
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         weekNumber: z.number(),
@@ -3968,7 +3968,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -3984,7 +3984,7 @@ export const appRouter = router({
 
   // Plant LST Logs
   plantLST: router({
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         technique: z.string(),
@@ -4005,7 +4005,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    list: publicProcedure
+    list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .query(async ({ input }) => {
         const database = await getDb();
@@ -4021,7 +4021,7 @@ export const appRouter = router({
 
   // Fertilization Presets (Predefinições de Fertilização)
   fertilizationPresets: router({
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         name: z.string(),
         waterVolume: z.number(),
@@ -4049,7 +4049,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    list: publicProcedure
+    list: protectedProcedure
       .query(async ({ ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
@@ -4061,7 +4061,7 @@ export const appRouter = router({
           .orderBy(desc(fertilizationPresets.createdAt));
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
@@ -4074,7 +4074,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(z.object({
         id: z.number(),
         name: z.string(),
@@ -4108,7 +4108,7 @@ export const appRouter = router({
 
   // Watering Presets (Predefinições de Rega)
   wateringPresets: router({
-    create: publicProcedure
+    create: protectedProcedure
       .input(z.object({
         name: z.string(),
         plantCount: z.number(),
@@ -4134,7 +4134,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    list: publicProcedure
+    list: protectedProcedure
       .query(async ({ ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
@@ -4146,7 +4146,7 @@ export const appRouter = router({
           .orderBy(desc(wateringPresets.createdAt));
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
@@ -4159,7 +4159,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(z.object({
         id: z.number(),
         name: z.string(),
@@ -4190,7 +4190,7 @@ export const appRouter = router({
   }),
 
   taskTemplates: router({
-    list: publicProcedure.query(async () => {
+    list: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
 
@@ -4202,7 +4202,7 @@ export const appRouter = router({
       return templates;
     }),
 
-    create: publicProcedure
+    create: protectedProcedure
       .input(
         z.object({
           title: z.string().min(1),
@@ -4227,7 +4227,7 @@ export const appRouter = router({
         return { success: true, id: newTemplate.insertId };
       }),
 
-    update: publicProcedure
+    update: protectedProcedure
       .input(
         z.object({
           id: z.number(),
@@ -4256,7 +4256,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    delete: publicProcedure
+    delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const database = await getDb();
@@ -4282,7 +4282,7 @@ export const appRouter = router({
   // Nutrient Recipes (Receitas de Nutrientes)
   nutrients: router({
     // Listar templates de receitas
-    listTemplates: publicProcedure
+    listTemplates: protectedProcedure
       .input(z.object({ phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).optional() }).optional())
       .query(async ({ input }) => {
         const database = await getDb();
@@ -4303,7 +4303,7 @@ export const appRouter = router({
       }),
 
     // Criar template de receita
-    createTemplate: publicProcedure
+    createTemplate: protectedProcedure
       .input(
         z.object({
           name: z.string().min(1),
@@ -4344,7 +4344,7 @@ export const appRouter = router({
       }),
 
     // Registrar aplicação de nutrientes
-    recordApplication: publicProcedure
+    recordApplication: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -4395,7 +4395,7 @@ export const appRouter = router({
       }),
 
     // Listar histórico de aplicações
-    listApplications: publicProcedure
+    listApplications: protectedProcedure
       .input(
         z.object({
           tentId: z.number().optional(),
@@ -4428,7 +4428,7 @@ export const appRouter = router({
   // Watering Applications (Aplicações de Rega)
   watering: router({
     // Registrar aplicação de rega
-    recordApplication: publicProcedure
+    recordApplication: protectedProcedure
       .input(
         z.object({
           tentId: z.number(),
@@ -4468,7 +4468,7 @@ export const appRouter = router({
       }),
 
     // Listar histórico de aplicações
-    listApplications: publicProcedure
+    listApplications: protectedProcedure
       .input(
         z.object({
           tentId: z.number().optional(),
@@ -4508,7 +4508,7 @@ export const appRouter = router({
   // Backup & Restore
   backup: router({
     // Exportar backup completo
-    export: publicProcedure.query(async () => {
+    export: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
 
@@ -4551,7 +4551,7 @@ export const appRouter = router({
     }),
 
     // Importar backup
-    import: publicProcedure
+    import: protectedProcedure
       .input(
         z.object({
           version: z.string(),
@@ -4697,7 +4697,7 @@ export const appRouter = router({
   // Área Aguardando Secagem (Harvest Queue)
   harvestQueue: router({
     // Listar todas as plantas aguardando secagem
-    list: publicProcedure.query(async () => {
+    list: protectedProcedure.query(async () => {
       const database = await getDb();
       if (!database) throw new Error("DB não disponível");
       const queuePlants = await database
@@ -4710,7 +4710,7 @@ export const appRouter = router({
 
     // Mover plantas de uma estufa FLORA para a fila de secagem
     // Isso libera a estufa sem precisar de uma estufa de secagem disponível
-    moveToQueue: publicProcedure
+    moveToQueue: protectedProcedure
       .input(
         z.object({
           cycleId: z.number(),
@@ -4795,7 +4795,7 @@ export const appRouter = router({
       }),
 
     // Mover plantas da fila para uma estufa de secagem
-    moveToDrying: publicProcedure
+    moveToDrying: protectedProcedure
       .input(
         z.object({
           targetTentId: z.number(), // Estufa que vai virar secagem
@@ -4893,7 +4893,7 @@ export const appRouter = router({
       }),
 
     // Descartar plantas da fila (ex: perdas)
-    discard: publicProcedure
+    discard: protectedProcedure
       .input(
         z.object({
           plantIds: z.array(z.number()),
@@ -4919,13 +4919,13 @@ export const appRouter = router({
   // Push Notifications (Web Push / VAPID)
   push: router({
     // Retorna a chave pública VAPID para o frontend
-    getVapidKey: publicProcedure.query(() => ({
+    getVapidKey: protectedProcedure.query(() => ({
       publicKey: getVapidPublicKey(),
       configured: isPushConfigured(),
     })),
 
     // Registrar subscription do dispositivo (persiste no banco)
-    subscribe: publicProcedure
+    subscribe: protectedProcedure
       .input(
         z.object({
           subscription: z.object({
@@ -4950,7 +4950,7 @@ export const appRouter = router({
       }),
 
     // Atualizar configurações de lembrete para um endpoint específico (UPSERT)
-    updateReminderSettings: publicProcedure
+    updateReminderSettings: protectedProcedure
       .input(
         z.object({
           endpoint: z.string(),
@@ -4998,7 +4998,7 @@ export const appRouter = router({
       }),
 
     // Enviar notificação de teste
-    sendTest: publicProcedure.mutation(async () => {
+    sendTest: protectedProcedure.mutation(async () => {
       if (!isPushConfigured()) {
         throw new Error("Web Push não configurado. Adicione VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no .env");
       }

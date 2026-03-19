@@ -9,14 +9,36 @@ import { users } from '../drizzle/schema';
 import { getDb } from './db';
 
 /**
+ * Busca um usuário por openId (Google OAuth)
+ */
+export async function getUserByOpenId(openId: string): Promise<User | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.openId, openId))
+      .limit(1);
+    return result[0] ?? null;
+  } catch (error) {
+    console.error('[Database] Error getting user by openId:', error);
+    return null;
+  }
+}
+
+/**
  * Cria um novo usuário
  */
 export async function createUser(userData: {
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
   name: string | null;
   role: 'user' | 'admin';
   lastSignedIn: Date;
+  openId?: string;
+  loginMethod?: string;
 }): Promise<User> {
   const db = await getDb();
   if (!db) {
@@ -28,10 +50,12 @@ export async function createUser(userData: {
       .insert(users)
       .values({
         email: userData.email,
-        passwordHash: userData.passwordHash,
+        passwordHash: userData.passwordHash ?? '',
         name: userData.name,
         role: userData.role,
         lastSignedIn: userData.lastSignedIn,
+        openId: userData.openId ?? null,
+        loginMethod: userData.loginMethod ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as InsertUser)

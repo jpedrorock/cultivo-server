@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
@@ -12,11 +12,13 @@ import { BottomNav } from "./components/BottomNav";
 import { Sidebar } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { useAuth } from "./_core/hooks/useAuth";
 import Home from "./pages/Home";
 import TentLog from "./pages/TentLog";
 import TentDetails from "./pages/TentDetails";
 import QuickLog from "./pages/QuickLog";
-
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 import Tarefas from "./pages/Tarefas";
 import ManageStrains from "./pages/ManageStrains";
@@ -40,9 +42,7 @@ import HarvestQueue from "./pages/HarvestQueue";
 import Nutrients from "./pages/Nutrients";
 
 
-
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   const [location] = useLocation();
   return (
     <Switch key={location}>
@@ -83,47 +83,71 @@ function Router() {
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
-function App() {
+function AuthenticatedApp() {
+  const { isAuthenticated, loading } = useAuth();
+  const [, setLocation] = useLocation();
   const [showSplash, setShowSplash] = useState(() => {
-    // Show splash only once per session
-    const hasSeenSplash = sessionStorage.getItem('hasSeenSplash');
-    return !hasSeenSplash;
+    return !sessionStorage.getItem('hasSeenSplash');
   });
 
-  const handleSplashFinish = () => {
-    sessionStorage.setItem('hasSeenSplash', 'true');
-    setShowSplash(false);
-  };
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      setLocation('/login');
+    }
+  }, [loading, isAuthenticated, setLocation]);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return null;
+
+  return (
+    <>
+      {showSplash && (
+        <SplashScreen
+          onFinish={() => {
+            sessionStorage.setItem('hasSeenSplash', 'true');
+            setShowSplash(false);
+          }}
+        />
+      )}
+      <Sidebar />
+      <div
+        className="md:pl-64"
+        style={{
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem)',
+        }}
+      >
+        <Router />
+      </div>
+      <BottomNav />
+      <InstallPWA />
+      <AddToHomeScreenPrompt />
+    </>
+  );
+}
+
+function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider
         defaultTheme="light"
         switchable
       >
-        {/* Splash screen por cima do app (z-index alto) - app já monta atrás */}
-        {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
         <TooltipProvider>
           <Toaster />
-          <Sidebar />
-          <div
-            className="md:pl-64"
-            style={{
-              // No mobile: reservar espaço para o BottomNav (56px de py-3 + ícones) + safe-area do iPhone
-              // No desktop: sem padding-bottom (sem BottomNav)
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem)',
-            }}
-          >
-            <Router />
-          </div>
-          <BottomNav />
-          <InstallPWA />
-          <AddToHomeScreenPrompt />
+          <Switch>
+            <Route path="/login" component={Login} />
+            <Route path="/register" component={Register} />
+            <Route>
+              <AuthenticatedApp />
+            </Route>
+          </Switch>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
