@@ -19,6 +19,7 @@ import TentDetails from "./pages/TentDetails";
 import QuickLog from "./pages/QuickLog";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AdminUsers from "./pages/AdminUsers";
 
 import Tarefas from "./pages/Tarefas";
 import ManageStrains from "./pages/ManageStrains";
@@ -75,6 +76,7 @@ function Router() {
       <Route path={"/tent/:id"} component={TentDetails} />
       <Route path={"/tent/:id/log"} component={TentLog} />
       <Route path={"/quick-log"} component={QuickLog} />
+      <Route path={"/admin/users"} component={AdminUsers} />
       <Route path={"/help"} component={Help} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

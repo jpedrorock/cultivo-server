@@ -377,12 +377,14 @@ export default function QuickLog() {
             )}
 
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
-              <div className="flex justify-center mb-6">
-                <div className="relative flex items-center justify-center">
-                  <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
-                    <Activity className="w-16 h-16 text-white" />
-                  </div>
+              <div className="flex items-center gap-4 animate-[slide-in-from-bottom_0.6s_ease-out]">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shrink-0">
+                  <Activity className="w-7 h-7 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs text-muted-foreground font-medium">Planta {currentPlantIndex + 1} de {plants.length} · {plants[currentPlantIndex].code}</div>
+                  <div className="text-2xl font-bold text-foreground truncate">{plants[currentPlantIndex].name}</div>
+                  <div className="text-sm text-muted-foreground">Como está a saúde?</div>
                 </div>
               </div>
             )}
@@ -413,12 +415,6 @@ export default function QuickLog() {
               </div>
             )}
 
-            {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
-              <div className="text-center space-y-2 animate-[slide-in-from-bottom_0.7s_ease-out]">
-                <h2 className="text-3xl font-bold text-foreground">{plants[currentPlantIndex].name}</h2>
-                <p className="text-lg text-muted-foreground">Como está a saúde?</p>
-              </div>
-            )}
 
             {/* Step 0: Tent selection */}
             {currentStep === 0 && (
@@ -792,50 +788,36 @@ export default function QuickLog() {
             {/* Step 10+: Plant health form (expanded) */}
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
               <div className="space-y-4">
-                {/* Plant info */}
-                <div className="p-4 bg-card rounded-xl shadow-lg border-l-4 border-emerald-500 mb-6">
-                  <div className="text-sm text-muted-foreground">Planta {currentPlantIndex + 1} de {plants.length}</div>
-                  <div className="font-bold text-lg text-foreground">{plants[currentPlantIndex].name}</div>
-                  <div className="text-sm text-foreground/80">{plants[currentPlantIndex].code}</div>
+                {/* Status buttons — empilhados com ícone à esquerda */}
+                <div className="flex flex-col gap-2">
+                  {[
+                    { value: "healthy",   label: "Saudável", icon: "✓", active: "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md" },
+                    { value: "attention", label: "Atenção",  icon: "⚠️", active: "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md" },
+                    { value: "sick",      label: "Doente",   icon: "✕", active: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md" },
+                  ].map(({ value, label, icon, active }) => {
+                    const selected = (plantHealthRecords.get(plants[currentPlantIndex].id)?.status || "healthy") === value;
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => updatePlantHealthRecord(plants[currentPlantIndex].id, "status", value)}
+                        className={`flex items-center gap-4 w-full px-5 py-4 rounded-xl font-semibold text-base transition-all duration-300 ${selected ? active : "bg-card text-card-foreground border-2 border-border"}`}
+                      >
+                        <span className="text-xl w-6 text-center">{icon}</span>
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <Accordion type="multiple" defaultValue={["health"]} className="space-y-3">
-                  {/* Health Status Section */}
-                  <AccordionItem value="health" className="border border-border rounded-xl bg-card shadow-sm">
+                {/* Sintomas e Notas — colapsável, fechado por padrão */}
+                <Accordion type="multiple" defaultValue={[]} className="space-y-0">
+                  <AccordionItem value="details" className="border border-border rounded-xl bg-card shadow-sm">
                     <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-emerald-600" />
-                        <span className="font-semibold">Status de Saúde</span>
-                      </div>
+                      <span className="text-sm font-medium text-muted-foreground">Sintomas e Notas (opcional)</span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-4">
-                      {/* Status selection */}
                       <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">Status</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {["healthy", "attention", "sick"].map((status) => (
-                            <button
-                              key={status}
-                              onClick={() => updatePlantHealthRecord(plants[currentPlantIndex].id, "status", status)}
-                              className={`py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
-                                (plantHealthRecords.get(plants[currentPlantIndex].id)?.status || "healthy") === status
-                                  ? status === "healthy"
-                                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg"
-                                    : status === "attention"
-                                    ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white shadow-lg"
-                                    : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg"
-                                  : "bg-card text-card-foreground border-2 border-border"
-                              }`}
-                            >
-                              {status === "healthy" ? "✓ Saudável" : status === "attention" ? "⚠️ Atenção" : "✗ Doente"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Symptoms */}
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">Sintomas (opcional)</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">Sintomas</label>
                         <Input
                           value={plantHealthRecords.get(plants[currentPlantIndex].id)?.symptoms || ""}
                           onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "symptoms", e.target.value)}
@@ -843,10 +825,8 @@ export default function QuickLog() {
                           className="h-12 border-2 border-input rounded-xl bg-card text-foreground shadow-sm"
                         />
                       </div>
-
-                      {/* Notes */}
                       <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">Notas (opcional)</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">Notas</label>
                         <Textarea
                           value={plantHealthRecords.get(plants[currentPlantIndex].id)?.notes || ""}
                           onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "notes", e.target.value)}
@@ -856,65 +836,51 @@ export default function QuickLog() {
                       </div>
                     </AccordionContent>
                   </AccordionItem>
-
-                  {/* Photo Section */}
-                  <AccordionItem value="photo" className="border border-border rounded-xl bg-card shadow-sm">
-                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                      <div className="flex items-center gap-2">
-                        <Camera className="h-5 w-5 text-muted-foreground" />
-                        <span className="font-semibold">Foto (opcional)</span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4 space-y-4">
-                      <div className="space-y-3">
-                        {(plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl) ? (
-                          <div className="relative">
-                            <LazyImage
-                              src={plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl!}
-                              alt="Preview"
-                              aspectRatio="16/9"
-                              className="w-full h-48 rounded-xl"
-                            />
-                            {plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl && (
-                              <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">✓ Enviada</div>
-                            )}
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {
-                                updatePlantHealthRecord(plants[currentPlantIndex].id, "photoPreview", undefined);
-                                updatePlantHealthRecord(plants[currentPlantIndex].id, "photoUrl", undefined);
-                              }}
-                              className="absolute top-2 right-2"
-                            >
-                              Remover
-                            </Button>
-                          </div>
-                        ) : uploadProgress.isUploading ? (
-                          <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-green-500 rounded-xl bg-green-500/10">
-                            <Loader2 className="h-8 w-8 text-green-500 animate-spin mb-2" />
-                            <span className="text-sm text-green-500 font-medium">Enviando foto...</span>
-                            <span className="text-xs text-green-500 mt-1">{uploadProgress.progress}%</span>
-                          </div>
-                        ) : (
-                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-500/5 transition-colors">
-                            <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                            <span className="text-sm text-muted-foreground">Tirar foto ou selecionar</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              onChange={handlePhotoCapture}
-                              className="hidden"
-                            />
-                          </label>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  {/* Trichomes and LST sections removed - available in individual plant pages */}
                 </Accordion>
+
+                {/* Foto — direto, sem accordion */}
+                {(plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl) ? (
+                  <div className="relative">
+                    <LazyImage
+                      src={plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl!}
+                      alt="Preview"
+                      aspectRatio="16/9"
+                      className="w-full h-48 rounded-xl"
+                    />
+                    {plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl && (
+                      <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">✓ Enviada</div>
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        updatePlantHealthRecord(plants[currentPlantIndex].id, "photoPreview", undefined);
+                        updatePlantHealthRecord(plants[currentPlantIndex].id, "photoUrl", undefined);
+                      }}
+                      className="absolute top-2 right-2"
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                ) : uploadProgress.isUploading ? (
+                  <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-green-500 rounded-xl bg-green-500/10">
+                    <Loader2 className="h-8 w-8 text-green-500 animate-spin mb-2" />
+                    <span className="text-sm text-green-500 font-medium">Enviando foto...</span>
+                    <span className="text-xs text-green-500 mt-1">{uploadProgress.progress}%</span>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-500/5 transition-colors">
+                    <Camera className="h-7 w-7 text-muted-foreground mb-1" />
+                    <span className="text-sm text-muted-foreground">Foto (opcional)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handlePhotoCapture}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
             )}
           </div>

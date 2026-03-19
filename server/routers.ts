@@ -1,5 +1,8 @@
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { getUserById, updateUserProfile, updateUserPassword, getUserByEmail } from "./db-auth";
+import { hashPassword, comparePassword } from "./_core/auth";
+import { users } from "../drizzle/schema";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
 import { z } from "zod";
 import { eq, and, or, desc, asc, sql, isNotNull, inArray } from "drizzle-orm";
@@ -5012,5 +5015,74 @@ export const appRouter = router({
       return { success: true };
     }),
   }),
+
+  profile: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const user = await getUserById(ctx.user.id);
+      if (!user) throw new Error('Usuário não encontrado');
+      return { id: user.id, email: user.email, name: user.name, role: user.role };
+    }),
+
+    updateName: protectedProcedure
+      .input(z.object({ name: z.string().min(1).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        await updateUserProfile(ctx.user.id, { name: input.name });
+        return { success: true };
+      }),
+
+    updatePassword: protectedProcedure
+      .input(z.object({ currentPassword: z.string(), newPassword: z.string().min(6) }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserById(ctx.user.id);
+        if (!user) throw new Error('Usuário não encontrado');
+        if (user.passwordHash) {
+          const valid = await comparePassword(input.currentPassword, user.passwordHash);
+          if (!valid) throw new Error('Senha atual incorreta');
+        }
+        const hash = await hashPassword(input.newPassword);
+        await updateUserPassword(ctx.user.id, hash);
+        return { success: true };
+      }),
+
+    deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) throw new Error('Banco indisponível');
+      await database.delete(users).where(eq(users.id, ctx.user.id));
+      return { success: true };
+    }),
+  }),
+
+  admin: router({
+    listUsers: adminProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) throw new Error('Banco indisponível');
+      const result = await database
+        .select({ id: users.id, email: users.email, name: users.name, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
+        .from(users)
+        .orderBy(users.createdAt);
+      return result;
+    }),
+
+    deleteUser: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.userId === ctx.user.id) throw new Error('Não pode excluir sua própria conta por aqui');
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        await database.delete(users).where(eq(users.id, input.userId));
+        return { success: true };
+      }),
+
+    setRole: adminProcedure
+      .input(z.object({ userId: z.number(), role: z.enum(['user', 'admin']) }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.userId === ctx.user.id) throw new Error('Não pode alterar seu próprio role');
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        await database.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+        return { success: true };
+      }),
+  }),
 });
+
 export type AppRouter = typeof appRouter;
