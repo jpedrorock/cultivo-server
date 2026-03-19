@@ -19,6 +19,13 @@ import { PageTransition } from "@/components/PageTransition";
 export default function QuickLog() {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
+
+  // Lock body scroll while this page is mounted
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
   
   // Photo upload progress state
   const [uploadProgress, setUploadProgress] = useState<{
@@ -342,35 +349,40 @@ export default function QuickLog() {
       {/* Content */}
       <div className="flex-1 flex items-center justify-center overflow-hidden pb-24">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">
-          <div className="bg-card rounded-2xl shadow-lg p-6 space-y-6 relative max-h-[85vh] overflow-y-auto w-full">
-          {/* Decorative animated circle */}
-          {currentStep < 9 && currentStepData && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
-          )}
-
+          <div className="bg-card rounded-2xl shadow-lg h-[85vh] overflow-hidden w-full flex flex-col">
           {/* Step content */}
-          <div className="relative z-10 space-y-6 animate-[fade-in_0.5s_ease-out]">
+          <div className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out]">
+          <div className="min-h-full flex flex-col justify-center p-6 space-y-6">
             {/* Icon */}
             {currentStep < 9 && currentStepData && (
               <div className="flex justify-center mb-6">
-                <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${currentStepData.gradient} flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]`}>
-                  <currentStepData.icon className="w-16 h-16 text-white" />
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
+                  <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${currentStepData.gradient} flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]`}>
+                    <currentStepData.icon className="w-16 h-16 text-white" />
+                  </div>
                 </div>
               </div>
             )}
 
             {currentStep === 9 && recordPlantHealth === null && (
               <div className="flex justify-center mb-6">
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
-                  <Heart className="w-16 h-16 text-white" />
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
+                    <Heart className="w-16 h-16 text-white" />
+                  </div>
                 </div>
               </div>
             )}
 
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
               <div className="flex justify-center mb-6">
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
-                  <Activity className="w-16 h-16 text-white" />
+                <div className="relative flex items-center justify-center">
+                  <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
+                    <Activity className="w-16 h-16 text-white" />
+                  </div>
                 </div>
               </div>
             )}
@@ -905,6 +917,7 @@ export default function QuickLog() {
                 </Accordion>
               </div>
             )}
+          </div>
           </div>
           </div>
         </div>
