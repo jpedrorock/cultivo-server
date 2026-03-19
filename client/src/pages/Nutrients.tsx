@@ -270,11 +270,15 @@ export default function Nutrients() {
   const firstTentId = tents.data?.[0]?.id?.toString();
   const effectiveTentId = selectedTentId || firstTentId || "";
 
-  const applications = trpc.nutrients.listApplications.useQuery({
-    tentId: historyTentFilter !== "all" ? Number(historyTentFilter) : undefined,
-    phase: historyPhaseFilter !== "all" ? historyPhaseFilter : undefined,
-    limit: 50,
-  });
+  const applications = trpc.nutrients.listApplications.useQuery(
+    historyTentFilter !== "all" || historyPhaseFilter !== "all"
+      ? {
+          ...(historyTentFilter !== "all" && { tentId: Number(historyTentFilter) }),
+          ...(historyPhaseFilter !== "all" && { phase: historyPhaseFilter }),
+          limit: 50,
+        }
+      : { limit: 50 }
+  );
 
   const products = getProductsByPhaseWeek(phase, week);
   const calculatedProducts = products.map(p => ({ ...p, totalG: p.gPerLiter * volumeL }));

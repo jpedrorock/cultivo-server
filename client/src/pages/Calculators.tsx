@@ -208,10 +208,11 @@ function WateringRunoffCalculator() {
   
   // Queries
   const tents = trpc.tents.list.useQuery();
-  const applications = trpc.watering.listApplications.useQuery({
-    tentId: historyTentFilter !== "all" ? Number(historyTentFilter) : undefined,
-    limit: 50,
-  });
+  const applications = trpc.watering.listApplications.useQuery(
+    historyTentFilter !== "all"
+      ? { tentId: Number(historyTentFilter), limit: 50 }
+      : { limit: 50 }
+  );
   const saveApplication = trpc.watering.recordApplication.useMutation();
   
   // Calculadora de Runoff
