@@ -322,6 +322,8 @@ export const appRouter = router({
               eq(plantTentHistory.toTentId, input.id)
             )
           );
+          // Desvincula plantas antes de deletar a estufa (evita FK violation)
+          await tx.update(plants).set({ currentTentId: null }).where(eq(plants.currentTentId, input.id));
           await tx.delete(tents).where(eq(tents.id, input.id));
         });
 
@@ -833,11 +835,18 @@ export const appRouter = router({
           if (!input.targetTentId) {
             throw new Error("Estufa destino é obrigatória ao criar mudas");
           }
-          
+
+          // Buscar nome da strain do ciclo
+          let strainName = 'Sem strain';
+          if (cycle.strainId) {
+            const [strain] = await database.select({ name: strains.name }).from(strains).where(eq(strains.id, cycle.strainId));
+            strainName = strain?.name || 'Sem strain';
+          }
+
           const seedlings = [];
           for (let i = 1; i <= input.clonesProduced; i++) {
             seedlings.push({
-              name: `Clone ${i} - ${cycle.strainName || 'Sem strain'}`,
+              name: `Clone ${i} - ${strainName}`,
               strainId: cycle.strainId,
               currentTentId: input.targetTentId, // Mudas vão para estufa selecionada
               plantStage: "SEEDLING" as const,
@@ -1552,14 +1561,15 @@ export const appRouter = router({
           .offset(input.offset);
         
         // Get total count for pagination
-        const countQuery = database
+        let countQuery = database
           .select({ count: sql<number>`count(*)` })
-          .from(dailyLogs);
-        
+          .from(dailyLogs)
+          .$dynamic();
+
         if (conditions.length > 0) {
-          countQuery.where(and(...conditions));
+          countQuery = countQuery.where(and(...conditions));
         }
-        
+
         const countResult = await countQuery;
         const total = Number(countResult[0]?.count || 0);
         
