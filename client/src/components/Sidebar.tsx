@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef } from "react";
+import { useNavBadges } from "@/hooks/useNavBadges";
 import {
   Tooltip,
   TooltipContent,
@@ -14,16 +15,7 @@ import { Badge } from "@/components/ui/badge";
 export function Sidebar() {
   const [location] = useLocation();
   const { data: tents } = trpc.tents.list.useQuery();
-  const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
-    {},
-    { refetchInterval: 30_000 } // poll every 30s to detect new alerts
-  );
-
-  // Buscar contagem de plantas aguardando secagem
-  const { data: harvestQueuePlants } = trpc.harvestQueue.list.useQuery(undefined, {
-    refetchInterval: 60_000,
-  });
-  const harvestQueueCount = harvestQueuePlants?.length || 0;
+  const { alertCount, harvestQueueCount } = useNavBadges();
 
   // Track previous count to detect new alerts — badge shake
   const prevCountRef = useRef<number | null>(null);

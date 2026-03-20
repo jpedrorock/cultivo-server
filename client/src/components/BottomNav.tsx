@@ -3,7 +3,7 @@ import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
-import { trpc } from "@/lib/trpc";
+import { useNavBadges } from "@/hooks/useNavBadges";
 import {
   Sheet,
   SheetContent,
@@ -34,27 +34,18 @@ export function BottomNav() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
 
   // TODOS os hooks devem ser chamados antes de qualquer return condicional (regra do React)
-  const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
-    {},
-    { refetchInterval: 30_000 }
-  );
+  const { alertCount, harvestQueueCount } = useNavBadges();
   const prevCountRef = useRef<number | null>(null);
   const [badgeShaking, setBadgeShaking] = useState(false);
 
   useEffect(() => {
-    const current = alertCount ?? 0;
-    if (prevCountRef.current !== null && current > prevCountRef.current) {
+    if (prevCountRef.current !== null && alertCount > prevCountRef.current) {
       setBadgeShaking(true);
       const timer = setTimeout(() => setBadgeShaking(false), 700);
       return () => clearTimeout(timer);
     }
-    prevCountRef.current = current;
+    prevCountRef.current = alertCount;
   }, [alertCount]);
-
-  const { data: harvestQueuePlants } = trpc.harvestQueue.list.useQuery(undefined, {
-    refetchInterval: 60_000,
-  });
-  const harvestQueueCount = harvestQueuePlants?.length || 0;
 
   // Ocultar nav em telas de foco (ex: registro rápido) — após todos os hooks
   const isHidden = HIDDEN_NAV_ROUTES.includes(location);

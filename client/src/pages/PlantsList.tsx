@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,27 +160,35 @@ export default function PlantsList() {
     },
   });
 
-  const filteredPlants = plants?.filter((plant) =>
-    plant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    plant.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPlants = useMemo(() =>
+    plants?.filter((plant) =>
+      plant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      plant.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+    [plants, searchTerm]
   );
 
   // Agrupar plantas por estufa
-  const plantsByTent = filteredPlants?.reduce((acc, plant) => {
-    if (!acc[plant.currentTentId]) {
-      acc[plant.currentTentId] = [];
-    }
-    acc[plant.currentTentId].push(plant);
-    return acc;
-  }, {} as Record<number, typeof plants>);
+  const plantsByTent = useMemo(() =>
+    filteredPlants?.reduce((acc, plant) => {
+      if (!acc[plant.currentTentId]) {
+        acc[plant.currentTentId] = [];
+      }
+      acc[plant.currentTentId].push(plant);
+      return acc;
+    }, {} as Record<number, typeof plants>),
+    [filteredPlants]
+  );
 
-  const getStrainName = (strainId: number) => {
-    return strains?.find((s) => s.id === strainId)?.name || "Unknown";
-  };
+  const getStrainName = useMemo(() => {
+    const map = new Map(strains?.map((s) => [s.id, s.name]));
+    return (strainId: number) => map.get(strainId) || "Unknown";
+  }, [strains]);
 
-  const getTentName = (tentId: number) => {
-    return tents?.find((t) => t.id === tentId)?.name || "Unknown";
-  };
+  const getTentName = useMemo(() => {
+    const map = new Map(tents?.map((t) => [t.id, t.name]));
+    return (tentId: number) => map.get(tentId) || "Unknown";
+  }, [tents]);
 
   // getStatusColor e getStatusLabel importados de @/lib/plantUtils
 

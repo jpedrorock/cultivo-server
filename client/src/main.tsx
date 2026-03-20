@@ -9,7 +9,16 @@ import { getLoginUrl } from "./const";
 import "./index.css";
 import { Toaster } from "sonner";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,          // dados válidos por 30s — sem refetch desnecessário
+      gcTime: 5 * 60_000,         // cache mantido por 5min após componente desmontar
+      refetchOnWindowFocus: false, // sem "piscar" ao trocar de aba
+      retry: 1,                   // apenas 1 retry em vez de 3
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -26,7 +35,7 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Query Error]", error);
+    if (import.meta.env.DEV) console.error("[API Query Error]", error);
   }
 });
 
@@ -34,7 +43,7 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Mutation Error]", error);
+    if (import.meta.env.DEV) console.error("[API Mutation Error]", error);
   }
 });
 
@@ -59,7 +68,7 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker
       .register('/sw.js')
       .then((registration) => {
-        console.log('[PWA] Service Worker registered:', registration.scope);
+        if (import.meta.env.DEV) console.log('[PWA] Service Worker registered:', registration.scope);
         
         // Verificar atualizações a cada 60 segundos
         setInterval(() => {
@@ -67,7 +76,7 @@ if ('serviceWorker' in navigator) {
         }, 60000);
       })
       .catch((error) => {
-        console.error('[PWA] Service Worker registration failed:', error);
+        if (import.meta.env.DEV) console.error('[PWA] Service Worker registration failed:', error);
       });
   });
 }
