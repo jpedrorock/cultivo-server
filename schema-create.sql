@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS `strains` (
   `vegaWeeks`   INT NOT NULL DEFAULT 4,
   `floraWeeks`  INT NOT NULL DEFAULT 8,
   `isActive`    BOOLEAN NOT NULL DEFAULT TRUE,
+  `groupId`     INT NULL,
   `createdAt`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS `plants` (
   `finishedAt`        TIMESTAMP NULL,
   `finishReason`      TEXT,
   `notes`             TEXT,
+  `groupId`           INT NULL,
   `createdAt`         TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (`strainId`)      REFERENCES `strains`(`id`),
@@ -173,6 +175,7 @@ CREATE TABLE IF NOT EXISTS `weeklyTargets` (
   `ecMin`       DECIMAL(3,1),
   `ecMax`       DECIMAL(3,1),
   `notes`       TEXT,
+  `groupId`     INT NULL,
   `createdAt`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
   UNIQUE KEY `strainPhaseWeekUnique` (`strainId`, `phase`, `weekNumber`),
@@ -236,6 +239,7 @@ CREATE TABLE IF NOT EXISTS `recipeTemplates` (
   `phTarget`     DECIMAL(3,1),
   `productsJson` TEXT NOT NULL,
   `notes`        TEXT,
+  `groupId`      INT NULL,
   `createdAt`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -250,6 +254,7 @@ CREATE TABLE IF NOT EXISTS `taskTemplates` (
   `weekNumber`  INT,
   `title`       VARCHAR(200) NOT NULL,
   `description` TEXT,
+  `groupId`     INT NULL,
   `createdAt`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -372,6 +377,7 @@ CREATE TABLE IF NOT EXISTS `notificationHistory` (
   `metadata` TEXT,
   `isRead`   BOOLEAN NOT NULL DEFAULT FALSE,
   `sentAt`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  `groupId`  INT NULL,
   INDEX `typeIdx` (`type`),
   INDEX `dateIdx` (`sentAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -549,6 +555,7 @@ CREATE TABLE IF NOT EXISTS `fertilizationPresets` (
   `weekNumber`          INT,
   `irrigationsPerWeek`  DECIMAL(10,1),
   `calculationMode`     ENUM('per-irrigation', 'per-week') NOT NULL,
+  `groupId`             INT NULL,
   `createdAt`           TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -564,6 +571,7 @@ CREATE TABLE IF NOT EXISTS `wateringPresets` (
   `targetRunoff` DECIMAL(10,1) NOT NULL,
   `phase`        ENUM('VEGA', 'FLORA'),
   `weekNumber`   INT,
+  `groupId`      INT NULL,
   `createdAt`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

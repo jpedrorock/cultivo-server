@@ -40,6 +40,44 @@ import {
 } from "../drizzle/schema";
 import { nanoid } from "nanoid";
 
+/**
+ * Valida que uma estufa pertence ao grupo do usuário.
+ * Lança erro se não pertencer — use em todos os routers que acessam recursos via tentId.
+ */
+async function validateTentOwnership(tentId: number, groupId: number | null | undefined): Promise<void> {
+  const database = await getDb();
+  if (!database) throw new Error("Banco de dados não inicializado");
+  const [tent] = await database.select({ id: tents.id, groupId: tents.groupId }).from(tents).where(eq(tents.id, tentId)).limit(1);
+  if (!tent) throw new Error("Estufa não encontrada");
+  if (groupId != null && tent.groupId != null && tent.groupId !== groupId) {
+    throw new Error("Acesso negado: estufa não pertence ao seu grupo");
+  }
+}
+
+/**
+ * Valida que um ciclo pertence ao grupo do usuário (via tent do ciclo).
+ */
+async function validateCycleOwnership(cycleId: number, groupId: number | null | undefined): Promise<void> {
+  const database = await getDb();
+  if (!database) throw new Error("Banco de dados não inicializado");
+  const [cycle] = await database.select({ id: cycles.id, tentId: cycles.tentId }).from(cycles).where(eq(cycles.id, cycleId)).limit(1);
+  if (!cycle) throw new Error("Ciclo não encontrado");
+  await validateTentOwnership(cycle.tentId, groupId);
+}
+
+/**
+ * Valida que uma planta pertence ao grupo do usuário.
+ */
+async function validatePlantOwnership(plantId: number, groupId: number | null | undefined): Promise<void> {
+  const database = await getDb();
+  if (!database) throw new Error("Banco de dados não inicializado");
+  const [plant] = await database.select({ id: plants.id, groupId: plants.groupId }).from(plants).where(eq(plants.id, plantId)).limit(1);
+  if (!plant) throw new Error("Planta não encontrada");
+  if (groupId != null && plant.groupId != null && plant.groupId !== groupId) {
+    throw new Error("Acesso negado: planta não pertence ao seu grupo");
+  }
+}
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -77,11 +115,12 @@ export const appRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
       return db.getAllTents(ctx.user.groupId);
     }),
-    getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+    getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input, ctx }) => {
       const database = await getDb();
       if (!database) throw new Error("DB not available");
       const tent = await db.getTentById(input.id);
       if (!tent) return undefined;
+      await validateTentOwnership(input.id, ctx.user.groupId);
       // Para estufas de manutenção, buscar último evento de clonagem e último ciclo com clonesProduced
       let lastCloningAt: number | null = null;
       let lastCloningCount: number | null = null;
@@ -149,19 +188,22 @@ export const appRouter = router({
           powerW: z.number().int().positive().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+
+        // Verificar ownership
+        await validateTentOwnership(input.id, ctx.user.groupId);
+
         // Verificar se a estufa existe
         const existingTent = await database
           .select()
           .from(tents)
           .where(eq(tents.id, input.id))
           .limit(1);
-        
+
         if (existingTent.length === 0) {
           throw new Error("Estufa não encontrada");
         }
@@ -187,11 +229,12 @@ export const appRouter = router({
       }),
     getDeletePreview: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado.");
         }
+        await validateTentOwnership(input.id, ctx.user.groupId);
         
         // Contar registros relacionados que serão deletados
         const [cyclesCount] = await database
@@ -268,12 +311,14 @@ export const appRouter = router({
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-             // Verificar se há ciclos ativos
+        // Verificar ownership
+        await validateTentOwnership(input.id, ctx.user.groupId);
+        // Verificar se há ciclos ativos
         const activeCycles = await database
           .select({ id: cycles.id })
           .from(cycles)
@@ -464,16 +509,27 @@ export const appRouter = router({
 
   // Cycles (Ciclos)
   cycles: router({
-    listActive: protectedProcedure.query(async () => {
-      const allCycles = await db.getAllCycles();
-      return allCycles.filter(c => c.status === "ACTIVE");
+    listActive: protectedProcedure.query(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) throw new Error("Banco de dados não inicializado");
+      const allCycles = await database
+        .select({ id: cycles.id, status: cycles.status, tentId: cycles.tentId, tentGroupId: tents.groupId })
+        .from(cycles)
+        .leftJoin(tents, eq(cycles.tentId, tents.id))
+        .where(eq(cycles.status, "ACTIVE"));
+      return allCycles.filter(c =>
+        ctx.user.groupId == null || c.tentGroupId == null || c.tentGroupId === ctx.user.groupId
+      );
     }),
-    getActiveCyclesWithProgress: protectedProcedure.query(async () => {
+    getActiveCyclesWithProgress: protectedProcedure.query(async ({ ctx }) => {
       const database = await getDb();
       if (!database) {
         throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
       }
-      
+
+      // Filtro de groupId na query
+      const groupConditions = eq(cycles.status, "ACTIVE");
+
       // Buscar ciclos ativos com tent e strain
       const activeCycles = await database
         .select({
@@ -481,6 +537,7 @@ export const appRouter = router({
           tentId: cycles.tentId,
           tentName: tents.name,
           tentCategory: tents.category,
+          tentGroupId: tents.groupId,
           strainId: cycles.strainId,
           strainName: strains.name,
           startDate: cycles.startDate,
@@ -493,11 +550,16 @@ export const appRouter = router({
         .from(cycles)
         .leftJoin(tents, eq(cycles.tentId, tents.id))
         .leftJoin(strains, eq(cycles.strainId, strains.id))
-        .where(eq(cycles.status, "ACTIVE"));
+        .where(groupConditions);
+
+      // Filtrar pelo grupo do usuário
+      const filtered = activeCycles.filter(c =>
+        ctx.user.groupId == null || c.tentGroupId == null || c.tentGroupId === ctx.user.groupId
+      );
       
       const now = new Date();
       
-      return activeCycles.map((cycle: any) => {
+      return filtered.map((cycle: any) => {
         const startDate = new Date(cycle.startDate);
         const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
         
@@ -551,7 +613,8 @@ export const appRouter = router({
         };
       });
     }),
-    getByTent: protectedProcedure.input(z.object({ tentId: z.number() })).query(async ({ input }) => {
+    getByTent: protectedProcedure.input(z.object({ tentId: z.number() })).query(async ({ input, ctx }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
       return db.getCycleByTentId(input.tentId);
     }),
     create: protectedProcedure
@@ -562,11 +625,12 @@ export const appRouter = router({
           startDate: z.date(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         await database.insert(cycles).values(input);
         return { success: true };
       }),
@@ -576,24 +640,26 @@ export const appRouter = router({
           cycleId: z.number(),
           floraStartDate: z.date(),
           targetTentId: z.number().optional(),
+
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
         // Buscar ciclo atual
         const [cycle] = await database
           .select()
           .from(cycles)
           .where(eq(cycles.id, input.cycleId));
-        
+
         if (!cycle) {
           throw new Error("Ciclo não encontrado");
         }
-        
+
         if (cycle.floraStartDate) {
           throw new Error("Ciclo já está em floração");
         }
@@ -635,11 +701,12 @@ export const appRouter = router({
       }),
     finalize: protectedProcedure
       .input(z.object({ cycleId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
         await database
           .update(cycles)
           .set({ status: "FINISHED" })
@@ -656,22 +723,23 @@ export const appRouter = router({
           harvestWeight: z.number().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
         // Buscar ciclo atual
         const [cycle] = await database
           .select()
           .from(cycles)
           .where(eq(cycles.id, input.cycleId));
-        
+
         if (!cycle) {
           throw new Error("Ciclo não encontrado");
         }
-        
+
         if (!cycle.floraStartDate) {
           throw new Error("Ciclo não está em floração");
         }
@@ -760,18 +828,19 @@ export const appRouter = router({
           cloningStartDate: z.date(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado");
         }
-        
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
         // Buscar ciclo atual
         const [cycle] = await database
           .select()
           .from(cycles)
           .where(eq(cycles.id, input.cycleId));
-        
+
         if (!cycle) {
           throw new Error("Ciclo não encontrado");
         }
@@ -800,11 +869,12 @@ export const appRouter = router({
           targetTentId: z.number().optional(), // Estufa destino para as mudas
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado");
         }
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
         
         // Buscar ciclo atual
         const [cycle] = await database
@@ -872,12 +942,13 @@ export const appRouter = router({
           weekNumber: z.number().min(1),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
+
         // Calcular startDate baseado na fase e semana
         const startDate = new Date(input.startDate);
         const weeksToSubtract = input.weekNumber - 1;
@@ -931,12 +1002,13 @@ export const appRouter = router({
           clonesProduced: z.number().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
         console.log('[cycles.edit] Input received:', input);
         
         const updates: any = {};
@@ -1034,22 +1106,23 @@ export const appRouter = router({
           seedlingCount: z.number().min(1).max(50).optional(), // Alias para clonesProduced (compatibilidade)
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado.");
         }
-        
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
         // Buscar ciclo atual
         const [cycle] = await database
           .select()
           .from(cycles)
           .where(eq(cycles.id, input.cycleId));
-        
+
         if (!cycle) {
           throw new Error("Ciclo não encontrado");
         }
-        
+
         // Usar motherPlantId e clonesProduced dos inputs
         const motherPlantId = input.motherPlantId;
         const clonesProduced = input.clonesProduced || input.seedlingCount || 10;
@@ -1164,12 +1237,13 @@ export const appRouter = router({
           targetTentId: z.number().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado.");
         }
-        
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
         // Buscar ciclo atual
         const [cycle] = await database
           .select()
@@ -1308,10 +1382,11 @@ export const appRouter = router({
     
     getReportData: protectedProcedure
       .input(z.object({ cycleId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
         // Buscar informações do ciclo
         const cycleData = await database
           .select()
@@ -1375,7 +1450,8 @@ export const appRouter = router({
           limit: z.number().optional(),
         })
       )
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         return db.getDailyLogs(input.tentId, input.limit);
       }),
     // getHistoricalWithTargets removido - usar getDailyLogs diretamente
@@ -1416,14 +1492,13 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
 
-        
         // Calcular runoffPercentage se ambos wateringVolume e runoffCollected foram fornecidos
         let runoffPercentage: string | undefined;
         if (input.wateringVolume && input.runoffCollected) {
@@ -1453,9 +1528,10 @@ export const appRouter = router({
       }),
     getLatestByTent: protectedProcedure
       .input(z.object({ tentId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         const result = await database
           .select()
           .from(dailyLogs)
@@ -1467,9 +1543,10 @@ export const appRouter = router({
     
     getWeeklyData: protectedProcedure
       .input(z.object({ tentId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         
         // Get logs from last 7 days
         const sevenDaysAgo = new Date();
@@ -1514,14 +1591,21 @@ export const appRouter = router({
           offset: z.number().default(0),
         })
       )
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
+        // Validate tent ownership if tentId provided
+        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
+
         // Build filter conditions
         const conditions = [];
         if (input.tentId) {
           conditions.push(eq(dailyLogs.tentId, input.tentId));
+        }
+        // Filter by groupId when no specific tentId (show only logs from tents of same group)
+        if (!input.tentId && ctx.user.groupId != null) {
+          conditions.push(eq(tents.groupId, ctx.user.groupId));
         }
         if (input.startDate) {
           conditions.push(sql`${dailyLogs.logDate} >= ${input.startDate}`);
@@ -1592,30 +1676,35 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        // Validate ownership via the log's tentId
+        const [log] = await database.select({ tentId: dailyLogs.tentId }).from(dailyLogs).where(eq(dailyLogs.id, input.id)).limit(1);
+        if (log) await validateTentOwnership(log.tentId, ctx.user.groupId);
+
         const { id, ...updateData } = input;
-        
+
         await database
           .update(dailyLogs)
           .set(updateData)
           .where(eq(dailyLogs.id, id));
-        
+
         return { success: true };
       }),
-    
+
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        const [log] = await database.select({ tentId: dailyLogs.tentId }).from(dailyLogs).where(eq(dailyLogs.id, input.id)).limit(1);
+        if (log) await validateTentOwnership(log.tentId, ctx.user.groupId);
+
         await database
           .delete(dailyLogs)
           .where(eq(dailyLogs.id, input.id));
@@ -1629,9 +1718,10 @@ export const appRouter = router({
     // Configurações de alertas
     getSettings: protectedProcedure
       .input(z.object({ tentId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         const settings = await database
           .select()
           .from(alertSettings)
@@ -1639,10 +1729,11 @@ export const appRouter = router({
           .limit(1);
         return settings[0] || null;
       }),
-    
+
     getIdealValues: protectedProcedure
       .input(z.object({ tentId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         return db.getIdealValuesByTent(input.tentId);
       }),
     
@@ -1661,12 +1752,13 @@ export const appRouter = router({
           phMargin: z.number().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
+
         // Verificar se já existe configuração
         const existing = await database
           .select()
@@ -1717,10 +1809,11 @@ export const appRouter = router({
           limit: z.number().default(50),
         })
       )
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) return [];
-        
+        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
+
         if (input.tentId) {
           return database
             .select()
@@ -1744,32 +1837,37 @@ export const appRouter = router({
           status: z.enum(["NEW", "SEEN"]).optional(),
         })
       )
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
         return db.getAlerts(input.tentId, input.status);
       }),
     getNewCount: protectedProcedure
       .input(z.object({ tentId: z.number().optional() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
         return db.getNewAlertsCount(input.tentId);
       }),
     markAsSeen: protectedProcedure
       .input(z.object({ alertId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
+        const [alert] = await database.select({ tentId: alerts.tentId }).from(alerts).where(eq(alerts.id, input.alertId)).limit(1);
+        if (alert) await validateTentOwnership(alert.tentId, ctx.user.groupId);
         await database.update(alerts).set({ status: "SEEN" }).where(eq(alerts.id, input.alertId));
         return { success: true };
       }),
-    
+
     markAllAsSeen: protectedProcedure
       .input(z.object({ tentId: z.number().optional() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
+        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
         const conditions = [eq(alerts.status, "NEW")];
         if (input.tentId !== undefined) {
           conditions.push(eq(alerts.tentId, input.tentId));
@@ -1783,7 +1881,8 @@ export const appRouter = router({
 
     checkAlerts: protectedProcedure
       .input(z.object({ tentId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         return db.checkAlertsForTent(input.tentId);
       }),
     
@@ -2235,12 +2334,12 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        await database.insert(weeklyTargets).values(input);
+        await database.insert(weeklyTargets).values({ ...input, groupId: ctx.user.groupId ?? null });
         return { success: true };
       }),
   }),
@@ -2253,12 +2352,14 @@ export const appRouter = router({
           tentId: z.number(),
         })
       )
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         return db.getTaskInstances(input.tentId);
       }),
     getTasksByTent: protectedProcedure
       .input(z.object({ tentId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         const database = await getDb();
         if (!database) return [];
 
@@ -2387,11 +2488,11 @@ export const appRouter = router({
 
         return tasks;
       }),
-    getPendingTasks: protectedProcedure.query(async () => {
+    getPendingTasks: protectedProcedure.query(async ({ ctx }) => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
 
-      // Get all active cycles
+      // Get all active cycles (filtered by group via tent join)
       const allCycles = await db.getAllCycles();
       const activeCycles = allCycles.filter((c: any) => c.status === "ACTIVE");
       const pendingTasks: any[] = [];
@@ -2400,6 +2501,8 @@ export const appRouter = router({
         // Get tent info
         const tent = await database.select().from(tents).where(eq(tents.id, cycle.tentId)).limit(1);
         if (tent.length === 0) continue;
+        // Filter by group
+        if (ctx.user.groupId != null && tent[0].groupId != null && tent[0].groupId !== ctx.user.groupId) continue;
 
         // Get all incomplete tasks for this tent in current week
         const now = new Date();
@@ -2433,7 +2536,7 @@ export const appRouter = router({
 
       return pendingTasks;
     }),
-    getCurrentWeekTasks: protectedProcedure.query(async () => {
+    getCurrentWeekTasks: protectedProcedure.query(async ({ ctx }) => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
 
@@ -2454,6 +2557,9 @@ export const appRouter = router({
 
         // Get tent info to check category
         const tent = await database.select().from(tents).where(eq(tents.id, cycle.tentId)).limit(1);
+        if (!tent[0]) continue;
+        // Filter by group
+        if (ctx.user.groupId != null && tent[0].groupId != null && tent[0].groupId !== ctx.user.groupId) continue;
         const tentCategory = tent[0]?.category;
         
         // Determine phase based on tent category
@@ -2591,11 +2697,13 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
+        const [task] = await database.select({ tentId: taskInstances.tentId }).from(taskInstances).where(eq(taskInstances.id, input.taskId)).limit(1);
+        if (task) await validateTentOwnership(task.tentId, ctx.user.groupId);
         await database
           .update(taskInstances)
           .set({ isDone: true, completedAt: new Date(), notes: input.notes })
@@ -2604,39 +2712,42 @@ export const appRouter = router({
       }),
     toggleTask: protectedProcedure
       .input(z.object({ taskId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+
         // Get current state
         const task = await database
           .select()
           .from(taskInstances)
           .where(eq(taskInstances.id, input.taskId))
           .limit(1);
-        
+
         if (task.length === 0) throw new Error("Task not found");
-        
+        await validateTentOwnership(task[0].tentId, ctx.user.groupId);
+
         const newIsDone = !task[0].isDone;
         await database
           .update(taskInstances)
-          .set({ 
-            isDone: newIsDone, 
-            completedAt: newIsDone ? new Date() : null 
+          .set({
+            isDone: newIsDone,
+            completedAt: newIsDone ? new Date() : null
           })
           .where(eq(taskInstances.id, input.taskId));
-        
+
         return { success: true, isDone: newIsDone };
       }),
     delete: protectedProcedure
       .input(z.object({ taskId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
+        const [task] = await database.select({ tentId: taskInstances.tentId }).from(taskInstances).where(eq(taskInstances.id, input.taskId)).limit(1);
+        if (task) await validateTentOwnership(task.tentId, ctx.user.groupId);
         await database.delete(taskInstances).where(eq(taskInstances.id, input.taskId));
         return { success: true };
       }),
@@ -2645,7 +2756,8 @@ export const appRouter = router({
 
   // Tent A (Estufa A - Clonagem)
   tentA: router({
-    getState: protectedProcedure.input(z.object({ tentId: z.number() })).query(async ({ input }) => {
+    getState: protectedProcedure.input(z.object({ tentId: z.number() })).query(async ({ input, ctx }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
       return db.getTentAState(input.tentId);
     }),
     startCloning: protectedProcedure
@@ -2655,7 +2767,8 @@ export const appRouter = router({
           startDate: z.date(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
@@ -2762,10 +2875,11 @@ export const appRouter = router({
         currentTentId: z.number(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validateTentOwnership(input.currentTentId, ctx.user.groupId);
+
         const result = await database.insert(plants).values({
           name: input.name,
           code: input.code,
@@ -2773,8 +2887,9 @@ export const appRouter = router({
           currentTentId: input.currentTentId,
           notes: input.notes,
           status: "ACTIVE",
+          groupId: ctx.user.groupId ?? null,
         });
-        
+
         // Retornar o ID inserido
         return { id: result.insertId };
       }),
@@ -2786,26 +2901,32 @@ export const appRouter = router({
         strainId: z.number().optional(),
         status: z.enum(["ACTIVE", "HARVESTED", "DEAD", "DISCARDED"]).optional(),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
+
         let conditions = [];
-        
+
+        // Filter by group
+        if (ctx.user.groupId != null) {
+          conditions.push(eq(plants.groupId, ctx.user.groupId));
+        }
+
         // Filtrar apenas plantas ACTIVE por padrão
         if (input.status) {
           conditions.push(eq(plants.status, input.status));
         } else {
           conditions.push(eq(plants.status, "ACTIVE"));
         }
-        
+
         if (input.tentId) {
           conditions.push(eq(plants.currentTentId, input.tentId));
         }
         if (input.strainId) {
           conditions.push(eq(plants.strainId, input.strainId));
         }
-        
+
         let query = database.select().from(plants).where(and(...conditions));
         
         const plantsList = await query as any;
@@ -2874,15 +2995,16 @@ export const appRouter = router({
     // Obter planta por ID
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validatePlantOwnership(input.id, ctx.user.groupId);
+
         const [plant] = await database
           .select()
           .from(plants)
           .where(eq(plants.id, input.id));
-        
+
         return plant;
       }),
 
@@ -2896,9 +3018,10 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.id, ctx.user.groupId);
 
         // Verificar se planta existe
         const existingPlant = await database
@@ -2938,9 +3061,11 @@ export const appRouter = router({
         toTentId: z.number(),
         reason: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        await validateTentOwnership(input.toTentId, ctx.user.groupId);
         
         // Buscar estufa atual
         const [plant] = await database
@@ -2974,9 +3099,11 @@ export const appRouter = router({
         toTentId: z.number(),
         reason: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.fromTentId, ctx.user.groupId);
+        await validateTentOwnership(input.toTentId, ctx.user.groupId);
         
         // Buscar todas as plantas na estufa de origem
         const plantsToMove = await database
@@ -3029,9 +3156,10 @@ export const appRouter = router({
         toTentId: z.number(),
         reason: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.toTentId, ctx.user.groupId);
         
         if (input.plantIds.length === 0) {
           return { success: true, movedCount: 0 };
@@ -3070,9 +3198,10 @@ export const appRouter = router({
       .input(z.object({
         plantId: z.number(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         // Buscar planta atual
         const [plant] = await database
@@ -3123,9 +3252,10 @@ export const appRouter = router({
         plantId: z.number(),
         status: z.enum(["HARVESTED", "DEAD"]),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         await database
           .update(plants)
@@ -3140,9 +3270,10 @@ export const appRouter = router({
       .input(z.object({
         plantId: z.number(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         // Buscar planta atual
         const [plant] = await database
@@ -3172,7 +3303,7 @@ export const appRouter = router({
       .input(z.object({
         plantIds: z.array(z.number()),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
@@ -3202,9 +3333,10 @@ export const appRouter = router({
         plantIds: z.array(z.number()),
         targetTentId: z.number(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.targetTentId, ctx.user.groupId);
         
         // Verificar se estufa destino existe
         const [targetTent] = await database
@@ -3230,7 +3362,7 @@ export const appRouter = router({
       .input(z.object({
         plantIds: z.array(z.number()),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
@@ -3252,7 +3384,7 @@ export const appRouter = router({
         plantIds: z.array(z.number()),
         reason: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
@@ -3275,9 +3407,10 @@ export const appRouter = router({
         plantId: z.number(),
         reason: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         // Atualizar status para DISCARDED
         await database
@@ -3294,9 +3427,10 @@ export const appRouter = router({
     // Excluir planta permanentemente
     delete: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         // Delete all related records first (cascade)
         await database.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
@@ -3316,7 +3450,7 @@ export const appRouter = router({
     // Excluir múltiplas plantas em massa
     bulkDelete: protectedProcedure
       .input(z.object({ plantIds: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         if (!input.plantIds.length) return { count: 0 };
@@ -3339,7 +3473,8 @@ export const appRouter = router({
     // Buscar histórico de movimentação entre estufas
     getTentHistory: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         
@@ -3370,9 +3505,10 @@ export const appRouter = router({
     // Buscar fotos da planta
     getPhotos: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         const photos = await database
           .select()
@@ -3390,9 +3526,10 @@ export const appRouter = router({
         imageData: z.string(), // base64
         mimeType: z.string(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         // Converter base64 para Buffer
         const base64Data = input.imageData.split(',')[1] || input.imageData;
@@ -3437,9 +3574,10 @@ export const appRouter = router({
         status: z.enum(["HARVESTED", "DISCARDED"]),
         finishReason: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         // Verificar se planta está ACTIVE
         const [plant] = await database
@@ -3475,9 +3613,11 @@ export const appRouter = router({
         plantId: z.number(),
         targetTentId: z.number(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        await validateTentOwnership(input.targetTentId, ctx.user.groupId);
         
         // Verificar se planta está arquivada
         const [plant] = await database
@@ -3604,9 +3744,10 @@ export const appRouter = router({
     // Excluir planta permanentemente (apenas para erros de cadastro)
     deletePermanently: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         // Deletar todos os registros relacionados primeiro (cascade manual)
         await database.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
@@ -3631,23 +3772,25 @@ export const appRouter = router({
         plantId: z.number(),
         content: z.string(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
         await database.insert(plantObservations).values({
           plantId: input.plantId,
           content: input.content,
         });
-        
+
         return { success: true };
       }),
 
     list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         return await database
           .select()
@@ -3661,26 +3804,28 @@ export const appRouter = router({
   plantPhotos: router({
     list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
         return await database
           .select()
           .from(plantPhotos)
           .where(eq(plantPhotos.plantId, input.plantId))
           .orderBy(desc(plantPhotos.photoDate));
       }),
-    
+
     upload: protectedProcedure
       .input(z.object({
         plantId: z.number(),
         photoBase64: z.string(), // Base64 data URL
         description: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         let photoUrl: string | undefined;
         let photoKey: string | undefined;
@@ -3735,9 +3880,10 @@ export const appRouter = router({
         volumeOut: z.number(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         const runoffPercent = (input.volumeOut / input.volumeIn) * 100;
         
@@ -3754,10 +3900,11 @@ export const appRouter = router({
 
     list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
         return await database
           .select()
           .from(plantRunoffLogs)
@@ -3778,9 +3925,10 @@ export const appRouter = router({
         photoUrl: z.string().optional(),   // URL ou caminho relativo da foto enviada via /api/upload/image
         photoBase64: z.string().optional(),       // Legado: base64 (mantido para compatibilidade)
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
 
         let resolvedPhotoUrl: string | undefined = input.photoUrl; // preferência: URL pré-enviada
         let photoKey: string | undefined;
@@ -3815,10 +3963,11 @@ export const appRouter = router({
 
     list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
         return await database
           .select()
           .from(plantHealthLogs)
@@ -3919,9 +4068,10 @@ export const appRouter = router({
         photoUrl: z.string().optional(),  // URL ou caminho relativo da foto enviada via /api/upload/image
         photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         let resolvedPhotoUrl: string | undefined = input.photoUrl;
         let photoKey: string | undefined;
@@ -3957,10 +4107,11 @@ export const appRouter = router({
 
     list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
         return await database
           .select()
           .from(plantTrichomeLogs)
@@ -3978,9 +4129,10 @@ export const appRouter = router({
         response: z.string().optional(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         
         await database.insert(plantLSTLogs).values({
           plantId: input.plantId,
@@ -3994,10 +4146,11 @@ export const appRouter = router({
 
     list: protectedProcedure
       .input(z.object({ plantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
         return await database
           .select()
           .from(plantLSTLogs)
@@ -4023,7 +4176,6 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         
         await database.insert(fertilizationPresets).values({
-          
           name: input.name,
           waterVolume: input.waterVolume.toString(),
           targetEC: input.targetEC.toString(),
@@ -4031,8 +4183,9 @@ export const appRouter = router({
           weekNumber: input.weekNumber,
           irrigationsPerWeek: input.irrigationsPerWeek?.toString(),
           calculationMode: input.calculationMode,
+          groupId: ctx.user.groupId ?? null,
         });
-        
+
         return { success: true };
       }),
 
@@ -4040,11 +4193,18 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
+        const conditions = [];
+        if (ctx.user.groupId != null) {
+          conditions.push(
+            sql`(${fertilizationPresets.groupId} IS NULL OR ${fertilizationPresets.groupId} = ${ctx.user.groupId})`
+          );
+        }
+
         return await database
           .select()
           .from(fertilizationPresets)
-          
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
           .orderBy(desc(fertilizationPresets.createdAt));
       }),
 
@@ -4053,7 +4213,12 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        // Validate ownership
+        const [preset] = await database.select({ groupId: fertilizationPresets.groupId }).from(fertilizationPresets).where(eq(fertilizationPresets.id, input.id)).limit(1);
+        if (preset?.groupId != null && ctx.user.groupId != null && preset.groupId !== ctx.user.groupId) {
+          throw new Error("Acesso negado: predefinição não pertence ao seu grupo");
+        }
+
         await database
           .delete(fertilizationPresets)
           .where(eq(fertilizationPresets.id, input.id));
@@ -4109,15 +4274,15 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         
         await database.insert(wateringPresets).values({
-          
           name: input.name,
           plantCount: input.plantCount,
           potSize: input.potSize.toString(),
           targetRunoff: input.targetRunoff.toString(),
           phase: input.phase,
           weekNumber: input.weekNumber,
+          groupId: ctx.user.groupId ?? null,
         });
-        
+
         return { success: true };
       }),
 
@@ -4125,11 +4290,18 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
+        const conditions = [];
+        if (ctx.user.groupId != null) {
+          conditions.push(
+            sql`(${wateringPresets.groupId} IS NULL OR ${wateringPresets.groupId} = ${ctx.user.groupId})`
+          );
+        }
+
         return await database
           .select()
           .from(wateringPresets)
-          
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
           .orderBy(desc(wateringPresets.createdAt));
       }),
 
@@ -4138,7 +4310,11 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        const [preset] = await database.select({ groupId: wateringPresets.groupId }).from(wateringPresets).where(eq(wateringPresets.id, input.id)).limit(1);
+        if (preset?.groupId != null && ctx.user.groupId != null && preset.groupId !== ctx.user.groupId) {
+          throw new Error("Acesso negado: predefinição não pertence ao seu grupo");
+        }
+
         await database
           .delete(wateringPresets)
           .where(eq(wateringPresets.id, input.id));
@@ -4177,16 +4353,22 @@ export const appRouter = router({
   }),
 
   taskTemplates: router({
-    list: protectedProcedure.query(async () => {
+    list: protectedProcedure.query(async ({ ctx }) => {
       const database = await getDb();
       if (!database) throw new Error("Database not available");
 
-      const templates = await database
+      const conditions = [];
+      if (ctx.user.groupId != null) {
+        conditions.push(
+          sql`(${taskTemplates.groupId} IS NULL OR ${taskTemplates.groupId} = ${ctx.user.groupId})`
+        );
+      }
+
+      return await database
         .select()
         .from(taskTemplates)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(taskTemplates.phase, taskTemplates.weekNumber, taskTemplates.title);
-
-      return templates;
     }),
 
     create: protectedProcedure
@@ -4199,7 +4381,7 @@ export const appRouter = router({
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
@@ -4209,6 +4391,7 @@ export const appRouter = router({
           phase: input.phase,
           context: input.context,
           weekNumber: input.weekNumber,
+          groupId: ctx.user.groupId ?? null,
         });
 
         return { success: true, id: newTemplate.insertId };
@@ -4225,7 +4408,7 @@ export const appRouter = router({
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
@@ -4271,21 +4454,28 @@ export const appRouter = router({
     // Listar templates de receitas
     listTemplates: protectedProcedure
       .input(z.object({ phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).optional() }).optional())
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
+        const groupFilter = ctx.user.groupId != null
+          ? sql`(${recipeTemplates.groupId} IS NULL OR ${recipeTemplates.groupId} = ${ctx.user.groupId})`
+          : undefined;
+
         if (input?.phase) {
+          const conditions = [eq(recipeTemplates.phase, input.phase)];
+          if (groupFilter) conditions.push(groupFilter);
           return database
             .select()
             .from(recipeTemplates)
-            .where(eq(recipeTemplates.phase, input.phase))
+            .where(and(...conditions))
             .orderBy(recipeTemplates.weekNumber, recipeTemplates.name);
         }
 
         return database
           .select()
           .from(recipeTemplates)
+          .where(groupFilter)
           .orderBy(recipeTemplates.phase, recipeTemplates.weekNumber, recipeTemplates.name);
       }),
 
@@ -4312,7 +4502,7 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
@@ -4325,6 +4515,7 @@ export const appRouter = router({
           phTarget: input.phTarget?.toString() || null,
           productsJson: JSON.stringify(input.products),
           notes: input.notes || null,
+          groupId: ctx.user.groupId ?? null,
         });
 
         return { success: true, id: newTemplate.insertId };
@@ -4358,9 +4549,10 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
 
         const [newApplication] = await database.insert(nutrientApplications).values({
           tentId: input.tentId,
@@ -4432,9 +4624,10 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
 
         const [newApplication] = await database.insert(wateringApplications).values({
           tentId: input.tentId,

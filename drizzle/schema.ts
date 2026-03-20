@@ -88,11 +88,13 @@ export type InsertTent = typeof tents.$inferInsert;
  */
 export const strains = mysqlTable("strains", {
   id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 100 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   vegaWeeks: int("vegaWeeks").default(4).notNull(),
   floraWeeks: int("floraWeeks").default(8).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
+  /** null = strain global (visível para todos); preenchido = privada do grupo */
+  groupId: int("groupId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -198,6 +200,8 @@ export const weeklyTargets = mysqlTable(
     ecMin: decimal("ecMin", { precision: 3, scale: 1 }),
     ecMax: decimal("ecMax", { precision: 3, scale: 1 }),
     notes: text("notes"),
+    /** Grupo ao qual este target pertence */
+    groupId: int("groupId"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -288,6 +292,8 @@ export const recipeTemplates = mysqlTable("recipeTemplates", {
   phTarget: decimal("phTarget", { precision: 3, scale: 1 }),
   productsJson: text("productsJson").notNull(),
   notes: text("notes"),
+  /** null = template global; preenchido = privado do grupo */
+  groupId: int("groupId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -305,6 +311,8 @@ export const taskTemplates = mysqlTable("taskTemplates", {
   weekNumber: int("weekNumber"),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
+  /** null = template global; preenchido = privado do grupo */
+  groupId: int("groupId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -490,6 +498,7 @@ export const notificationHistory = mysqlTable(
     metadata: text("metadata"), // JSON string with additional data
     isRead: boolean("isRead").default(false).notNull(),
     sentAt: timestamp("sentAt").defaultNow().notNull(),
+    groupId: int("groupId"),
   },
   (table) => ({
     typeIdx: index("typeIdx").on(table.type),
@@ -527,6 +536,8 @@ export const plants = mysqlTable(
     finishedAt: timestamp("finishedAt"),
     finishReason: text("finishReason"),
     notes: text("notes"),
+    /** Grupo ao qual a planta pertence */
+    groupId: int("groupId"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -738,6 +749,7 @@ export const fertilizationPresets = mysqlTable("fertilizationPresets", {
   weekNumber: int("weekNumber"),
   irrigationsPerWeek: decimal("irrigationsPerWeek", { precision: 10, scale: 1 }),
   calculationMode: mysqlEnum("calculationMode", ["per-irrigation", "per-week"]).notNull(),
+  groupId: int("groupId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -756,6 +768,7 @@ export const wateringPresets = mysqlTable("wateringPresets", {
   targetRunoff: decimal("targetRunoff", { precision: 10, scale: 1 }).notNull(),
   phase: mysqlEnum("phase", ["VEGA", "FLORA"]),
   weekNumber: int("weekNumber"),
+  groupId: int("groupId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
