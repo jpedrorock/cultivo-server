@@ -12,6 +12,21 @@ import {
 } from "drizzle-orm/mysql-core";
 
 /**
+ * Grupos — cada grupo tem seus próprios dados de cultivo (estufas, plantas, etc.)
+ * Usuários globais compartilham dados dentro do mesmo grupo.
+ */
+export const groups = mysqlTable("groups", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  inviteCode: varchar("inviteCode", { length: 20 }).notNull().unique(),
+  ownerId: int("ownerId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Group = typeof groups.$inferSelect;
+export type InsertGroup = typeof groups.$inferInsert;
+
+/**
  * Core user table backing auth flow.
  * Extend this file with additional tables as your product grows.
  * Columns use camelCase to match both database fields and generated types.
@@ -34,6 +49,10 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   /** Role do usuário */
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /** Grupo ao qual o usuário pertence (null = ainda não configurou) */
+  groupId: int("groupId"),
+  /** URL da foto de perfil (Google OAuth) */
+  avatarUrl: text("avatarUrl"),
   /** Timestamps */
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -55,6 +74,8 @@ export const tents = mysqlTable("tents", {
   height: int("height").notNull(),
   volume: decimal("volume", { precision: 10, scale: 3 }).notNull(),
   powerW: int("powerW"),
+  /** Grupo ao qual esta estufa pertence */
+  groupId: int("groupId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

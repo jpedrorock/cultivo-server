@@ -5,6 +5,8 @@ interface AuthUser {
   email: string;
   name: string | null;
   role: string;
+  groupId: number | null;
+  avatarUrl: string | null;
 }
 
 interface AuthState {

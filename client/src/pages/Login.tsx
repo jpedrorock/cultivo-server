@@ -59,8 +59,8 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <span className="text-3xl">🌱</span>
+          <div className="w-16 h-16 mx-auto mb-4">
+            <img src="/icon.svg" alt="Cultivo" className="w-full h-full" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Cultivo</h1>
           <p className="text-sm text-muted-foreground mt-1">Faça login para continuar</p>

@@ -275,14 +275,14 @@ export default function PlantsList() {
             <div className="flex gap-2">
               <Link href="/plants/archive">
                 <Button variant="outline">
-                  <Archive className="w-4 h-4 mr-2" />
-                  Arquivo
+                  <Archive className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Arquivo</span>
                 </Button>
               </Link>
               <Link href="/plants/new">
                 <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nova Planta
+                  <Plus className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Nova Planta</span>
                 </Button>
               </Link>
             </div>

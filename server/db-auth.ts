@@ -39,6 +39,7 @@ export async function createUser(userData: {
   lastSignedIn: Date;
   openId?: string;
   loginMethod?: string;
+  avatarUrl?: string | null;
 }): Promise<User> {
   const db = await getDb();
   if (!db) {
@@ -56,6 +57,7 @@ export async function createUser(userData: {
         lastSignedIn: userData.lastSignedIn,
         openId: userData.openId ?? null,
         loginMethod: userData.loginMethod ?? null,
+        avatarUrl: userData.avatarUrl ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as InsertUser)
@@ -145,6 +147,15 @@ export async function updateUserLastSignedIn(userId: number): Promise<void> {
     console.error('[Database] Error updating lastSignedIn:', error);
     throw error;
   }
+}
+
+/**
+ * Atualiza a URL do avatar do usuário
+ */
+export async function updateUserAvatar(userId: number, avatarUrl: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ avatarUrl, updatedAt: new Date() }).where(eq(users.id, userId));
 }
 
 /**

@@ -36,7 +36,9 @@ import {
   recipeTemplates,
   nutrientApplications,
   wateringApplications,
+  groups,
 } from "../drizzle/schema";
+import { nanoid } from "nanoid";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -72,8 +74,8 @@ export const appRouter = router({
 
   // Tents (Estufas)
   tents: router({
-    list: protectedProcedure.query(async () => {
-      return db.getAllTents();
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return db.getAllTents(ctx.user.groupId);
     }),
     getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       const database = await getDb();
@@ -118,20 +120,21 @@ export const appRouter = router({
           powerW: z.number().int().positive().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+
         // Calcular volume (em litros)
         const volume = (input.width * input.depth * input.height) / 1000;
-        
+
         const [result] = await database.insert(tents).values({
           ...input,
           volume: volume.toFixed(3),
+          groupId: ctx.user.groupId ?? null,
         });
-        
+
         return { success: true, id: result.insertId };
       }),
     update: protectedProcedure
@@ -301,53 +304,27 @@ export const appRouter = router({
         
         const cycleIds = allCycles.map((c: any) => c.id);
         
-        // Deletar registros relacionados em cascata
-        // Deletar daily logs (usa tentId diretamente)
-        await database.delete(dailyLogs).where(eq(dailyLogs.tentId, input.id));
-        
-        // Deletar task instances (usa tentId diretamente)
-        await database.delete(taskInstances).where(eq(taskInstances.tentId, input.id));
-        
-        // Deletar ciclos (weeklyTargets não precisa ser deletado pois é relacionado a strain, não a ciclo)
-        await database.delete(cycles).where(eq(cycles.tentId, input.id));
-        
-        // Deletar alert settings
-        await database.delete(alertSettings).where(eq(alertSettings.tentId, input.id));
-        
-        // Deletar alert history
-        await database.delete(alertHistory).where(eq(alertHistory.tentId, input.id));
-        
-        // Deletar alerts
-        await database.delete(alerts).where(eq(alerts.tentId, input.id));
-        
-        // Deletar tent A state (se existir)
-        await database.delete(tentAState).where(eq(tentAState.tentId, input.id));
-        
-        // Deletar cloning events
-        await database.delete(cloningEvents).where(eq(cloningEvents.tentId, input.id));
-        
-        // Deletar recipes (receitas nutricionais)
-        await database.delete(recipes).where(eq(recipes.tentId, input.id));
-        
-        // Deletar plant tent history (histórico de movimentações)
-        await database.delete(plantTentHistory).where(
-          or(
-            eq(plantTentHistory.fromTentId, input.id),
-            eq(plantTentHistory.toTentId, input.id)
-          )
-        );
-        
-        // Finalmente, deletar estufa
-        try {
-          await database.delete(tents).where(eq(tents.id, input.id));
-        } catch (error: any) {
-          // Se falhar por foreign key constraint, mostrar mensagem clara
-          if (error.message?.includes('foreign key constraint')) {
-            throw new Error("Não é possível excluir esta estufa. Verifique se há ciclos ativos ou registros relacionados. Finalize o ciclo primeiro.");
-          }
-          throw error;
-        }
-        
+        // Tudo dentro de uma transação — se qualquer delete falhar,
+        // o banco volta ao estado original automaticamente.
+        await database.transaction(async (tx) => {
+          await tx.delete(dailyLogs).where(eq(dailyLogs.tentId, input.id));
+          await tx.delete(taskInstances).where(eq(taskInstances.tentId, input.id));
+          await tx.delete(cycles).where(eq(cycles.tentId, input.id));
+          await tx.delete(alertSettings).where(eq(alertSettings.tentId, input.id));
+          await tx.delete(alertHistory).where(eq(alertHistory.tentId, input.id));
+          await tx.delete(alerts).where(eq(alerts.tentId, input.id));
+          await tx.delete(tentAState).where(eq(tentAState.tentId, input.id));
+          await tx.delete(cloningEvents).where(eq(cloningEvents.tentId, input.id));
+          await tx.delete(recipes).where(eq(recipes.tentId, input.id));
+          await tx.delete(plantTentHistory).where(
+            or(
+              eq(plantTentHistory.fromTentId, input.id),
+              eq(plantTentHistory.toTentId, input.id)
+            )
+          );
+          await tx.delete(tents).where(eq(tents.id, input.id));
+        });
+
         return { success: true };
       }),
   }),
@@ -2822,69 +2799,66 @@ export const appRouter = router({
         let query = database.select().from(plants).where(and(...conditions));
         
         const plantsList = await query as any;
-        
-        // Para cada planta, buscar última foto de saúde, status de saúde e fase do ciclo
-        const plantsWithDetails = await Promise.all(
-          plantsList.map(async (plant: any) => {
-            // Última foto de saúde
-            const [lastHealthPhoto] = await database
-              .select()
-              .from(plantHealthLogs)
-              .where(eq(plantHealthLogs.plantId, plant.id))
-              .orderBy(desc(plantHealthLogs.logDate))
-              .limit(1);
-            
-            // Último status de saúde
-            const [lastHealth] = await database
-              .select()
-              .from(plantHealthLogs)
-              .where(eq(plantHealthLogs.plantId, plant.id))
-              .orderBy(desc(plantHealthLogs.logDate))
-              .limit(1);
-            
-            // Buscar ciclo ativo da estufa
-            const [activeCycle] = await database
+
+        if (plantsList.length === 0) return [];
+
+        const plantIds = plantsList.map((p: any) => p.id);
+        const tentIds = [...new Set(plantsList.map((p: any) => p.currentTentId).filter(Boolean))] as number[];
+
+        // 1 query: último health log por planta (em vez de 2 queries duplicadas por planta)
+        const healthRows = await database
+          .select()
+          .from(plantHealthLogs)
+          .where(inArray(plantHealthLogs.plantId, plantIds))
+          .orderBy(desc(plantHealthLogs.logDate));
+
+        // Mapa: plantId → primeiro (mais recente) health log
+        const healthMap = new Map<number, any>();
+        for (const row of healthRows) {
+          if (!healthMap.has(row.plantId)) healthMap.set(row.plantId, row);
+        }
+
+        // 1 query: ciclos ativos para todas as estufas relevantes
+        const activeCycleRows = tentIds.length > 0
+          ? await database
               .select()
               .from(cycles)
-              .where(and(
-                eq(cycles.tentId, plant.currentTentId),
-                eq(cycles.status, "ACTIVE")
-              ))
-              .limit(1);
-            
-            // Calcular fase e semana do ciclo
-            let cyclePhase = null;
-            let cycleWeek = null;
-            
-            if (activeCycle) {
-              const now = new Date();
-              const startDate = new Date(activeCycle.startDate);
-              const floraStartDate = activeCycle.floraStartDate ? new Date(activeCycle.floraStartDate) : null;
-              
-              if (floraStartDate && now >= floraStartDate) {
-                // Está em FLORA
-                cyclePhase = "FLORA";
-                const daysInFlora = Math.floor((now.getTime() - floraStartDate.getTime()) / (1000 * 60 * 60 * 24));
-                cycleWeek = Math.floor(daysInFlora / 7) + 1;
-              } else {
-                // Está em VEGA
-                cyclePhase = "VEGA";
-                const daysInVega = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                cycleWeek = Math.floor(daysInVega / 7) + 1;
-              }
+              .where(and(inArray(cycles.tentId, tentIds), eq(cycles.status, "ACTIVE")))
+          : [];
+
+        // Mapa: tentId → ciclo ativo
+        const cycleMap = new Map<number, any>();
+        for (const c of activeCycleRows) cycleMap.set(c.tentId, c);
+
+        const now = new Date();
+
+        return plantsList.map((plant: any) => {
+          const lastHealth = healthMap.get(plant.id) ?? null;
+          const activeCycle = cycleMap.get(plant.currentTentId) ?? null;
+
+          let cyclePhase = null;
+          let cycleWeek = null;
+
+          if (activeCycle) {
+            const startDate = new Date(activeCycle.startDate);
+            const floraStartDate = activeCycle.floraStartDate ? new Date(activeCycle.floraStartDate) : null;
+            if (floraStartDate && now >= floraStartDate) {
+              cyclePhase = "FLORA";
+              cycleWeek = Math.floor((now.getTime() - floraStartDate.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
+            } else {
+              cyclePhase = "VEGA";
+              cycleWeek = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
             }
-            
-            return {
-              ...plant,
-              lastHealthPhotoUrl: lastHealthPhoto?.photoUrl || null,
-              lastHealthStatus: lastHealth?.healthStatus || null,
-              cyclePhase,
-              cycleWeek,
-            };
-          })
-        );
-        
-        return plantsWithDetails;
+          }
+
+          return {
+            ...plant,
+            lastHealthPhotoUrl: lastHealth?.photoUrl ?? null,
+            lastHealthStatus: lastHealth?.healthStatus ?? null,
+            cyclePhase,
+            cycleWeek,
+          };
+        });
       }),
 
     // Obter planta por ID
@@ -4585,59 +4559,7 @@ export const appRouter = router({
           throw new Error("Versão de backup não suportada");
         }
 
-        // AVISO: Esta operação limpa todos os dados existentes!
-        // Em produção, considere fazer backup antes de importar
-
-        // Deletar dados existentes (em ordem reversa de dependências)
-        // Aplicações e registros de plantas
-        await database.delete(wateringApplications);
-        await database.delete(nutrientApplications);
-        await database.delete(plantRunoffLogs);
-        await database.delete(plantTrichomeLogs);
-        await database.delete(plantLSTLogs);
-        await database.delete(plantObservations);
-        await database.delete(plantHealthLogs);
-        await database.delete(plantPhotos);
-        await database.delete(plantTentHistory);
-        
-        // Receitas e presets
-        await database.delete(recipeTemplates);
-        await database.delete(wateringPresets);
-        await database.delete(fertilizationPresets);
-        await database.delete(recipes);
-        
-        // Alertas e notificações
-        await database.delete(notificationHistory);
-        await database.delete(alertHistory);
-        await database.delete(alerts);
-        await database.delete(alertSettings);
-        
-        // Tarefas
-        await database.delete(taskInstances);
-        await database.delete(taskTemplates);
-        
-        // Registros diários e plantas
-        await database.delete(dailyLogs);
-        await database.delete(plants);
-        
-        // Eventos de clonagem
-        await database.delete(cloningEvents);
-        
-        // Estado de estufa
-        await database.delete(tentAState);
-        
-        // Ciclos
-        await database.delete(cycles);
-        
-        // Targets semanais (depende de strains)
-        await database.delete(weeklyTargets);
-        
-        // Strains e estufas
-        await database.delete(strains);
-        await database.delete(tents);
-
         // Função auxiliar: converte strings ISO de data para objetos Date
-        // O Drizzle ORM com MySQL exige objetos Date para campos timestamp
         const sanitizeDates = (rows: any[]): any[] =>
           rows.map((row) => {
             const out: Record<string, any> = {};
@@ -4652,48 +4574,55 @@ export const appRouter = router({
             return out;
           });
 
-        // Inserir dados do backup (com datas convertidas)
-        if (input.data.tents && input.data.tents.length > 0) {
-          await database.insert(tents).values(sanitizeDates(input.data.tents));
-        }
-        if (input.data.strains && input.data.strains.length > 0) {
-          await database.insert(strains).values(sanitizeDates(input.data.strains));
-        }
-        if (input.data.cycles && input.data.cycles.length > 0) {
-          await database.insert(cycles).values(sanitizeDates(input.data.cycles));
-        }
-        if (input.data.plants && input.data.plants.length > 0) {
-          await database.insert(plants).values(sanitizeDates(input.data.plants));
-        }
-        if (input.data.dailyLogs && input.data.dailyLogs.length > 0) {
-          await database.insert(dailyLogs).values(sanitizeDates(input.data.dailyLogs));
-        }
-        if (input.data.taskTemplates && input.data.taskTemplates.length > 0) {
-          await database.insert(taskTemplates).values(sanitizeDates(input.data.taskTemplates));
-        }
-        if (input.data.alertSettings && input.data.alertSettings.length > 0) {
-          await database.insert(alertSettings).values(sanitizeDates(input.data.alertSettings));
-        }
-        if (input.data.alerts && input.data.alerts.length > 0) {
-          await database.insert(alerts).values(sanitizeDates(input.data.alerts));
-        }
-        if (input.data.plantPhotos && input.data.plantPhotos.length > 0) {
-          await database.insert(plantPhotos).values(sanitizeDates(input.data.plantPhotos));
-        }
-        if (input.data.plantHealthLogs && input.data.plantHealthLogs.length > 0) {
-          await database.insert(plantHealthLogs).values(sanitizeDates(input.data.plantHealthLogs));
-        }
-        if (input.data.recipeTemplates && input.data.recipeTemplates.length > 0) {
-          await database.insert(recipeTemplates).values(sanitizeDates(input.data.recipeTemplates));
-        }
-        if (input.data.nutrientApplications && input.data.nutrientApplications.length > 0) {
-          await database.insert(nutrientApplications).values(sanitizeDates(input.data.nutrientApplications));
-        }
-        if (input.data.wateringApplications && input.data.wateringApplications.length > 0) {
-          await database.insert(wateringApplications).values(sanitizeDates(input.data.wateringApplications));
-        }
+        // Tudo dentro de uma transação: se qualquer operação falhar,
+        // o banco volta ao estado original automaticamente.
+        await database.transaction(async (tx) => {
+          // Deletar dados existentes (ordem reversa de dependências)
+          await tx.delete(wateringApplications);
+          await tx.delete(nutrientApplications);
+          await tx.delete(plantRunoffLogs);
+          await tx.delete(plantTrichomeLogs);
+          await tx.delete(plantLSTLogs);
+          await tx.delete(plantObservations);
+          await tx.delete(plantHealthLogs);
+          await tx.delete(plantPhotos);
+          await tx.delete(plantTentHistory);
+          await tx.delete(recipeTemplates);
+          await tx.delete(wateringPresets);
+          await tx.delete(fertilizationPresets);
+          await tx.delete(recipes);
+          await tx.delete(notificationHistory);
+          await tx.delete(alertHistory);
+          await tx.delete(alerts);
+          await tx.delete(alertSettings);
+          await tx.delete(taskInstances);
+          await tx.delete(taskTemplates);
+          await tx.delete(dailyLogs);
+          await tx.delete(plants);
+          await tx.delete(cloningEvents);
+          await tx.delete(tentAState);
+          await tx.delete(cycles);
+          await tx.delete(weeklyTargets);
+          await tx.delete(strains);
+          await tx.delete(tents);
 
-         return { success: true, message: "Backup restaurado com sucesso" };
+          // Inserir dados do backup (com datas convertidas)
+          if (input.data.tents?.length) await tx.insert(tents).values(sanitizeDates(input.data.tents));
+          if (input.data.strains?.length) await tx.insert(strains).values(sanitizeDates(input.data.strains));
+          if (input.data.cycles?.length) await tx.insert(cycles).values(sanitizeDates(input.data.cycles));
+          if (input.data.plants?.length) await tx.insert(plants).values(sanitizeDates(input.data.plants));
+          if (input.data.dailyLogs?.length) await tx.insert(dailyLogs).values(sanitizeDates(input.data.dailyLogs));
+          if (input.data.taskTemplates?.length) await tx.insert(taskTemplates).values(sanitizeDates(input.data.taskTemplates));
+          if (input.data.alertSettings?.length) await tx.insert(alertSettings).values(sanitizeDates(input.data.alertSettings));
+          if (input.data.alerts?.length) await tx.insert(alerts).values(sanitizeDates(input.data.alerts));
+          if (input.data.plantPhotos?.length) await tx.insert(plantPhotos).values(sanitizeDates(input.data.plantPhotos));
+          if (input.data.plantHealthLogs?.length) await tx.insert(plantHealthLogs).values(sanitizeDates(input.data.plantHealthLogs));
+          if (input.data.recipeTemplates?.length) await tx.insert(recipeTemplates).values(sanitizeDates(input.data.recipeTemplates));
+          if (input.data.nutrientApplications?.length) await tx.insert(nutrientApplications).values(sanitizeDates(input.data.nutrientApplications));
+          if (input.data.wateringApplications?.length) await tx.insert(wateringApplications).values(sanitizeDates(input.data.wateringApplications));
+        });
+
+        return { success: true, message: "Backup restaurado com sucesso" };
       }),
   }),
 
@@ -5016,6 +4945,78 @@ export const appRouter = router({
     }),
   }),
 
+  groups: router({
+    // Buscar grupo do usuário atual
+    mine: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user.groupId) return null;
+      const database = await getDb();
+      if (!database) throw new Error('Banco indisponível');
+      const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
+      if (!group) return null;
+      // Contar membros
+      const members = await database.select({ id: users.id, name: users.name, email: users.email, role: users.role })
+        .from(users).where(eq(users.groupId, ctx.user.groupId));
+      return { ...group, members, isOwner: group.ownerId === ctx.user.id };
+    }),
+
+    // Criar novo grupo
+    create: protectedProcedure
+      .input(z.object({ name: z.string().min(1).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        const inviteCode = nanoid(8).toUpperCase();
+        const [result] = await database.insert(groups).values({
+          name: input.name,
+          inviteCode,
+          ownerId: ctx.user.id,
+        });
+        const groupId = result.insertId;
+        // Atribuir usuário ao grupo
+        await database.update(users).set({ groupId }).where(eq(users.id, ctx.user.id));
+        return { success: true, groupId, inviteCode };
+      }),
+
+    // Entrar em um grupo via código de convite
+    join: protectedProcedure
+      .input(z.object({ inviteCode: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        const [group] = await database.select().from(groups)
+          .where(eq(groups.inviteCode, input.inviteCode.toUpperCase())).limit(1);
+        if (!group) throw new Error('Código de convite inválido');
+        await database.update(users).set({ groupId: group.id }).where(eq(users.id, ctx.user.id));
+        return { success: true, groupId: group.id, groupName: group.name };
+      }),
+
+    // Regenerar código de convite (só o dono)
+    regenerateCode: protectedProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user.groupId) throw new Error('Você não pertence a nenhum grupo');
+      const database = await getDb();
+      if (!database) throw new Error('Banco indisponível');
+      const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
+      if (!group || group.ownerId !== ctx.user.id) throw new Error('Apenas o dono pode regenerar o código');
+      const inviteCode = nanoid(8).toUpperCase();
+      await database.update(groups).set({ inviteCode }).where(eq(groups.id, ctx.user.groupId));
+      return { inviteCode };
+    }),
+
+    // Remover membro do grupo (só o dono)
+    removeMember: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user.groupId) throw new Error('Você não pertence a nenhum grupo');
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
+        if (!group || group.ownerId !== ctx.user.id) throw new Error('Apenas o dono pode remover membros');
+        if (input.userId === ctx.user.id) throw new Error('Não pode se remover do grupo');
+        await database.update(users).set({ groupId: null }).where(eq(users.id, input.userId));
+        return { success: true };
+      }),
+  }),
+
   profile: router({
     get: protectedProcedure.query(async ({ ctx }) => {
       const user = await getUserById(ctx.user.id);
@@ -5047,6 +5048,14 @@ export const appRouter = router({
     deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
       const database = await getDb();
       if (!database) throw new Error('Banco indisponível');
+      // Se for dono de um cultivo, dissolver o grupo (remover todos os membros)
+      if (ctx.user.groupId) {
+        const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
+        if (group && group.ownerId === ctx.user.id) {
+          await database.update(users).set({ groupId: null }).where(eq(users.groupId, ctx.user.groupId));
+          await database.delete(groups).where(eq(groups.id, ctx.user.groupId));
+        }
+      }
       await database.delete(users).where(eq(users.id, ctx.user.id));
       return { success: true };
     }),

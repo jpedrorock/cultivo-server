@@ -19,6 +19,7 @@ import TentDetails from "./pages/TentDetails";
 import QuickLog from "./pages/QuickLog";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Setup from "./pages/Setup";
 import AdminUsers from "./pages/AdminUsers";
 
 import Tarefas from "./pages/Tarefas";
@@ -28,6 +29,8 @@ import CalculatorMenu from "./pages/CalculatorMenu";
 import Alerts from "./pages/Alerts";
 import HistoryTable from "./pages/HistoryTable";
 import Settings from "./pages/Settings";
+import AccountSettings from "./pages/AccountSettings";
+import AppearanceSettings from "./pages/AppearanceSettings";
 import Backup from "./pages/Backup";
 import StrainTargets from "./pages/StrainTargets";
 
@@ -61,6 +64,8 @@ function Router() {
       <Route path={"/alerts"} component={Alerts} />
       <Route path={"/history"} component={HistoryTable} />
       <Route path={"/settings"} component={Settings} />
+      <Route path={"/settings/account"} component={AccountSettings} />
+      <Route path={"/settings/appearance"} component={AppearanceSettings} />
       <Route path={"/settings/backup"} component={Backup} />
       <Route path={"/settings/notifications"} component={NotificationSettings} />
       <Route path={"/settings/alerts"} component={AlertSettings} />
@@ -86,17 +91,21 @@ function Router() {
 }
 
 function AuthenticatedApp() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const [, setLocation] = useLocation();
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem('hasSeenSplash');
   });
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      setLocation('/login');
+    if (!loading) {
+      if (!isAuthenticated) {
+        setLocation('/login');
+      } else if (user && user.groupId === null) {
+        setLocation('/setup');
+      }
     }
-  }, [loading, isAuthenticated, setLocation]);
+  }, [loading, isAuthenticated, user, setLocation]);
 
   if (loading) {
     return (
@@ -106,7 +115,7 @@ function AuthenticatedApp() {
     );
   }
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated || !user?.groupId) return null;
 
   return (
     <>
@@ -146,6 +155,7 @@ function App() {
           <Switch>
             <Route path="/login" component={Login} />
             <Route path="/register" component={Register} />
+            <Route path="/setup" component={Setup} />
             <Route>
               <AuthenticatedApp />
             </Route>

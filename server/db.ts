@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, isNotNull, or } from "drizzle-orm";
+import { eq, and, desc, sql, isNotNull, or, inArray, max, count } from "drizzle-orm";
 import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import {
@@ -140,69 +140,91 @@ export async function getUserByOpenId(openId: string) {
   }
 }
 
-export async function getAllTents(): Promise<(Tent & { plantCount: number; seedlingCount: number; lastReadingAt: number | null; lastCloningAt: number | null; lastCloningCount: number | null })[]> {
+export async function getAllTents(groupId?: number | null): Promise<(Tent & { plantCount: number; seedlingCount: number; lastReadingAt: number | null; lastCloningAt: number | null; lastCloningCount: number | null })[]> {
   const db = await getDb();
   if (!db) return [];
-  
-  const allTents = await db.select().from(tents).orderBy(tents.id);
-  
-  // Para cada estufa, contar plantas e mudas ativas separadamente + buscar última leitura
-  const tentsWithPlantCount = await Promise.all(
-    allTents.map(async (tent: Tent) => {
-      const plantsList = await db
-        .select()
-        .from(plants)
-        .where(and(eq(plants.currentTentId, tent.id), eq(plants.status, 'ACTIVE')));
-      
-      const plantsOnly = plantsList.filter((p: any) => p.plantStage === 'PLANT');
-      const seedlingsOnly = plantsList.filter((p: any) => p.plantStage === 'SEEDLING');
-      
-      // Buscar último registro (daily log) desta estufa
-      const lastLog = await db
-        .select()
-        .from(dailyLogs)
-        .where(eq(dailyLogs.tentId, tent.id))
-        .orderBy(desc(dailyLogs.logDate))
-        .limit(1);
 
-      // Para estufas de manutenção, buscar último evento de clonagem e último ciclo com clonesProduced
-      let lastCloningAt: number | null = null;
-      let lastCloningCount: number | null = null;
-      if (tent.category === 'MAINTENANCE') {
-        // lastCloningAt: data do último cloningEvent (quando a estufa foi para clonagem)
-        const lastCloningEvent = await db
-          .select()
-          .from(cloningEvents)
-          .where(eq(cloningEvents.tentId, tent.id))
-          .orderBy(desc(cloningEvents.startDate))
-          .limit(1);
-        if (lastCloningEvent[0]) {
-          lastCloningAt = new Date(lastCloningEvent[0].startDate).getTime();
-        }
-        // lastCloningCount: número de clones produzidos no último ciclo com clonesProduced
-        const lastCycleWithClones = await db
-          .select({ clonesProduced: cycles.clonesProduced })
-          .from(cycles)
-          .where(and(eq(cycles.tentId, tent.id), isNotNull(cycles.clonesProduced)))
-          .orderBy(desc(cycles.createdAt))
-          .limit(1);
-        if (lastCycleWithClones[0]) {
-          lastCloningCount = lastCycleWithClones[0].clonesProduced ?? null;
-        }
-      }
-      
-      return {
-        ...tent,
-        plantCount: plantsOnly.length,
-        seedlingCount: seedlingsOnly.length,
-        lastReadingAt: lastLog[0]?.logDate ? new Date(lastLog[0].logDate).getTime() : null,
-        lastCloningAt,
-        lastCloningCount,
-      };
+  const allTents = groupId != null
+    ? await db.select().from(tents).where(eq(tents.groupId, groupId)).orderBy(tents.id)
+    : await db.select().from(tents).orderBy(tents.id);
+
+  if (allTents.length === 0) return [];
+
+  const tentIds = allTents.map((t: Tent) => t.id);
+
+  // 1 query: contar plantas ativas por estufa e fase (PLANT/SEEDLING)
+  const plantCountRows = await db
+    .select({
+      currentTentId: plants.currentTentId,
+      plantStage: plants.plantStage,
+      total: count(),
     })
-  );
-  
-  return tentsWithPlantCount;
+    .from(plants)
+    .where(and(inArray(plants.currentTentId, tentIds), eq(plants.status, 'ACTIVE')))
+    .groupBy(plants.currentTentId, plants.plantStage);
+
+  // 1 query: último daily log por estufa
+  const lastLogRows = await db
+    .select({ tentId: dailyLogs.tentId, lastDate: max(dailyLogs.logDate) })
+    .from(dailyLogs)
+    .where(inArray(dailyLogs.tentId, tentIds))
+    .groupBy(dailyLogs.tentId);
+
+  // Para estufas de manutenção: 1 query cada
+  const maintenanceIds = allTents.filter((t: Tent) => t.category === 'MAINTENANCE').map((t: Tent) => t.id);
+
+  const lastCloningRows = maintenanceIds.length > 0
+    ? await db
+        .select({ tentId: cloningEvents.tentId, lastDate: max(cloningEvents.startDate) })
+        .from(cloningEvents)
+        .where(inArray(cloningEvents.tentId, maintenanceIds))
+        .groupBy(cloningEvents.tentId)
+    : [];
+
+  const lastClonesRows = maintenanceIds.length > 0
+    ? await db
+        .select({ tentId: cycles.tentId, clonesProduced: cycles.clonesProduced, createdAt: cycles.createdAt })
+        .from(cycles)
+        .where(and(inArray(cycles.tentId, maintenanceIds), isNotNull(cycles.clonesProduced)))
+        .orderBy(desc(cycles.createdAt))
+    : [];
+
+  // Montar mapas para lookup O(1)
+  const plantCountMap = new Map<number, { plants: number; seedlings: number }>();
+  for (const row of plantCountRows) {
+    const id = row.currentTentId!;
+    if (!plantCountMap.has(id)) plantCountMap.set(id, { plants: 0, seedlings: 0 });
+    const entry = plantCountMap.get(id)!;
+    if (row.plantStage === 'PLANT') entry.plants = Number(row.total);
+    else if (row.plantStage === 'SEEDLING') entry.seedlings = Number(row.total);
+  }
+
+  const lastLogMap = new Map<number, number | null>();
+  for (const row of lastLogRows) {
+    lastLogMap.set(row.tentId!, row.lastDate ? new Date(row.lastDate).getTime() : null);
+  }
+
+  const lastCloningMap = new Map<number, number | null>();
+  for (const row of lastCloningRows) {
+    lastCloningMap.set(row.tentId!, row.lastDate ? new Date(row.lastDate).getTime() : null);
+  }
+
+  // Primeiro por tentId (já ordenado por desc createdAt)
+  const lastClonesMap = new Map<number, number | null>();
+  for (const row of lastClonesRows) {
+    if (!lastClonesMap.has(row.tentId!) && row.clonesProduced != null) {
+      lastClonesMap.set(row.tentId!, row.clonesProduced);
+    }
+  }
+
+  return allTents.map((tent: Tent) => ({
+    ...tent,
+    plantCount: plantCountMap.get(tent.id)?.plants ?? 0,
+    seedlingCount: plantCountMap.get(tent.id)?.seedlings ?? 0,
+    lastReadingAt: lastLogMap.get(tent.id) ?? null,
+    lastCloningAt: lastCloningMap.get(tent.id) ?? null,
+    lastCloningCount: lastClonesMap.get(tent.id) ?? null,
+  }));
 }
 
 export async function getTentById(id: number): Promise<Tent | undefined> {

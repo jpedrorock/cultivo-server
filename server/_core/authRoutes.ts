@@ -4,6 +4,7 @@ import {
   getUserByOpenId,
   createUser,
   updateUserLastSignedIn,
+  updateUserAvatar,
 } from '../db-auth';
 import {
   hashPassword,
@@ -127,7 +128,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({
         success: true,
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: { id: user.id, email: user.email, name: user.name, role: user.role, groupId: user.groupId ?? null, avatarUrl: user.avatarUrl ?? null },
       });
     } catch (error) {
       console.error('[Auth] Me failed', error);
@@ -234,8 +235,15 @@ export function registerAuthRoutes(app: Express) {
             lastSignedIn: new Date(),
             openId: googleUser.id,
             loginMethod: 'google',
+            avatarUrl: googleUser.picture ?? null,
           });
         }
+      }
+
+      // Atualizar foto de perfil se mudou
+      if (googleUser.picture && user.avatarUrl !== googleUser.picture) {
+        await updateUserAvatar(user.id, googleUser.picture);
+        user = { ...user, avatarUrl: googleUser.picture };
       }
 
       await updateUserLastSignedIn(user.id);

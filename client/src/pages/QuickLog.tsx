@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X } from "lucide-react";
-import { ConflictFreeSlider } from "@/components/ConflictFreeSlider";
+import { RangeSlider } from "@/components/ui/range-slider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
@@ -550,7 +550,7 @@ export default function QuickLog() {
 
             {/* Step 5: pH */}
             {currentStep === 5 && (
-              <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
+              <div className="space-y-6 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <div className="flex items-center justify-center gap-4">
                   <Input
                     type="number"
@@ -570,6 +570,22 @@ export default function QuickLog() {
                     }`}
                   />
                   <span className="text-4xl font-bold text-muted-foreground">pH</span>
+                </div>
+                <div className="pt-4 pb-2">
+                  <RangeSlider
+                    min={0}
+                    max={14}
+                    step={0.1}
+                    value={parseFloat(ph) || 7}
+                    onChange={(v) => setPh(v.toFixed(1))}
+                    trackGradient="linear-gradient(to right, #dc2626 0%, #f97316 28.5%, #eab308 42.8%, #22c55e 50%, #3b82f6 64.2%, #8b5cf6 100%)"
+                    formatTooltip={(v) => `pH ${v.toFixed(1)}`}
+                    labels={[
+                      { position: 0, label: "0", sublabel: "Ácido", color: "#dc2626" },
+                      { position: 50, label: "7", sublabel: "Neutro", color: "#22c55e" },
+                      { position: 100, label: "14", sublabel: "Alcalino", color: "#8b5cf6" },
+                    ]}
+                  />
                 </div>
               </div>
             )}
@@ -664,39 +680,84 @@ export default function QuickLog() {
                 </div>
 
                 {/* Light Intensity Slider */}
-                <div className="space-y-4">
-                  {lightUnit === "ppfd" ? (
-                    <ConflictFreeSlider
-                      value={ppfd}
-                      onChange={(val) => setPpfd(val)}
-                      min={0}
-                      max={1500}
-                      step={10}
-                      unit="μmol/m²/s"
-                      showValue={true}
-                      className="-mx-4"
-                    />
-                  ) : (
-                    <>
-                      <ConflictFreeSlider
+                {lightUnit === "ppfd" ? (
+                  <div className="space-y-4 pt-4">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        step={10}
+                        min={0}
+                        max={1200}
+                        value={ppfd || ""}
+                        onChange={(e) => {
+                          const val = Math.min(1200, Math.max(0, parseInt(e.target.value) || 0));
+                          setPpfd(val);
+                        }}
+                        placeholder="600"
+                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                          ppfd > 0
+                            ? 'border-amber-500 ring-2 ring-amber-500/20'
+                            : 'border-border focus:ring-4 focus:ring-amber-500/10'
+                        }`}
+                      />
+                      <span className="text-sm font-bold text-muted-foreground whitespace-nowrap">μmol/m²/s</span>
+                    </div>
+                    <div className="pb-2">
+                      <RangeSlider
+                        min={0}
+                        max={1200}
+                        step={10}
+                        value={ppfd}
+                        onChange={(val) => setPpfd(val)}
+                        trackGradient="linear-gradient(to right, #3b82f6 0%, #10b981 33%, #eab308 66%, #ef4444 100%)"
+                        formatTooltip={(v) => `${v} μmol/m²/s`}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 pt-4">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        step={1000}
+                        min={0}
+                        max={100000}
+                        value={luxValue || ""}
+                        onChange={(e) => {
+                          const val = Math.min(100000, Math.max(0, parseInt(e.target.value) || 0));
+                          setLuxValue(val);
+                          setPpfd(Math.round(val * 0.0185));
+                        }}
+                        placeholder="35000"
+                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                          luxValue > 0
+                            ? 'border-amber-500 ring-2 ring-amber-500/20'
+                            : 'border-border focus:ring-4 focus:ring-amber-500/10'
+                        }`}
+                      />
+                      <span className="text-sm font-bold text-muted-foreground">lux</span>
+                    </div>
+                    <div className="pb-2">
+                      <RangeSlider
+                        min={0}
+                        max={100000}
+                        step={1000}
                         value={luxValue}
                         onChange={(val) => {
                           setLuxValue(val);
                           setPpfd(Math.round(val * 0.0185));
                         }}
-                        min={0}
-                        max={80000}
-                        step={500}
-                        unit="Lux"
-                        showValue={true}
-                        className="-mx-4"
+                        trackGradient="linear-gradient(to right, #3b82f6 0%, #10b981 33%, #eab308 66%, #ef4444 100%)"
+                        formatTooltip={(v) => `${(v / 1000).toFixed(0)}k lux`}
                       />
-                      {luxValue > 0 && (
-                        <div className="text-xs text-muted-foreground text-center mt-2">≈ {Math.round(luxValue * 0.0185)} μmol/m²/s</div>
-                      )}
-                    </>
-                  )}
-                </div>
+                    </div>
+                    {luxValue > 0 && (
+                      <p className="text-xs text-muted-foreground text-center">≈ {Math.round(luxValue * 0.0185)} μmol/m²/s</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -957,7 +1018,7 @@ export default function QuickLog() {
               handleSaveDailyLog();
             }}
             disabled={saveDailyLogMutation.isPending}
-            className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+            className="flex-1 h-14 text-sm font-medium rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
           >
             {saveDailyLogMutation.isPending ? (
               <>
