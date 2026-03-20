@@ -16,18 +16,15 @@ export default function PendingApproval() {
           <Clock className="w-8 h-8 text-amber-600" />
         </div>
 
-        <h1 className="text-2xl font-bold text-foreground mb-2">Aguardando aprovação</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-2">Acesso pendente</h1>
         <p className="text-muted-foreground text-sm leading-relaxed mb-8">
-          Sua conta foi criada com sucesso! Um administrador precisa aprovar o seu acesso antes que você possa entrar no app.
+          Sua conta ainda está aguardando liberação pelo administrador.
+          Assim que aprovado, você consegue entrar normalmente.
         </p>
-
-        <div className="px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm mb-8">
-          Assim que aprovado, faça login normalmente com suas credenciais.
-        </div>
 
         <button
           onClick={handleLogout}
-          className="text-sm text-muted-foreground hover:text-foreground underline"
+          className="w-full py-3 rounded-xl border-2 border-border text-foreground font-medium hover:bg-muted transition-colors"
         >
           Voltar para o login
         </button>

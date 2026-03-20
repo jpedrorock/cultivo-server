@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { CheckCircle, Clock } from 'lucide-react';
 import { useAuth } from '@/_core/hooks/useAuth';
 
 export default function Register() {
@@ -8,6 +9,8 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [registeredName, setRegisteredName] = useState('');
   const [, setLocation] = useLocation();
   const { isAuthenticated, loading: authLoading, refresh } = useAuth();
 
@@ -35,7 +38,8 @@ export default function Register() {
       const data = await res.json();
       if (res.ok) {
         if (data.pending) {
-          setLocation('/pending-approval');
+          setRegisteredName(name || email);
+          setPending(true);
         } else {
           await refresh();
           setLocation('/');
@@ -51,6 +55,46 @@ export default function Register() {
   };
 
   if (authLoading) return null;
+
+  // Tela de confirmação — conta criada, aguardando aprovação
+  if (pending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-emerald-100 flex items-center justify-center">
+            <CheckCircle className="w-8 h-8 text-emerald-600" />
+          </div>
+
+          <h1 className="text-2xl font-bold text-foreground mb-2">Conta criada!</h1>
+          <p className="text-muted-foreground text-sm mb-8">
+            Olá{registeredName ? `, ${registeredName.split(' ')[0]}` : ''}! Seu cadastro foi recebido com sucesso.
+          </p>
+
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-5 text-left mb-6">
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-400 mb-1">
+                  Aguardando aprovação do admin
+                </p>
+                <p className="text-sm text-amber-700 dark:text-amber-500 leading-relaxed">
+                  O administrador precisa liberar o seu acesso antes de você entrar no app.
+                  Assim que aprovado, faça login normalmente com seu email e senha.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setLocation('/login')}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold hover:opacity-90 transition-opacity"
+          >
+            Ir para o login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
