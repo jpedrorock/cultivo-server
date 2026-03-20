@@ -341,7 +341,7 @@ export default function QuickLog() {
             <X className="w-5 h-5" />
           </button>
           {/* Step content */}
-          <div className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out]">
+          <div className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="min-h-full flex flex-col justify-center p-6 space-y-6">
             {/* Icon */}
             {currentStep < 9 && currentStepData && (
@@ -446,10 +446,10 @@ export default function QuickLog() {
                       setTempC(newValue);
                     }}
                     placeholder="25"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                       tempC
                         ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border focus:ring-4 focus:ring-orange-500/10'
+                        : 'border-border'
                     }`}
                   />
                   <span className="text-4xl font-bold text-muted-foreground">°C</span>
@@ -472,10 +472,10 @@ export default function QuickLog() {
                       setRhPct(newValue);
                     }}
                     placeholder="60"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                       rhPct
                         ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border focus:ring-4 focus:ring-blue-500/10'
+                        : 'border-border'
                     }`}
                   />
                   <span className="text-4xl font-bold text-muted-foreground">%</span>
