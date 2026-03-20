@@ -55,6 +55,7 @@ const TABLES_DROP_ORDER = [
   "strains",
   "tents",
   "users",
+  "groups",
   "recipeTemplates",
   "fertilizationPresets",
   "wateringPresets",

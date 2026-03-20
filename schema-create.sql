@@ -16,7 +16,18 @@
 SET FOREIGN_KEY_CHECKS=0;
 
 -- ============================================================
--- 1. USERS
+-- 1. GROUPS (Cultivos / grupos de usuários)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `groups` (
+  `id`         INT AUTO_INCREMENT PRIMARY KEY,
+  `name`       VARCHAR(100) NOT NULL,
+  `inviteCode` VARCHAR(20) NOT NULL UNIQUE,
+  `ownerId`    INT NOT NULL,
+  `createdAt`  TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 2. USERS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `users` (
   `id`           INT AUTO_INCREMENT PRIMARY KEY,
