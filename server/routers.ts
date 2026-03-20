@@ -1,6 +1,6 @@
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
-import { getUserById, updateUserProfile, updateUserPassword, getUserByEmail } from "./db-auth";
+import { getUserById, updateUserProfile, updateUserPassword, getUserByEmail, approveUser, revokeUser, getPendingUsers } from "./db-auth";
 import { hashPassword, comparePassword } from "./_core/auth";
 import { users } from "../drizzle/schema";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
@@ -5275,11 +5275,30 @@ export const appRouter = router({
       const database = await getDb();
       if (!database) throw new Error('Banco indisponível');
       const result = await database
-        .select({ id: users.id, email: users.email, name: users.name, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
+        .select({ id: users.id, email: users.email, name: users.name, role: users.role, approved: users.approved, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
         .from(users)
         .orderBy(users.createdAt);
       return result;
     }),
+
+    listPendingUsers: adminProcedure.query(async () => {
+      return getPendingUsers();
+    }),
+
+    approveUser: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ input }) => {
+        await approveUser(input.userId);
+        return { success: true };
+      }),
+
+    revokeUser: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.userId === ctx.user.id) throw new Error('Não pode revogar o próprio acesso');
+        await revokeUser(input.userId);
+        return { success: true };
+      }),
 
     deleteUser: adminProcedure
       .input(z.object({ userId: z.number() }))

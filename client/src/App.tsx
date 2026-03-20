@@ -45,6 +45,7 @@ const NewPlant             = lazy(() => import("./pages/NewPlant"));
 const PlantArchivePage     = lazy(() => import("./pages/PlantArchivePage"));
 const HarvestQueue         = lazy(() => import("./pages/HarvestQueue"));
 const Nutrients            = lazy(() => import("./pages/Nutrients"));
+const PendingApproval      = lazy(() => import("./pages/PendingApproval"));
 
 // Spinner minimalista usado durante carregamento lazy
 function PageLoader() {
@@ -109,6 +110,8 @@ function AuthenticatedApp() {
     if (!loading) {
       if (!isAuthenticated) {
         setLocation('/login');
+      } else if (user && user.approved === false) {
+        setLocation('/pending-approval');
       } else if (user && user.groupId === null) {
         setLocation('/setup');
       }
@@ -123,7 +126,7 @@ function AuthenticatedApp() {
     );
   }
 
-  if (!isAuthenticated || !user?.groupId) return null;
+  if (!isAuthenticated || !user?.approved || !user?.groupId) return null;
 
   return (
     <>
@@ -164,6 +167,11 @@ function App() {
             <Route path="/login" component={Login} />
             <Route path="/register" component={Register} />
             <Route path="/setup" component={Setup} />
+            <Route path="/pending-approval">
+              <Suspense fallback={<PageLoader />}>
+                <PendingApproval />
+              </Suspense>
+            </Route>
             <Route>
               <AuthenticatedApp />
             </Route>

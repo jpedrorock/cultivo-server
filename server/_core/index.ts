@@ -55,6 +55,31 @@ async function ensurePushSubscriptionsTable() {
   }
 }
 
+async function ensureUsersApprovedColumn() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+
+    const [rows]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+    );
+    const existingCols = rows.map((r: any) => r.COLUMN_NAME);
+
+    if (!existingCols.includes('approved')) {
+      // Adicionar coluna — usuários existentes recebem approved=TRUE para não perder acesso
+      await conn.execute(`ALTER TABLE \`users\` ADD COLUMN \`approved\` TINYINT(1) NOT NULL DEFAULT 1`);
+      console.log("[DB] Coluna approved adicionada à tabela users (existentes aprovados automaticamente)");
+    }
+
+    await conn.end();
+  } catch (err: any) {
+    console.warn("[DB] Erro ao migrar users.approved:", err?.message);
+  }
+}
+
 async function ensureNotificationSettingsColumns() {
   try {
     const connectionString = process.env.DATABASE_URL;
@@ -91,6 +116,9 @@ async function startServer() {
 
   // Garantir que a tabela pushSubscriptions existe (migration incremental)
   await ensurePushSubscriptionsTable();
+
+  // Garantir que a coluna approved existe na tabela users
+  await ensureUsersApprovedColumn();
 
   // Garantir que as colunas de lembrete diário existem na tabela notificationSettings
   await ensureNotificationSettingsColumns();

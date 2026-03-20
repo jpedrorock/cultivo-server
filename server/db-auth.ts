@@ -3,7 +3,7 @@
  * Este arquivo contém as funções necessárias para o novo sistema de autenticação JWT
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { InsertUser, User } from '../drizzle/schema';
 import { users } from '../drizzle/schema';
 import { getDb } from './db';
@@ -31,11 +31,49 @@ export async function getUserByOpenId(openId: string): Promise<User | null> {
 /**
  * Cria um novo usuário
  */
+/**
+ * Conta quantos usuários existem no sistema
+ */
+export async function countUsers(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(users);
+  return Number(result[0]?.count ?? 0);
+}
+
+/**
+ * Aprova um usuário
+ */
+export async function approveUser(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.update(users).set({ approved: true, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+/**
+ * Remove a aprovação de um usuário (rejeitar/revogar acesso)
+ */
+export async function revokeUser(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+  await db.update(users).set({ approved: false, updatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+/**
+ * Lista usuários aguardando aprovação
+ */
+export async function getPendingUsers(): Promise<User[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(users).where(eq(users.approved, false));
+}
+
 export async function createUser(userData: {
   email: string;
   passwordHash?: string;
   name: string | null;
   role: 'user' | 'admin';
+  approved: boolean;
   lastSignedIn: Date;
   openId?: string;
   loginMethod?: string;
@@ -54,6 +92,7 @@ export async function createUser(userData: {
         passwordHash: userData.passwordHash ?? '',
         name: userData.name,
         role: userData.role,
+        approved: userData.approved,
         lastSignedIn: userData.lastSignedIn,
         openId: userData.openId ?? null,
         loginMethod: userData.loginMethod ?? null,

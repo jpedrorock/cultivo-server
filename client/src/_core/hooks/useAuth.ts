@@ -7,6 +7,7 @@ interface AuthUser {
   role: string;
   groupId: number | null;
   avatarUrl: string | null;
+  approved: boolean;
 }
 
 interface AuthState {

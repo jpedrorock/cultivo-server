@@ -42,6 +42,8 @@ export default function Login() {
       if (res.ok) {
         await refresh();
         setLocation('/');
+      } else if (data.code === 'PENDING_APPROVAL') {
+        setLocation('/pending-approval');
       } else {
         setError(data.error || 'Email ou senha incorretos');
       }

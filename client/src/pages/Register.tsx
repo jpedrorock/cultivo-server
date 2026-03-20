@@ -34,8 +34,12 @@ export default function Register() {
       });
       const data = await res.json();
       if (res.ok) {
-        await refresh();
-        setLocation('/');
+        if (data.pending) {
+          setLocation('/pending-approval');
+        } else {
+          await refresh();
+          setLocation('/');
+        }
       } else {
         setError(data.error || 'Erro ao criar conta');
       }

@@ -53,6 +53,8 @@ export const users = mysqlTable("users", {
   groupId: int("groupId"),
   /** URL da foto de perfil (Google OAuth) */
   avatarUrl: text("avatarUrl"),
+  /** Se o usuário foi aprovado por um admin (false = aguardando aprovação) */
+  approved: boolean("approved").default(false).notNull(),
   /** Timestamps */
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

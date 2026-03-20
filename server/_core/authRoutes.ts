@@ -5,6 +5,7 @@ import {
   createUser,
   updateUserLastSignedIn,
   updateUserAvatar,
+  countUsers,
 } from '../db-auth';
 import {
   hashPassword,
@@ -51,19 +52,35 @@ export function registerAuthRoutes(app: Express) {
 
       const passwordHash = await hashPassword(password);
 
+      // Primeiro usuário → admin aprovado automaticamente; demais aguardam aprovação
+      const total = await countUsers();
+      const isFirst = total === 0;
+
       const user = await createUser({
         email,
         passwordHash,
         name: name || null,
-        role: 'user',
+        role: isFirst ? 'admin' : 'user',
+        approved: isFirst,
         lastSignedIn: new Date(),
       });
+
+      if (!isFirst) {
+        // Usuário aguardando aprovação — não faz login ainda
+        res.status(201).json({
+          success: true,
+          pending: true,
+          message: 'Conta criada! Aguarde aprovação de um administrador.',
+        });
+        return;
+      }
 
       const token = createToken(user.id, user.email);
       setAuthCookie(res, token);
 
       res.status(201).json({
         success: true,
+        pending: false,
         user: { id: user.id, email: user.email, name: user.name, role: user.role },
         token,
       });
@@ -98,6 +115,11 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
+      if (!user.approved) {
+        res.status(403).json({ error: 'Sua conta ainda não foi aprovada por um administrador.', code: 'PENDING_APPROVAL' });
+        return;
+      }
+
       await updateUserLastSignedIn(user.id);
 
       const token = createToken(user.id, user.email);
@@ -128,7 +150,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({
         success: true,
-        user: { id: user.id, email: user.email, name: user.name, role: user.role, groupId: user.groupId ?? null, avatarUrl: user.avatarUrl ?? null },
+        user: { id: user.id, email: user.email, name: user.name, role: user.role, groupId: user.groupId ?? null, avatarUrl: user.avatarUrl ?? null, approved: user.approved },
       });
     } catch (error) {
       console.error('[Auth] Me failed', error);
@@ -227,17 +249,26 @@ export function registerAuthRoutes(app: Express) {
         // Verificar se já existe conta com o mesmo email
         user = await getUserByEmail(googleUser.email);
         if (!user) {
-          // Criar novo usuário
+          // Primeiro usuário → admin aprovado; demais aguardam aprovação
+          const total = await countUsers();
+          const isFirst = total === 0;
           user = await createUser({
             email: googleUser.email,
             name: googleUser.name ?? null,
-            role: 'user',
+            role: isFirst ? 'admin' : 'user',
+            approved: isFirst,
             lastSignedIn: new Date(),
             openId: googleUser.id,
             loginMethod: 'google',
             avatarUrl: googleUser.picture ?? null,
           });
         }
+      }
+
+      // Bloquear login de usuários não aprovados
+      if (!user.approved) {
+        res.redirect('/pending-approval');
+        return;
       }
 
       // Atualizar foto de perfil se mudou
