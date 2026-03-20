@@ -12,17 +12,19 @@ import { SplashScreen } from "./components/SplashScreen";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 
-// Rotas críticas — carregadas imediatamente
+import { prefetchRoutes } from "./lib/prefetchRoutes";
+
+// Rotas críticas — carregadas imediatamente (sem lazy)
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Setup from "./pages/Setup";
 import NotFound from "./pages/NotFound";
+import QuickLog from "./pages/QuickLog"; // usado direto na nav inferior
 
-// Rotas secundárias — carregadas sob demanda
+// Rotas secundárias — carregadas sob demanda (e prefetchadas em background)
 const TentLog              = lazy(() => import("./pages/TentLog"));
 const TentDetails          = lazy(() => import("./pages/TentDetails"));
-const QuickLog             = lazy(() => import("./pages/QuickLog"));
 const AdminUsers           = lazy(() => import("./pages/AdminUsers"));
 const Help                 = lazy(() => import("./pages/Help"));
 const Tarefas              = lazy(() => import("./pages/Tarefas"));
@@ -46,6 +48,7 @@ const PlantArchivePage     = lazy(() => import("./pages/PlantArchivePage"));
 const HarvestQueue         = lazy(() => import("./pages/HarvestQueue"));
 const Nutrients            = lazy(() => import("./pages/Nutrients"));
 const PendingApproval      = lazy(() => import("./pages/PendingApproval"));
+// QuickLog removido daqui — agora é eager (import estático acima)
 
 // Spinner minimalista usado durante carregamento lazy
 function PageLoader() {
@@ -114,6 +117,9 @@ function AuthenticatedApp() {
         setLocation('/pending-approval');
       } else if (user && user.groupId === null) {
         setLocation('/setup');
+      } else if (isAuthenticated) {
+        // Usuário autenticado e no app — precarregar outras páginas em background
+        prefetchRoutes();
       }
     }
   }, [loading, isAuthenticated, user, setLocation]);
