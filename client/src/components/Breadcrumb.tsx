@@ -20,10 +20,8 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
           return (
             <li key={index} className="flex items-center gap-2">
               {item.href && !isLast ? (
-                <Link href={item.href}>
-                  <a className="hover:text-foreground transition-colors">
-                    {item.label}
-                  </a>
+                <Link href={item.href} className="hover:text-foreground transition-colors">
+                  {item.label}
                 </Link>
               ) : (
                 <span className={isLast ? "text-foreground font-medium" : ""}>
