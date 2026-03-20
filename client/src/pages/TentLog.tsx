@@ -214,7 +214,7 @@ export default function TentLog() {
 
   const getPhaseInfo = () => {
     if (!cycle) {
-      return { phase: "Inativo", color: "bg-muted0" };
+      return { phase: "Inativo", color: "bg-muted" };
     }
 
     if (tent.category === "MAINTENANCE") {

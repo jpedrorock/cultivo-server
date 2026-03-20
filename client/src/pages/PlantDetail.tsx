@@ -53,6 +53,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 import { PressButton } from "@/components/PressButton";
 import { PressDropdownMenuItem } from "@/components/PressDropdownMenuItem";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 export default function PlantDetail() {
   const [, params] = useRoute("/plants/:id");
@@ -612,49 +613,21 @@ export default function PlantDetail() {
       </Dialog>
 
       {/* Delete Confirm Dialog */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              Excluir Planta
-            </DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir permanentemente{" "}
-              <span className="font-semibold text-foreground">{plant.name}</span>?
-              Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
-              Use apenas para plantas cadastradas por engano.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <PressButton
-              variant="outline"
-              onClick={() => setDeleteConfirmOpen(false)}
-              disabled={deleteMutation.isPending}
-            >
-              Cancelar
-            </PressButton>
-            <PressButton
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteMutation.isPending}
-              pressIntensity="strong"
-            >
-              {deleteMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir Permanentemente
-                </>
-              )}
-            </PressButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Excluir Planta"
+        description={
+          <>
+            Tem certeza que deseja excluir permanentemente{" "}
+            <span className="font-semibold text-foreground">{plant.name}</span>?
+            Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
+            Use apenas para plantas cadastradas por engano.
+          </>
+        }
+        onConfirm={confirmDelete}
+        isPending={deleteMutation.isPending}
+      />
 
       {/* Transplant Confirm Dialog */}
       <Dialog open={transplantConfirmOpen} onOpenChange={setTransplantConfirmOpen}>

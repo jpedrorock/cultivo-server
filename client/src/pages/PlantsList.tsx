@@ -25,6 +25,7 @@ import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
 import { useLocation } from "wouter";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { LazyImage } from "@/components/LazyImage";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 export default function PlantsList() {
   const [, navigate] = useLocation();
@@ -833,51 +834,24 @@ export default function PlantsList() {
       </Dialog>
 
       {/* Delete Plant Confirm Dialog */}
-      <Dialog open={deletePlantDialog.open} onOpenChange={(open) => setDeletePlantDialog({ open })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-5 h-5" />
-              Excluir Planta
-            </DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir permanentemente{" "}
-              <span className="font-semibold text-foreground">{deletePlantDialog.plant?.name}</span>?
-              Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setDeletePlantDialog({ open: false })}
-              disabled={deletePlant.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deletePlantDialog.plant) {
-                  deletePlant.mutate({ plantId: deletePlantDialog.plant.id });
-                }
-              }}
-              disabled={deletePlant.isPending}
-            >
-              {deletePlant.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir Permanentemente
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmDialog
+        open={deletePlantDialog.open}
+        onOpenChange={(open) => setDeletePlantDialog({ open })}
+        title="Excluir Planta"
+        description={
+          <>
+            Tem certeza que deseja excluir permanentemente{" "}
+            <span className="font-semibold text-foreground">{deletePlantDialog.plant?.name}</span>?
+            Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
+          </>
+        }
+        onConfirm={() => {
+          if (deletePlantDialog.plant) {
+            deletePlant.mutate({ plantId: deletePlantDialog.plant.id });
+          }
+        }}
+        isPending={deletePlant.isPending}
+      />
 
       {/* Bulk Promote Confirm Dialog */}
       <Dialog open={bulkPromoteConfirm} onOpenChange={setBulkPromoteConfirm}>
