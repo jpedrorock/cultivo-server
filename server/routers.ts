@@ -4764,14 +4764,18 @@ export const appRouter = router({
 
         const gid = ctx.user.groupId ?? null;
 
-        // Função auxiliar: converte strings ISO de data para objetos Date
+        // Função auxiliar: converte strings de data para objetos Date
+        // Suporta: "2024-01-15T12:00:00Z" (datetime) e "2024-01-15" (date only)
         const sanitizeDates = (rows: any[]): any[] =>
           rows.map((row) => {
             const out: Record<string, any> = {};
             for (const [k, v] of Object.entries(row)) {
-              if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)) {
+              if (typeof v === "string" && (
+                /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v) ||
+                /^\d{4}-\d{2}-\d{2}$/.test(v)
+              )) {
                 const d = new Date(v);
-                out[k] = isNaN(d.getTime()) ? v : d;
+                out[k] = isNaN(d.getTime()) ? null : d;
               } else {
                 out[k] = v;
               }

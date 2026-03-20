@@ -788,12 +788,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const currentWeek = cycle ? (() => {
     const now = new Date();
     const start = new Date(cycle.startDate);
+    if (isNaN(start.getTime())) return null;
     const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-    
-    if (floraStart && now >= floraStart) {
-      return Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
+      return Math.max(1, Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
     }
-    return Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
   })() : null;
   
   const currentPhase = cycle ? (cycle.floraStartDate ? "FLORA" : "VEGA") : null;
@@ -1029,11 +1029,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     Semana {(() => {
                       const now = new Date();
                       const start = new Date(cycle.startDate);
+                      if (isNaN(start.getTime())) return '?';
                       const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                      if (floraStart && now >= floraStart) {
-                        return Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+                      if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
+                        return Math.max(1, Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
                       }
-                      return Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+                      return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
                     })()}
                   </span>
                 )}
@@ -1055,9 +1056,10 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                       {(() => {
                         const now = new Date();
                         const start = new Date(cycle.startDate);
+                        if (isNaN(start.getTime())) return '—';
                         const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
                         let weekStart;
-                        if (floraStart && now >= floraStart) {
+                        if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
                           const weeksSinceFlora = Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
                           weekStart = new Date(floraStart.getTime() + (weeksSinceFlora * 7 * 24 * 60 * 60 * 1000));
                         } else {
