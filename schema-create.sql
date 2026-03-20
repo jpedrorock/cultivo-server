@@ -406,9 +406,11 @@ CREATE TABLE IF NOT EXISTS `notificationSettings` (
   `rhAlertsEnabled`      BOOLEAN NOT NULL DEFAULT TRUE,
   `ppfdAlertsEnabled`    BOOLEAN NOT NULL DEFAULT TRUE,
   `phAlertsEnabled`      BOOLEAN NOT NULL DEFAULT TRUE,
-  `taskRemindersEnabled` BOOLEAN NOT NULL DEFAULT TRUE,
-  `dailySummaryEnabled`  BOOLEAN NOT NULL DEFAULT FALSE,
-  `dailySummaryTime`     VARCHAR(5) DEFAULT '09:00',
+  `taskRemindersEnabled`  BOOLEAN NOT NULL DEFAULT TRUE,
+  `dailyReminderEnabled`  BOOLEAN NOT NULL DEFAULT FALSE,
+  `reminderTimes`         TEXT DEFAULT '[]',
+  `dailySummaryEnabled`   BOOLEAN NOT NULL DEFAULT FALSE,
+  `dailySummaryTime`      VARCHAR(5) DEFAULT '09:00',
   `createdAt`            TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   `updatedAt`            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -625,7 +627,7 @@ CREATE TABLE IF NOT EXISTS `wateringApplications` (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `pushSubscriptions` (
   `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `endpoint`        TEXT NOT NULL,
+  `endpoint`        VARCHAR(512) NOT NULL UNIQUE,
   `keysJson`        TEXT NOT NULL,
   `reminderEnabled` TINYINT(1) NOT NULL DEFAULT 0,
   `reminderTimes`   TEXT,
