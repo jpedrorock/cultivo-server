@@ -4753,7 +4753,7 @@ export const appRouter = router({
           }),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
@@ -4761,6 +4761,8 @@ export const appRouter = router({
         if (input.version !== "1.0") {
           throw new Error("Versão de backup não suportada");
         }
+
+        const gid = ctx.user.groupId ?? null;
 
         // Função auxiliar: converte strings ISO de data para objetos Date
         const sanitizeDates = (rows: any[]): any[] =>
@@ -4776,6 +4778,10 @@ export const appRouter = router({
             }
             return out;
           });
+
+        // Carimbra o groupId do usuário logado nos recursos que pertencem ao grupo
+        const withGroup = (rows: any[]): any[] =>
+          sanitizeDates(rows).map((row) => ({ ...row, groupId: gid }));
 
         // Tudo dentro de uma transação: se qualquer operação falhar,
         // o banco volta ao estado original automaticamente.
@@ -4809,18 +4815,18 @@ export const appRouter = router({
           await tx.delete(strains);
           await tx.delete(tents);
 
-          // Inserir dados do backup (com datas convertidas)
-          if (input.data.tents?.length) await tx.insert(tents).values(sanitizeDates(input.data.tents));
+          // Inserir dados do backup — tents/plants/templates recebem o groupId do usuário
+          if (input.data.tents?.length) await tx.insert(tents).values(withGroup(input.data.tents));
           if (input.data.strains?.length) await tx.insert(strains).values(sanitizeDates(input.data.strains));
           if (input.data.cycles?.length) await tx.insert(cycles).values(sanitizeDates(input.data.cycles));
-          if (input.data.plants?.length) await tx.insert(plants).values(sanitizeDates(input.data.plants));
+          if (input.data.plants?.length) await tx.insert(plants).values(withGroup(input.data.plants));
           if (input.data.dailyLogs?.length) await tx.insert(dailyLogs).values(sanitizeDates(input.data.dailyLogs));
-          if (input.data.taskTemplates?.length) await tx.insert(taskTemplates).values(sanitizeDates(input.data.taskTemplates));
+          if (input.data.taskTemplates?.length) await tx.insert(taskTemplates).values(withGroup(input.data.taskTemplates));
           if (input.data.alertSettings?.length) await tx.insert(alertSettings).values(sanitizeDates(input.data.alertSettings));
           if (input.data.alerts?.length) await tx.insert(alerts).values(sanitizeDates(input.data.alerts));
           if (input.data.plantPhotos?.length) await tx.insert(plantPhotos).values(sanitizeDates(input.data.plantPhotos));
           if (input.data.plantHealthLogs?.length) await tx.insert(plantHealthLogs).values(sanitizeDates(input.data.plantHealthLogs));
-          if (input.data.recipeTemplates?.length) await tx.insert(recipeTemplates).values(sanitizeDates(input.data.recipeTemplates));
+          if (input.data.recipeTemplates?.length) await tx.insert(recipeTemplates).values(withGroup(input.data.recipeTemplates));
           if (input.data.nutrientApplications?.length) await tx.insert(nutrientApplications).values(sanitizeDates(input.data.nutrientApplications));
           if (input.data.wateringApplications?.length) await tx.insert(wateringApplications).values(sanitizeDates(input.data.wateringApplications));
         });
