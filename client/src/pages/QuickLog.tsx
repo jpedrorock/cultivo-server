@@ -324,11 +324,11 @@ export default function QuickLog() {
 
   return (
     <PageTransition>
-        <div className="h-screen overflow-hidden bg-background flex flex-col">
+        <div className="h-dvh overflow-hidden bg-background flex flex-col pt-[env(safe-area-inset-top,0px)]">
       {/* Content */}
       <div className="flex-1 flex items-center justify-center overflow-hidden pb-24">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">
-          <div className="bg-card rounded-2xl shadow-lg h-[85vh] overflow-hidden w-full flex flex-col relative">
+          <div className="bg-card dark:bg-zinc-900 dark:border dark:border-zinc-700 rounded-2xl shadow-lg h-[85%] overflow-hidden w-full flex flex-col relative">
           {/* Botão fechar — dentro do card, canto superior direito */}
           <button
             onClick={() => {
@@ -416,7 +416,7 @@ export default function QuickLog() {
                     className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
                       tentId === tent.id
                         ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-xl scale-105"
-                        : "bg-card text-card-foreground border-border hover:border-green-300 hover:shadow-lg"
+                        : "bg-card dark:bg-zinc-800 text-card-foreground border-border dark:border-zinc-600 hover:border-green-400 dark:hover:border-green-500 hover:shadow-lg"
                     }`}
                   >
                     <div className="font-bold text-xl">{tent.name}</div>
@@ -446,7 +446,7 @@ export default function QuickLog() {
                       setTempC(newValue);
                     }}
                     placeholder="25"
-                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                       tempC
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border'
@@ -472,7 +472,7 @@ export default function QuickLog() {
                       setRhPct(newValue);
                     }}
                     placeholder="60"
-                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                       rhPct
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border'
@@ -498,7 +498,7 @@ export default function QuickLog() {
                       setWateringVolume(newValue);
                     }}
                     placeholder="2000"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       wateringVolume
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-green-500/10'
@@ -524,7 +524,7 @@ export default function QuickLog() {
                       setRunoffCollected(newValue);
                     }}
                     placeholder="300"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       runoffCollected
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-teal-500/10'
@@ -563,7 +563,7 @@ export default function QuickLog() {
                       setPh(newValue);
                     }}
                     placeholder="6.0"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       ph
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-purple-500/10'
@@ -605,7 +605,7 @@ export default function QuickLog() {
                       setEc(newValue);
                     }}
                     placeholder="1.5"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       ec
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-yellow-500/10'
@@ -695,7 +695,7 @@ export default function QuickLog() {
                           setPpfd(val);
                         }}
                         placeholder="600"
-                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                           ppfd > 0
                             ? 'border-amber-500 ring-2 ring-amber-500/20'
                             : 'border-border focus:ring-4 focus:ring-amber-500/10'
@@ -731,7 +731,7 @@ export default function QuickLog() {
                           setPpfd(Math.round(val * 0.0185));
                         }}
                         placeholder="35000"
-                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-card text-foreground shadow-lg transition-all duration-200 ${
+                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                           luxValue > 0
                             ? 'border-amber-500 ring-2 ring-amber-500/20'
                             : 'border-border focus:ring-4 focus:ring-amber-500/10'
