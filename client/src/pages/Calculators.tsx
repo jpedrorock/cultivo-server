@@ -802,7 +802,6 @@ function LuxPPFDCalculator() {
               onChange={(v) => setLux(String(v))}
               trackGradient={lightGradient}
               formatTooltip={(v) => `${(v / 1000).toFixed(0)}k lux`}
-              labels={luxLabels}
             />
           </div>
         ) : (
@@ -830,7 +829,6 @@ function LuxPPFDCalculator() {
               onChange={(v) => setPpfd(String(v))}
               trackGradient={lightGradient}
               formatTooltip={(v) => `${v} µmol`}
-              labels={ppfdLabels}
             />
           </div>
         )}
