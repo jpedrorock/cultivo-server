@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { PageTransition } from "@/components/PageTransition";
+import { savePendingLog, isOnline } from "@/lib/offlineStorage";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
 
@@ -269,13 +270,13 @@ export default function QuickLog() {
     }
   };
 
-  const handleSaveDailyLog = () => {
+  const handleSaveDailyLog = async () => {
     if (!tentId) {
       toast.error("Selecione uma estufa");
       return;
     }
 
-    saveDailyLogMutation.mutate({
+    const payload = {
       tentId,
       logDate: new Date(),
       turn,
@@ -286,7 +287,29 @@ export default function QuickLog() {
       ph: ph || undefined,
       ec: ec || undefined,
       ppfd: ppfd || undefined,
-    });
+    };
+
+    // Sem conexão → salvar na fila offline e avançar normalmente
+    if (!isOnline()) {
+      try {
+        await savePendingLog(payload);
+        // Pedir ao SW para sincronizar quando voltar a internet
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+          const reg = await navigator.serviceWorker.ready;
+          await (reg as any).sync.register('sync-daily-logs');
+        }
+        toast("📱 Salvo offline — vai sincronizar quando conectar", {
+          description: "Registro na fila de envio",
+          duration: 4000,
+        });
+        setCurrentStep(9); // avança para tela de confirmação
+      } catch {
+        toast.error("Erro ao salvar offline");
+      }
+      return;
+    }
+
+    saveDailyLogMutation.mutate(payload);
   };
 
   const canGoNext = () => {

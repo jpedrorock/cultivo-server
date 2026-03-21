@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { startMissingReadingsMonitor, getNotificationPermission } from "@/lib/notifications";
 import PullToRefresh from "react-simple-pull-to-refresh";
+import { countPendingLogs, syncPendingLogs, onConnectionRestored } from "@/lib/offlineStorage";
 import { PageTransition, StaggerList, ListItemAnimation, CardAnimation, AnimatedCounter } from "@/components/PageTransition";
 import { SkeletonLoader } from "@/components/SkeletonLoader";
 import { TentCardSkeleton } from "@/components/TentCardSkeleton";
@@ -59,6 +60,7 @@ export default function Home() {
   const [showMoveAllPlants, setShowMoveAllPlants] = useState(false);
   const [targetTentId, setTargetTentId] = useState<string>("");
   const [deletePreviewTentId, setDeletePreviewTentId] = useState<number | null>(null);
+  const [pendingLogsCount, setPendingLogsCount] = useState(0);
   const [finalizeCycleConfirm, setFinalizeCycleConfirm] = useState<{ open: boolean; cycleId: number | null; tentName: string }>({
     open: false, cycleId: null, tentName: ""
   });
@@ -80,6 +82,42 @@ export default function Home() {
     },
     onError: () => toast.error("Erro ao alterar estado do sistema"),
   });
+
+  // Offline sync — contar pendentes e sincronizar ao reconectar
+  const createLogMutation = trpc.dailyLogs.create.useMutation();
+  useEffect(() => {
+    // Contar ao montar
+    countPendingLogs().then(setPendingLogsCount);
+
+    // Quando voltar a internet → sincronizar automaticamente
+    const unsubscribe = onConnectionRestored(async () => {
+      const count = await countPendingLogs();
+      if (count === 0) return;
+      toast("🔄 Conexão restaurada — sincronizando registros...", { duration: 3000 });
+      const synced = await syncPendingLogs(async (log) => {
+        await createLogMutation.mutateAsync({
+          tentId: log.tentId,
+          logDate: log.logDate instanceof Date ? log.logDate : new Date(log.logDate),
+          turn: log.turn,
+          tempC: log.tempC || undefined,
+          rhPct: log.rhPct || undefined,
+          wateringVolume: log.wateringVolume,
+          runoffCollected: log.runoffCollected,
+          ph: log.ph || undefined,
+          ec: log.ec || undefined,
+          ppfd: log.ppfd,
+        });
+      });
+      const remaining = await countPendingLogs();
+      setPendingLogsCount(remaining);
+      if (synced > 0) {
+        toast.success(`✅ ${synced} registro${synced > 1 ? 's' : ''} sincronizado${synced > 1 ? 's' : ''} com sucesso!`);
+      }
+    });
+
+    return unsubscribe;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Start missing readings monitor when component mounts
   useEffect(() => {
@@ -410,6 +448,18 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* Banner de registros offline pendentes */}
+      {pendingLogsCount > 0 && (
+        <div className="container pt-4">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400">
+            <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+            <span className="text-sm font-medium">
+              {pendingLogsCount} registro{pendingLogsCount > 1 ? 's' : ''} salvo{pendingLogsCount > 1 ? 's' : ''} offline — aguardando conexão para sincronizar
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="container py-8">
