@@ -353,12 +353,12 @@ function WateringRunoffCalculator() {
                   <Label className="text-base font-semibold">Número de Plantas</Label>
                   <span className="text-2xl font-bold text-primary">{numPlants}</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[1, 2, 3, 4, 6, 8, 12, 16].map((n) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {[2, 4, 6, 8].map((n) => (
                     <button
                       key={n}
                       onClick={() => setNumPlants(n)}
-                      className={`min-w-[48px] px-3 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${
+                      className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
                         numPlants === n
                           ? "bg-blue-500 text-white shadow-md scale-105"
                           : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-blue-400"
@@ -372,7 +372,7 @@ function WateringRunoffCalculator() {
                   type="number"
                   inputMode="numeric"
                   placeholder="Outro número de plantas..."
-                  value={![1,2,3,4,6,8,12,16].includes(numPlants) ? numPlants : ""}
+                  value={![2,4,6,8].includes(numPlants) ? numPlants : ""}
                   onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) setNumPlants(v); }}
                   className="h-11 text-center text-lg font-bold"
                 />
@@ -384,12 +384,12 @@ function WateringRunoffCalculator() {
                   <Label className="text-base font-semibold">Tamanho do Vaso</Label>
                   <span className="text-2xl font-bold text-primary">{potSize}L</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[7, 11, 15, 20, 25, 30, 50].map((n) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {[5, 11, 20, 50].map((n) => (
                     <button
                       key={n}
                       onClick={() => setPotSize(n)}
-                      className={`min-w-[52px] px-3 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${
+                      className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
                         potSize === n
                           ? "bg-blue-500 text-white shadow-md scale-105"
                           : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-blue-400"
@@ -403,7 +403,7 @@ function WateringRunoffCalculator() {
                   type="number"
                   inputMode="numeric"
                   placeholder="Outro tamanho (L)..."
-                  value={![7,11,15,20,25,30,50].includes(potSize) ? potSize : ""}
+                  value={![5,11,20,50].includes(potSize) ? potSize : ""}
                   onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) setPotSize(v); }}
                   className="h-11 text-center text-lg font-bold"
                 />
@@ -417,16 +417,14 @@ function WateringRunoffCalculator() {
                     desiredRunoff < 10 ? "text-red-500" : desiredRunoff <= 25 ? "text-green-500" : "text-yellow-500"
                   }`}>{desiredRunoff}%</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {[10, 15, 20, 25, 30].map((n) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {[10, 15, 20, 25].map((n) => (
                     <button
                       key={n}
                       onClick={() => setDesiredRunoff(n)}
-                      className={`min-w-[56px] px-3 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${
+                      className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
                         desiredRunoff === n
-                          ? n <= 25
-                            ? "bg-green-500 text-white shadow-md scale-105"
-                            : "bg-yellow-500 text-white shadow-md scale-105"
+                          ? "bg-green-500 text-white shadow-md scale-105"
                           : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-green-400"
                       }`}
                     >
@@ -441,7 +439,7 @@ function WateringRunoffCalculator() {
                   type="number"
                   inputMode="numeric"
                   placeholder="Outro % de runoff..."
-                  value={![10,15,20,25,30].includes(desiredRunoff) ? desiredRunoff : ""}
+                  value={![10,15,20,25].includes(desiredRunoff) ? desiredRunoff : ""}
                   onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 0) setDesiredRunoff(v); }}
                   className="h-11 text-center text-lg font-bold"
                 />
