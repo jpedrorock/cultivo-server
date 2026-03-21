@@ -353,19 +353,28 @@ function WateringRunoffCalculator() {
                   <Label className="text-base font-semibold">Número de Plantas</Label>
                   <span className="text-2xl font-bold text-primary">{numPlants}</span>
                 </div>
-                <RangeSlider
-                  min={1}
-                  max={20}
-                  step={1}
-                  value={numPlants}
-                  onChange={setNumPlants}
-                  fillColor="#3b82f6"
-                  formatTooltip={(v) => `${v} planta${v !== 1 ? 's' : ''}`}
-                  labels={[
-                    { position: 0, label: "1" },
-                    { position: 47.4, label: "10" },
-                    { position: 100, label: "20" },
-                  ]}
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4, 6, 8, 12, 16].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setNumPlants(n)}
+                      className={`min-w-[48px] px-3 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${
+                        numPlants === n
+                          ? "bg-blue-500 text-white shadow-md scale-105"
+                          : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-blue-400"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="Outro número de plantas..."
+                  value={![1,2,3,4,6,8,12,16].includes(numPlants) ? numPlants : ""}
+                  onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) setNumPlants(v); }}
+                  className="h-11 text-center text-lg font-bold"
                 />
               </div>
 
@@ -375,20 +384,28 @@ function WateringRunoffCalculator() {
                   <Label className="text-base font-semibold">Tamanho do Vaso</Label>
                   <span className="text-2xl font-bold text-primary">{potSize}L</span>
                 </div>
-                <RangeSlider
-                  min={1}
-                  max={50}
-                  step={1}
-                  value={potSize}
-                  onChange={setPotSize}
-                  fillColor="#3b82f6"
-                  formatTooltip={(v) => `${v}L`}
-                  labels={[
-                    { position: 0, label: "1L" },
-                    { position: 20.4, label: "11L" },
-                    { position: 40.8, label: "20L" },
-                    { position: 100, label: "50L" },
-                  ]}
+                <div className="flex flex-wrap gap-2">
+                  {[7, 11, 15, 20, 25, 30, 50].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setPotSize(n)}
+                      className={`min-w-[52px] px-3 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${
+                        potSize === n
+                          ? "bg-blue-500 text-white shadow-md scale-105"
+                          : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-blue-400"
+                      }`}
+                    >
+                      {n}L
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="Outro tamanho (L)..."
+                  value={![7,11,15,20,25,30,50].includes(potSize) ? potSize : ""}
+                  onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) setPotSize(v); }}
+                  className="h-11 text-center text-lg font-bold"
                 />
               </div>
 
@@ -396,22 +413,37 @@ function WateringRunoffCalculator() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <Label className="text-base font-semibold">Runoff Desejado</Label>
-                  <span className="text-2xl font-bold text-primary">{desiredRunoff}%</span>
+                  <span className={`text-2xl font-bold ${
+                    desiredRunoff < 10 ? "text-red-500" : desiredRunoff <= 25 ? "text-green-500" : "text-yellow-500"
+                  }`}>{desiredRunoff}%</span>
                 </div>
-                <RangeSlider
-                  min={0}
-                  max={50}
-                  step={1}
-                  value={desiredRunoff}
-                  onChange={setDesiredRunoff}
-                  fillColor={desiredRunoff < 10 ? "#ef4444" : desiredRunoff <= 25 ? "#22c55e" : "#eab308"}
-                  formatTooltip={(v) => `${v}%`}
-                  labels={[
-                    { position: 0, label: "0%", color: "#ef4444" },
-                    { position: 30, label: "15%", sublabel: "Ideal", color: "#22c55e" },
-                    { position: 50, label: "25%", sublabel: "Ideal", color: "#22c55e" },
-                    { position: 100, label: "50%", color: "#ef4444" },
-                  ]}
+                <div className="flex flex-wrap gap-2">
+                  {[10, 15, 20, 25, 30].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setDesiredRunoff(n)}
+                      className={`min-w-[56px] px-3 py-2 rounded-xl font-bold text-sm transition-all duration-200 ${
+                        desiredRunoff === n
+                          ? n <= 25
+                            ? "bg-green-500 text-white shadow-md scale-105"
+                            : "bg-yellow-500 text-white shadow-md scale-105"
+                          : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-green-400"
+                      }`}
+                    >
+                      {n}%
+                      {(n === 15 || n === 20) && (
+                        <span className="block text-[10px] font-normal opacity-75">ideal</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="Outro % de runoff..."
+                  value={![10,15,20,25,30].includes(desiredRunoff) ? desiredRunoff : ""}
+                  onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 0) setDesiredRunoff(v); }}
+                  className="h-11 text-center text-lg font-bold"
                 />
               </div>
 
@@ -748,70 +780,60 @@ function LuxPPFDCalculator() {
         </div>
 
         {conversionMode === "lux-to-ppfd" ? (
-          <div className="space-y-6">
-            {/* Input numérico */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="lux" className="text-base font-semibold">Intensidade (Lux)</Label>
-                <span className="text-2xl font-bold text-yellow-500">{parseInt(lux || "0").toLocaleString('pt-BR')}</span>
-              </div>
-              <RangeSlider
-                id="lux-slider"
-                min={0}
-                max={100000}
-                step={1000}
-                value={parseInt(lux || "0")}
-                onChange={(v) => setLux(String(v))}
-                trackGradient={lightGradient}
-                formatTooltip={(v) => `${(v / 1000).toFixed(0)}k lux`}
-                labels={luxLabels}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="lux-input" className="text-xs text-muted-foreground">Ou digite o valor exato:</Label>
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-4">
               <Input
                 id="lux-input"
-                type="text"
+                type="number"
                 inputMode="numeric"
-                placeholder="Ex: 50000"
+                placeholder="35000"
                 value={lux}
                 onChange={(e) => setLux(e.target.value)}
-                className="text-xl h-12 px-4 font-bold text-center"
+                className={`w-44 md:w-52 text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                  parseInt(lux || "0") > 0 ? "border-yellow-500 ring-2 ring-yellow-500/20" : "border-border"
+                }`}
                 data-tour="lux-input"
               />
+              <span className="text-2xl md:text-3xl font-bold text-muted-foreground">lux</span>
             </div>
+            <RangeSlider
+              min={0}
+              max={100000}
+              step={1000}
+              value={parseInt(lux || "0")}
+              onChange={(v) => setLux(String(v))}
+              trackGradient={lightGradient}
+              formatTooltip={(v) => `${(v / 1000).toFixed(0)}k lux`}
+              labels={luxLabels}
+            />
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="ppfd-slider" className="text-base font-semibold">PPFD (µmol/m²/s)</Label>
-                <span className="text-2xl font-bold text-yellow-500">{parseInt(ppfd || "0")}</span>
-              </div>
-              <RangeSlider
-                id="ppfd-slider"
-                min={0}
-                max={1200}
-                step={10}
-                value={parseInt(ppfd || "0")}
-                onChange={(v) => setPpfd(String(v))}
-                trackGradient={lightGradient}
-                formatTooltip={(v) => `${v} µmol`}
-                labels={ppfdLabels}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ppfd-input" className="text-xs text-muted-foreground">Ou digite o valor exato:</Label>
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-4">
               <Input
                 id="ppfd-input"
-                type="text"
+                type="number"
                 inputMode="numeric"
-                placeholder="Ex: 750"
+                placeholder="600"
                 value={ppfd}
                 onChange={(e) => setPpfd(e.target.value)}
-                className="text-xl h-12 px-4 font-bold text-center"
+                className={`w-44 md:w-52 text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                  parseInt(ppfd || "0") > 0 ? "border-yellow-500 ring-2 ring-yellow-500/20" : "border-border"
+                }`}
               />
+              <span className="text-lg md:text-xl font-bold text-muted-foreground whitespace-nowrap">µmol/m²/s</span>
             </div>
+            <RangeSlider
+              id="ppfd-slider"
+              min={0}
+              max={1200}
+              step={10}
+              value={parseInt(ppfd || "0")}
+              onChange={(v) => setPpfd(String(v))}
+              trackGradient={lightGradient}
+              formatTooltip={(v) => `${v} µmol`}
+              labels={ppfdLabels}
+            />
           </div>
         )}
 
