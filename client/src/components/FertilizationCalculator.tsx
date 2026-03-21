@@ -278,7 +278,7 @@ export function FertilizationCalculator() {
                 setVolume(safe);
               }}
               placeholder="Ex: 10"
-              className="text-[1.5rem] sm:text-[2rem] h-14 sm:h-16 px-4 font-bold text-center"
+              className="text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 px-4 font-bold text-center"
             />
           </div>
 

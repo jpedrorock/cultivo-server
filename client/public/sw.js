@@ -1,9 +1,9 @@
 // Service Worker para App Cultivo PWA
 // Versão do cache - incrementar para forçar atualização
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const CACHE_NAME = `app-cultivo-${CACHE_VERSION}`;
 
-// Assets para cache (estratégia Cache First)
+// Assets essenciais garantidos no install (sem hash — sempre os mesmos)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -17,12 +17,30 @@ const STATIC_ASSETS = [
 ];
 
 // Instalação do Service Worker
+// Estratégia: cacheia os assets essenciais E descobre os chunks JS/CSS
+// via parse do index.html (que tem os hashes gerados pelo Vite).
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing Service Worker...', CACHE_VERSION);
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching static assets');
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // 1. Cachear assets estáticos conhecidos
+      await cache.addAll(STATIC_ASSETS);
+
+      // 2. Descobrir e cachear chunks JS/CSS do Vite via index.html
+      try {
+        const html = await fetch('/index.html').then(r => r.text());
+        const matches = [...html.matchAll(/src="([^"]+\.js)"|href="([^"]+\.css)"/g)];
+        const vitChunks = matches
+          .map(m => m[1] || m[2])
+          .filter(Boolean)
+          .filter(url => url.startsWith('/') || url.startsWith('./'));
+        if (vitChunks.length > 0) {
+          console.log('[SW] Caching Vite chunks:', vitChunks.length);
+          await cache.addAll(vitChunks);
+        }
+      } catch (e) {
+        console.warn('[SW] Could not pre-cache Vite chunks:', e);
+      }
     })
   );
   // Ativar imediatamente sem esperar

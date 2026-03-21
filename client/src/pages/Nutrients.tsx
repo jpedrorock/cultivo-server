@@ -23,6 +23,7 @@ import { toast as showToast } from "sonner";
 import { Beaker, Printer, Loader2, ArrowLeft, Download, Droplets, Zap, FlaskConical } from "lucide-react";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageTransition } from "@/components/PageTransition";
+import { useLocation } from "wouter";
 
 type Phase = "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
 
@@ -255,6 +256,7 @@ function generateReceiptImage(
 }
 
 export default function Nutrients() {
+  const [, setLocation] = useLocation();
   const [phase, setPhase] = useState<Phase>("VEGA");
   const [week, setWeek] = useState(1);
   const [volumeL, setVolumeL] = useState(10);
@@ -396,7 +398,7 @@ export default function Nutrients() {
     <PageTransition>
       <div className="container py-6 max-w-5xl">
         <Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Calculadoras", href: "/calculators" }, { label: "Fertilização" }]} />
-        <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="mb-4">
+        <Button variant="ghost" size="sm" onClick={() => setLocation("/calculators")} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />Voltar
         </Button>
         <div className="flex items-center gap-3 mb-6">
