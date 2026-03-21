@@ -446,13 +446,13 @@ export default function QuickLog() {
                       setTempC(newValue);
                     }}
                     placeholder="25"
-                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                       tempC
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-muted-foreground">°C</span>
+                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">°C</span>
                 </div>
               </div>
             )}
@@ -472,13 +472,13 @@ export default function QuickLog() {
                       setRhPct(newValue);
                     }}
                     placeholder="60"
-                    className={`w-40 text-center text-5xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                       rhPct
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-muted-foreground">%</span>
+                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">%</span>
                 </div>
               </div>
             )}
@@ -498,13 +498,13 @@ export default function QuickLog() {
                       setWateringVolume(newValue);
                     }}
                     placeholder="2000"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       wateringVolume
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-green-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-muted-foreground">ml</span>
+                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">ml</span>
                 </div>
               </div>
             )}
@@ -524,13 +524,13 @@ export default function QuickLog() {
                       setRunoffCollected(newValue);
                     }}
                     placeholder="300"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       runoffCollected
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-teal-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-muted-foreground">ml</span>
+                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">ml</span>
                 </div>
                 {runoffPercentage && (
                   <div className="text-center p-4 bg-muted rounded-xl border border-border animate-[slide-in-from-bottom_0.9s_ease-out]">
@@ -563,13 +563,13 @@ export default function QuickLog() {
                       setPh(newValue);
                     }}
                     placeholder="6.0"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       ph
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-purple-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-muted-foreground">pH</span>
+                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">pH</span>
                 </div>
                 <div className="pt-4 pb-2">
                   <RangeSlider
@@ -605,13 +605,13 @@ export default function QuickLog() {
                       setEc(newValue);
                     }}
                     placeholder="1.5"
-                    className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
+                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       ec
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border focus:ring-4 focus:ring-yellow-500/10'
                     }`}
                   />
-                  <span className="text-4xl font-bold text-muted-foreground">mS/cm</span>
+                  <span className="text-2xl md:text-3xl lg:text-4xl font-bold text-muted-foreground">mS/cm</span>
                 </div>
               </div>
             )}
@@ -695,13 +695,13 @@ export default function QuickLog() {
                           setPpfd(val);
                         }}
                         placeholder="600"
-                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
+                        className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                           ppfd > 0
                             ? 'border-amber-500 ring-2 ring-amber-500/20'
                             : 'border-border focus:ring-4 focus:ring-amber-500/10'
                         }`}
                       />
-                      <span className="text-sm font-bold text-muted-foreground whitespace-nowrap">μmol/m²/s</span>
+                      <span className="text-xs md:text-sm font-bold text-muted-foreground whitespace-nowrap">μmol/m²/s</span>
                     </div>
                     <div className="pb-2">
                       <RangeSlider
@@ -731,13 +731,13 @@ export default function QuickLog() {
                           setPpfd(Math.round(val * 0.0185));
                         }}
                         placeholder="35000"
-                        className={`text-center text-4xl h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
+                        className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                           luxValue > 0
                             ? 'border-amber-500 ring-2 ring-amber-500/20'
                             : 'border-border focus:ring-4 focus:ring-amber-500/10'
                         }`}
                       />
-                      <span className="text-sm font-bold text-muted-foreground">lux</span>
+                      <span className="text-2xl md:text-3xl lg:text-4xl font-bold text-muted-foreground">lux</span>
                     </div>
                     <div className="pb-2">
                       <RangeSlider
