@@ -326,7 +326,7 @@ export default function QuickLog() {
     <PageTransition>
         <div className="h-dvh overflow-hidden bg-background flex flex-col pt-[env(safe-area-inset-top,0px)]">
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden pb-24">
+      <div className="flex-1 flex items-center justify-center overflow-hidden">
         <div className="container mx-auto px-4 max-w-md h-full flex items-center">
           <div className="bg-card dark:bg-zinc-900 dark:border dark:border-zinc-700 rounded-2xl shadow-lg h-[85%] overflow-hidden w-full flex flex-col relative">
           {/* Botão fechar — dentro do card, canto superior direito */}
@@ -956,30 +956,8 @@ export default function QuickLog() {
             )}
           </div>
           </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Progress dots - only show for daily log steps */}
-      {currentStep < 9 && (
-        <div className="flex justify-center gap-2 py-6">
-          {steps.map((step, index) => (
-            <div
-              key={step.id}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                index === currentStep
-                  ? "w-8 bg-green-500"
-                  : index < currentStep
-                  ? "w-2 bg-green-300"
-                  : "w-2 bg-gray-300"
-              }`}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Navigation buttons */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] bg-background border-t border-border flex gap-3 z-50">
+          {/* Navigation buttons — footer dentro do card */}
+          <div className="shrink-0 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-border flex gap-3 bg-card dark:bg-zinc-900">
         {/* Back button - only for daily log steps */}
         {currentStep > 0 && currentStep < 9 && (
           <Button
@@ -1069,6 +1047,9 @@ export default function QuickLog() {
             </AnimatedButton>
           </>
         )}
+      </div>
+          </div>
+        </div>
       </div>
 
       {/* Photo Upload Progress Overlay */}
