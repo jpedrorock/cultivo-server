@@ -513,7 +513,15 @@ export const appRouter = router({
       const database = await getDb();
       if (!database) throw new Error("Banco de dados não inicializado");
       const allCycles = await database
-        .select({ id: cycles.id, status: cycles.status, tentId: cycles.tentId, tentGroupId: tents.groupId })
+        .select({
+          id: cycles.id,
+          status: cycles.status,
+          tentId: cycles.tentId,
+          tentGroupId: tents.groupId,
+          startDate: cycles.startDate,
+          floraStartDate: cycles.floraStartDate,
+          cloningStartDate: cycles.cloningStartDate,
+        })
         .from(cycles)
         .leftJoin(tents, eq(cycles.tentId, tents.id))
         .where(eq(cycles.status, "ACTIVE"));
