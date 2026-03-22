@@ -332,12 +332,6 @@ export default function TentLog() {
                   trackGradient="linear-gradient(to right, #dc2626 0%, #f97316 28.5%, #eab308 42.8%, #22c55e 50%, #3b82f6 64.2%, #8b5cf6 100%)"
                   formatTooltip={(v) => `${v} µmol`}
                   showTooltip
-                  labels={[
-                    { position: 10,  label: "Clonagem", sublabel: "100-200",  color: "#ef4444", icon: "🌱" },
-                    { position: 33,  label: "Vega",     sublabel: "400-600",  color: "#22c55e", icon: "🌿" },
-                    { position: 60,  label: "Flora",    sublabel: "600-900",  color: "#f97316", icon: "🌸" },
-                    { position: 87,  label: "Máximo",   sublabel: "1000-1200",color: "#a855f7", icon: "⚡" },
-                  ]}
                 />
               </div>
 
