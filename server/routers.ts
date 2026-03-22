@@ -2908,7 +2908,7 @@ export const appRouter = router({
       .input(z.object({
         tentId: z.number().optional(),
         strainId: z.number().optional(),
-        status: z.enum(["ACTIVE", "HARVESTED", "DEAD", "DISCARDED"]).optional(),
+        status: z.enum(["ACTIVE", "HARVESTED", "DEAD", "DISCARDED", "AWAITING_DRYING"]).optional(),
       }))
       .query(async ({ input, ctx }) => {
         const database = await getDb();

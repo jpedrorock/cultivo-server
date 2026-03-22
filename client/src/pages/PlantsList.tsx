@@ -30,7 +30,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 export default function PlantsList() {
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"ACTIVE" | "HARVESTED" | "DEAD" | "DISCARDED" | undefined>();
+  const [filterStatus, setFilterStatus] = useState<"ACTIVE" | "HARVESTED" | "DEAD" | "DISCARDED" | "AWAITING_DRYING" | undefined>();
   
   // Ler query param ?tent=ID para auto-expandir estufa
   const tentParam = new URLSearchParams(window.location.search).get('tent');
@@ -335,6 +335,7 @@ export default function PlantsList() {
                 >
                   <option value="">Todos</option>
                   <option value="ACTIVE">Ativa</option>
+                  <option value="AWAITING_DRYING">Aguardando Secagem</option>
                   <option value="HARVESTED">Colhida</option>
                   <option value="DEAD">Morta</option>
                   <option value="DISCARDED">Descartada</option>
@@ -420,6 +421,8 @@ export default function PlantsList() {
                               ? "border-primary bg-primary/10 dark:bg-primary/15 shadow-lg shadow-primary/20 dark:shadow-primary/25"
                               : tent.category === 'MAINTENANCE'
                                 ? 'border-blue-500/25 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-1 hover:scale-[1.01]'
+                                : tent.category === 'DRYING' || plant.status === 'AWAITING_DRYING'
+                                ? 'border-amber-500/25 hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1 hover:scale-[1.01]'
                                 : tent.category === 'FLORA' || plant.cyclePhase === 'FLORA'
                                 ? 'border-purple-500/25 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 hover:scale-[1.01]'
                                 : tent.category === 'VEGA' || plant.cyclePhase === 'VEGA'
@@ -469,7 +472,11 @@ export default function PlantsList() {
 
                               {/* Fase + Saúde — mesmo tamanho, mesma linha */}
                               <div className="flex items-center gap-2 flex-wrap">
-                                {tent.category === 'MAINTENANCE' ? (
+                                {plant.status === 'AWAITING_DRYING' ? (
+                                  <span className="px-2 py-1 rounded-md text-xs font-semibold border bg-amber-500/10 border-amber-500/25 text-amber-400">
+                                    ⏳ Aguardando Secagem
+                                  </span>
+                                ) : tent.category === 'MAINTENANCE' ? (
                                   <span className="px-2 py-1 rounded-md text-xs font-semibold border bg-blue-500/10 border-blue-500/25 text-blue-400">
                                     🔧 Manutenção
                                   </span>
@@ -548,9 +555,9 @@ export default function PlantsList() {
             title="Nenhuma planta encontrada"
             description={
               filterStatus && searchTerm
-                ? `Nenhuma planta com status "${{ ACTIVE: 'Ativa', HARVESTED: 'Colhida', DEAD: 'Morta', DISCARDED: 'Descartada' }[filterStatus]}" corresponde a "${searchTerm}".`
+                ? `Nenhuma planta com status "${{ ACTIVE: 'Ativa', AWAITING_DRYING: 'Aguardando Secagem', HARVESTED: 'Colhida', DEAD: 'Morta', DISCARDED: 'Descartada' }[filterStatus]}" corresponde a "${searchTerm}".`
                 : filterStatus
-                ? `Nenhuma planta com status "${{ ACTIVE: 'Ativa', HARVESTED: 'Colhida', DEAD: 'Morta', DISCARDED: 'Descartada' }[filterStatus]}" encontrada.`
+                ? `Nenhuma planta com status "${{ ACTIVE: 'Ativa', AWAITING_DRYING: 'Aguardando Secagem', HARVESTED: 'Colhida', DEAD: 'Morta', DISCARDED: 'Descartada' }[filterStatus]}" encontrada.`
                 : `Nenhuma planta corresponde a "${searchTerm}".`
             }
             actionLabel="Limpar filtros"
