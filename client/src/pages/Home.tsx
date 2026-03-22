@@ -1037,16 +1037,26 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         <div className="space-y-5">
           {/* Cycle Info */}
           {cycle ? (
-            <div 
+            <div
               className={`rounded-lg p-4 space-y-2 border ${
                 tent.category === 'VEGA'
-                  ? 'bg-green-500/8 border-green-500/20 dark:bg-green-500/8 dark:border-green-500/15'
+                  ? 'border-green-500/20 dark:border-green-500/15'
                   : tent.category === 'FLORA'
-                  ? 'bg-purple-500/8 border-purple-500/20 dark:bg-purple-500/8 dark:border-purple-500/15'
+                  ? 'border-purple-500/20 dark:border-purple-500/15'
                   : tent.category === 'DRYING'
-                  ? 'bg-amber-500/8 border-amber-500/20 dark:bg-amber-500/8 dark:border-amber-500/15'
-                  : 'bg-blue-500/8 border-blue-500/20 dark:bg-blue-500/8 dark:border-blue-500/15'
+                  ? 'border-amber-500/20 dark:border-amber-500/15'
+                  : 'border-blue-500/20 dark:border-blue-500/15'
               }`}
+              style={{
+                background:
+                  tent.category === 'VEGA'
+                    ? 'linear-gradient(135deg, rgba(34,197,94,0.13) 0%, rgba(16,185,129,0.06) 60%, rgba(34,197,94,0.02) 100%)'
+                    : tent.category === 'FLORA'
+                    ? 'linear-gradient(135deg, rgba(168,85,247,0.14) 0%, rgba(139,92,246,0.07) 60%, rgba(168,85,247,0.02) 100%)'
+                    : tent.category === 'DRYING'
+                    ? 'linear-gradient(135deg, rgba(245,158,11,0.13) 0%, rgba(234,179,8,0.06) 60%, rgba(245,158,11,0.02) 100%)'
+                    : 'linear-gradient(135deg, rgba(59,130,246,0.13) 0%, rgba(99,102,241,0.07) 60%, rgba(59,130,246,0.02) 100%)',
+              }}
             >
               <div className="flex justify-between items-center">
                 <span className={`text-sm font-semibold flex items-center gap-1.5 ${
