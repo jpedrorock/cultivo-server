@@ -105,7 +105,7 @@ export function CyclesDashboard() {
 
           return (
             <div key={cycle.id} style={{ background: gradientBorder, padding: '1.5px', borderRadius: '0.75rem' }}>
-            <Card className="p-6 border-0 rounded-[10px]" style={{ background: 'hsl(var(--card))' }}>
+            <Card className="p-6 border-0 rounded-[10px] bg-card">
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
