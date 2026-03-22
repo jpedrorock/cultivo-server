@@ -1652,10 +1652,11 @@ export const appRouter = router({
           .limit(input.limit)
           .offset(input.offset);
         
-        // Get total count for pagination
+        // Get total count for pagination (must include the same JOIN as baseQuery)
         let countQuery = database
           .select({ count: sql<number>`count(*)` })
           .from(dailyLogs)
+          .leftJoin(tents, eq(dailyLogs.tentId, tents.id))
           .$dynamic();
 
         if (conditions.length > 0) {
