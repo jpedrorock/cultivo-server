@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type React from "react";
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -51,7 +52,11 @@ export function CyclesDashboard() {
           let phaseBg = 'bg-green-500/10';
           let phaseBorder = 'border-green-500/30';
           let phaseProgressBg = 'bg-green-500/20';
-          let phaseProgressBar = 'bg-green-500';
+          let phaseProgressBar = '';
+          let phaseProgressStyle: React.CSSProperties = {
+            background: 'linear-gradient(90deg, #34d399, #22c55e, #16a34a)',
+            boxShadow: '0 0 8px rgba(34,197,94,0.7), 0 0 18px rgba(34,197,94,0.3)',
+          };
           let phaseLabel = 'Vegetativa';
 
           if (cycle.phase === 'MAINTENANCE') {
@@ -60,7 +65,10 @@ export function CyclesDashboard() {
             phaseBg = 'bg-blue-500/10';
             phaseBorder = 'border-blue-500/30';
             phaseProgressBg = 'bg-blue-500/20';
-            phaseProgressBar = 'bg-blue-500';
+            phaseProgressStyle = {
+              background: 'linear-gradient(90deg, #60a5fa, #3b82f6, #2563eb)',
+              boxShadow: '0 0 8px rgba(59,130,246,0.7), 0 0 18px rgba(59,130,246,0.3)',
+            };
             phaseLabel = 'Manutenção';
           } else if (cycle.phase === 'CLONING') {
             PhaseIcon = Scissors;
@@ -68,7 +76,10 @@ export function CyclesDashboard() {
             phaseBg = 'bg-cyan-500/10';
             phaseBorder = 'border-cyan-500/30';
             phaseProgressBg = 'bg-cyan-500/20';
-            phaseProgressBar = 'bg-cyan-500';
+            phaseProgressStyle = {
+              background: 'linear-gradient(90deg, #2dd4bf, #06b6d4, #0891b2)',
+              boxShadow: '0 0 8px rgba(6,182,212,0.7), 0 0 18px rgba(6,182,212,0.3)',
+            };
             phaseLabel = 'Clonagem';
           } else if (cycle.phase === 'FLORA') {
             PhaseIcon = Leaf;
@@ -76,7 +87,10 @@ export function CyclesDashboard() {
             phaseBg = 'bg-purple-500/10';
             phaseBorder = 'border-purple-500/30';
             phaseProgressBg = 'bg-purple-500/20';
-            phaseProgressBar = 'bg-purple-500';
+            phaseProgressStyle = {
+              background: 'linear-gradient(90deg, #818cf8, #a78bfa, #c084fc, #a855f7)',
+              boxShadow: '0 0 8px rgba(168,85,247,0.8), 0 0 20px rgba(139,92,246,0.4)',
+            };
             phaseLabel = 'Floração';
           } else {
             // VEGA (padrão)
@@ -114,7 +128,7 @@ export function CyclesDashboard() {
                   )}
                 </div>
                 {(cycle.phase === 'VEGA' || cycle.phase === 'FLORA') && (
-                  <Progress value={cycle.progress} className={`h-2 ${phaseProgressBg}`} indicatorClassName={phaseProgressBar} />
+                  <Progress value={cycle.progress} className={`h-2 ${phaseProgressBg}`} indicatorStyle={phaseProgressStyle} />
                 )}
               </div>
 
