@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sprout, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { format, subDays } from "date-fns";
+import { format, subDays, differenceInHours, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageTransition } from "@/components/PageTransition";
 import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
@@ -211,61 +213,245 @@ export default function TentDetails() {
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
         <div className="container py-4 md:py-6">
-          <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
-            <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="icon">
-                <Link href="/">
-                  <ArrowLeft className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            {/* Voltar */}
+            <Button asChild variant="ghost" size="icon" className="shrink-0">
+              <Link href="/">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+
+            {/* Ícone + Título */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center shrink-0">
+                <TentIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{tent.name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    {tent.category} • {tent.width}×{tent.depth}×{tent.height}cm
+                  </p>
+                  {/* Freshness badge — último registro */}
+                  {logs && logs.length > 0 && (() => {
+                    const lastLogDate = new Date(logs[0].logDate);
+                    const hoursAgo = differenceInHours(new Date(), lastLogDate);
+                    const daysAgo = differenceInDays(new Date(), lastLogDate);
+                    if (hoursAgo < 24) return (
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                        {hoursAgo === 0 ? 'Agora' : `${hoursAgo}h atrás`}
+                      </span>
+                    );
+                    if (daysAgo === 1) return (
+                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                        Ontem
+                      </span>
+                    );
+                    return (
+                      <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                        {daysAgo}d sem registro
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div className="flex items-center gap-2 shrink-0 print-hide">
+              <Badge className={`${phaseInfo.color} text-white border-0 text-xs hidden sm:inline-flex`}>{phaseInfo.phase}</Badge>
+              <Button asChild size="sm" className="hidden sm:flex gap-1.5">
+                <Link href={`/tent/${tentId}/log`}>
+                  <Plus className="w-4 h-4" />
+                  Novo Registro
                 </Link>
               </Button>
-              <div className="flex-1">
-                <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2 md:gap-3">
-                  <Sprout className="w-6 h-6 md:w-7 md:h-7 text-primary" />
-                  {tent.name}
-                </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Tipo {tent.category} • {tent.width}×{tent.depth}×{tent.height}cm
-                </p>
-              </div>
-              <Badge className={`${phaseInfo.color} text-white border-0 text-xs md:text-sm`}>{phaseInfo.phase}</Badge>
-            </div>
-            <div className="flex gap-2 md:ml-auto print-hide">
-              <Button
-                variant="outline"
-                size="icon"
-                className="text-muted-foreground hover:text-foreground"
-                onClick={() => setEditTentOpen(true)}
-                title="Editar estufa"
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-                onClick={() => setDeleteConfirmOpen(true)}
-                title="Excluir estufa"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" onClick={handleShare} className="flex-1 md:flex-none" title="Compartilhar">
-                <Share2 className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Compartilhar</span>
-              </Button>
-              <Button variant="outline" onClick={handlePrint} className="flex-1 md:flex-none">
-                <Printer className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Imprimir</span>
-              </Button>
-              <Button asChild className="flex-1 md:flex-none">
-                <Link href={`/tent/${tentId}/log`}>Novo Registro</Link>
-              </Button>
+              {/* Dropdown de ações secundárias */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {/* "Novo Registro" só aparece no dropdown em mobile */}
+                  <DropdownMenuItem asChild className="sm:hidden">
+                    <Link href={`/tent/${tentId}/log`} className="flex items-center gap-2 cursor-pointer">
+                      <Plus className="w-4 h-4" />
+                      Novo Registro
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setEditTentOpen(true)} className="gap-2">
+                    <Pencil className="w-4 h-4" />
+                    Editar Estufa
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShare} className="gap-2">
+                    <Share2 className="w-4 h-4" />
+                    Compartilhar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handlePrint} className="gap-2">
+                    <Printer className="w-4 h-4" />
+                    Imprimir
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Excluir Estufa
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="container py-8 max-w-7xl">
+      <main className="container py-6 max-w-7xl space-y-6">
+
+        {/* ── Stat cards do ÚLTIMO registro ── */}
+        {(() => {
+          const last = logs?.[0];
+          type StatCard = { label: string; value: string; unit: string; icon: React.ReactNode; ok: boolean | null };
+          const stats: StatCard[] = [
+            {
+              label: "Temperatura",
+              value: last?.tempC ? parseFloat(last.tempC).toFixed(1) : "—",
+              unit: "°C",
+              icon: <ThermometerSun className="w-4 h-4 text-orange-500" />,
+              ok: last?.tempC ? (parseFloat(last.tempC) >= 20 && parseFloat(last.tempC) <= 28) : null,
+            },
+            {
+              label: "Umidade",
+              value: last?.rhPct ? parseFloat(last.rhPct).toFixed(0) : "—",
+              unit: "%",
+              icon: <Droplets className="w-4 h-4 text-blue-500" />,
+              ok: last?.rhPct ? (parseFloat(last.rhPct) >= 40 && parseFloat(last.rhPct) <= 70) : null,
+            },
+            {
+              label: "PPFD",
+              value: last?.ppfd ? String(last.ppfd) : "—",
+              unit: "µmol",
+              icon: <Sun className="w-4 h-4 text-yellow-500" />,
+              ok: last?.ppfd ? (last.ppfd >= 400 && last.ppfd <= 900) : null,
+            },
+            {
+              label: "pH",
+              value: last?.ph ? parseFloat(last.ph).toFixed(1) : "—",
+              unit: "",
+              icon: <TestTube className="w-4 h-4 text-purple-500" />,
+              ok: last?.ph ? (parseFloat(last.ph) >= 5.8 && parseFloat(last.ph) <= 6.5) : null,
+            },
+            {
+              label: "EC",
+              value: last?.ec ? parseFloat(last.ec).toFixed(1) : "—",
+              unit: "mS",
+              icon: <Zap className="w-4 h-4 text-emerald-500" />,
+              ok: last?.ec ? (parseFloat(last.ec) >= 1.0 && parseFloat(last.ec) <= 2.5) : null,
+            },
+          ];
+          return (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  Último registro
+                  {last && (
+                    <span className="text-xs text-muted-foreground/70 ml-1">
+                      {format(new Date(last.logDate), "dd/MM HH:mm", { locale: ptBR })}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {stats.map((s) => (
+                  <div
+                    key={s.label}
+                    className={`rounded-xl border p-3 flex flex-col gap-1 ${
+                      s.ok === null
+                        ? "bg-muted/40 border-border"
+                        : s.ok
+                        ? "bg-emerald-500/5 border-emerald-500/20"
+                        : "bg-red-500/5 border-red-500/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {s.icon}
+                      <span className="text-[10px] text-muted-foreground font-medium truncate">{s.label}</span>
+                    </div>
+                    <p className={`text-xl font-bold leading-none ${
+                      s.ok === null ? "text-muted-foreground" : s.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                    }`}>
+                      {s.value}
+                      {s.unit && <span className="text-xs font-normal ml-0.5 text-muted-foreground">{s.unit}</span>}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Progress bar do ciclo ── */}
+        {cycle && tent.category !== 'MAINTENANCE' && (() => {
+          const startDate = new Date(cycle.startDate);
+          const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
+          const totalDays = Math.floor((Date.now() - startDate.getTime()) / (24 * 60 * 60 * 1000));
+          const weekNum = Math.floor(totalDays / 7) + 1;
+
+          // Estima total de semanas: vega ≈ 8, flora ≈ 8
+          const vegaWeeks = 8;
+          const floraWeeks = 8;
+          const isFlora = !!floraStart;
+          const totalEstWeeks = vegaWeeks + floraWeeks;
+          const progressPct = Math.min((weekNum / totalEstWeeks) * 100, 100);
+
+          const phases = [
+            { label: "Clonagem", range: "Sem 1-2", active: !isFlora && weekNum <= 2 },
+            { label: "Vega", range: "Sem 3-8", active: !isFlora && weekNum > 2 },
+            { label: "Flora", range: "Sem 9-16", active: isFlora },
+            { label: "Colheita", range: "", active: false },
+          ];
+
+          return (
+            <Card className="bg-card/90">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-foreground">
+                    Semana <span className="text-primary text-base">{weekNum}</span>
+                    <span className="text-muted-foreground font-normal"> / ~{totalEstWeeks} estimadas</span>
+                  </p>
+                  <span className="text-xs text-muted-foreground">{Math.round(progressPct)}%</span>
+                </div>
+                {/* Barra */}
+                <div className="h-2 rounded-full bg-muted overflow-hidden mb-3">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-700"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                {/* Marcadores de fase */}
+                <div className="grid grid-cols-4 gap-1">
+                  {phases.map((p) => (
+                    <div key={p.label} className="flex flex-col items-center gap-0.5">
+                      <div className={`w-2 h-2 rounded-full ${p.active ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                      <span className={`text-[10px] font-medium text-center leading-tight ${p.active ? 'text-primary' : 'text-muted-foreground/60'}`}>
+                        {p.label}
+                      </span>
+                      {p.range && <span className="text-[9px] text-muted-foreground/40">{p.range}</span>}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         {/* Cycle Info */}
         {cycle && (
           <Card className="bg-card/90 backdrop-blur-sm mb-6">
