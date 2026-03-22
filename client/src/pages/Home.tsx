@@ -1050,12 +1050,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               style={{
                 background:
                   tent.category === 'VEGA'
-                    ? 'linear-gradient(135deg, rgba(34,197,94,0.13) 0%, rgba(16,185,129,0.06) 60%, rgba(34,197,94,0.02) 100%)'
+                    ? 'linear-gradient(135deg, rgba(34,197,94,0.22) 0%, rgba(16,185,129,0.10) 60%, rgba(34,197,94,0.03) 100%)'
                     : tent.category === 'FLORA'
-                    ? 'linear-gradient(135deg, rgba(168,85,247,0.14) 0%, rgba(139,92,246,0.07) 60%, rgba(168,85,247,0.02) 100%)'
+                    ? 'linear-gradient(135deg, rgba(168,85,247,0.24) 0%, rgba(139,92,246,0.11) 60%, rgba(168,85,247,0.03) 100%)'
                     : tent.category === 'DRYING'
-                    ? 'linear-gradient(135deg, rgba(245,158,11,0.13) 0%, rgba(234,179,8,0.06) 60%, rgba(245,158,11,0.02) 100%)'
-                    : 'linear-gradient(135deg, rgba(59,130,246,0.13) 0%, rgba(99,102,241,0.07) 60%, rgba(59,130,246,0.02) 100%)',
+                    ? 'linear-gradient(135deg, rgba(245,158,11,0.22) 0%, rgba(234,179,8,0.10) 60%, rgba(245,158,11,0.03) 100%)'
+                    : 'linear-gradient(135deg, rgba(59,130,246,0.22) 0%, rgba(99,102,241,0.10) 60%, rgba(59,130,246,0.03) 100%)',
               }}
             >
               <div className="flex justify-between items-center">
