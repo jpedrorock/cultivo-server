@@ -424,38 +424,38 @@ export default function PlantsList() {
                                 ? 'border-purple-500/25 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 hover:scale-[1.01]'
                                 : 'hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.01]'
                           }}`}>
-                            <CardHeader>
-                              <div className="flex items-start justify-between gap-2">
+                            <CardHeader className="pb-3">
+                              {/* Linha 1: checkbox + nome + status */}
+                              <div className="flex items-center gap-2">
                                 <Checkbox
                                   checked={selectedPlants.has(plant.id)}
                                   onCheckedChange={() => togglePlantSelection(plant.id)}
-                                  className="mt-1"
                                 />
-                                <Link href={`/plants/${plant.id}`} className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <CardTitle className="text-lg hover:text-primary transition-colors cursor-pointer">
-                                      {plant.name}
-                                    </CardTitle>
-                                    {/* Badge de Muda vs Planta */}
-                                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${
-                                      plant.plantStage === "SEEDLING" 
-                                        ? "bg-green-500/10 text-green-600 border-green-500/30" 
-                                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                                    }`}>
-                                      {plant.plantStage === "SEEDLING" ? "🌱 Muda" : "🌿 Planta"}
-                                    </span>
-                                  </div>
-                                  {plant.code && (
-                                    <CardDescription className="text-sm font-mono">{plant.code}</CardDescription>
-                                  )}
+                                <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0">
+                                  <CardTitle className="text-base leading-tight hover:text-primary transition-colors cursor-pointer truncate">
+                                    {plant.name}
+                                  </CardTitle>
                                 </Link>
-                                <div className={`px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(plant.status)}`}>
+                                <div className={`shrink-0 px-2 py-0.5 rounded-md text-xs font-medium border ${getStatusColor(plant.status)}`}>
                                   {getStatusLabel(plant.status)}
                                 </div>
                               </div>
+                              {/* Linha 2: código + tipo */}
+                              <div className="flex items-center gap-2 mt-1 ml-6">
+                                {plant.code && (
+                                  <span className="text-xs font-mono text-muted-foreground">{plant.code}</span>
+                                )}
+                                {plant.code && <span className="text-muted-foreground/40 text-xs">·</span>}
+                                <span className={`text-xs font-medium ${
+                                  plant.plantStage === "SEEDLING" ? "text-green-500" : "text-emerald-500"
+                                }`}>
+                                  {plant.plantStage === "SEEDLING" ? "🌱 Muda" : "🌿 Planta"}
+                                </span>
+                              </div>
                             </CardHeader>
-                            <CardContent className="space-y-3">
-                              {/* Última foto da planta */}
+
+                            <CardContent className="space-y-3 pt-0">
+                              {/* Foto */}
                               {plant.lastHealthPhotoUrl && (
                                 <LazyImage
                                   src={plant.lastHealthPhotoUrl}
@@ -465,68 +465,64 @@ export default function PlantsList() {
                                 />
                               )}
 
-                              {/* Indicadores visuais */}
-                              <div className="flex flex-wrap gap-2">
-                                {/* Fase do Ciclo — sistema de cores por fase (consistente com cards de estufa) */}
+                              {/* Fase + Saúde — mesmo tamanho, mesma linha */}
+                              <div className="flex items-center gap-2 flex-wrap">
                                 {plant.cyclePhase && plant.cycleWeek && (
-                                  <div className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1.5 ${
+                                  <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${
                                     plant.cyclePhase === 'VEGA'
-                                      ? 'bg-green-500/8 border-green-500/20 text-green-700 dark:bg-green-500/10 dark:border-green-500/25 dark:text-green-400'
-                                      : 'bg-purple-500/8 border-purple-500/20 text-purple-700 dark:bg-purple-500/10 dark:border-purple-500/25 dark:text-purple-400'
+                                      ? 'bg-green-500/10 border-green-500/25 text-green-400'
+                                      : 'bg-purple-500/10 border-purple-500/25 text-purple-400'
                                   }`}>
-                                    <span>{plant.cyclePhase === 'VEGA' ? '🌱' : '🌸'}</span>
-                                    <span>{plant.cyclePhase === 'VEGA' ? 'Vega' : 'Flora'}</span>
-                                    <span className="ml-auto font-bold">Sem. {plant.cycleWeek}</span>
-                                  </div>
+                                    {plant.cyclePhase === 'VEGA' ? '🌱' : '🌸'} {plant.cyclePhase === 'VEGA' ? 'Vega' : 'Flora'} · Sem. {plant.cycleWeek}
+                                  </span>
                                 )}
-                                {/* Saúde */}
                                 {plant.lastHealthStatus && (
-                                  <div className={`px-2 py-1 rounded-md text-xs font-medium ${
-                                    plant.lastHealthStatus === "HEALTHY" ? "bg-green-500/10 text-green-600 border border-green-500/30" :
-                                    plant.lastHealthStatus === "STRESSED" ? "bg-yellow-500/10 text-yellow-600 border border-yellow-500/30" :
-                                    plant.lastHealthStatus === "SICK" ? "bg-red-500/10 text-red-600 border border-red-500/30" :
-                                    "bg-blue-500/10 text-blue-600 border border-blue-500/30"
+                                  <span className={`px-2 py-1 rounded-md text-xs font-medium border ${
+                                    plant.lastHealthStatus === "HEALTHY" ? "bg-green-500/10 border-green-500/25 text-green-400" :
+                                    plant.lastHealthStatus === "STRESSED" ? "bg-yellow-500/10 border-yellow-500/25 text-yellow-400" :
+                                    plant.lastHealthStatus === "SICK" ? "bg-red-500/10 border-red-500/25 text-red-400" :
+                                    "bg-blue-500/10 border-blue-500/25 text-blue-400"
                                   }`}>
                                     {plant.lastHealthStatus === "HEALTHY" ? "💚 Saudável" :
                                      plant.lastHealthStatus === "STRESSED" ? "💛 Estressada" :
                                      plant.lastHealthStatus === "SICK" ? "❤️ Doente" :
                                      "💙 Recuperando"}
-                                  </div>
+                                  </span>
                                 )}
                               </div>
 
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Strain:</span>
-                                  <span className="font-medium">{getStrainName(plant.strainId)}</span>
-                                </div>
-                              </div>
+                              {/* Strain inline */}
+                              <p className="text-xs text-muted-foreground truncate">
+                                🧬 {getStrainName(plant.strainId)}
+                              </p>
 
-                              <div className="flex gap-2">
+                              {/* Ações */}
+                              <div className="flex items-center gap-2 pt-1">
                                 <Link
                                   href={`/plants/${plant.id}`}
-                                  className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground h-8 px-3 transition-all duration-150 ease-out hover:bg-primary/90 hover:scale-[1.03] hover:shadow-md hover:shadow-primary/30 active:scale-95"
+                                  className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium bg-gradient-to-br from-emerald-400 to-green-600 text-white h-8 px-3 shadow-[0_0_8px_rgba(74,222,128,0.2)] hover:shadow-[0_0_12px_rgba(74,222,128,0.35)] hover:scale-[1.02] active:scale-95 transition-all duration-150"
                                 >
                                   Ver Planta
                                 </Link>
                                 {plant.status === "ACTIVE" && (
                                   <AnimatedButton
                                     variant="outline"
-                                    size="sm"
-                                    className="flex-1 gap-1 hover:scale-[1.03] hover:border-primary/40 hover:shadow-sm active:scale-95 transition-all duration-150"
+                                    size="icon-sm"
+                                    className="hover:scale-[1.05] hover:border-primary/40 hover:bg-primary/10 hover:text-primary active:scale-95 transition-all duration-150"
+                                    title="Mover planta"
                                     onClick={() => handleMovePlant(plant, tent.id)}
                                   >
-                                    <MoveRight className="w-3 h-3" />
-                                    Mover
+                                    <MoveRight className="w-3.5 h-3.5" />
                                   </AnimatedButton>
                                 )}
                                 <AnimatedButton
                                   variant="outline"
-                                  size="sm"
-                                  className="gap-1 hover:scale-[1.03] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500 active:scale-95 transition-all duration-150"
+                                  size="icon-sm"
+                                  className="hover:scale-[1.05] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500 active:scale-95 transition-all duration-150"
+                                  title="Excluir planta"
                                   onClick={() => setDeletePlantDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </AnimatedButton>
                               </div>
                             </CardContent>
