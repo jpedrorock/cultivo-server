@@ -1228,12 +1228,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           {/* KPI Metrics — rich typography with Geist */}
           <div className="grid grid-cols-4 gap-2 pt-4 border-t border-border/60">
             {/* Temperature */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-orange-500/5 border border-orange-500/10">
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-orange-500/15" style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(234,88,12,0.08) 60%, rgba(249,115,22,0.02) 100%)' }}>
               <ThermometerSun className="w-4 h-4 text-orange-500 mb-0.5" />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Temp</p>
               <div className="flex items-center gap-0.5">
                 <p className={`text-base font-bold tracking-tight leading-none ${
-                  latestLog?.tempC 
+                  latestLog?.tempC
                     ? getValueColor(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)
                     : "text-foreground"
                 }`}>
@@ -1243,12 +1243,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               </div>
             </div>
             {/* Humidity */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-blue-500/5 border border-blue-500/10">
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-blue-500/15" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(37,99,235,0.08) 60%, rgba(59,130,246,0.02) 100%)' }}>
               <Droplets className="w-4 h-4 text-blue-500 mb-0.5" />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">RH</p>
               <div className="flex items-center gap-0.5">
                 <p className={`text-base font-bold tracking-tight leading-none ${
-                  latestLog?.rhPct 
+                  latestLog?.rhPct
                     ? getValueColor(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)
                     : "text-foreground"
                 }`}>
@@ -1258,12 +1258,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               </div>
             </div>
             {/* PPFD */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-yellow-500/15" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(202,138,4,0.08) 60%, rgba(234,179,8,0.02) 100%)' }}>
               <Sun className="w-4 h-4 text-yellow-500 dark:text-yellow-400 mb-0.5" />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PPFD</p>
               <div className="flex items-center gap-0.5">
                 <p className={`text-base font-bold tracking-tight leading-none ${
-                  latestLog?.ppfd 
+                  latestLog?.ppfd
                     ? getValueColor(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)
                     : "text-foreground"
                 }`}>
@@ -1273,7 +1273,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               </div>
             </div>
             {/* Photoperiod */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg bg-purple-500/5 border border-purple-500/10">
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-purple-500/15" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(139,92,246,0.08) 60%, rgba(168,85,247,0.02) 100%)' }}>
               <Clock className="w-4 h-4 text-purple-500 mb-0.5" />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Foto</p>
               <p className="text-base font-bold tracking-tight leading-none text-foreground">
