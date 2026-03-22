@@ -97,8 +97,15 @@ export function CyclesDashboard() {
             phaseLabel = 'Vegetativa';
           }
 
+          const gradientBorder =
+            cycle.phase === 'MAINTENANCE' ? 'linear-gradient(135deg, #60a5fa, #3b82f6, #6366f1)'
+            : cycle.phase === 'CLONING'    ? 'linear-gradient(135deg, #2dd4bf, #06b6d4, #0891b2)'
+            : cycle.phase === 'FLORA'      ? 'linear-gradient(135deg, #818cf8, #a78bfa, #a855f7)'
+            :                               'linear-gradient(135deg, #4ade80, #22c55e, #16a34a)';
+
           return (
-            <Card key={cycle.id} className={`p-6 border-2 ${phaseBorder}`}>
+            <div key={cycle.id} style={{ background: gradientBorder, padding: '1.5px', borderRadius: '0.75rem' }}>
+            <Card className="p-6 border-0 rounded-[10px]" style={{ background: 'hsl(var(--card))' }}>
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -167,6 +174,7 @@ export function CyclesDashboard() {
 
 
             </Card>
+            </div>
           );
         })}
       </div>

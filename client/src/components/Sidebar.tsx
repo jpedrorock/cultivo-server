@@ -100,9 +100,13 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150",
                 isActive
-                  ? "bg-primary/10 text-primary font-semibold shadow-sm ring-1 ring-primary/15"
+                  ? "text-primary font-semibold shadow-sm"
                   : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
               )}
+              style={isActive ? {
+                background: 'linear-gradient(135deg, rgba(34,197,94,0.18) 0%, rgba(16,185,129,0.08) 60%, rgba(34,197,94,0.02) 100%)',
+                boxShadow: 'inset 0 0 0 1px rgba(34,197,94,0.2)',
+              } : undefined}
             >
               <Icon className={cn(
                 "w-4.5 h-4.5 shrink-0",
@@ -162,7 +166,7 @@ export function Sidebar() {
         </Link>
 
         {/* Status pill */}
-        <div className="mt-3 mx-1 px-3 py-2.5 bg-primary/8 rounded-xl border border-primary/12">
+        <div className="mt-3 mx-1 px-3 py-2.5 rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.18) 0%, rgba(16,185,129,0.08) 60%, rgba(34,197,94,0.02) 100%)', boxShadow: 'inset 0 0 0 1px rgba(34,197,94,0.22)' }}>
           {/* Row 1: Sistema Ativo dot */}
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
