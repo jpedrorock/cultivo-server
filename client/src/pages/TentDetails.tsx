@@ -94,6 +94,12 @@ export default function TentDetails() {
     tentId,
   });
 
+  // Filter logs by dateRange client-side for charts/averages (must be before conditional returns — Rules of Hooks)
+  const filteredLogs = useMemo(() => {
+    if (!logs) return [];
+    return logs.filter((log) => new Date(log.logDate) >= dateFilter.startDate);
+  }, [logs, dateFilter.startDate]);
+
   if (tentLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -184,12 +190,6 @@ export default function TentDetails() {
       }
     }
   };
-
-  // Filter logs by dateRange client-side for charts/averages
-  const filteredLogs = useMemo(() => {
-    if (!logs) return [];
-    return logs.filter((log) => new Date(log.logDate) >= dateFilter.startDate);
-  }, [logs, dateFilter.startDate]);
 
   // Prepare chart data (filtered by period)
   const chartData = filteredLogs.map((log) => ({
