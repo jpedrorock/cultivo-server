@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TrendingUp, Droplets, Sun, FlaskConical } from "lucide-react";
@@ -87,33 +87,31 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-red-500" />
+                <TrendingUp className="w-5 h-5 text-orange-500" />
                 Temperatura
               </CardTitle>
               <CardDescription>Evolução da temperatura ao longo do tempo</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="acGradTemp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#f97316" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
                   <XAxis dataKey="date" className="text-xs" />
                   <YAxis domain={['dataMin - 2', 'dataMax + 2']} className="text-xs" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="temp" 
-                    stroke="#ef4444" 
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    name="Temp (°C)"
-                    connectNulls
-                    animationDuration={800}
-                    animationBegin={0}
-                    animationEasing="ease-out"
-                  />
-                  <Brush dataKey="date" height={30} stroke="#ef4444" fill="transparent" />
-                </LineChart>
+                  <Area type="monotone" dataKey="temp" stroke="#f97316" strokeWidth={2.5}
+                    fill="url(#acGradTemp)" dot={{ r: 3.5, fill: "#f97316", strokeWidth: 0 }}
+                    activeDot={{ r: 5 }} name="Temp (°C)" connectNulls
+                    animationDuration={800} animationEasing="ease-out" />
+                  <Brush dataKey="date" height={28} stroke="#f97316" fill="transparent" />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -131,26 +129,24 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="acGradRh" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
                   <XAxis dataKey="date" className="text-xs" />
                   <YAxis domain={[0, 100]} className="text-xs" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="rh" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    name="RH (%)"
-                    connectNulls
-                    animationDuration={800}
-                    animationBegin={0}
-                    animationEasing="ease-out"
-                  />
-                  <Brush dataKey="date" height={30} stroke="#3b82f6" fill="transparent" />
-                </LineChart>
+                  <Area type="monotone" dataKey="rh" stroke="#3b82f6" strokeWidth={2.5}
+                    fill="url(#acGradRh)" dot={{ r: 3.5, fill: "#3b82f6", strokeWidth: 0 }}
+                    activeDot={{ r: 5 }} name="RH (%)" connectNulls
+                    animationDuration={800} animationEasing="ease-out" />
+                  <Brush dataKey="date" height={28} stroke="#3b82f6" fill="transparent" />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -168,26 +164,24 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="acGradPpfd" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#eab308" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
                   <XAxis dataKey="date" className="text-xs" />
                   <YAxis domain={['dataMin - 50', 'dataMax + 50']} className="text-xs" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="ppfd" 
-                    stroke="#eab308" 
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                    name="PPFD (μmol/m²/s)"
-                    connectNulls
-                    animationDuration={800}
-                    animationBegin={0}
-                    animationEasing="ease-out"
-                  />
-                  <Brush dataKey="date" height={30} stroke="#eab308" fill="transparent" />
-                </LineChart>
+                  <Area type="monotone" dataKey="ppfd" stroke="#eab308" strokeWidth={2.5}
+                    fill="url(#acGradPpfd)" dot={{ r: 3.5, fill: "#eab308", strokeWidth: 0 }}
+                    activeDot={{ r: 5 }} name="PPFD (μmol/m²/s)" connectNulls
+                    animationDuration={800} animationEasing="ease-out" />
+                  <Brush dataKey="date" height={28} stroke="#eab308" fill="transparent" />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -205,45 +199,37 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="acGradPh" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="acGradEc" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#a855f7" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
                   <XAxis dataKey="date" className="text-xs" />
                   <YAxis yAxisId="left" domain={[0, 14]} className="text-xs" />
                   <YAxis yAxisId="right" orientation="right" domain={[0, 'dataMax + 0.5']} className="text-xs" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   {hasPHData && (
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="ph" 
-                      stroke="#22c55e" 
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      name="pH"
-                      connectNulls
-                      animationDuration={800}
-                      animationBegin={0}
-                      animationEasing="ease-out"
-                    />
+                    <Area yAxisId="left" type="monotone" dataKey="ph" stroke="#22c55e" strokeWidth={2.5}
+                      fill="url(#acGradPh)" dot={{ r: 3.5, fill: "#22c55e", strokeWidth: 0 }}
+                      activeDot={{ r: 5 }} name="pH" connectNulls
+                      animationDuration={800} animationEasing="ease-out" />
                   )}
                   {hasECData && (
-                    <Line 
-                      yAxisId="right"
-                      type="monotone" 
-                      dataKey="ec" 
-                      stroke="#a855f7" 
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      name="EC (mS/cm)"
-                      connectNulls
-                      animationDuration={800}
-                      animationBegin={100}
-                      animationEasing="ease-out"
-                    />
+                    <Area yAxisId="right" type="monotone" dataKey="ec" stroke="#a855f7" strokeWidth={2.5}
+                      fill="url(#acGradEc)" dot={{ r: 3.5, fill: "#a855f7", strokeWidth: 0 }}
+                      activeDot={{ r: 5 }} name="EC (mS/cm)" connectNulls
+                      animationDuration={800} animationEasing="ease-out" />
                   )}
-                  <Brush dataKey="date" height={30} stroke="#a855f7" fill="transparent" />
-                </LineChart>
+                  <Brush dataKey="date" height={28} stroke="#a855f7" fill="transparent" />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>

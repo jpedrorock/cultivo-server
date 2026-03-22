@@ -90,9 +90,8 @@ export default function TentDetails() {
     };
   }, [dateRange]);
 
-  const { data: logs, isLoading: logsLoading } = trpc.dailyLogs.list.useQuery({
+  const { data: logs, isLoading: logsLoading, isError: logsError } = trpc.dailyLogs.list.useQuery({
     tentId,
-    ...dateFilter,
   });
 
   if (tentLoading) {
@@ -186,25 +185,31 @@ export default function TentDetails() {
     }
   };
 
-  // Prepare chart data
-  const chartData = logs?.map((log) => ({
+  // Filter logs by dateRange client-side for charts/averages
+  const filteredLogs = useMemo(() => {
+    if (!logs) return [];
+    return logs.filter((log) => new Date(log.logDate) >= dateFilter.startDate);
+  }, [logs, dateFilter.startDate]);
+
+  // Prepare chart data (filtered by period)
+  const chartData = filteredLogs.map((log) => ({
     date: format(new Date(log.logDate), "dd/MM", { locale: ptBR }),
     fullDate: format(new Date(log.logDate), "dd/MM/yyyy HH:mm", { locale: ptBR }),
     turn: log.turn,
     temp: log.tempC ? parseFloat(log.tempC) : null,
     rh: log.rhPct ? parseFloat(log.rhPct) : null,
     ppfd: log.ppfd || null,
-  })) || [];
+  }));
 
-  // Calculate averages
-  const avgTemp = logs?.length
-    ? (logs.reduce((sum, log) => sum + (log.tempC ? parseFloat(log.tempC) : 0), 0) / logs.filter(l => l.tempC).length).toFixed(1)
+  // Calculate averages (filtered by period)
+  const avgTemp = filteredLogs.length
+    ? (filteredLogs.reduce((sum, log) => sum + (log.tempC ? parseFloat(log.tempC) : 0), 0) / filteredLogs.filter(l => l.tempC).length).toFixed(1)
     : "--";
-  const avgRh = logs?.length
-    ? (logs.reduce((sum, log) => sum + (log.rhPct ? parseFloat(log.rhPct) : 0), 0) / logs.filter(l => l.rhPct).length).toFixed(1)
+  const avgRh = filteredLogs.length
+    ? (filteredLogs.reduce((sum, log) => sum + (log.rhPct ? parseFloat(log.rhPct) : 0), 0) / filteredLogs.filter(l => l.rhPct).length).toFixed(1)
     : "--";
-  const avgPpfd = logs?.length
-    ? Math.round(logs.reduce((sum, log) => sum + (log.ppfd || 0), 0) / logs.filter(l => l.ppfd).length)
+  const avgPpfd = filteredLogs.length
+    ? Math.round(filteredLogs.reduce((sum, log) => sum + (log.ppfd || 0), 0) / filteredLogs.filter(l => l.ppfd).length)
     : "--";
 
   return (
@@ -846,6 +851,13 @@ export default function TentDetails() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
+            ) : logsError ? (
+              <Card className="bg-card/90 backdrop-blur-sm">
+                <CardContent className="p-12 text-center">
+                  <p className="text-destructive font-medium mb-2">Erro ao carregar registros</p>
+                  <p className="text-sm text-muted-foreground">Tente recarregar a página.</p>
+                </CardContent>
+              </Card>
             ) : logs && logs.length > 0 ? (
               <div className="space-y-4">
                 {logs.map((log) => (
@@ -943,8 +955,9 @@ export default function TentDetails() {
             ) : (
               <Card className="bg-card/90 backdrop-blur-sm">
                 <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">Nenhum registro encontrado para este período</p>
-                  <Button asChild className="mt-4">
+                  <p className="text-muted-foreground font-medium mb-1">Nenhum registro encontrado</p>
+                  <p className="text-sm text-muted-foreground mb-4">Comece registrando as condições da estufa diariamente.</p>
+                  <Button asChild>
                     <Link href={`/tent/${tentId}/log`}>Criar Primeiro Registro</Link>
                   </Button>
                 </CardContent>
