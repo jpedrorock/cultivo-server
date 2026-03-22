@@ -418,10 +418,12 @@ export default function PlantsList() {
                             <Card className={`border-2 transition-all duration-200 ease-out group cursor-pointer overflow-hidden ${
                             selectedPlants.has(plant.id)
                               ? "border-primary bg-primary/10 dark:bg-primary/15 shadow-lg shadow-primary/20 dark:shadow-primary/25"
-                              : plant.cyclePhase === 'VEGA'
-                                ? 'border-green-500/25 hover:border-green-500/50 hover:shadow-xl hover:shadow-green-500/10 hover:-translate-y-1 hover:scale-[1.01]'
-                                : plant.cyclePhase === 'FLORA'
+                              : tent.category === 'MAINTENANCE'
+                                ? 'border-blue-500/25 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-1 hover:scale-[1.01]'
+                                : tent.category === 'FLORA' || plant.cyclePhase === 'FLORA'
                                 ? 'border-purple-500/25 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 hover:scale-[1.01]'
+                                : tent.category === 'VEGA' || plant.cyclePhase === 'VEGA'
+                                ? 'border-green-500/25 hover:border-green-500/50 hover:shadow-xl hover:shadow-green-500/10 hover:-translate-y-1 hover:scale-[1.01]'
                                 : 'hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.01]'
                           }}`}>
                             <CardHeader className="pb-3">
@@ -467,7 +469,11 @@ export default function PlantsList() {
 
                               {/* Fase + Saúde — mesmo tamanho, mesma linha */}
                               <div className="flex items-center gap-2 flex-wrap">
-                                {plant.cyclePhase && plant.cycleWeek && (
+                                {tent.category === 'MAINTENANCE' ? (
+                                  <span className="px-2 py-1 rounded-md text-xs font-semibold border bg-blue-500/10 border-blue-500/25 text-blue-400">
+                                    🔧 Manutenção
+                                  </span>
+                                ) : plant.cyclePhase && plant.cycleWeek && (
                                   <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${
                                     plant.cyclePhase === 'VEGA'
                                       ? 'bg-green-500/10 border-green-500/25 text-green-400'
