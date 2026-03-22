@@ -9,7 +9,7 @@ import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, subDays, differenceInHours, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageTransition } from "@/components/PageTransition";
@@ -713,118 +713,127 @@ export default function TentDetails() {
             ) : (
               <>
                 {/* Temperature Chart */}
-                <Card className="bg-card/90 backdrop-blur-sm border-orange-100">
+                <Card className="bg-card/90 backdrop-blur-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <ThermometerSun className="w-5 h-5 text-orange-600" />
-                      Evolução da Temperatura
+                      <ThermometerSun className="w-5 h-5 text-orange-500" />
+                      Temperatura
                     </CardTitle>
-                    <CardDescription>Temperatura em °C ao longo do tempo</CardDescription>
+                    <CardDescription>Evolução em °C ao longo do tempo</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="date" stroke="#6b7280" />
-                        <YAxis stroke="#6b7280" domain={[15, 30]} />
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart data={chartData}>
+                        <defs>
+                          <linearGradient id="gradTemp" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor="#f97316" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
+                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
+                        <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[15, 35]} />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "8px",
-                          }}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
                         />
-                        <Legend />
-                        <Line
+                        <Area
                           type="monotone"
                           dataKey="temp"
-                          stroke="#ea580c"
-                          strokeWidth={2}
-                          dot={{ fill: "#ea580c", r: 4 }}
+                          stroke="#f97316"
+                          strokeWidth={2.5}
+                          fill="url(#gradTemp)"
+                          dot={{ fill: "#f97316", r: 3.5, strokeWidth: 0 }}
+                          activeDot={{ r: 5, fill: "#f97316" }}
                           name="Temperatura (°C)"
                           animationDuration={800}
-                          animationBegin={0}
                           animationEasing="ease-out"
                         />
-                      </LineChart>
+                      </AreaChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
 
                 {/* Humidity Chart */}
-                <Card className="bg-card/90 backdrop-blur-sm border-blue-100">
+                <Card className="bg-card/90 backdrop-blur-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Droplets className="w-5 h-5 text-blue-600" />
-                      Evolução da Umidade
+                      <Droplets className="w-5 h-5 text-blue-500" />
+                      Umidade Relativa
                     </CardTitle>
-                    <CardDescription>Umidade relativa em % ao longo do tempo</CardDescription>
+                    <CardDescription>Evolução em % ao longo do tempo</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="date" stroke="#6b7280" />
-                        <YAxis stroke="#6b7280" domain={[40, 80]} />
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart data={chartData}>
+                        <defs>
+                          <linearGradient id="gradRh" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
+                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
+                        <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[30, 90]} />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "8px",
-                          }}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
                         />
-                        <Legend />
-                        <Line
+                        <Area
                           type="monotone"
                           dataKey="rh"
-                          stroke="#2563eb"
-                          strokeWidth={2}
-                          dot={{ fill: "#2563eb", r: 4 }}
+                          stroke="#3b82f6"
+                          strokeWidth={2.5}
+                          fill="url(#gradRh)"
+                          dot={{ fill: "#3b82f6", r: 3.5, strokeWidth: 0 }}
+                          activeDot={{ r: 5, fill: "#3b82f6" }}
                           name="Umidade (%)"
                           animationDuration={800}
-                          animationBegin={0}
                           animationEasing="ease-out"
                         />
-                      </LineChart>
+                      </AreaChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
 
                 {/* PPFD Chart */}
-                <Card className="bg-card/90 backdrop-blur-sm border-yellow-100">
+                <Card className="bg-card/90 backdrop-blur-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Sun className="w-5 h-5 text-yellow-600" />
-                      Evolução do PPFD
+                      <Sun className="w-5 h-5 text-yellow-500" />
+                      PPFD
                     </CardTitle>
-                    <CardDescription>PPFD em µmol/m²/s ao longo do tempo</CardDescription>
+                    <CardDescription>Evolução em µmol/m²/s ao longo do tempo</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis dataKey="date" stroke="#6b7280" />
-                        <YAxis stroke="#6b7280" domain={[200, 700]} />
+                    <ResponsiveContainer width="100%" height={280}>
+                      <AreaChart data={chartData}>
+                        <defs>
+                          <linearGradient id="gradPpfd" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor="#eab308" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
+                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
+                        <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 1200]} />
                         <Tooltip
-                          contentStyle={{
-                            backgroundColor: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "8px",
-                          }}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "hsl(var(--foreground))" }}
                         />
-                        <Legend />
-                        <Line
+                        <Area
                           type="monotone"
                           dataKey="ppfd"
-                          stroke="#ca8a04"
-                          strokeWidth={2}
-                          dot={{ fill: "#ca8a04", r: 4 }}
-                          name="PPFD (μmol/m²/s)"
+                          stroke="#eab308"
+                          strokeWidth={2.5}
+                          fill="url(#gradPpfd)"
+                          dot={{ fill: "#eab308", r: 3.5, strokeWidth: 0 }}
+                          activeDot={{ r: 5, fill: "#eab308" }}
+                          name="PPFD (µmol/m²/s)"
                           animationDuration={800}
-                          animationBegin={0}
                           animationEasing="ease-out"
                         />
-                      </LineChart>
+                      </AreaChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
