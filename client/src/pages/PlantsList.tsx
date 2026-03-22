@@ -416,8 +416,8 @@ export default function PlantsList() {
                         {tentPlants.map((plant: any) => (
                           <ListItemAnimation key={plant.id}>
                             <Card className={`border-2 transition-all duration-200 ease-out group cursor-pointer overflow-hidden ${
-                            selectedPlants.has(plant.id) 
-                              ? "border-primary bg-primary/5 shadow-md shadow-primary/10" 
+                            selectedPlants.has(plant.id)
+                              ? "border-primary bg-primary/10 dark:bg-primary/15 shadow-lg shadow-primary/20 dark:shadow-primary/25"
                               : plant.cyclePhase === 'VEGA'
                                 ? 'border-green-500/25 hover:border-green-500/50 hover:shadow-xl hover:shadow-green-500/10 hover:-translate-y-1 hover:scale-[1.01]'
                                 : plant.cyclePhase === 'FLORA'
