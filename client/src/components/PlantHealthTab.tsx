@@ -32,6 +32,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import JSZip from "jszip";
 import { uploadImage } from "@/lib/uploadImage";
 import EditHealthLogDialog from "@/components/EditHealthLogDialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -89,6 +90,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
   const [editingLog, setEditingLog] = useState<any | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "processing" | "uploading" | "success" | "error">("idle");
   const [uploadMessage, setUploadMessage] = useState<string>("");
   
@@ -243,6 +245,44 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
 
   const getStatusOption = (status: string) =>
     STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
+
+  const handleDownloadAllPhotos = async () => {
+    const photoLogs = (healthLogs || []).filter((l: any) => l.photoUrl);
+    if (photoLogs.length === 0) {
+      toast.error("Nenhuma foto encontrada.");
+      return;
+    }
+    setIsDownloadingZip(true);
+    toast.info(`Preparando ${photoLogs.length} foto(s) para download...`);
+    try {
+      const zip = new JSZip();
+      // Ordena da mais antiga para mais nova (ideal para time-lapse)
+      const sorted = [...photoLogs].sort(
+        (a: any, b: any) => new Date(a.logDate).getTime() - new Date(b.logDate).getTime()
+      );
+      await Promise.all(
+        sorted.map(async (log: any, i: number) => {
+          const date = new Date(log.logDate).toISOString().slice(0, 10);
+          const filename = `${String(i + 1).padStart(3, "0")}_${date}.jpg`;
+          const res = await fetch(log.photoUrl);
+          const blob = await res.blob();
+          zip.file(filename, blob);
+        })
+      );
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `fotos-planta-${plantId}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`✅ ${photoLogs.length} foto(s) baixada(s)!`);
+    } catch (e) {
+      toast.error("Erro ao baixar fotos. Tente novamente.");
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-24">
@@ -407,15 +447,31 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
 
       {/* Health Logs Timeline */}
       <div className="space-y-3">
-        <h3 className="text-base font-semibold flex items-center gap-2">
-          <Heart className="w-4 h-4" />
-          Histórico de Saúde
-          {healthLogs && healthLogs.length > 0 && (
-            <span className="text-xs text-muted-foreground font-normal">
-              ({healthLogs.length} registro{healthLogs.length !== 1 ? "s" : ""})
-            </span>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold flex items-center gap-2">
+            <Heart className="w-4 h-4" />
+            Histórico de Saúde
+            {healthLogs && healthLogs.length > 0 && (
+              <span className="text-xs text-muted-foreground font-normal">
+                ({healthLogs.length} registro{healthLogs.length !== 1 ? "s" : ""})
+              </span>
+            )}
+          </h3>
+          {healthLogs && healthLogs.filter((l: any) => l.photoUrl).length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={handleDownloadAllPhotos}
+              disabled={isDownloadingZip}
+            >
+              {isDownloadingZip
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Baixando...</>
+                : <><Download className="w-3.5 h-3.5" /> Baixar fotos ({healthLogs.filter((l: any) => l.photoUrl).length})</>
+              }
+            </Button>
           )}
-        </h3>
+        </div>
         {isLoading ? (
           <HealthTabSkeleton />
         ) : healthLogs && healthLogs.length > 0 ? (
