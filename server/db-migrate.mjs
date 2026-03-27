@@ -5,23 +5,20 @@
  *
  * Para mudanças de schema:
  *   1. Edite drizzle/schema.ts
- *   2. pnpm db:generate  → gera o arquivo de migration
- *   3. Commit + push     → postbuild aplica automaticamente
+ *   2. Adicione o ALTER TABLE em INCREMENTAL_ALTERS abaixo
+ *   3. Commit + push → postbuild aplica automaticamente
  *
  * Uso manual: pnpm db:migrate
  */
 
-import { drizzle } from "drizzle-orm/mysql2";
-import { migrate } from "drizzle-orm/mysql2/migrator";
 import mysql from "mysql2/promise";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname } from "path";
 import { config } from "dotenv";
 
 config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = join(__dirname, "..", "drizzle");
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -29,17 +26,46 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
+/**
+ * ALTER TABLE statements incrementais — adicione aqui cada nova mudança de schema.
+ * São executados com segurança: erros de "coluna/tabela já existe" são ignorados.
+ */
+const INCREMENTAL_ALTERS = [
+  // 2026-03-27: Soft-delete para lixeira de plantas
+  "ALTER TABLE plants ADD COLUMN deletedAt TIMESTAMP NULL DEFAULT NULL",
+];
+
 async function runMigrations() {
-  console.log("🔄 Aplicando migrations pendentes...");
+  console.log("🔄 Verificando schema do banco de dados...");
 
   const connection = await mysql.createConnection(DATABASE_URL);
-  const db = drizzle(connection);
 
   try {
-    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-    console.log("✅ Migrations aplicadas com sucesso — dados preservados.");
+    let appliedCount = 0;
+
+    for (const sql of INCREMENTAL_ALTERS) {
+      try {
+        await connection.execute(sql);
+        console.log(`✅ Aplicado: ${sql.slice(0, 80)}...`);
+        appliedCount++;
+      } catch (e) {
+        // errno 1060 = coluna já existe, errno 1050 = tabela já existe → ok
+        if (e.errno === 1060 || e.errno === 1050) {
+          // já aplicado anteriormente, ignora
+        } else {
+          console.error(`❌ Erro no ALTER: ${e.message}`);
+          throw e;
+        }
+      }
+    }
+
+    if (appliedCount === 0) {
+      console.log("✅ Schema já atualizado — nenhuma alteração necessária.");
+    } else {
+      console.log(`✅ ${appliedCount} alteração(ões) de schema aplicada(s).`);
+    }
   } catch (err) {
-    console.error("❌ Erro ao aplicar migrations:", err.message);
+    console.error("❌ Erro crítico nas migrations:", err.message);
     process.exit(1);
   } finally {
     await connection.end();
