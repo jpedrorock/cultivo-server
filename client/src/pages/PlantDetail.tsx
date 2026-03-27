@@ -69,7 +69,10 @@ export default function PlantDetail() {
   const [discardReason, setDiscardReason] = useState("");
   const haptic = useTactileFeedback();
 
-  const { data: plant, isLoading, isError, refetch } = trpc.plants.getById.useQuery({ id: plantId });
+  const { data: plant, isLoading, isError, refetch } = trpc.plants.getById.useQuery(
+    { id: plantId },
+    { enabled: plantId > 0 }
+  );
   const { data: strain } = trpc.strains.getById.useQuery(
     { id: plant?.strainId || 0 },
     { enabled: !!plant?.strainId }
