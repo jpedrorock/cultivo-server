@@ -5,7 +5,7 @@ import { hashPassword, comparePassword } from "./_core/auth";
 import { users } from "../drizzle/schema";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
 import { z } from "zod";
-import { eq, and, or, desc, asc, sql, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
 import * as db from "./db";
 import { getDb, applyPhaseTransitionLimits } from "./db";
 import {
@@ -2922,6 +2922,9 @@ export const appRouter = router({
           conditions.push(eq(plants.groupId, ctx.user.groupId));
         }
 
+        // Excluir plantas na lixeira (soft-delete)
+        conditions.push(isNull(plants.deletedAt));
+
         // Filtrar apenas plantas ACTIVE por padrão
         if (input.status) {
           conditions.push(eq(plants.status, input.status));
@@ -3433,15 +3436,56 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Excluir planta permanentemente
+    // Mover planta para lixeira (soft-delete)
     delete: protectedProcedure
       .input(z.object({ plantId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        // Delete all related records first (cascade)
+        await database.update(plants).set({ deletedAt: new Date() }).where(eq(plants.id, input.plantId));
+        return { success: true };
+      }),
+
+    // Mover múltiplas plantas para lixeira em massa
+    bulkDelete: protectedProcedure
+      .input(z.object({ plantIds: z.array(z.number()) }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        if (!input.plantIds.length) return { count: 0 };
+        await database.update(plants).set({ deletedAt: new Date() }).where(inArray(plants.id, input.plantIds));
+        return { count: input.plantIds.length };
+      }),
+
+    // Listar plantas na lixeira
+    listDeleted: protectedProcedure
+      .query(async ({ ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        const conditions = [isNotNull(plants.deletedAt)];
+        if (ctx.user.groupId != null) conditions.push(eq(plants.groupId, ctx.user.groupId));
+        return await database.select().from(plants).where(and(...conditions)).orderBy(desc(plants.deletedAt)) as any[];
+      }),
+
+    // Restaurar planta da lixeira
+    restore: protectedProcedure
+      .input(z.object({ plantId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        await database.update(plants).set({ deletedAt: null }).where(eq(plants.id, input.plantId));
+        return { success: true };
+      }),
+
+    // Excluir planta permanentemente (da lixeira)
+    permanentDelete: protectedProcedure
+      .input(z.object({ plantId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
         await database.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
         await database.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
         await database.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
@@ -3449,34 +3493,8 @@ export const appRouter = router({
         await database.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
         await database.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
         await database.delete(plantTentHistory).where(eq(plantTentHistory.plantId, input.plantId));
-        
-        // Delete the plant itself
         await database.delete(plants).where(eq(plants.id, input.plantId));
-        
         return { success: true };
-      }),
-
-    // Excluir múltiplas plantas em massa
-    bulkDelete: protectedProcedure
-      .input(z.object({ plantIds: z.array(z.number()) }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        if (!input.plantIds.length) return { count: 0 };
-
-        // Deletar registros relacionados para todas as plantas
-        await database.delete(plantObservations).where(inArray(plantObservations.plantId, input.plantIds));
-        await database.delete(plantPhotos).where(inArray(plantPhotos.plantId, input.plantIds));
-        await database.delete(plantRunoffLogs).where(inArray(plantRunoffLogs.plantId, input.plantIds));
-        await database.delete(plantHealthLogs).where(inArray(plantHealthLogs.plantId, input.plantIds));
-        await database.delete(plantTrichomeLogs).where(inArray(plantTrichomeLogs.plantId, input.plantIds));
-        await database.delete(plantLSTLogs).where(inArray(plantLSTLogs.plantId, input.plantIds));
-        await database.delete(plantTentHistory).where(inArray(plantTentHistory.plantId, input.plantIds));
-
-        // Deletar as plantas
-        await database.delete(plants).where(inArray(plants.id, input.plantIds));
-
-        return { count: input.plantIds.length };
       }),
 
     // Buscar histórico de movimentação entre estufas

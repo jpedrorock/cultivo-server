@@ -538,6 +538,8 @@ export const plants = mysqlTable(
     finishedAt: timestamp("finishedAt"),
     finishReason: text("finishReason"),
     notes: text("notes"),
+    /** Soft-delete: quando preenchido, a planta está na lixeira */
+    deletedAt: timestamp("deletedAt"),
     /** Grupo ao qual a planta pertence */
     groupId: int("groupId"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

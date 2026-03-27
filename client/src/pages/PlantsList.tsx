@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2 } from "lucide-react";
+import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -120,6 +120,8 @@ export default function PlantsList() {
     plant?: { id: number; name: string };
   }>({ open: false });
 
+  const [showTrash, setShowTrash] = useState(false);
+  const [permanentDeleteDialog, setPermanentDeleteDialog] = useState<{ open: boolean; plant?: { id: number; name: string } }>({ open: false });
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [bulkPromoteConfirm, setBulkPromoteConfirm] = useState(false);
   const [bulkHarvestConfirm, setBulkHarvestConfirm] = useState(false);
@@ -128,7 +130,8 @@ export default function PlantsList() {
   const bulkDelete = trpc.plants.bulkDelete.useMutation({
     onSuccess: (data) => {
       utils.plants.list.invalidate();
-      toast.success(`🗑️ ${data.count} planta(s) excluída(s) com sucesso!`);
+      utils.plants.listDeleted.invalidate();
+      toast.success(`🗑️ ${data.count} planta(s) movida(s) para a lixeira!`);
       setSelectedPlants(new Set());
       setBulkDeleteConfirm(false);
     },
@@ -140,12 +143,33 @@ export default function PlantsList() {
   const deletePlant = trpc.plants.delete.useMutation({
     onSuccess: () => {
       utils.plants.list.invalidate();
-      toast.success("🗑️ Planta excluída com sucesso!");
+      utils.plants.listDeleted.invalidate();
+      toast.success("🗑️ Planta movida para a lixeira!");
       setDeletePlantDialog({ open: false });
     },
     onError: (error) => {
       toast.error(`Erro ao excluir planta: ${error.message}`);
     },
+  });
+
+  const { data: deletedPlants } = trpc.plants.listDeleted.useQuery();
+
+  const restorePlant = trpc.plants.restore.useMutation({
+    onSuccess: () => {
+      utils.plants.list.invalidate();
+      utils.plants.listDeleted.invalidate();
+      toast.success("✅ Planta restaurada com sucesso!");
+    },
+    onError: (error) => toast.error(`Erro ao restaurar: ${error.message}`),
+  });
+
+  const permanentDeletePlant = trpc.plants.permanentDelete.useMutation({
+    onSuccess: () => {
+      utils.plants.listDeleted.invalidate();
+      toast.success("🗑️ Planta excluída permanentemente!");
+      setPermanentDeleteDialog({ open: false });
+    },
+    onError: (error) => toast.error(`Erro ao excluir: ${error.message}`),
   });
 
   const movePlant = trpc.plants.moveTent.useMutation({
@@ -460,14 +484,16 @@ export default function PlantsList() {
                             </CardHeader>
 
                             <CardContent className="space-y-3 pt-0">
-                              {/* Foto */}
+                              {/* Foto clicável */}
                               {plant.lastHealthPhotoUrl && (
-                                <LazyImage
-                                  src={plant.lastHealthPhotoUrl}
-                                  alt={plant.name}
-                                  aspectRatio="3/4"
-                                  className="w-full rounded-lg"
-                                />
+                                <Link href={`/plants/${plant.id}`}>
+                                  <LazyImage
+                                    src={plant.lastHealthPhotoUrl}
+                                    alt={plant.name}
+                                    aspectRatio="3/4"
+                                    className="w-full rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                                  />
+                                </Link>
                               )}
 
                               {/* Fase + Saúde — mesmo tamanho, mesma linha */}
@@ -572,7 +598,80 @@ export default function PlantsList() {
             onAction={() => navigate("/plants/new")}
           />
         )}
+      {/* Lixeira */}
+      {(deletedPlants?.length ?? 0) > 0 && (
+        <div className="max-w-7xl mx-auto px-4 pb-6">
+          <button
+            onClick={() => setShowTrash(!showTrash)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+          >
+            <Trash2 className="w-4 h-4" />
+            Lixeira ({deletedPlants!.length} planta{deletedPlants!.length !== 1 ? 's' : ''})
+            {showTrash ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          </button>
+          {showTrash && (
+            <Card className="border-dashed border-destructive/30">
+              <CardContent className="pt-4 space-y-2">
+                {deletedPlants!.map((plant: any) => (
+                  <div key={plant.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/40">
+                    <div>
+                      <p className="text-sm font-medium">{plant.name}</p>
+                      {plant.code && <p className="text-xs text-muted-foreground font-mono">{plant.code}</p>}
+                      <p className="text-xs text-muted-foreground">
+                        Excluída em {new Date(plant.deletedAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <AnimatedButton
+                        variant="outline"
+                        size="sm"
+                        className="text-xs gap-1 hover:border-green-500/40 hover:text-green-500"
+                        onClick={() => restorePlant.mutate({ plantId: plant.id })}
+                        disabled={restorePlant.isPending}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Restaurar
+                      </AnimatedButton>
+                      <AnimatedButton
+                        variant="outline"
+                        size="sm"
+                        className="text-xs gap-1 hover:border-red-500/40 hover:text-red-500"
+                        onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Excluir
+                      </AnimatedButton>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
       </main>
+
+      {/* Permanent Delete Dialog */}
+      <Dialog open={permanentDeleteDialog.open} onOpenChange={(open) => setPermanentDeleteDialog({ open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir permanentemente</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir <span className="font-semibold text-foreground">{permanentDeleteDialog.plant?.name}</span> permanentemente? Esta ação não pode ser desfeita e todos os dados da planta serão perdidos.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPermanentDeleteDialog({ open: false })}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={permanentDeletePlant.isPending}
+              onClick={() => permanentDeleteDialog.plant && permanentDeletePlant.mutate({ plantId: permanentDeleteDialog.plant.id })}
+            >
+              {permanentDeletePlant.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir permanentemente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Move Plant Dialog */}
       <Dialog open={movePlantDialog.open} onOpenChange={(open) => setMovePlantDialog({ open })}>
