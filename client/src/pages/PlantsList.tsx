@@ -599,90 +599,158 @@ export default function PlantsList() {
           />
         )}
       {/* Lixeira */}
-      {(deletedPlants?.length ?? 0) > 0 && (
-        <div className="max-w-7xl mx-auto px-4 pb-10">
-          {/* Header colapsável */}
-          <button
-            onClick={() => setShowTrash(!showTrash)}
-            className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-border/50 bg-muted/30 hover:bg-muted/50 transition-all duration-200"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-destructive/10 border border-destructive/15 flex items-center justify-center">
-                <Trash2 className="w-3.5 h-3.5 text-destructive/60" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold leading-tight">Lixeira</p>
-                <p className="text-xs text-muted-foreground leading-tight">
-                  {deletedPlants!.length} planta{deletedPlants!.length !== 1 ? 's' : ''} · toque para ver
-                </p>
-              </div>
+      <div className="max-w-7xl mx-auto px-4 pb-10">
+        {/* Header colapsável */}
+        <button
+          onClick={() => setShowTrash(!showTrash)}
+          className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-red-500/20 dark:border-red-500/15 bg-red-500/5 hover:bg-red-500/10 transition-all duration-200 group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+              <Trash2 className="w-4 h-4 text-red-500/70" />
             </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-foreground leading-tight">Lixeira</p>
+              <p className="text-xs text-muted-foreground leading-tight">
+                {(deletedPlants?.length ?? 0) === 0
+                  ? 'vazia · plantas permanecem 30 dias'
+                  : `${deletedPlants!.length} planta${deletedPlants!.length !== 1 ? 's' : ''} · permanecem 30 dias`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {(deletedPlants?.length ?? 0) > 0 && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-500/15 text-red-500 dark:text-red-400">
+                {deletedPlants!.length}
+              </span>
+            )}
             <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-300 ${showTrash ? 'rotate-180' : ''}`} />
-          </button>
+          </div>
+        </button>
 
-          {/* Lista expandida */}
-          {showTrash && (
-            <div className="mt-2 space-y-2">
-              {deletedPlants!.map((plant: any) => {
-                const daysAgo = Math.floor((Date.now() - new Date(plant.deletedAt).getTime()) / 86400000);
-                return (
-                  <div
-                    key={plant.id}
-                    className="flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-border/40 bg-card hover:bg-muted/20 transition-colors"
+        {/* Lista expandida */}
+        {showTrash && (
+          <div className="mt-2 rounded-2xl border border-red-500/15 overflow-hidden">
+            {(deletedPlants?.length ?? 0) === 0 ? (
+              /* Empty state */
+              <div className="flex flex-col items-center justify-center py-10 px-6 bg-red-500/3 gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <Sprout className="w-7 h-7 text-emerald-500/60" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-foreground">Lixeira vazia</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Plantas excluídas aparecem aqui por 30 dias</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Lista de plantas */}
+                <div className="divide-y divide-red-500/10">
+                  {deletedPlants!.map((plant: any) => {
+                    const deletedMs = Date.now() - new Date(plant.deletedAt).getTime();
+                    const daysAgo = Math.floor(deletedMs / 86400000);
+                    const daysLeft = Math.max(0, 30 - daysAgo);
+                    const hoursLeft = Math.max(0, 720 - Math.floor(deletedMs / 3600000));
+
+                    // Countdown chip color
+                    const chipClass =
+                      daysLeft <= 1
+                        ? "bg-red-600 text-white animate-pulse"
+                        : daysLeft <= 3
+                        ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                        : daysLeft <= 7
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                        : "bg-muted text-muted-foreground";
+
+                    const chipLabel =
+                      daysLeft <= 1
+                        ? hoursLeft <= 1 ? "< 1h" : `${hoursLeft}h`
+                        : `${daysLeft}d`;
+
+                    return (
+                      <div
+                        key={plant.id}
+                        className="flex items-center gap-3 px-4 py-3.5 bg-background/60 hover:bg-red-500/5 transition-colors border-l-4 border-red-400/30"
+                      >
+                        {/* Avatar desaturado */}
+                        <div className="w-10 h-10 rounded-xl bg-muted/70 border border-border/30 flex items-center justify-center shrink-0 grayscale opacity-60">
+                          <Sprout className="w-5 h-5 text-muted-foreground" />
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-sm font-semibold truncate text-foreground/80">{plant.name}</p>
+                            {plant.code && (
+                              <span className="text-xs font-mono text-muted-foreground/50 shrink-0">{plant.code}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-muted-foreground/70 truncate">
+                              {getStrainName(plant.strainId) || 'Sem strain'}
+                            </span>
+                            <span className="text-muted-foreground/30 text-xs">·</span>
+                            <span className="text-xs text-muted-foreground/60 shrink-0">
+                              {daysAgo === 0 ? 'hoje' : daysAgo === 1 ? 'ontem' : `há ${daysAgo}d`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Chip de prazo */}
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 leading-none ${chipClass}`}>
+                          {chipLabel}
+                        </span>
+
+                        {/* Ações */}
+                        <div className="flex items-center gap-1 shrink-0 ml-1">
+                          <AnimatedButton
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2.5 text-xs gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50"
+                            onClick={() => restorePlant.mutate({ plantId: plant.id })}
+                            disabled={restorePlant.isPending}
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            Restaurar
+                          </AnimatedButton>
+                          <AnimatedButton
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-7 w-7 text-muted-foreground/40 hover:bg-red-500/10 hover:text-red-500"
+                            title="Excluir permanentemente"
+                            onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </AnimatedButton>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Barra de ações no rodapé */}
+                <div className="flex items-center justify-between px-4 py-3 bg-red-500/5 border-t border-red-500/15">
+                  <button
+                    className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+                    onClick={() => {
+                      deletedPlants!.forEach((p: any) => restorePlant.mutate({ plantId: p.id }));
+                    }}
+                    disabled={restorePlant.isPending}
                   >
-                    {/* Avatar */}
-                    <div className="w-10 h-10 rounded-xl bg-muted/60 border border-border/40 flex items-center justify-center shrink-0">
-                      <Sprout className="w-4.5 h-4.5 text-muted-foreground/40" />
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold truncate">{plant.name}</p>
-                        {plant.code && (
-                          <span className="text-xs font-mono text-muted-foreground/70 shrink-0">{plant.code}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-xs text-muted-foreground truncate">
-                          🧬 {getStrainName(plant.strainId)}
-                        </span>
-                        <span className="text-muted-foreground/30 text-xs">·</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {daysAgo === 0 ? 'hoje' : daysAgo === 1 ? 'ontem' : `há ${daysAgo} dias`}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ações */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <AnimatedButton
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs gap-1.5 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/50"
-                        onClick={() => restorePlant.mutate({ plantId: plant.id })}
-                        disabled={restorePlant.isPending}
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        Restaurar
-                      </AnimatedButton>
-                      <AnimatedButton
-                        variant="ghost"
-                        size="icon-sm"
-                        className="h-8 w-8 text-muted-foreground/50 hover:bg-destructive/10 hover:text-destructive"
-                        title="Excluir permanentemente"
-                        onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </AnimatedButton>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                    Restaurar tudo
+                  </button>
+                  <button
+                    className="text-xs font-medium text-red-500 hover:underline"
+                    onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: -1, name: `todas as ${deletedPlants!.length} plantas da lixeira` } })}
+                  >
+                    Esvaziar lixeira
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
       </main>
 
       {/* Permanent Delete Dialog */}
@@ -699,7 +767,16 @@ export default function PlantsList() {
             <Button
               variant="destructive"
               disabled={permanentDeletePlant.isPending}
-              onClick={() => permanentDeleteDialog.plant && permanentDeletePlant.mutate({ plantId: permanentDeleteDialog.plant.id })}
+              onClick={() => {
+                if (!permanentDeleteDialog.plant) return;
+                if (permanentDeleteDialog.plant.id === -1) {
+                  // Esvaziar lixeira: deletar todas
+                  deletedPlants?.forEach((p: any) => permanentDeletePlant.mutate({ plantId: p.id }));
+                  setPermanentDeleteDialog({ open: false });
+                } else {
+                  permanentDeletePlant.mutate({ plantId: permanentDeleteDialog.plant.id });
+                }
+              }}
             >
               {permanentDeletePlant.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir permanentemente"}
             </Button>
