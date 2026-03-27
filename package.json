@@ -14,7 +14,9 @@
     "db:seed": "node server/seed.mjs",
     "db:reset": "node server/seed.mjs",
     "db:restart": "node server/db-reset.mjs",
-    "postbuild": "node server/db-reset.mjs"
+    "db:migrate": "node server/db-migrate.mjs",
+    "db:generate": "drizzle-kit generate",
+    "postbuild": "node server/db-migrate.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
