@@ -9,6 +9,7 @@ import { AddToHomeScreenPrompt } from "./components/AddToHomeScreenPrompt";
 import { BottomNav } from "./components/BottomNav";
 import { Sidebar } from "./components/Sidebar";
 import { SplashScreen } from "./components/SplashScreen";
+import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -151,7 +152,9 @@ function AuthenticatedApp() {
           paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem)',
         }}
       >
-        <Router />
+        <PullToRefresh>
+          <Router />
+        </PullToRefresh>
       </div>
       <BottomNav />
       <InstallPWA />
