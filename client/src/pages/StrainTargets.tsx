@@ -102,15 +102,17 @@ export default function StrainTargets() {
               <div className="flex gap-2 mt-1">
                 <Input
                   type="text"
-                  placeholder="Mín"
+                  inputMode="decimal"
+                  placeholder="Mín (ex: 22.5)"
                   value={target.tempMin || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "tempMin", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "tempMin", e.target.value.replace(',', '.'))}
                 />
                 <Input
                   type="text"
-                  placeholder="Máx"
+                  inputMode="decimal"
+                  placeholder="Máx (ex: 28.0)"
                   value={target.tempMax || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "tempMax", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "tempMax", e.target.value.replace(',', '.'))}
                 />
               </div>
             </div>
@@ -121,15 +123,17 @@ export default function StrainTargets() {
               <div className="flex gap-2 mt-1">
                 <Input
                   type="text"
-                  placeholder="Mín"
+                  inputMode="decimal"
+                  placeholder="Mín (ex: 55)"
                   value={target.rhMin || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "rhMin", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "rhMin", e.target.value.replace(',', '.'))}
                 />
                 <Input
                   type="text"
-                  placeholder="Máx"
+                  inputMode="decimal"
+                  placeholder="Máx (ex: 70)"
                   value={target.rhMax || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "rhMax", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "rhMax", e.target.value.replace(',', '.'))}
                 />
               </div>
             </div>
@@ -139,16 +143,18 @@ export default function StrainTargets() {
               <Label>PPFD (µmol/m²/s)</Label>
               <div className="flex gap-2 mt-1">
                 <Input
-                  type="number"
-                  placeholder="Mín"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Mín (ex: 400)"
                   value={target.ppfdMin || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "ppfdMin", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "ppfdMin", e.target.value.replace(/\D/g, ''))}
                 />
                 <Input
-                  type="number"
-                  placeholder="Máx"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Máx (ex: 800)"
                   value={target.ppfdMax || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "ppfdMax", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "ppfdMax", e.target.value.replace(/\D/g, ''))}
                 />
               </div>
             </div>
@@ -171,15 +177,17 @@ export default function StrainTargets() {
               <div className="flex gap-2 mt-1">
                 <Input
                   type="text"
-                  placeholder="Mín"
+                  inputMode="decimal"
+                  placeholder="Mín (ex: 6.0)"
                   value={target.phMin || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "phMin", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "phMin", e.target.value.replace(',', '.'))}
                 />
                 <Input
                   type="text"
-                  placeholder="Máx"
+                  inputMode="decimal"
+                  placeholder="Máx (ex: 7.0)"
                   value={target.phMax || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "phMax", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "phMax", e.target.value.replace(',', '.'))}
                 />
               </div>
             </div>
@@ -190,15 +198,17 @@ export default function StrainTargets() {
               <div className="flex gap-2 mt-1">
                 <Input
                   type="text"
-                  placeholder="Mín"
+                  inputMode="decimal"
+                  placeholder="Mín (ex: 1.2)"
                   value={target.ecMin || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "ecMin", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "ecMin", e.target.value.replace(',', '.'))}
                 />
                 <Input
                   type="text"
-                  placeholder="Máx"
+                  inputMode="decimal"
+                  placeholder="Máx (ex: 2.0)"
                   value={target.ecMax || ""}
-                  onChange={(e) => updateTarget(phase, weekNumber, "ecMax", e.target.value)}
+                  onChange={(e) => updateTarget(phase, weekNumber, "ecMax", e.target.value.replace(',', '.'))}
                 />
               </div>
             </div>

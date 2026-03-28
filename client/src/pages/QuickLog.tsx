@@ -459,17 +459,18 @@ export default function QuickLog() {
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <div className="flex items-center justify-center gap-4">
                   <Input
-                    type="number"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="text"
+                    inputMode="decimal"
                     value={tempC}
                     onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (newValue && !tempC) triggerHaptic('light');
-                      setTempC(newValue);
+                      const raw = e.target.value.replace(',', '.');
+                      if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                        if (raw && !tempC) triggerHaptic('light');
+                        setTempC(raw);
+                      }
                     }}
-                    placeholder="25"
-                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                    placeholder="24.5"
+                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       tempC
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border'
@@ -485,17 +486,18 @@ export default function QuickLog() {
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <div className="flex items-center justify-center gap-4">
                   <Input
-                    type="number"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="text"
+                    inputMode="decimal"
                     value={rhPct}
                     onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (newValue && !rhPct) triggerHaptic('light');
-                      setRhPct(newValue);
+                      const raw = e.target.value.replace(',', '.');
+                      if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                        if (raw && !rhPct) triggerHaptic('light');
+                        setRhPct(raw);
+                      }
                     }}
-                    placeholder="60"
-                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                    placeholder="60.0"
+                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
                       rhPct
                         ? 'border-green-500 ring-2 ring-green-500/20'
                         : 'border-border'
