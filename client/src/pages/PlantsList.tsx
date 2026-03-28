@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
@@ -29,6 +30,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 export default function PlantsList() {
   const [, navigate] = useLocation();
+  const haptic = useTactileFeedback();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"ACTIVE" | "HARVESTED" | "DEAD" | "DISCARDED" | "AWAITING_DRYING" | undefined>();
   
@@ -945,7 +947,7 @@ export default function PlantsList() {
 
       {/* Floating Action Bar for Bulk Operations */}
       {selectedPlants.size > 0 && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 transform -translate-x-1/2 z-50 max-w-[95vw]">
+        <div className="fixed bottom-20 left-4 right-4 z-50 shadow-2xl">
           <Card className="shadow-2xl border-2">
             <CardContent className="p-3 md:p-4">
               <div className="flex flex-wrap items-center gap-2 md:gap-3 justify-center">
@@ -960,7 +962,7 @@ export default function PlantsList() {
                     size="sm"
                     variant="outline"
                     className="text-xs px-2 md:px-3"
-                    onClick={() => setBulkPromoteConfirm(true)}
+                    onClick={() => { haptic.confirm(); setBulkPromoteConfirm(true); }}
                     disabled={bulkPromote.isPending}
                   >
                     {bulkPromote.isPending ? (
@@ -977,7 +979,7 @@ export default function PlantsList() {
                   size="sm"
                   variant="outline"
                   className="text-xs px-2 md:px-3"
-                  onClick={() => setBatchMoveDialog(true)}
+                  onClick={() => { haptic.confirm(); setBatchMoveDialog(true); }}
                 >
                   <MoveRight className="w-4 h-4 mr-2" />
                   Mover
@@ -988,7 +990,7 @@ export default function PlantsList() {
                   size="sm"
                   variant="outline"
                   className="text-xs px-2 md:px-3"
-                  onClick={() => setBulkHarvestConfirm(true)}
+                  onClick={() => { haptic.destructive(); setBulkHarvestConfirm(true); }}
                   disabled={bulkHarvest.isPending}
                 >
                   {bulkHarvest.isPending ? (
@@ -1003,7 +1005,7 @@ export default function PlantsList() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setBulkDiscardConfirm(true)}
+                  onClick={() => { haptic.destructive(); setBulkDiscardConfirm(true); }}
                   disabled={bulkDiscard.isPending}
                   className="text-destructive hover:text-destructive text-xs px-2 md:px-3"
                 >
@@ -1019,7 +1021,7 @@ export default function PlantsList() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setBulkDeleteConfirm(true)}
+                  onClick={() => { haptic.destructive(); setBulkDeleteConfirm(true); }}
                   disabled={bulkDelete.isPending}
                   className="text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 text-xs px-2 md:px-3"
                 >
