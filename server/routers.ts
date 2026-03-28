@@ -33,6 +33,7 @@ import {
   plantLSTLogs,
   fertilizationPresets,
   wateringPresets,
+  pumpPresets,
   recipeTemplates,
   nutrientApplications,
   wateringApplications,
@@ -4375,6 +4376,72 @@ export const appRouter = router({
           })
           .where(eq(wateringPresets.id, input.id));
         
+        return { success: true };
+      }),
+  }),
+
+  // Pump Presets (Predefinições de Bomba — Calculadora de Rega Automática)
+  pumpPresets: router({
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(100),
+        totalFlowMlPerMin: z.number().positive(),
+        numOutlets: z.number().int().positive(),
+        maxRuntimeMin: z.number().positive(),
+        restTimeBetweenCyclesMin: z.number().min(0),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        await database.insert(pumpPresets).values({
+          name: input.name,
+          totalFlowMlPerMin: input.totalFlowMlPerMin.toString(),
+          numOutlets: input.numOutlets,
+          maxRuntimeMin: input.maxRuntimeMin.toString(),
+          restTimeBetweenCyclesMin: input.restTimeBetweenCyclesMin.toString(),
+          groupId: ctx.user.groupId ?? null,
+        });
+
+        return { success: true };
+      }),
+
+    list: protectedProcedure
+      .query(async ({ ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const conditions = [];
+        if (ctx.user.groupId != null) {
+          conditions.push(
+            sql`(${pumpPresets.groupId} IS NULL OR ${pumpPresets.groupId} = ${ctx.user.groupId})`
+          );
+        }
+
+        return await database
+          .select()
+          .from(pumpPresets)
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+          .orderBy(desc(pumpPresets.createdAt));
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const [preset] = await database
+          .select({ groupId: pumpPresets.groupId })
+          .from(pumpPresets)
+          .where(eq(pumpPresets.id, input.id))
+          .limit(1);
+
+        if (preset?.groupId != null && ctx.user.groupId != null && preset.groupId !== ctx.user.groupId) {
+          throw new Error("Acesso negado: predefinição não pertence ao seu grupo");
+        }
+
+        await database.delete(pumpPresets).where(eq(pumpPresets.id, input.id));
         return { success: true };
       }),
   }),

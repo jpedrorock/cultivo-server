@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { Calculator, Droplets, Sun, Beaker, TestTube } from "lucide-react";
+import { Calculator, Droplets, Sun, Beaker, TestTube, Timer } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 
 export default function CalculatorMenu() {
@@ -15,6 +15,16 @@ export default function CalculatorMenu() {
       bgColor: "bg-teal-500/10",
       iconColor: "text-teal-600 dark:text-teal-400",
       badge: "Popular",
+    },
+    {
+      id: "irrigation-schedule",
+      title: "Rega Automática",
+      description: "Cronograma de ciclos por bomba gotejadora, vaso e janela de luz",
+      icon: Timer,
+      color: "from-blue-500 to-cyan-600",
+      bgColor: "bg-blue-500/10",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      badge: "Novo",
     },
     {
       id: "nutrients",

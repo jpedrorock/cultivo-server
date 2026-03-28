@@ -782,6 +782,25 @@ export type InsertWateringPreset = typeof wateringPresets.$inferInsert;
 
 
 /**
+ * Predefinições de bomba para a Calculadora de Rega Automática
+ */
+export const pumpPresets = mysqlTable("pumpPresets", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  totalFlowMlPerMin: decimal("totalFlowMlPerMin", { precision: 10, scale: 2 }).notNull(),
+  numOutlets: int("numOutlets").notNull(),
+  maxRuntimeMin: decimal("maxRuntimeMin", { precision: 10, scale: 1 }).notNull(),
+  restTimeBetweenCyclesMin: decimal("restTimeBetweenCyclesMin", { precision: 10, scale: 1 }).notNull(),
+  groupId: int("groupId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PumpPreset = typeof pumpPresets.$inferSelect;
+export type InsertPumpPreset = typeof pumpPresets.$inferInsert;
+
+
+/**
  * Preferências de alertas do usuário
  */
 export const alertPreferences = mysqlTable("alertPreferences", {

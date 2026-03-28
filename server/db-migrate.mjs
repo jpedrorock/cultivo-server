@@ -33,6 +33,19 @@ if (!DATABASE_URL) {
 const INCREMENTAL_ALTERS = [
   // 2026-03-27: Soft-delete para lixeira de plantas
   "ALTER TABLE plants ADD COLUMN deletedAt TIMESTAMP NULL DEFAULT NULL",
+
+  // 2026-03-27: Predefinições de bomba para a Calculadora de Rega Automática
+  `CREATE TABLE IF NOT EXISTS pumpPresets (
+    id                       INT AUTO_INCREMENT PRIMARY KEY,
+    name                     VARCHAR(100) NOT NULL,
+    totalFlowMlPerMin        DECIMAL(10,2) NOT NULL,
+    numOutlets               INT NOT NULL,
+    maxRuntimeMin            DECIMAL(10,1) NOT NULL,
+    restTimeBetweenCyclesMin DECIMAL(10,1) NOT NULL,
+    groupId                  INT NULL,
+    createdAt                TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updatedAt                TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 async function runMigrations() {

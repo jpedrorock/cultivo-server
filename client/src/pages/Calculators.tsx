@@ -134,6 +134,7 @@ function downloadTextFile(content: string, filename: string) {
 import { useRoute, useLocation, Redirect } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { FertilizationCalculator } from "@/components/FertilizationCalculator";
+import { IrrigationScheduleCalculator } from "@/components/IrrigationScheduleCalculator";
 
 export default function Calculators() {
   const [, params] = useRoute("/calculators/:id");
@@ -147,6 +148,7 @@ export default function Calculators() {
 
   const calculatorTitles: Record<string, string> = {
     "watering-runoff": "Rega e Runoff",
+    "irrigation-schedule": "Rega Automática",
     "lux-ppfd": "Conversor Lux → PPFD",
     "ppm-ec": "Conversor PPM ↔ EC",
     "ph-adjust": "Calculadora de pH",
@@ -179,6 +181,7 @@ export default function Calculators() {
       {/* Main Content */}
       <main className="container py-4 md:py-8">
         {calculatorId === "watering-runoff" && <WateringRunoffCalculator />}
+        {calculatorId === "irrigation-schedule" && <IrrigationScheduleCalculator />}
         {calculatorId === "lux-ppfd" && <LuxPPFDCalculator />}
         {calculatorId === "ppm-ec" && <PPMECConverter />}
         {calculatorId === "ph-adjust" && <PHAdjustCalculator />}
