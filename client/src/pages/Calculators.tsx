@@ -135,6 +135,7 @@ import { useRoute, useLocation, Redirect } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { FertilizationCalculator } from "@/components/FertilizationCalculator";
 import { IrrigationScheduleCalculator } from "@/components/IrrigationScheduleCalculator";
+import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 
 export default function Calculators() {
   const [, params] = useRoute("/calculators/:id");
@@ -193,6 +194,7 @@ export default function Calculators() {
 
 // Rega e Runoff (Integrado)
 function WateringRunoffCalculator() {
+  const haptic = useTactileFeedback();
   // Estados para tabs
   const [activeTab, setActiveTab] = useState<"calculator" | "history">("calculator");
   
@@ -360,7 +362,7 @@ function WateringRunoffCalculator() {
                   {[2, 4, 6, 8].map((n) => (
                     <button
                       key={n}
-                      onClick={() => setNumPlants(n)}
+                      onClick={() => { haptic.tap(); setNumPlants(n); }}
                       className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
                         numPlants === n
                           ? "bg-blue-500 text-white shadow-md scale-105"
@@ -391,7 +393,7 @@ function WateringRunoffCalculator() {
                   {[5, 11, 20, 50].map((n) => (
                     <button
                       key={n}
-                      onClick={() => setPotSize(n)}
+                      onClick={() => { haptic.tap(); setPotSize(n); }}
                       className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
                         potSize === n
                           ? "bg-blue-500 text-white shadow-md scale-105"
@@ -424,7 +426,7 @@ function WateringRunoffCalculator() {
                   {[10, 15, 20, 25].map((n) => (
                     <button
                       key={n}
-                      onClick={() => setDesiredRunoff(n)}
+                      onClick={() => { haptic.tap(); setDesiredRunoff(n); }}
                       className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
                         desiredRunoff === n
                           ? "bg-green-500 text-white shadow-md scale-105"
