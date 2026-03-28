@@ -5,6 +5,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { BigStepper } from "@/components/BigStepper";
 import { Badge } from "@/components/ui/badge";
 import { TentIcon } from "@/components/TentIcon";
 import { RangeSlider } from "@/components/ui/range-slider";
@@ -362,17 +363,7 @@ export default function TentLog() {
                       <span className={`w-2 h-2 rounded-full ${validationDot(tempValidation)}`} />
                     )}
                   </div>
-                  <div className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 bg-background dark:bg-zinc-900 transition-colors ${validationBorder(tempValidation) || "border-border"}`}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="24.5"
-                      value={tempC}
-                      onChange={(e) => setTempC(e.target.value)}
-                      className="flex-1 bg-transparent text-4xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums w-0 min-w-0"
-                    />
-                    <span className="text-lg text-muted-foreground font-medium shrink-0">°C</span>
-                  </div>
+                  <BigStepper value={tempC} onChange={setTempC} step={0.5} min={-10} max={50} decimals={1} unit="°C" />
                   {currentTargets && (
                     <p className={`text-xs font-medium ${validationText(tempValidation)}`}>
                       🎯 {currentTargets.tempMin}–{currentTargets.tempMax}°C
@@ -391,17 +382,7 @@ export default function TentLog() {
                       <span className={`w-2 h-2 rounded-full ${validationDot(rhValidation)}`} />
                     )}
                   </div>
-                  <div className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 bg-background dark:bg-zinc-900 transition-colors ${validationBorder(rhValidation) || "border-border"}`}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="65"
-                      value={rhPct}
-                      onChange={(e) => setRhPct(e.target.value)}
-                      className="flex-1 bg-transparent text-4xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums w-0 min-w-0"
-                    />
-                    <span className="text-lg text-muted-foreground font-medium shrink-0">%</span>
-                  </div>
+                  <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" />
                   {currentTargets && (
                     <p className={`text-xs font-medium ${validationText(rhValidation)}`}>
                       🎯 {currentTargets.rhMin}–{currentTargets.rhMax}%
@@ -427,18 +408,7 @@ export default function TentLog() {
                       <span className={`w-2 h-2 rounded-full ${validationDot(phValidation)}`} />
                     )}
                   </div>
-                  <div className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 bg-background dark:bg-zinc-900 transition-colors ${validationBorder(phValidation) || "border-border"}`}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="6.2"
-                      step="0.1"
-                      value={ph}
-                      onChange={(e) => setPh(e.target.value)}
-                      className="flex-1 bg-transparent text-4xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums w-0 min-w-0"
-                    />
-                    <span className="text-lg text-muted-foreground font-medium shrink-0">pH</span>
-                  </div>
+                  <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" />
                   {currentTargets && (
                     <p className={`text-xs font-medium ${validationText(phValidation)}`}>
                       🎯 {currentTargets.phMin}–{currentTargets.phMax}
@@ -457,18 +427,7 @@ export default function TentLog() {
                       <span className={`w-2 h-2 rounded-full ${validationDot(ecValidation)}`} />
                     )}
                   </div>
-                  <div className={`flex items-center gap-2 rounded-xl border-2 px-4 py-3 bg-background dark:bg-zinc-900 transition-colors ${validationBorder(ecValidation) || "border-border"}`}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="1.6"
-                      step="0.1"
-                      value={ec}
-                      onChange={(e) => setEc(e.target.value)}
-                      className="flex-1 bg-transparent text-4xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums w-0 min-w-0"
-                    />
-                    <span className="text-lg text-muted-foreground font-medium shrink-0">mS</span>
-                  </div>
+                  <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" />
                   {currentTargets && (
                     <p className={`text-xs font-medium ${validationText(ecValidation)}`}>
                       🎯 {currentTargets.ecMin}–{currentTargets.ecMax} mS/cm

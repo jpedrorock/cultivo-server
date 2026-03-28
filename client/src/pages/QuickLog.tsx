@@ -5,6 +5,7 @@ import { AnimatedButton } from "@/components/AnimatedButton";
 import { LazyImage } from "@/components/LazyImage";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { BigStepper } from "@/components/BigStepper";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X } from "lucide-react";
 import { RangeSlider } from "@/components/ui/range-slider";
@@ -457,106 +458,28 @@ export default function QuickLog() {
             {/* Step 1: Temperature */}
             {currentStep === 1 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <div className="flex items-center justify-center gap-4">
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    value={tempC}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(',', '.');
-                      if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
-                        if (raw && !tempC) triggerHaptic('light');
-                        setTempC(raw);
-                      }
-                    }}
-                    placeholder="24.5"
-                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                      tempC
-                        ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border'
-                    }`}
-                  />
-                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">°C</span>
-                </div>
+                <BigStepper value={tempC} onChange={setTempC} step={0.5} min={-10} max={50} decimals={1} unit="°C" />
               </div>
             )}
 
             {/* Step 2: Humidity */}
             {currentStep === 2 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <div className="flex items-center justify-center gap-4">
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    value={rhPct}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(',', '.');
-                      if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
-                        if (raw && !rhPct) triggerHaptic('light');
-                        setRhPct(raw);
-                      }
-                    }}
-                    placeholder="60.0"
-                    className={`w-40 md:w-52 text-center text-4xl md:text-5xl lg:text-6xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                      rhPct
-                        ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border'
-                    }`}
-                  />
-                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">%</span>
-                </div>
+                <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" />
               </div>
             )}
 
             {/* Step 3: Watering volume */}
             {currentStep === 3 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <div className="flex items-center justify-center gap-4">
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={wateringVolume}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (newValue && !wateringVolume) triggerHaptic('light');
-                      setWateringVolume(newValue);
-                    }}
-                    placeholder="2000"
-                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                      wateringVolume
-                        ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border focus:ring-4 focus:ring-green-500/10'
-                    }`}
-                  />
-                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">ml</span>
-                </div>
+                <BigStepper value={wateringVolume} onChange={setWateringVolume} step={100} min={0} decimals={0} unit="ml" />
               </div>
             )}
 
             {/* Step 4: Runoff collected */}
             {currentStep === 4 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <div className="flex items-center justify-center gap-4">
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={runoffCollected}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (newValue && !runoffCollected) triggerHaptic('light');
-                      setRunoffCollected(newValue);
-                    }}
-                    placeholder="300"
-                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                      runoffCollected
-                        ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border focus:ring-4 focus:ring-teal-500/10'
-                    }`}
-                  />
-                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">ml</span>
-                </div>
+                <BigStepper value={runoffCollected} onChange={setRunoffCollected} step={50} min={0} decimals={0} unit="ml" />
                 {runoffPercentage && (
                   <div className="text-center p-4 bg-muted rounded-xl border border-border animate-[slide-in-from-bottom_0.9s_ease-out]">
                     <div className="text-sm text-foreground/80">Porcentagem de Runoff</div>
@@ -576,26 +499,7 @@ export default function QuickLog() {
             {/* Step 5: pH */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <div className="flex items-center justify-center gap-4">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    value={ph}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (newValue && !ph) triggerHaptic('light');
-                      setPh(newValue);
-                    }}
-                    placeholder="6.0"
-                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                      ph
-                        ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border focus:ring-4 focus:ring-purple-500/10'
-                    }`}
-                  />
-                  <span className="text-3xl md:text-4xl lg:text-5xl font-bold text-muted-foreground">pH</span>
-                </div>
+                <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" />
                 <div className="pt-4 pb-2">
                   <RangeSlider
                     min={0}
@@ -618,26 +522,7 @@ export default function QuickLog() {
             {/* Step 6: EC */}
             {currentStep === 6 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <div className="flex items-center justify-center gap-4">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    value={ec}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (newValue && !ec) triggerHaptic('light');
-                      setEc(newValue);
-                    }}
-                    placeholder="1.5"
-                    className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                      ec
-                        ? 'border-green-500 ring-2 ring-green-500/20'
-                        : 'border-border focus:ring-4 focus:ring-yellow-500/10'
-                    }`}
-                  />
-                  <span className="text-2xl md:text-3xl lg:text-4xl font-bold text-muted-foreground">mS/cm</span>
-                </div>
+                <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" />
               </div>
             )}
 
