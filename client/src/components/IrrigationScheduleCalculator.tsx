@@ -334,7 +334,7 @@ function getSuggestedLabel(phase: "vega" | "flora", weekNumber: number): string 
 
 export function IrrigationScheduleCalculator() {
   // ── Bomba ──
-  const [pumpFlowStr, setPumpFlowStr] = useState("2000");
+  const [pumpFlowStr, setPumpFlowStr] = useState("200");
   const [outletsStr, setOutletsStr] = useState("8");
   const [maxRuntimeStr, setMaxRuntimeStr] = useState("3");
   const [restTimeStr, setRestTimeStr] = useState("30");
@@ -346,8 +346,8 @@ export function IrrigationScheduleCalculator() {
 
   // ── Luz ──
   const [scheduleMode, setScheduleMode] = useState<"auto" | "manual">("auto");
-  const [lightsOnTime, setLightsOnTime] = useState("06:00");
-  const [lightsOffTime, setLightsOffTime] = useState("22:00");
+  const [lightsOnTime, setLightsOnTime] = useState("18:00");
+  const [lightsOffTime, setLightsOffTime] = useState("12:00");
   const [manualTimes, setManualTimes] = useState<string[]>(["08:00", "12:00", "18:00"]);
 
   // ── Volume ──
