@@ -363,7 +363,7 @@ export default function TentLog() {
                       <span className={`w-2 h-2 rounded-full ${validationDot(tempValidation)}`} />
                     )}
                   </div>
-                  <BigStepper value={tempC} onChange={setTempC} step={0.5} min={-10} max={50} decimals={1} unit="°C" />
+                  <BigStepper value={tempC} onChange={setTempC} step={0.1} min={-10} max={50} decimals={1} unit="°C" fieldType="temperature" />
                   {currentTargets && (
                     <p className={`text-xs font-medium ${validationText(tempValidation)}`}>
                       🎯 {currentTargets.tempMin}–{currentTargets.tempMax}°C
@@ -382,7 +382,7 @@ export default function TentLog() {
                       <span className={`w-2 h-2 rounded-full ${validationDot(rhValidation)}`} />
                     )}
                   </div>
-                  <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" />
+                  <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" fieldType="humidity" />
                   {currentTargets && (
                     <p className={`text-xs font-medium ${validationText(rhValidation)}`}>
                       🎯 {currentTargets.rhMin}–{currentTargets.rhMax}%
@@ -408,7 +408,7 @@ export default function TentLog() {
                       <span className={`w-2 h-2 rounded-full ${validationDot(phValidation)}`} />
                     )}
                   </div>
-                  <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" />
+                  <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" fieldType="ph" />
                   {currentTargets && (
                     <p className={`text-xs font-medium ${validationText(phValidation)}`}>
                       🎯 {currentTargets.phMin}–{currentTargets.phMax}

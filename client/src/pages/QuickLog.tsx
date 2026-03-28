@@ -491,7 +491,7 @@ export default function QuickLog() {
             {/* Step 1: Temperature */}
             {currentStep === 1 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={tempC} onChange={setTempC} step={0.5} min={-10} max={50} decimals={1} unit="°C" colorClass={getValidationColor(tempC, targets?.tempMin ? parseFloat(String(targets.tempMin)) : null, targets?.tempMax ? parseFloat(String(targets.tempMax)) : null)} />
+                <BigStepper value={tempC} onChange={setTempC} step={0.1} min={-10} max={50} decimals={1} unit="°C" fieldType="temperature" colorClass={getValidationColor(tempC, targets?.tempMin ? parseFloat(String(targets.tempMin)) : null, targets?.tempMax ? parseFloat(String(targets.tempMax)) : null)} />
                 {targets?.tempMin && targets?.tempMax && (
                   <p className="text-xs text-center text-muted-foreground mt-1">
                     🎯 {parseFloat(String(targets.tempMin))}–{parseFloat(String(targets.tempMax))}°C
@@ -503,7 +503,7 @@ export default function QuickLog() {
             {/* Step 2: Humidity */}
             {currentStep === 2 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" colorClass={getValidationColor(rhPct, targets?.rhMin ? parseFloat(String(targets.rhMin)) : null, targets?.rhMax ? parseFloat(String(targets.rhMax)) : null)} />
+                <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" fieldType="humidity" colorClass={getValidationColor(rhPct, targets?.rhMin ? parseFloat(String(targets.rhMin)) : null, targets?.rhMax ? parseFloat(String(targets.rhMax)) : null)} />
                 {targets?.rhMin && targets?.rhMax && (
                   <p className="text-xs text-center text-muted-foreground mt-1">
                     🎯 {parseFloat(String(targets.rhMin))}–{parseFloat(String(targets.rhMax))}%
@@ -515,14 +515,14 @@ export default function QuickLog() {
             {/* Step 3: Watering volume */}
             {currentStep === 3 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={wateringVolume} onChange={setWateringVolume} step={100} min={0} decimals={0} unit="ml" />
+                <BigStepper value={wateringVolume} onChange={setWateringVolume} step={100} min={0} decimals={0} unit="ml" fieldType="water" fillMax={3000} />
               </div>
             )}
 
             {/* Step 4: Runoff collected */}
             {currentStep === 4 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={runoffCollected} onChange={setRunoffCollected} step={50} min={0} decimals={0} unit="ml" />
+                <BigStepper value={runoffCollected} onChange={setRunoffCollected} step={50} min={0} decimals={0} unit="ml" fieldType="runoff" fillMax={600} />
                 {runoffPercentage && (
                   <div className="text-center p-4 bg-muted rounded-xl border border-border animate-[slide-in-from-bottom_0.9s_ease-out]">
                     <div className="text-sm text-foreground/80">Porcentagem de Runoff</div>
@@ -542,7 +542,7 @@ export default function QuickLog() {
             {/* Step 5: pH */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" colorClass={getValidationColor(ph, targets?.phMin ? parseFloat(String(targets.phMin)) : null, targets?.phMax ? parseFloat(String(targets.phMax)) : null)} />
+                <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" fieldType="ph" colorClass={getValidationColor(ph, targets?.phMin ? parseFloat(String(targets.phMin)) : null, targets?.phMax ? parseFloat(String(targets.phMax)) : null)} />
                 {targets?.phMin && targets?.phMax && (
                   <p className="text-xs text-center text-muted-foreground mt-1">
                     🎯 {parseFloat(String(targets.phMin))}–{parseFloat(String(targets.phMax))} pH
@@ -645,27 +645,17 @@ export default function QuickLog() {
                 {/* Light Intensity Slider */}
                 {lightUnit === "ppfd" ? (
                   <div className="space-y-4 pt-4">
-                    <div className="flex items-center gap-3">
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        step={10}
-                        min={0}
-                        max={1200}
-                        value={ppfd || ""}
-                        onChange={(e) => {
-                          const val = Math.min(1200, Math.max(0, parseInt(e.target.value) || 0));
-                          setPpfd(val);
-                        }}
-                        placeholder="600"
-                        className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                          ppfd > 0
-                            ? 'border-amber-500 ring-2 ring-amber-500/20'
-                            : 'border-border focus:ring-4 focus:ring-amber-500/10'
-                        }`}
-                      />
-                      <span className="text-xs md:text-sm font-bold text-muted-foreground whitespace-nowrap">μmol/m²/s</span>
-                    </div>
+                    <BigStepper
+                      value={ppfd > 0 ? String(ppfd) : ""}
+                      onChange={(v) => setPpfd(parseInt(v) || 0)}
+                      step={10}
+                      min={0}
+                      max={1200}
+                      decimals={0}
+                      unit="μmol/m²/s"
+                      fieldType="light"
+                      placeholder="600"
+                    />
                     <div className="pb-2">
                       <RangeSlider
                         min={0}
