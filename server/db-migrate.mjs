@@ -47,9 +47,14 @@ const INCREMENTAL_ALTERS = [
     updatedAt                TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
-  // 2026-03-28: Runoff EC/pH — L5
+  // 2026-03-28: Runoff EC/pH — L5 (removidos do schema: ph/ec já medem o runoff)
   "ALTER TABLE dailyLogs ADD COLUMN runoffPh DECIMAL(3,1) NULL DEFAULT NULL",
   "ALTER TABLE dailyLogs ADD COLUMN runoffEc DECIMAL(4,2) NULL DEFAULT NULL",
+
+  // 2026-03-28: Volume de rega e runoff coletado
+  "ALTER TABLE dailyLogs ADD COLUMN wateringVolume INT NULL DEFAULT NULL",
+  "ALTER TABLE dailyLogs ADD COLUMN runoffCollected INT NULL DEFAULT NULL",
+  "ALTER TABLE dailyLogs ADD COLUMN runoffPercentage DECIMAL(5,2) NULL DEFAULT NULL",
 ];
 
 async function runMigrations() {

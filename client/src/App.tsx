@@ -109,7 +109,8 @@ function Router() {
 
 function AuthenticatedApp() {
   const { isAuthenticated, loading, user } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const isDisplayMode = location.endsWith("/display");
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem('hasSeenSplash');
   });
@@ -149,10 +150,10 @@ function AuthenticatedApp() {
           }}
         />
       )}
-      <Sidebar />
+      {!isDisplayMode && <Sidebar />}
       <div
-        className="md:pl-64"
-        style={{
+        className={isDisplayMode ? "" : "md:pl-64"}
+        style={isDisplayMode ? {} : {
           paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem)',
         }}
       >
@@ -160,7 +161,7 @@ function AuthenticatedApp() {
           <Router />
         </PullToRefresh>
       </div>
-      <BottomNav />
+      {!isDisplayMode && <BottomNav />}
       <InstallPWA />
       <AddToHomeScreenPrompt />
     </>

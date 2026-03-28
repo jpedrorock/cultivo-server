@@ -22,8 +22,6 @@ export interface PendingLog {
   ec?: string;
   wateringVolume?: number;
   runoffCollected?: number;
-  runoffPh?: string;
-  runoffEc?: string;
   notes?: string;
   savedAt: number; // timestamp
 }

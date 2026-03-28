@@ -84,8 +84,6 @@ export default function QuickLog() {
   const [rhPct, setRhPct] = useState("");
   const [wateringVolume, setWateringVolume] = useState("");
   const [runoffCollected, setRunoffCollected] = useState("");
-  const [runoffPh, setRunoffPh] = useState("");
-  const [runoffEc, setRunoffEc] = useState("");
   const [ph, setPh] = useState("");
   const [ec, setEc] = useState("");
   const [ppfd, setPpfd] = useState(400); // Valor inicial realista: 400 μmol/m²/s
@@ -323,8 +321,6 @@ export default function QuickLog() {
       rhPct: rhPct || undefined,
       wateringVolume: wateringVolume ? parseFloat(wateringVolume) : undefined,
       runoffCollected: runoffCollected ? parseFloat(runoffCollected) : undefined,
-      runoffPh: runoffPh || undefined,
-      runoffEc: runoffEc || undefined,
       ph: ph || undefined,
       ec: ec || undefined,
       ppfd: ppfd || undefined,
@@ -677,43 +673,6 @@ export default function QuickLog() {
                     </div>
                   </div>
                 )}
-                {/* pH e EC do Runoff (L5) */}
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground font-medium block text-center">pH Runoff <span className="opacity-50">(opcional)</span></label>
-                    <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-card">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        placeholder="6.0"
-                        step="0.1"
-                        min="0"
-                        max="14"
-                        value={runoffPh}
-                        onChange={(e) => setRunoffPh(e.target.value)}
-                        className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
-                      />
-                      <span className="text-xs text-muted-foreground">pH</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground font-medium block text-center">EC Runoff <span className="opacity-50">(opcional)</span></label>
-                    <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-card">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        placeholder="1.8"
-                        step="0.1"
-                        min="0"
-                        max="10"
-                        value={runoffEc}
-                        onChange={(e) => setRunoffEc(e.target.value)}
-                        className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
-                      />
-                      <span className="text-xs text-muted-foreground">mS/cm</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 

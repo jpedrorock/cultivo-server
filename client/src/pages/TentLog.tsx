@@ -34,8 +34,6 @@ export default function TentLog() {
   const [ec, setEc] = useState("");
   const [wateringVolume, setWateringVolume] = useState("");
   const [runoffCollected, setRunoffCollected] = useState("");
-  const [runoffPh, setRunoffPh] = useState("");
-  const [runoffEc, setRunoffEc] = useState("");
   const [notes, setNotes] = useState("");
 
   // Validação em tempo real
@@ -149,14 +147,12 @@ export default function TentLog() {
         ppfd: ppfd || undefined,
         wateringVolume: wateringVolume ? parseInt(wateringVolume) : undefined,
         runoffCollected: runoffCollected ? parseInt(runoffCollected) : undefined,
-        runoffPh: runoffPh || undefined,
-        runoffEc: runoffEc || undefined,
         notes: notes || undefined,
       });
       if (destination === "server") toast.success("Registro salvo com sucesso!");
       setTempC(""); setRhPct(""); setPpfd(400);
       setPh(""); setEc("");
-      setWateringVolume(""); setRunoffCollected(""); setRunoffPh(""); setRunoffEc(""); setNotes("");
+      setWateringVolume(""); setRunoffCollected(""); setNotes("");
     } catch (error: any) {
       toast.error(`Erro ao salvar: ${error?.message || "Tente novamente"}`);
     }
@@ -548,51 +544,6 @@ export default function TentLog() {
                 </div>
               </div>
 
-              {/* Linha 2 — pH e EC do Runoff (L5) */}
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                    <FlaskConical className="w-3 h-3 text-purple-400" />
-                    pH do Runoff
-                    <span className="font-normal opacity-50">(opcional)</span>
-                  </label>
-                  <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-background dark:bg-zinc-900">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="6.0"
-                      step="0.1"
-                      min="0"
-                      max="14"
-                      value={runoffPh}
-                      onChange={(e) => setRunoffPh(e.target.value)}
-                      className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
-                    />
-                    <span className="text-xs text-muted-foreground">pH</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-yellow-400" />
-                    EC do Runoff
-                    <span className="font-normal opacity-50">(opcional)</span>
-                  </label>
-                  <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-background dark:bg-zinc-900">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="1.8"
-                      step="0.1"
-                      min="0"
-                      max="10"
-                      value={runoffEc}
-                      onChange={(e) => setRunoffEc(e.target.value)}
-                      className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
-                    />
-                    <span className="text-xs text-muted-foreground">mS/cm</span>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
 

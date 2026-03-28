@@ -462,14 +462,6 @@ export default function Home() {
       {/* Main Content */}
       <main className="container py-4">
         {/* Tents Grid */}
-        <div className="mb-4 flex justify-end">
-          <div className="hidden sm:block">
-            <AnimatedButton onClick={() => setCreateTentModalOpen(true)} className="gap-2" data-tour="create-tent-button">
-              <Sprout className="w-4 h-4" />
-              Criar Nova Estufa
-            </AnimatedButton>
-          </div>
-        </div>
 
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -504,11 +496,11 @@ export default function Home() {
           </StaggerList>
         )}
 
-        {/* Botão nova estufa — mobile only, abaixo dos cards */}
+        {/* Botão nova estufa — abaixo dos cards em todas as telas */}
         {!isLoading && (
           <button
             onClick={() => setCreateTentModalOpen(true)}
-            className="sm:hidden w-full mt-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200 py-4"
+            className="w-full mt-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200 py-4"
             data-tour="create-tent-button"
           >
             <Sprout className="w-5 h-5" />
@@ -1448,21 +1440,21 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
 
     {/* ── Tarefas — botão toggle + painel deslizante ── */}
     {cycle && (
-      <div className="mx-1">
+      <div className="mx-1 mt-2">
         {/* Botão toggle — sempre visível, fino */}
         <button
           onClick={e => { e.stopPropagation(); setTasksOpen(!tasksOpen); }}
-          className="w-full flex items-center justify-between px-4 py-2 rounded-b-xl bg-muted/20 border border-t-0 border-border/30 hover:bg-muted/40 transition-all duration-200"
+          className="w-full flex items-center justify-between px-5 py-3 rounded-b-xl bg-muted/20 border border-t-0 border-border/30 hover:bg-muted/40 transition-all duration-200"
         >
-          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
             Tarefas
-            <span className="text-[10px] opacity-60">
+            <span className="text-xs opacity-60 font-normal">
               {(morningDone ? 1 : 0) + (afternoonDone ? 1 : 0)}/2 hoje · {completedTasks}/{totalTasks} semana
             </span>
           </span>
           <span className={`text-muted-foreground transition-transform duration-300 ${tasksOpen ? "rotate-180" : ""}`}>
-            <ArrowRight className="w-3.5 h-3.5 rotate-90" />
+            <ArrowRight className="w-4 h-4 rotate-90" />
           </span>
         </button>
 
