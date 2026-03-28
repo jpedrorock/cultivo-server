@@ -148,7 +148,7 @@ export default function TentDetails() {
     }
 
     if (tent.category === "MAINTENANCE") {
-      return { phase: "Manutenção", color: "bg-blue-500/100" };
+      return { phase: "Manutenção", color: "bg-blue-500" };
     }
 
     if (cycle.floraStartDate) {
@@ -378,7 +378,7 @@ export default function TentDetails() {
               label: "Umidade",
               value: last?.rhPct ? parseFloat(last.rhPct).toFixed(0) : "—",
               unit: "%",
-              icon: <Droplets className="w-4 h-4 text-blue-500" />,
+              icon: <Droplets className="w-4 h-4 text-teal-400" />,
               ok: last?.rhPct ? (parseFloat(last.rhPct) >= 40 && parseFloat(last.rhPct) <= 70) : null,
             },
             {
@@ -565,7 +565,7 @@ export default function TentDetails() {
                     <Button
                       onClick={() => openPhaseConfirm("CLONING")}
                       size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      className="bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 text-white border-0"
                     >
                       <Sprout className="w-4 h-4 mr-2" />
                       Tirar Clones
@@ -575,7 +575,7 @@ export default function TentDetails() {
                     <Button
                       onClick={() => openPhaseConfirm("FLORA")}
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white border-0"
                     >
                       <Flower2 className="w-4 h-4 mr-2" />
                       Avançar para Floração
@@ -586,7 +586,7 @@ export default function TentDetails() {
                       <Button
                         onClick={() => setHarvestQueueOpen(true)}
                         size="sm"
-                        className="bg-orange-500 hover:bg-orange-600 text-white"
+                        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black border-0"
                       >
                         <Wind className="w-4 h-4 mr-2" />
                         Colher → Aguardando Secagem
@@ -595,7 +595,7 @@ export default function TentDetails() {
                         onClick={() => openPhaseConfirm("DRYING")}
                         size="sm"
                         variant="outline"
-                        className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                        className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-400"
                       >
                         <Wind className="w-4 h-4 mr-2" />
                         Ir direto para Secagem
@@ -680,20 +680,20 @@ export default function TentDetails() {
           </Card>
 
           {/* Umidade */}
-          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #38bdf8" }}>
+          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #2dd4bf" }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-sky-400" />
+                    <Droplets className="w-4 h-4 text-teal-400" />
                     Umidade Média
                   </p>
                   <p className="text-3xl font-bold text-foreground">{avgRh}%</p>
                   <p className="text-xs text-muted-foreground mt-1">Últimos {dateRange} dias</p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-sky-400/10 ring-1 ring-sky-400/30 flex items-center justify-center"
-                     style={{ boxShadow: "0 0 12px rgba(56,189,248,0.25)" }}>
-                  <Droplets className="w-6 h-6 text-sky-400" />
+                <div className="w-12 h-12 rounded-full bg-teal-400/10 ring-1 ring-teal-400/30 flex items-center justify-center"
+                     style={{ boxShadow: "0 0 12px rgba(45,212,191,0.25)" }}>
+                  <Droplets className="w-6 h-6 text-teal-400" />
                 </div>
               </div>
             </CardContent>

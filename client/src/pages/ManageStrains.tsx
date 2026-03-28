@@ -205,7 +205,7 @@ export default function ManageStrains() {
           {/* Botão: ícone no mobile, texto completo no desktop */}
           <AnimatedButton
             onClick={() => setIsCreateOpen(true)}
-            className="bg-green-600 hover:bg-green-700 text-white shrink-0 h-10"
+            className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0 shrink-0 h-10"
             aria-label="Nova Strain"
           >
             <Plus className="h-4 w-4 sm:mr-2" />
@@ -328,7 +328,7 @@ export default function ManageStrains() {
               {!searchQuery && (
                 <AnimatedButton
                   onClick={() => setIsCreateOpen(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white h-11"
+                  className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0 h-11"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Criar Primeira Strain
@@ -414,7 +414,7 @@ export default function ManageStrains() {
               </Button>
               <AnimatedButton
                 onClick={onSave}
-                className={`h-11 w-full sm:w-auto ${saveClass ?? "bg-green-600 hover:bg-green-700 text-white"}`}
+                className={`h-11 w-full sm:w-auto ${saveClass ?? "bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0"}`}
                 disabled={isPending}
               >
                 {isPending ? "Salvando..." : saveLabel}

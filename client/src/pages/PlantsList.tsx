@@ -631,47 +631,44 @@ export default function PlantsList() {
           />
         )}
       {/* ── Lixeira ── */}
-      <div className="max-w-7xl mx-auto px-4 pb-12">
-
-        {/* Header colapsável com gradiente sutil */}
-        <button
-          onClick={() => setShowTrash(!showTrash)}
-          className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-destructive/15 bg-gradient-to-r from-destructive/5 to-destructive/3 hover:from-destructive/10 hover:to-destructive/5 transition-all duration-300 group"
-        >
-          <div className="flex items-center gap-3">
-            {/* Ícone com leve animação na abertura */}
-            <div className="relative w-10 h-10 shrink-0">
-              <div className="w-10 h-10 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
-                <Trash2 className="w-4 h-4 text-destructive/60 group-hover:text-destructive/80 transition-colors" />
+      <div className="space-y-4 pb-12">
+        <Card className="overflow-hidden">
+          <CardHeader
+            className="hover:bg-muted/50 transition-colors cursor-pointer"
+            onClick={() => setShowTrash(!showTrash)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 flex-1">
+                {showTrash ? (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                )}
+                <div className="relative shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4 text-destructive/70" />
+                  </div>
+                  {(deletedPlants?.length ?? 0) > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-[9px] font-bold text-white flex items-center justify-center">
+                      {deletedPlants!.length > 9 ? '9+' : deletedPlants!.length}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Lixeira</CardTitle>
+                  <CardDescription>
+                    {(deletedPlants?.length ?? 0) === 0
+                      ? 'Vazia · excluídas ficam 30 dias'
+                      : `${deletedPlants!.length} planta${deletedPlants!.length !== 1 ? 's' : ''} · removidas recentemente`}
+                  </CardDescription>
+                </div>
               </div>
-              {(deletedPlants?.length ?? 0) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-[9px] font-bold text-white flex items-center justify-center">
-                  {deletedPlants!.length > 9 ? '9+' : deletedPlants!.length}
-                </span>
-              )}
             </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold text-foreground leading-tight">Lixeira</p>
-              <p className="text-xs text-muted-foreground leading-tight mt-0.5">
-                {(deletedPlants?.length ?? 0) === 0
-                  ? 'Vazia · excluídas ficam 30 dias'
-                  : `${deletedPlants!.length} planta${deletedPlants!.length !== 1 ? 's' : ''} · removidas recentemente`}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-muted-foreground/50 hidden sm:block">
-              {showTrash ? 'Fechar' : 'Ver tudo'}
-            </span>
-            <div className={`w-7 h-7 rounded-lg border border-border/50 bg-background/60 flex items-center justify-center transition-transform duration-300 ${showTrash ? 'rotate-180' : ''}`}>
-              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-            </div>
-          </div>
-        </button>
+          </CardHeader>
 
         {/* Lista expandida */}
         {showTrash && (
-          <div className="mt-3 space-y-2">
+          <CardContent className="space-y-2 pt-0">
             {(deletedPlants?.length ?? 0) === 0 ? (
               /* ── Empty state ── */
               <div className="flex flex-col items-center justify-center py-12 px-6 rounded-2xl border border-dashed border-border/50 bg-muted/20 gap-4">
@@ -809,8 +806,9 @@ export default function PlantsList() {
                 </div>
               </>
             )}
-          </div>
+          </CardContent>
         )}
+        </Card>
       </div>
       </main>
 
@@ -1158,7 +1156,7 @@ export default function PlantsList() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setBulkPromoteConfirm(false)}>Cancelar</Button>
             <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0"
               onClick={() => { bulkPromote.mutate({ plantIds: Array.from(selectedPlants) }); setBulkPromoteConfirm(false); }}
               disabled={bulkPromote.isPending}
             >
@@ -1186,7 +1184,7 @@ export default function PlantsList() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setBulkHarvestConfirm(false)}>Cancelar</Button>
             <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0"
               onClick={() => { bulkHarvest.mutate({ plantIds: Array.from(selectedPlants) }); setBulkHarvestConfirm(false); }}
               disabled={bulkHarvest.isPending}
             >

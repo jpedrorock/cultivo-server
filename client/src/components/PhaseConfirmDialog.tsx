@@ -38,10 +38,10 @@ const PHASE_CONFIG: Record<
     description:
       "As plantas entrarão no ciclo 12/12. Esta ação iniciará a fase de floração e não pode ser desfeita facilmente.",
     bgColor:
-      "bg-green-500/10 border border-green-500/30 dark:bg-green-500/15 dark:border-green-500/35",
-    iconColor: "text-green-600 dark:text-green-400",
+      "bg-purple-500/10 border border-purple-500/30 dark:bg-purple-500/15 dark:border-purple-500/35",
+    iconColor: "text-purple-500 dark:text-purple-400",
     confirmClass:
-      "bg-green-600 hover:bg-green-700 text-white focus:ring-green-500",
+      "bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white border-0",
     confirmLabel: "Sim, iniciar Floração",
   },
   DRYING: {
@@ -50,10 +50,10 @@ const PHASE_CONFIG: Record<
     description:
       "As plantas serão colhidas e a estufa entrará em modo de secagem. Confirme apenas se a colheita estiver pronta.",
     bgColor:
-      "bg-orange-500/10 border border-orange-500/30 dark:bg-orange-500/15 dark:border-orange-500/35",
-    iconColor: "text-orange-600 dark:text-orange-400",
+      "bg-amber-500/10 border border-amber-500/30 dark:bg-amber-500/15 dark:border-amber-500/35",
+    iconColor: "text-amber-600 dark:text-amber-400",
     confirmClass:
-      "bg-orange-500 hover:bg-orange-600 text-white focus:ring-orange-500",
+      "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black border-0",
     confirmLabel: "Sim, iniciar Secagem",
   },
   CLONING: {
@@ -62,10 +62,10 @@ const PHASE_CONFIG: Record<
     description:
       "Serão selecionadas as plantas mãe para clonagem. A estufa entrará em fase de clonagem.",
     bgColor:
-      "bg-blue-500/10 border border-blue-500/30 dark:bg-blue-500/15 dark:border-blue-500/35",
-    iconColor: "text-blue-600 dark:text-blue-400",
+      "bg-sky-500/10 border border-sky-500/30 dark:bg-sky-500/15 dark:border-sky-500/35",
+    iconColor: "text-sky-500 dark:text-sky-400",
     confirmClass:
-      "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500",
+      "bg-gradient-to-r from-sky-400 to-cyan-500 hover:from-sky-500 hover:to-cyan-600 text-black border-0",
     confirmLabel: "Sim, iniciar Clonagem",
   },
 };

@@ -156,7 +156,7 @@ export default function MorningCheck() {
               </Button>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold text-foreground">Morning Check</h1>
+                  <h1 className="text-lg font-bold text-foreground">Status</h1>
                   <Clock className="w-4 h-4 text-muted-foreground" />
                   <span className="text-base font-bold text-primary tabular-nums">{timeStr}</span>
                 </div>

@@ -98,7 +98,7 @@ export function CyclesDashboard() {
           }
 
           const gradientBorder =
-            cycle.phase === 'MAINTENANCE' ? 'linear-gradient(135deg, #60a5fa, #3b82f6, #6366f1)'
+            cycle.phase === 'MAINTENANCE' ? 'linear-gradient(135deg, #60a5fa, #3b82f6, #2563eb)'
             : cycle.phase === 'CLONING'    ? 'linear-gradient(135deg, #2dd4bf, #06b6d4, #0891b2)'
             : cycle.phase === 'FLORA'      ? 'linear-gradient(135deg, #818cf8, #a78bfa, #a855f7)'
             :                               'linear-gradient(135deg, #4ade80, #22c55e, #16a34a)';

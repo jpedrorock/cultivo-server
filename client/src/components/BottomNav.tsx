@@ -58,7 +58,7 @@ export function BottomNav() {
   ];
 
   const moreMenuItems: NavItem[] = [
-    { href: "/morning-check", icon: Sunrise, label: "Morning Check" },
+    { href: "/morning-check", icon: Sunrise, label: "Status" },
     { href: "/plants", icon: Leaf, label: "Plantas" },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
@@ -109,7 +109,7 @@ export function BottomNav() {
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 py-3 px-4 rounded-lg transition-colors relative",
                   item.href === "/quick-log"
-                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    ? "bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white shadow-lg shadow-green-900/30"
                     : isActive
                       ? "text-primary hover:bg-primary/10"
                       : "text-muted-foreground hover:text-primary hover:bg-primary/10"

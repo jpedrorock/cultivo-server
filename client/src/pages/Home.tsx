@@ -1,9 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
 import { WeatherWidget } from "@/components/WeatherWidget";
-import { AlertsWidget } from "@/components/AlertsWidget";
-import { CyclesDashboard } from "@/components/CyclesDashboard";
-import { TentChartWidget } from "@/components/TentChartWidget";
 import StartCycleModal from "@/components/StartCycleModal";
 import { InitiateCycleModal } from "@/components/InitiateCycleModal";
 import { EditCycleModal } from "@/components/EditCycleModal";
@@ -336,7 +333,7 @@ export default function Home() {
                 <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
                   <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
                 </div>
-                <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">Gerenciamento<br className="sm:hidden" /> de Estufas</h1>
+                <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">Cultivo</h1>
               </div>
             </div>
           </div>
@@ -414,7 +411,7 @@ export default function Home() {
               <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
                 <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
               </div>
-              <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">Gerenciamento<br className="sm:hidden" /> de Estufas</h1>
+              <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">Cultivo</h1>
             </div>
             <div className="flex items-center gap-3">
               <Link href="/quick-log" className="!hidden md:!inline-block">
@@ -463,14 +460,15 @@ export default function Home() {
       )}
 
       {/* Main Content */}
-      <main className="container py-8">
+      <main className="container py-4">
         {/* Tents Grid */}
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-foreground">Estufas</h2>
-          <AnimatedButton onClick={() => setCreateTentModalOpen(true)} className="gap-2" data-tour="create-tent-button">
-            <Sprout className="w-4 h-4" />
-            Criar Nova Estufa
-          </AnimatedButton>
+        <div className="mb-4 flex justify-end">
+          <div className="hidden sm:block">
+            <AnimatedButton onClick={() => setCreateTentModalOpen(true)} className="gap-2" data-tour="create-tent-button">
+              <Sprout className="w-4 h-4" />
+              Criar Nova Estufa
+            </AnimatedButton>
+          </div>
         </div>
 
         {isLoading ? (
@@ -506,35 +504,25 @@ export default function Home() {
           </StaggerList>
         )}
 
+        {/* Botão nova estufa — mobile only, abaixo dos cards */}
+        {!isLoading && (
+          <button
+            onClick={() => setCreateTentModalOpen(true)}
+            className="sm:hidden w-full mt-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200 py-4"
+            data-tour="create-tent-button"
+          >
+            <Sprout className="w-5 h-5" />
+            <span className="text-sm font-medium">Nova Estufa</span>
+          </button>
+        )}
+
         {/* Weather Widget */}
         <div className="mt-8">
           <WeatherWidget />
         </div>
 
-        {/* Alerts Widget */}
-        <div className="mt-8">
-          <AlertsWidget />
-        </div>
 
-        {/* Cycles Dashboard */}
-        <div className="mt-8">
-          <CyclesDashboard />
-        </div>
 
-        {/* Weekly Summary Section */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold text-foreground mb-6">Resumo Semanal</h2>
-          <div className="space-y-6">
-            {tents?.filter(tent => getTentCycle(tent.id)).map((tent) => {
-              const cycle = getTentCycle(tent.id);
-              return (
-                <div key={tent.id}>
-                  <TentChartWidgetWrapper tentId={tent.id} tentName={tent.name} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
       </main>
 
@@ -785,14 +773,6 @@ export default function Home() {
   );
 }
 
-// Wrapper component to fetch weekly data
-function TentChartWidgetWrapper({ tentId, tentName }: { tentId: number; tentName: string }) {
-  const { data: weeklyData = [], isLoading } = trpc.dailyLogs.getWeeklyData.useQuery({ tentId });
-  
-  if (isLoading) return null;
-  
-  return <TentChartWidget tentId={tentId.toString()} tentName={tentName} data={weeklyData} />;
-}
 
 function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; color: string; w?: number; h?: number }) {
   if (values.length < 2) return null;
@@ -809,7 +789,9 @@ function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; co
 
 // Separate component for Tent Card with Tasks
 function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlora, onInitiateCycle, onEditCycle, onFinalizeCycle, onEditTent, onDeleteTent }: any) {
-  const [tasksExpanded, setTasksExpanded] = useState(false);
+  const [, navigate] = useLocation();
+  const [tasksOpen, setTasksOpen] = useState(false);         // painel inteiro aberto/fechado
+  const [tasksExpanded, setTasksExpanded] = useState(true);  // semana expandida quando painel aberto
   const [hideCompleted, setHideCompleted] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
 
@@ -873,6 +855,13 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { tentId: tent.id, phase: currentPhase! as any, weekNumber: currentWeek! },
     { enabled: !!cycle && !!currentPhase && !!currentWeek }
   );
+
+  const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
+    { tentId: tent.id },
+    { staleTime: 2 * 60 * 1000 }
+  );
+  const markAllSeen = trpc.alerts.markAllAsSeen.useMutation();
+  const newAlerts = (alertCount as any)?.count ?? 0;
   
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
@@ -961,15 +950,30 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const completedTasks = tasks?.filter((t) => t.isDone).length || 0;
   const totalTasks = tasks?.length || 0;
 
+  // Registros de hoje para tarefas diárias
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayLogs = (recentLogs ?? []).filter(l => new Date(l.logDate) >= todayStart);
+  const morningDone = todayLogs.length >= 1;
+  const afternoonDone = todayLogs.length >= 2;
+
   const phaseAccentColor =
     tent.category === 'VEGA'   ? '#4ade80' :
     tent.category === 'FLORA'  ? '#a78bfa' :
     tent.category === 'DRYING' ? '#fbbf24' :
     '#60a5fa';
 
+  const phaseBg =
+    tent.category === 'VEGA'
+      ? 'linear-gradient(160deg, rgba(74,222,128,0.07) 0%, transparent 50%)'
+      : tent.category === 'FLORA'
+      ? 'linear-gradient(160deg, rgba(167,139,250,0.08) 0%, transparent 50%)'
+      : tent.category === 'DRYING'
+      ? 'linear-gradient(160deg, rgba(251,191,36,0.07) 0%, transparent 50%)'
+      : 'linear-gradient(160deg, rgba(96,165,250,0.07) 0%, transparent 50%)';
+
   return (
     <ListItemAnimation>
-      <Card className="bg-card/90 backdrop-blur-sm shadow-md shadow-black/8 hover:shadow-xl hover:shadow-primary/12 transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-primary/30 group cursor-pointer overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}` }}>
+      <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`)} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -1020,6 +1024,21 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   </Badge>
                 );
               })()}
+              {/* Badge de alertas não lidos */}
+              {newAlerts > 0 && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    markAllSeen.mutate({ tentId: tent.id });
+                  }}
+                  title="Marcar alertas como vistos"
+                >
+                  <Badge className="bg-red-500/15 text-red-500 border-red-500/30 hover:bg-red-500/25 transition-colors gap-1 cursor-pointer">
+                    <AlertTriangle className="w-3 h-3" />
+                    {newAlerts} {newAlerts === 1 ? "alerta" : "alertas"}
+                  </Badge>
+                </button>
+              )}
             </CardTitle>
             <CardDescription className="mt-2 space-y-1">
               <div className="flex items-center gap-3">
@@ -1083,11 +1102,9 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     Novo Ciclo
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href={`/tent/${tent.id}`}>
-                      <ArrowRight className="w-4 h-4 mr-2" />
-                      Ver Detalhes
-                    </Link>
+                  <DropdownMenuItem onClick={() => navigate(`/tent/${tent.id}`)}>
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Ver Detalhes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onEditTent(tent)}>
@@ -1101,17 +1118,13 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 </>
               ) : (
                 <>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/quick-log?tentId=${tent.id}`}>
-                      <Zap className="w-4 h-4 mr-2" />
-                      Registrar
-                    </Link>
+                  <DropdownMenuItem onClick={() => navigate(`/quick-log?tentId=${tent.id}`)}>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Registrar
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/tent/${tent.id}`}>
-                      <ArrowRight className="w-4 h-4 mr-2" />
-                      Ver Detalhes
-                    </Link>
+                  <DropdownMenuItem onClick={() => navigate(`/tent/${tent.id}`)}>
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Ver Detalhes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onEditCycle(cycle, tent)}>
@@ -1165,7 +1178,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           {/* Cycle Info */}
           {cycle ? (
             <div
-              className={`rounded-lg p-4 space-y-2 border ${
+              onClick={() => navigate(`/tent/${tent.id}`)}
+              className={`rounded-lg p-4 space-y-2 border cursor-pointer hover:brightness-110 transition-all duration-150 ${
                 tent.category === 'VEGA'
                   ? 'border-green-500/20 dark:border-green-500/15'
                   : tent.category === 'FLORA'
@@ -1259,87 +1273,55 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   </>
                 )}
               </div>
+
+              {/* ── Barra de progresso do ciclo ── */}
+              {tent.category !== 'MAINTENANCE' && (() => {
+                const now = new Date();
+                const start = new Date(cycle.startDate);
+                if (isNaN(start.getTime())) return null;
+                const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
+                const isFlora = !!(floraStart && !isNaN(floraStart.getTime()) && now >= floraStart);
+                const weekNum = isFlora
+                  ? Math.max(1, Math.floor((now.getTime() - floraStart!.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1)
+                  : Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+                const totalEstWeeks = 16; // ~8 vega + 8 flora
+                const totalWeekNum = isFlora
+                  ? Math.floor((floraStart!.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + weekNum
+                  : weekNum;
+                const pct = Math.min((totalWeekNum / totalEstWeeks) * 100, 100);
+                const barColor =
+                  tent.category === 'VEGA'   ? '#4ade80' :
+                  tent.category === 'FLORA'  ? '#a78bfa' :
+                  tent.category === 'DRYING' ? '#fbbf24' : '#60a5fa';
+                return (
+                  <div className="pt-1 space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <div className="flex gap-2">
+                        {['Vega','Flora','Colheita'].map((label, i) => {
+                          const active = i === 0 && !isFlora || i === 1 && isFlora;
+                          return (
+                            <span key={label} className={`text-[10px] font-medium ${active ? '' : 'text-muted-foreground/50'}`}
+                                  style={active ? { color: barColor } : {}}>
+                              {label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{Math.round(pct)}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-black/20 dark:bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 6px ${barColor}80` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="bg-muted rounded-lg p-4 text-center">
               <p className="text-sm text-muted-foreground">Nenhum ciclo ativo</p>
-            </div>
-          )}
-
-          {/* Weekly Tasks */}
-          {cycle && (
-            <div className="space-y-2">
-              <div className="w-full flex items-center justify-between hover:bg-muted/50 rounded p-2 transition-colors">
-                <button
-                  onClick={() => setTasksExpanded(!tasksExpanded)}
-                  className="flex-1 flex items-center gap-2 text-left"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <h4 className="text-sm font-semibold text-foreground">
-                    Tarefas da Semana
-                  </h4>
-                </button>
-                <div className="flex items-center gap-3">
-                  {tasks && tasks.length > 0 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setHideCompleted(!hideCompleted);
-                      }}
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                      title={hideCompleted ? "Mostrar concluídas" : "Ocultar concluídas"}
-                    >
-                      {hideCompleted ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    </button>
-                  )}
-                  {totalTasks > 0 && (
-                    <Badge variant="outline" className="text-xs">
-                      {completedTasks}/{totalTasks}
-                    </Badge>
-                  )}
-                  <button
-                    onClick={() => setTasksExpanded(!tasksExpanded)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {tasksExpanded ? "▲" : "▼"}
-                  </button>
-                </div>
-              </div>
-
-              {tasksExpanded && (
-                tasksLoading ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                  </div>
-                ) : tasks && tasks.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {tasks.filter((task) => hideCompleted ? !task.isDone : true).map((task) => (
-                      <div
-                        key={task.id}
-                        className="flex items-center gap-2 p-2 rounded hover:bg-muted"
-                      >
-                        <Checkbox
-                          id={`task-${task.id}`}
-                          checked={task.isDone}
-                          onCheckedChange={() => handleToggleTask(task.id, task.isDone)}
-                        />
-                        <label
-                          htmlFor={`task-${task.id}`}
-                          className={`text-sm cursor-pointer flex-1 ${
-                            task.isDone ? "line-through text-muted-foreground" : "text-foreground"
-                          }`}
-                        >
-                          {task.title}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    Nenhuma tarefa para esta semana
-                  </p>
-                )
-              )}
             </div>
           )}
 
@@ -1370,8 +1352,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               <MiniSparkline values={sparkTemps} color="#f97316" />
             </div>
             {/* Humidity */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-blue-500/15" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(37,99,235,0.08) 60%, rgba(59,130,246,0.02) 100%)' }}>
-              <Droplets className="w-4 h-4 text-blue-500 mb-0.5" />
+            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-teal-400/20" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.15) 0%, rgba(20,184,166,0.07) 60%, rgba(45,212,191,0.02) 100%)' }}>
+              <Droplets className="w-4 h-4 text-teal-400 mb-0.5" />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">RH</p>
               <div className="flex items-center gap-0.5">
                 <p className={`text-base font-bold tracking-tight leading-none ${
@@ -1383,7 +1365,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 </p>
                 {latestLog?.rhPct && getStatusIcon(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)}
               </div>
-              <MiniSparkline values={sparkRh} color="#3b82f6" />
+              <MiniSparkline values={sparkRh} color="#2dd4bf" />
             </div>
             {/* PPFD */}
             <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-yellow-500/15" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(202,138,4,0.08) 60%, rgba(234,179,8,0.02) 100%)' }}>
@@ -1463,6 +1445,91 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         />
       )}
     </Card>
+
+    {/* ── Tarefas — botão toggle + painel deslizante ── */}
+    {cycle && (
+      <div className="mx-1">
+        {/* Botão toggle — sempre visível, fino */}
+        <button
+          onClick={e => { e.stopPropagation(); setTasksOpen(!tasksOpen); }}
+          className="w-full flex items-center justify-between px-4 py-2 rounded-b-xl bg-muted/20 border border-t-0 border-border/30 hover:bg-muted/40 transition-all duration-200"
+        >
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Tarefas
+            <span className="text-[10px] opacity-60">
+              {(morningDone ? 1 : 0) + (afternoonDone ? 1 : 0)}/2 hoje · {completedTasks}/{totalTasks} semana
+            </span>
+          </span>
+          <span className={`text-muted-foreground transition-transform duration-300 ${tasksOpen ? "rotate-180" : ""}`}>
+            <ArrowRight className="w-3.5 h-3.5 rotate-90" />
+          </span>
+        </button>
+
+        {/* Painel expansível */}
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${tasksOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
+          <div className="rounded-b-xl bg-muted/30 border border-t-0 border-border/40 divide-y divide-border/40">
+
+            {/* Tarefas Diárias */}
+            <div className="px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2 flex items-center gap-1.5">
+                <Clock className="w-3 h-3" /> Diárias
+              </p>
+              <div className="space-y-1.5">
+                {[
+                  { label: "Registro Manhã", done: morningDone },
+                  { label: "Registro Tarde", done: afternoonDone },
+                ].map(({ label, done }) => (
+                  <Link key={label} href={`/quick-log?tentId=${tent.id}`}>
+                    <div className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors ${done ? "opacity-50" : "hover:bg-primary/5"}`}>
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${done ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
+                        {done && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                      </div>
+                      <span className={`text-sm ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{label}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Tarefas da Semana */}
+            <div className="px-4 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3 h-3" /> Semana
+                </p>
+                <div className="flex items-center gap-2">
+                  {tasks && tasks.length > 0 && (
+                    <button onClick={(e) => { e.stopPropagation(); setHideCompleted(!hideCompleted); }} className="text-muted-foreground hover:text-foreground transition-colors">
+                      {hideCompleted ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                  <Badge variant="outline" className="text-xs h-5">{completedTasks}/{totalTasks}</Badge>
+                </div>
+              </div>
+              {tasksLoading ? (
+                <div className="flex justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
+              ) : tasks && tasks.length > 0 ? (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {tasks.filter(t => hideCompleted ? !t.isDone : true).map((task) => (
+                    <div key={task.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50">
+                      <Checkbox id={`task-${task.id}`} checked={task.isDone} onCheckedChange={() => handleToggleTask(task.id, task.isDone)} />
+                      <label htmlFor={`task-${task.id}`} className={`text-sm cursor-pointer flex-1 ${task.isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                        {task.title}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">Nenhuma tarefa esta semana</p>
+              )}
+            </div>
+
+          </div>
+        </div>
+      </div>
+    )}
+
     </ListItemAnimation>
   );
 }

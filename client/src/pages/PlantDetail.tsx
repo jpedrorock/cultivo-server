@@ -691,7 +691,7 @@ export default function PlantDetail() {
               Cancelar
             </PressButton>
             <PressButton
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white border-0"
               pressIntensity="medium"
               onClick={() => {
                 haptic.warning();
@@ -737,7 +737,7 @@ export default function PlantDetail() {
               Cancelar
             </PressButton>
             <PressButton
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0"
               onClick={confirmHarvest}
               disabled={archiveMutation.isPending}
               pressIntensity="medium"

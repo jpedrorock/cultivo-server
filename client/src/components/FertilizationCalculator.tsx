@@ -352,7 +352,7 @@ export function FertilizationCalculator() {
               }
             }}
             size="lg"
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold text-lg py-6"
+            className="w-full bg-gradient-to-r from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white font-bold text-lg py-6 border-0"
           >
             🧪 Calcular Receita
           </Button>

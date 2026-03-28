@@ -12,7 +12,7 @@ function calculateVPD(t: number, rh: number) {
 
 const vpdColor  = (v: number) => v < 0.4 ? "#60a5fa" : v <= 0.8 ? "#4ade80" : v <= 1.2 ? "#a78bfa" : v <= 1.6 ? "#fbbf24" : "#f87171";
 const tempColor = (v: number) => v < 18  ? "#60a5fa" : v <= 28  ? "#4ade80" : v <= 32  ? "#fbbf24" : "#f87171";
-const rhColor   = (v: number) => v < 40  ? "#f87171" : v <= 70  ? "#4ade80" : v <= 80  ? "#fbbf24" : "#f87171";
+const rhColor   = (v: number) => v < 40  ? "#f87171" : v <= 70  ? "#2dd4bf" : v <= 80  ? "#fbbf24" : "#f87171";
 const ppfdColor = (v: number) => v < 200 ? "#60a5fa" : v <= 600 ? "#4ade80" : v <= 900 ? "#fbbf24" : "#f87171";
 
 function Sparkline({ values, color, w = 80, h = 28 }: { values: number[]; color: string; w?: number; h?: number }) {
@@ -107,7 +107,7 @@ export default function DisplayMode() {
   );
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col select-none overflow-hidden">
+    <div className="fixed inset-0 bg-black flex flex-col select-none overflow-hidden z-[200]">
 
       {/* ── header ── */}
       <div className={`flex items-center justify-between shrink-0 ${landscape ? "px-4 py-1.5" : "px-5 pt-safe pt-3 pb-1"}`}>
