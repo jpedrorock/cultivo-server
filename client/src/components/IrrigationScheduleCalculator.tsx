@@ -197,6 +197,79 @@ function calculateIrrigationSchedule(input: IrrigationInput): IrrigationResult |
 }
 
 // ─────────────────────────────────────────────
+// Cálculo para modo de horários fixos (manual)
+// ─────────────────────────────────────────────
+
+function calculateManualSchedule(
+  input: IrrigationInput,
+  manualTimes: string[],
+): IrrigationResult | null {
+  const { pumpFlowMlMin, numOutlets, maxRuntimeMin, restTimeBetweenMin, potSizeLiters, targetPct } = input;
+
+  if (pumpFlowMlMin <= 0 || numOutlets <= 0 || maxRuntimeMin <= 0 || potSizeLiters <= 0 || targetPct <= 0) return null;
+
+  const validTimes = manualTimes.filter(Boolean);
+  if (validTimes.length === 0) return null;
+
+  const warnings: string[] = [];
+
+  const flowPerPlantMlMin = pumpFlowMlMin / numOutlets;
+  const dailyVolumePerPlantMl = potSizeLiters * 1000 * targetPct / 100;
+  const totalDailyVolumeMl = dailyVolumePerPlantMl * numOutlets;
+  const numCycles = validTimes.length;
+
+  const durationPerCycleMin = totalDailyVolumeMl / (numCycles * pumpFlowMlMin);
+  const durationPerCycleSec = Math.round(durationPerCycleMin * 60);
+  const mlPerCyclePerPlant = dailyVolumePerPlantMl / numCycles;
+  const expectedRunoffMlPerPlant = dailyVolumePerPlantMl * 0.175;
+
+  if (durationPerCycleMin > maxRuntimeMin + 0.01) {
+    warnings.push(
+      `Duração por ciclo (${durationPerCycleMin.toFixed(1)} min) excede o tempo máximo configurado (${maxRuntimeMin} min).`
+    );
+  }
+
+  // Verificar intervalo mínimo entre horários consecutivos
+  const sortedMinutes = [...validTimes.map(parseTimeToMinutes)].sort((a, b) => a - b);
+  for (let i = 1; i < sortedMinutes.length; i++) {
+    const gap = sortedMinutes[i] - sortedMinutes[i - 1];
+    const minGap = durationPerCycleMin + restTimeBetweenMin;
+    if (gap < minGap) {
+      warnings.push(
+        `Intervalo entre ciclos ${i} e ${i + 1} (~${gap.toFixed(0)} min) pode ser insuficiente para o descanso da bomba (${restTimeBetweenMin} min + ${durationPerCycleMin.toFixed(1)} min bombeando).`
+      );
+    }
+  }
+
+  // Ordenar os horários por hora do dia para exibição
+  const schedule: CycleEntry[] = [...validTimes]
+    .map((t, i) => ({ t, i }))
+    .sort((a, b) => parseTimeToMinutes(a.t) - parseTimeToMinutes(b.t))
+    .map(({ t }, idx) => ({
+      cycleNumber: idx + 1,
+      startTimeFormatted: t,
+      nextDay: false,
+      durationMin: durationPerCycleMin,
+      durationSec: durationPerCycleSec,
+      mlPerPlant: Math.round(mlPerCyclePerPlant),
+    }));
+
+  return {
+    flowPerPlantMlMin,
+    dailyVolumePerPlantMl,
+    totalDailyVolumeMl,
+    numCycles,
+    durationPerCycleMin,
+    durationPerCycleSec,
+    mlPerCyclePerPlant,
+    schedule,
+    expectedRunoffMlPerPlant,
+    availableWindowMin: 0,
+    warnings,
+  };
+}
+
+// ─────────────────────────────────────────────
 // Sugestão de % por fase/semana (boas práticas)
 // ─────────────────────────────────────────────
 
@@ -229,8 +302,10 @@ export function IrrigationScheduleCalculator() {
   const [weekNumber, setWeekNumber] = useState(3);
 
   // ── Luz ──
+  const [scheduleMode, setScheduleMode] = useState<"auto" | "manual">("auto");
   const [lightsOnTime, setLightsOnTime] = useState("06:00");
   const [lightsOffTime, setLightsOffTime] = useState("22:00");
+  const [manualTimes, setManualTimes] = useState<string[]>(["08:00", "12:00", "18:00"]);
 
   // ── Volume ──
   const [useCustomPct, setUseCustomPct] = useState(false);
@@ -278,14 +353,19 @@ export function IrrigationScheduleCalculator() {
   const suggestedPct = getSuggestedTargetPct(phase, weekNumber);
   const targetPct = useCustomPct ? (parseFloat(customPctStr) || suggestedPct) : suggestedPct;
   const flowPerPlant = numOutlets > 0 ? pumpFlowMlMin / numOutlets : 0;
-  const lightWindowH = ((lightsOffMinutes - lightsOnMinutes) / 60).toFixed(1);
+  const effectiveLightsOffMin = lightsOffMinutes <= lightsOnMinutes ? lightsOffMinutes + 1440 : lightsOffMinutes;
+  const lightWindowH = ((effectiveLightsOffMin - lightsOnMinutes) / 60).toFixed(1);
 
   // ── Cálculo principal ──
-  const result = useMemo(() => calculateIrrigationSchedule({
-    pumpFlowMlMin, numOutlets, maxRuntimeMin, restTimeBetweenMin,
-    potSizeLiters, targetPct, lightsOnMinutes, lightsOffMinutes,
-  }), [pumpFlowMlMin, numOutlets, maxRuntimeMin, restTimeBetweenMin,
-       potSizeLiters, targetPct, lightsOnMinutes, lightsOffMinutes]);
+  const baseInput = { pumpFlowMlMin, numOutlets, maxRuntimeMin, restTimeBetweenMin, potSizeLiters, targetPct, lightsOnMinutes, lightsOffMinutes };
+  const result = useMemo(() =>
+    scheduleMode === "manual"
+      ? calculateManualSchedule(baseInput, manualTimes)
+      : calculateIrrigationSchedule(baseInput),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [pumpFlowMlMin, numOutlets, maxRuntimeMin, restTimeBetweenMin,
+   potSizeLiters, targetPct, lightsOnMinutes, lightsOffMinutes,
+   scheduleMode, manualTimes]);
 
   // ── Carregar preset ──
   const handleLoadPreset = (preset: any) => {
@@ -585,13 +665,31 @@ export function IrrigationScheduleCalculator() {
       {/* ── SEÇÃO 3: Janela de Luz ── */}
       <Card>
         <CardContent className="p-5 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center">
-              <Sun className="w-4 h-4 text-yellow-500" />
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center">
+                <Sun className="w-4 h-4 text-yellow-500" />
+              </div>
+              <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Janela de Luz</h3>
             </div>
-            <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Janela de Luz</h3>
+            {/* Toggle modo */}
+            <div className="flex rounded-lg border border-border/60 overflow-hidden text-xs font-semibold shrink-0">
+              <button
+                onClick={() => setScheduleMode("auto")}
+                className={`px-3 py-1.5 transition-colors ${scheduleMode === "auto" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"}`}
+              >
+                🤖 Auto
+              </button>
+              <button
+                onClick={() => setScheduleMode("manual")}
+                className={`px-3 py-1.5 transition-colors ${scheduleMode === "manual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"}`}
+              >
+                📍 Fixo
+              </button>
+            </div>
           </div>
 
+          {/* Luzes ligam/apagam — sempre visível */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">🌅 Hora de acender</Label>
@@ -613,21 +711,87 @@ export function IrrigationScheduleCalculator() {
             </div>
           </div>
 
-          {lightsOffMinutes > lightsOnMinutes && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/8 border border-yellow-500/15">
-              <Clock className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-              <span className="text-xs text-yellow-700 dark:text-yellow-300">
-                Fotoperíodo: <strong>{lightWindowH}h</strong>
-                {parseFloat(lightWindowH) >= 18 ? " · Vega (18/6)" : parseFloat(lightWindowH) >= 12 ? " · Flora (12/12)" : ""}
-              </span>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/8 border border-yellow-500/15">
+            <Clock className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
+            <span className="text-xs text-yellow-700 dark:text-yellow-300">
+              Fotoperíodo: <strong>{lightWindowH}h</strong>
+              {parseFloat(lightWindowH) >= 18 ? " · Vega (18/6)" : parseFloat(lightWindowH) >= 12 ? " · Flora (12/12)" : ""}
+            </span>
+          </div>
+
+          {/* ── Modo Automático ── */}
+          {scheduleMode === "auto" && (
+            <div className="px-3 py-2.5 rounded-xl bg-muted/30 border border-border/40 text-xs text-muted-foreground space-y-0.5">
+              <p className="font-semibold text-foreground/70">Boas práticas embutidas:</p>
+              <p>• 1º ciclo: {lightsOnTime ? minutesToTimeString(lightsOnMinutes + 90) : "—"} (1,5h após acender)</p>
+              <p>• Último ciclo até: {minutesToTimeString(effectiveLightsOffMin - 120)} (2h antes de apagar)</p>
+              <p>• Horários calculados automaticamente dentro desta janela</p>
             </div>
           )}
 
-          <div className="px-3 py-2.5 rounded-xl bg-muted/30 border border-border/40 text-xs text-muted-foreground space-y-0.5">
-            <p className="font-semibold text-foreground/70">Boas práticas embutidas:</p>
-            <p>• 1º ciclo: {lightsOnTime ? minutesToTimeString(lightsOnMinutes + 90) : "—"} (1,5h após acender)</p>
-            <p>• Último ciclo até: {lightsOffTime ? minutesToTimeString(lightsOffMinutes - 120) : "—"} (2h antes de apagar)</p>
-          </div>
+          {/* ── Modo Fixo ── */}
+          {scheduleMode === "manual" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Horários fixos (máx. 4)</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs gap-1.5 text-primary hover:text-primary"
+                  onClick={() => {
+                    // Auto-sugerir horários baseados na janela de luz
+                    const first = lightsOnMinutes + 90;
+                    const last = effectiveLightsOffMin - 120;
+                    const n = 4;
+                    const step = (last - first) / (n - 1);
+                    const suggested = Array.from({ length: n }, (_, i) =>
+                      minutesToTimeString(Math.round(first + i * step))
+                    );
+                    setManualTimes(suggested);
+                  }}
+                >
+                  ✨ Sugerir ideais
+                </Button>
+              </div>
+
+              {manualTimes.map((t, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-muted-foreground w-5 shrink-0 text-right">{idx + 1}.</span>
+                  <Input
+                    type="time"
+                    value={t}
+                    onChange={(e) => {
+                      const updated = [...manualTimes];
+                      updated[idx] = e.target.value;
+                      setManualTimes(updated);
+                    }}
+                    className="text-xl font-bold text-center h-12 flex-1"
+                  />
+                  {manualTimes.length > 1 && (
+                    <button
+                      onClick={() => setManualTimes(manualTimes.filter((_, i) => i !== idx))}
+                      className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {manualTimes.length < 4 && (
+                <button
+                  onClick={() => setManualTimes([...manualTimes, minutesToTimeString(lightsOnMinutes + 90)])}
+                  className="w-full h-10 rounded-xl border-2 border-dashed border-border/50 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors flex items-center justify-center gap-1.5"
+                >
+                  + Adicionar horário
+                </button>
+              )}
+
+              <div className="px-3 py-2 rounded-xl bg-muted/30 border border-border/40 text-xs text-muted-foreground">
+                <p>O volume diário ({potSizeLiters > 0 ? `${(potSizeLiters * 1000 * targetPct / 100).toFixed(0)} ml/planta` : "—"}) será dividido igualmente entre os {manualTimes.length} horário{manualTimes.length > 1 ? "s" : ""}.</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
