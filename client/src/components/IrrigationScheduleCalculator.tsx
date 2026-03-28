@@ -917,9 +917,12 @@ export function IrrigationScheduleCalculator() {
                       {singleSub ? (
                         /* Linha única inline quando só 1 sub-ciclo */
                         <div className="flex items-center justify-between px-3 py-2 bg-background/60">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
                             <span className="font-mono font-bold text-foreground">{master.subCycles[0].startTimeFormatted}</span>
-                            <span className="text-xs text-muted-foreground">ligar bomba</span>
+                            <span className="text-muted-foreground/50 text-xs">–</span>
+                            <span className="font-mono font-bold text-foreground">
+                              {minutesToTimeString((parseTimeToMinutes(master.subCycles[0].startTimeFormatted) + master.subCycles[0].durationSec / 60) % 1440)}
+                            </span>
                           </div>
                           <div className="flex items-center gap-3 text-sm">
                             <span className="font-bold text-foreground">{master.subCycles[0].durationSec}s</span>
@@ -934,16 +937,15 @@ export function IrrigationScheduleCalculator() {
                               key={sub.subNumber}
                               className={`flex items-center justify-between px-3 py-2 ${sidx % 2 === 0 ? "bg-background/60" : "bg-muted/10"}`}
                             >
-                              <div className="flex items-center gap-2.5">
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text}`}>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} shrink-0`}>
                                   #{sub.subNumber}
                                 </span>
                                 <span className="font-mono font-bold text-foreground">{sub.startTimeFormatted}</span>
-                                {sidx > 0 && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    (+{((sidx) * (maxRuntimeMin + restTimeBetweenMin)).toFixed(0)} min)
-                                  </span>
-                                )}
+                                <span className="text-muted-foreground/50 text-xs">–</span>
+                                <span className="font-mono font-bold text-foreground">
+                                  {minutesToTimeString((parseTimeToMinutes(sub.startTimeFormatted) + sub.durationSec / 60) % 1440)}
+                                </span>
                               </div>
                               <div className="flex items-center gap-3 text-sm">
                                 <span className="font-bold text-foreground">{sub.durationSec}s</span>
