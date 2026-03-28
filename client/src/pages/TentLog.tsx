@@ -9,6 +9,7 @@ import { BigStepper } from "@/components/BigStepper";
 import { Badge } from "@/components/ui/badge";
 import { TentIcon } from "@/components/TentIcon";
 import { RangeSlider } from "@/components/ui/range-slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Save,
   Beaker, FlaskConical, Clock, Sunrise, Moon, NotebookPen, Zap,
@@ -33,6 +34,8 @@ export default function TentLog() {
   const [ec, setEc] = useState("");
   const [wateringVolume, setWateringVolume] = useState("");
   const [runoffCollected, setRunoffCollected] = useState("");
+  const [runoffPh, setRunoffPh] = useState("");
+  const [runoffEc, setRunoffEc] = useState("");
   const [notes, setNotes] = useState("");
 
   // Validação em tempo real
@@ -101,6 +104,14 @@ export default function TentLog() {
   const phValidation    = getValidationState(ph,     currentTargets?.phMin,   currentTargets?.phMax);
   const ecValidation    = getValidationState(ec,     currentTargets?.ecMin,   currentTargets?.ecMax);
 
+  // VPD automático (L2)
+  const vpd = useMemo(() => {
+    const t = parseFloat(tempC);
+    const rh = parseFloat(rhPct);
+    if (tempC === "" || rhPct === "" || isNaN(t) || isNaN(rh)) return null;
+    return parseFloat((0.6108 * Math.exp((17.27 * t) / (t + 237.3)) * (1 - rh / 100)).toFixed(2));
+  }, [tempC, rhPct]);
+
   // Runoff % calculado
   const runoffPercentage = useMemo(() => {
     const watering = parseFloat(wateringVolume);
@@ -138,12 +149,14 @@ export default function TentLog() {
         ppfd: ppfd || undefined,
         wateringVolume: wateringVolume ? parseInt(wateringVolume) : undefined,
         runoffCollected: runoffCollected ? parseInt(runoffCollected) : undefined,
+        runoffPh: runoffPh || undefined,
+        runoffEc: runoffEc || undefined,
         notes: notes || undefined,
       });
       if (destination === "server") toast.success("Registro salvo com sucesso!");
       setTempC(""); setRhPct(""); setPpfd(400);
       setPh(""); setEc("");
-      setWateringVolume(""); setRunoffCollected(""); setNotes("");
+      setWateringVolume(""); setRunoffCollected(""); setRunoffPh(""); setRunoffEc(""); setNotes("");
     } catch (error: any) {
       toast.error(`Erro ao salvar: ${error?.message || "Tente novamente"}`);
     }
@@ -199,6 +212,14 @@ export default function TentLog() {
     neutral: "bg-muted-foreground/30",
   }[s]);
 
+  // VPD zone info (L2)
+  const vpdInfo = vpd === null ? null
+    : vpd < 0.4  ? { label: "Muito baixo",   cls: "bg-blue-500/10   text-blue-600   dark:text-blue-400   border-blue-400/30"   }
+    : vpd <= 0.8 ? { label: "Ideal – Vega",  cls: "bg-green-500/10  text-green-600  dark:text-green-400  border-green-400/30"  }
+    : vpd <= 1.2 ? { label: "Ideal – Flora", cls: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-400/30" }
+    : vpd <= 1.6 ? { label: "Alto",          cls: "bg-amber-500/10  text-amber-600  dark:text-amber-400  border-amber-400/30"  }
+    :              { label: "Crítico",        cls: "bg-red-500/10    text-red-600    dark:text-red-400    border-red-400/30"    };
+
   // Runoff % color
   const runoffNum = runoffPercentage ? parseFloat(runoffPercentage) : null;
   const runoffColor = runoffNum == null ? "text-muted-foreground"
@@ -236,10 +257,10 @@ export default function TentLog() {
         </header>
 
         {/* ── Main ── */}
-        <main className="container py-6 max-w-3xl space-y-4">
+        <main className="container py-4 max-w-3xl">
 
           {/* Offline banner */}
-          <OfflineBanner onSync={syncNow} isSyncing={isSyncing} className="" />
+          <OfflineBanner onSync={syncNow} isSyncing={isSyncing} className="mb-4" />
 
           {/* Ciclo strip */}
           {cycle && currentPhaseInfo && (
@@ -257,8 +278,25 @@ export default function TentLog() {
               <span className="ml-auto text-xs text-muted-foreground">
                 {Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / (24 * 60 * 60 * 1000))} dias
               </span>
+              {(currentTargets as any)?.photoperiod && (
+                <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400 font-semibold text-xs shrink-0">
+                  <Sun className="w-3 h-3" />
+                  {(currentTargets as any).photoperiod}
+                </span>
+              )}
             </div>
           )}
+
+          {/* ── D4: Tabs por contexto ── */}
+          <Tabs defaultValue="manha" className="space-y-4 mt-4">
+            <TabsList className="grid w-full grid-cols-3 h-11">
+              <TabsTrigger value="manha" className="gap-1.5 text-sm">🌅 Manhã</TabsTrigger>
+              <TabsTrigger value="lab" className="gap-1.5 text-sm">🧪 Lab</TabsTrigger>
+              <TabsTrigger value="notas" className="gap-1.5 text-sm">📝 Notas</TabsTrigger>
+            </TabsList>
+
+            {/* ── Tab: Manhã ─────────────────────────────────────────── */}
+            <TabsContent value="manha" className="space-y-4">
 
           {/* ── Período AM/PM ── */}
           <Card>
@@ -344,8 +382,8 @@ export default function TentLog() {
             </CardContent>
           </Card>
 
-          {/* ── Ambiente + Nutrição (2 cols no desktop) ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Ambiente */}
+          <div className="grid grid-cols-1 gap-4">
 
             {/* 🌡️ Ambiente */}
             <Card>
@@ -392,60 +430,76 @@ export default function TentLog() {
               </CardContent>
             </Card>
 
-            {/* ⚗️ Nutrição */}
-            <Card>
-              <CardContent className="p-5 space-y-5">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                  <Beaker className="w-3.5 h-3.5 text-purple-500" />
-                  Nutrição
-                </p>
-
-                {/* pH */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-muted-foreground font-medium">pH</label>
-                    {phValidation !== "neutral" && (
-                      <span className={`w-2 h-2 rounded-full ${validationDot(phValidation)}`} />
-                    )}
-                  </div>
-                  <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" fieldType="ph" />
-                  {currentTargets && (
-                    <p className={`text-xs font-medium ${validationText(phValidation)}`}>
-                      🎯 {currentTargets.phMin}–{currentTargets.phMax}
-                    </p>
-                  )}
-                </div>
-
-                {/* EC */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                      <Zap className="w-3 h-3 text-yellow-500" />
-                      EC
-                    </label>
-                    {ecValidation !== "neutral" && (
-                      <span className={`w-2 h-2 rounded-full ${validationDot(ecValidation)}`} />
-                    )}
-                  </div>
-                  <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" />
-                  {currentTargets && (
-                    <p className={`text-xs font-medium ${validationText(ecValidation)}`}>
-                      🎯 {currentTargets.ecMin}–{currentTargets.ecMax} mS/cm
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
+            </TabsContent>{/* fim Manhã */}
 
-          {/* ── 💧 Rega ── */}
+            {/* ── Tab: Lab ─────────────────────────────────────────────── */}
+            <TabsContent value="lab" className="space-y-4">
+
+              {/* ⚗️ Nutrição */}
+              <Card>
+                <CardContent className="p-5 space-y-5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <Beaker className="w-3.5 h-3.5 text-purple-500" />
+                    Nutrição
+                  </p>
+                  {/* pH */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-muted-foreground font-medium">pH</label>
+                      {phValidation !== "neutral" && (
+                        <span className={`w-2 h-2 rounded-full ${validationDot(phValidation)}`} />
+                      )}
+                    </div>
+                    <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" fieldType="ph" />
+                    {currentTargets && (
+                      <p className={`text-xs font-medium ${validationText(phValidation)}`}>
+                        🎯 {currentTargets.phMin}–{currentTargets.phMax}
+                      </p>
+                    )}
+                  </div>
+                  {/* EC */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                        <Zap className="w-3 h-3 text-yellow-500" />
+                        EC
+                      </label>
+                      {ecValidation !== "neutral" && (
+                        <span className={`w-2 h-2 rounded-full ${validationDot(ecValidation)}`} />
+                      )}
+                    </div>
+                    <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" />
+                    {currentTargets && (
+                      <p className={`text-xs font-medium ${validationText(ecValidation)}`}>
+                        🎯 {currentTargets.ecMin}–{currentTargets.ecMax} mS/cm
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ── VPD ao vivo (L2) ── */}
+          {vpdInfo && (
+            <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border ${vpdInfo.cls}`}>
+              <div className="flex items-center gap-2">
+                <Droplets className="w-4 h-4 opacity-70" />
+                <span className="text-sm font-semibold">VPD</span>
+                <span className="text-xs opacity-60">{vpdInfo.label}</span>
+              </div>
+              <span className="font-bold text-xl tabular-nums">{vpd} kPa</span>
+            </div>
+          )}
+
+              {/* ── 💧 Rega ── */}
           <Card>
             <CardContent className="p-5">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 mb-4">
                 <Droplets className="w-3.5 h-3.5 text-teal-500" />
                 Rega & Runoff
               </p>
-              <div className="grid grid-cols-3 gap-3">
+              {/* Linha 1 — Volumes */}
+              <div className="grid grid-cols-3 gap-3 mb-3">
 
                 {/* Volume Regado */}
                 <div className="space-y-1.5">
@@ -493,8 +547,59 @@ export default function TentLog() {
                   <p className="text-[10px] text-muted-foreground text-center">Ideal: 10–20%</p>
                 </div>
               </div>
+
+              {/* Linha 2 — pH e EC do Runoff (L5) */}
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                    <FlaskConical className="w-3 h-3 text-purple-400" />
+                    pH do Runoff
+                    <span className="font-normal opacity-50">(opcional)</span>
+                  </label>
+                  <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-background dark:bg-zinc-900">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="6.0"
+                      step="0.1"
+                      min="0"
+                      max="14"
+                      value={runoffPh}
+                      onChange={(e) => setRunoffPh(e.target.value)}
+                      className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
+                    />
+                    <span className="text-xs text-muted-foreground">pH</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-yellow-400" />
+                    EC do Runoff
+                    <span className="font-normal opacity-50">(opcional)</span>
+                  </label>
+                  <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-background dark:bg-zinc-900">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="1.8"
+                      step="0.1"
+                      min="0"
+                      max="10"
+                      value={runoffEc}
+                      onChange={(e) => setRunoffEc(e.target.value)}
+                      className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
+                    />
+                    <span className="text-xs text-muted-foreground">mS/cm</span>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+            </TabsContent>{/* fim Lab */}
+
+            {/* ── Tab: Notas ──────────────────────────────────────────── */}
+            <TabsContent value="notas" className="space-y-4">
 
           {/* ── 📝 Observações ── */}
           <Card>
@@ -513,6 +618,9 @@ export default function TentLog() {
               />
             </CardContent>
           </Card>
+
+            </TabsContent>{/* fim Notas */}
+          </Tabs>
 
         </main>
 

@@ -1498,6 +1498,14 @@ export const appRouter = router({
             (val) => !val || val >= 0,
             { message: "Runoff coletado deve ser maior ou igual a 0" }
           ),
+          runoffPh: z.string().optional().refine(
+            (val) => !val || (parseFloat(val) >= 0 && parseFloat(val) <= 14),
+            { message: "pH do runoff deve estar entre 0 e 14" }
+          ),
+          runoffEc: z.string().optional().refine(
+            (val) => !val || (parseFloat(val) >= 0 && parseFloat(val) <= 10),
+            { message: "EC do runoff deve estar entre 0 e 10 mS/cm" }
+          ),
           notes: z.string().optional(),
         })
       )

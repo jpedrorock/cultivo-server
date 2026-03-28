@@ -28,6 +28,17 @@ import { PageTransition, StaggerList, ListItemAnimation } from "@/components/Pag
 import { LazyImage } from "@/components/LazyImage";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
+const getFitnessScore = (status: string | null | undefined) => {
+  if (!status) return null;
+  const map: Record<string, { score: number; color: string }> = {
+    HEALTHY:    { score: 95, color: "#4ade80" },
+    RECOVERING: { score: 62, color: "#60a5fa" },
+    STRESSED:   { score: 38, color: "#fbbf24" },
+    SICK:       { score: 12, color: "#f87171" },
+  };
+  return map[status] ?? null;
+};
+
 export default function PlantsList() {
   const [, navigate] = useLocation();
   const haptic = useTactileFeedback();
@@ -566,6 +577,25 @@ export default function PlantsList() {
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </AnimatedButton>
                               </div>
+                              {/* Fitness score */}
+                              {(() => {
+                                const fitness = getFitnessScore(plant.lastHealthStatus);
+                                if (!fitness) return null;
+                                return (
+                                  <div className="pt-0.5">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Fitness</span>
+                                      <span className="text-[10px] font-bold tabular-nums" style={{ color: fitness.color }}>{fitness.score}%</span>
+                                    </div>
+                                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full transition-all duration-700"
+                                        style={{ width: `${fitness.score}%`, background: fitness.color }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </CardContent>
                           </Card>
                           </ListItemAnimation>

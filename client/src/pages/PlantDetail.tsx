@@ -34,7 +34,8 @@ import { ArrowLeft,
   XCircle,
   History,
   ArrowRight,
-  GitFork
+  GitFork,
+  Camera
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import PlantObservationsTab from "@/components/PlantObservationsTab";
 import PlantHealthTab from "@/components/PlantHealthTab";
+import PhotoTimeline from "@/components/PhotoTimeline";
 import PlantTrichomesTab from "@/components/PlantTrichomesTab";
 import PlantLSTTab from "@/components/PlantLSTTab";
 import MoveTentModal from "@/components/MoveTentModal";
@@ -544,6 +546,10 @@ export default function PlantDetail() {
                 <History className="w-3.5 h-3.5" />
                 <span>Histórico</span>
               </TabsTrigger>
+              <TabsTrigger value="timeline" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
+                <Camera className="w-3.5 h-3.5" />
+                <span>Timeline</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -565,6 +571,10 @@ export default function PlantDetail() {
 
           <TabsContent value="history">
             <PlantTentHistoryTab plantId={plantId} />
+          </TabsContent>
+
+          <TabsContent value="timeline">
+            <PhotoTimeline plantId={plantId} />
           </TabsContent>
 
         </Tabs>

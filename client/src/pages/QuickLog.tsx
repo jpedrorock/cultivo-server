@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
@@ -7,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { BigStepper } from "@/components/BigStepper";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Loader2, Home, ThermometerSun, Droplets, Sprout, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X } from "lucide-react";
+import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { RangeSlider } from "@/components/ui/range-slider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -83,6 +84,8 @@ export default function QuickLog() {
   const [rhPct, setRhPct] = useState("");
   const [wateringVolume, setWateringVolume] = useState("");
   const [runoffCollected, setRunoffCollected] = useState("");
+  const [runoffPh, setRunoffPh] = useState("");
+  const [runoffEc, setRunoffEc] = useState("");
   const [ph, setPh] = useState("");
   const [ec, setEc] = useState("");
   const [ppfd, setPpfd] = useState(400); // Valor inicial realista: 400 μmol/m²/s
@@ -194,6 +197,8 @@ export default function QuickLog() {
     setRhPct("");
     setWateringVolume("");
     setRunoffCollected("");
+    setRunoffPh("");
+    setRunoffEc("");
     setPh("");
     setEc("");
     setPpfd(400); // Volta ao valor inicial realista
@@ -318,6 +323,8 @@ export default function QuickLog() {
       rhPct: rhPct || undefined,
       wateringVolume: wateringVolume ? parseFloat(wateringVolume) : undefined,
       runoffCollected: runoffCollected ? parseFloat(runoffCollected) : undefined,
+      runoffPh: runoffPh || undefined,
+      runoffEc: runoffEc || undefined,
       ph: ph || undefined,
       ec: ec || undefined,
       ppfd: ppfd || undefined,
@@ -359,7 +366,7 @@ export default function QuickLog() {
     { id: 0, title: "Estufa", icon: Home, gradient: "from-blue-500 to-cyan-600" },
     { id: 1, title: "Temperatura", icon: ThermometerSun, gradient: "from-orange-500 to-red-600" },
     { id: 2, title: "Umidade", icon: Droplets, gradient: "from-blue-400 to-blue-600" },
-    { id: 3, title: "Volume de Rega", icon: Sprout, gradient: "from-green-500 to-emerald-600" },
+    { id: 3, title: "Volume de Rega", icon: GlassWater, gradient: "from-blue-400 to-blue-600" },
     { id: 4, title: "Runoff Coletado", icon: Droplet, gradient: "from-teal-500 to-cyan-600" },
     { id: 5, title: "pH", icon: TestTube, gradient: "from-purple-500 to-pink-600" },
     { id: 6, title: "EC", icon: Zap, gradient: "from-yellow-500 to-orange-600" },
@@ -368,6 +375,88 @@ export default function QuickLog() {
   ];
 
   const currentStepData = steps[currentStep];
+
+  // ── Interpolação contínua de cor ─────────────────────────────────────────
+  function hexToRgb(hex: string): [number, number, number] {
+    return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+  }
+  function lerpRgb(a: [number,number,number], b: [number,number,number], t: number): string {
+    return `rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;
+  }
+  function colorAtStops(v: number, stops: [number, string][]): string {
+    if (v <= stops[0][0]) return lerpRgb(hexToRgb(stops[0][1]), hexToRgb(stops[0][1]), 0);
+    if (v >= stops[stops.length-1][0]) return lerpRgb(hexToRgb(stops[stops.length-1][1]), hexToRgb(stops[stops.length-1][1]), 0);
+    for (let i = 0; i < stops.length-1; i++) {
+      const [v0, c0] = stops[i];
+      const [v1, c1] = stops[i+1];
+      if (v >= v0 && v <= v1) return lerpRgb(hexToRgb(c0), hexToRgb(c1), (v-v0)/(v1-v0));
+    }
+    return lerpRgb(hexToRgb(stops[0][1]), hexToRgb(stops[0][1]), 0);
+  }
+  function darkenRgb(rgb: string, amt = 28): string {
+    const m = rgb.match(/\d+/g)!;
+    return `rgb(${Math.max(0,+m[0]-amt)},${Math.max(0,+m[1]-amt)},${Math.max(0,+m[2]-amt)})`;
+  }
+
+  // ── Gradiente dinâmico do círculo ────────────────────────────────────────
+  function getDynamicCircleGradient(): string {
+    switch (currentStep) {
+      case 1: { // Temperatura — interpolação contínua frio→quente
+        const c = colorAtStops(parseFloat(tempC) || 20, [
+          [10, "#60a5fa"], [17, "#34d399"], [22, "#4ade80"], [28, "#fbbf24"], [36, "#f87171"],
+        ]);
+        return `linear-gradient(135deg, ${c}, ${darkenRgb(c)})`;
+      }
+      case 2: { // Umidade — cinza seco → azul saturado
+        const c = colorAtStops(parseFloat(rhPct) || 50, [
+          [0, "#94a3b8"], [40, "#93c5fd"], [65, "#60a5fa"], [100, "#3b82f6"],
+        ]);
+        return `linear-gradient(135deg, ${c}, ${darkenRgb(c)})`;
+      }
+      case 3: // Water — azul (tratado como fill na JSX)
+        return "linear-gradient(135deg, #60a5fa, #2563eb)";
+      case 4: // Runoff — teal (tratado como fill na JSX)
+        return "linear-gradient(135deg, #2dd4bf, #0d9488)";
+      case 5: { // pH — espectro contínuo
+        const c = colorAtStops(parseFloat(ph) || 6.5, [
+          [0, "#ef4444"], [4, "#f97316"], [6, "#eab308"],
+          [6.8, "#22c55e"], [8, "#14b8a6"], [10, "#3b82f6"], [14, "#a855f7"],
+        ]);
+        return `linear-gradient(135deg, ${c}, ${darkenRgb(c)})`;
+      }
+      case 6: // EC — âmbar/laranja fixo
+        return "linear-gradient(135deg, #fbbf24, #f97316)";
+      case 7: { // PPFD — amarelo cada vez mais quente
+        const c = colorAtStops(ppfd, [
+          [0, "#fde68a"], [400, "#fbbf24"], [800, "#f59e0b"], [1200, "#f97316"],
+        ]);
+        return `linear-gradient(135deg, ${c}, ${darkenRgb(c, 20)})`;
+      }
+      case 0:  return "linear-gradient(135deg, #60a5fa, #0891b2)";
+      case 8:  return "linear-gradient(135deg, #4ade80, #10b981)";
+      default: return "linear-gradient(135deg, #4ade80, #10b981)";
+    }
+  }
+
+  // ── Estilo completo do círculo (inclui glow para PPFD e fill para água) ──
+  function getCircleStyle(): React.CSSProperties {
+    const base = getDynamicCircleGradient();
+    if (currentStep === 7) {
+      const ratio = Math.min(1, ppfd / 1200);
+      const blur  = Math.round(ratio * 48);
+      const spread = Math.round(ratio * 20);
+      const alpha = (ratio * 0.75).toFixed(2);
+      return {
+        background: base,
+        boxShadow: `0 0 ${blur}px ${spread}px rgba(251,191,36,${alpha}), 0 0 ${Math.round(blur*1.8)}px ${Math.round(spread*1.5)}px rgba(249,115,22,${(ratio*0.35).toFixed(2)})`,
+      };
+    }
+    return { background: base };
+  }
+
+  // fill % para steps de água
+  const waterFillPct = Math.min(100, ((parseFloat(wateringVolume) || 0) / 3000) * 100);
+  const runoffFillPct = Math.min(100, ((parseFloat(runoffCollected) || 0) / Math.max(parseFloat(wateringVolume) || 600, 600)) * 100);
 
   // Swipe handlers removed to prevent interference with PPFD slider
 
@@ -402,13 +491,52 @@ export default function QuickLog() {
           <div className="min-h-full flex flex-col justify-center p-6 space-y-6">
             {/* Icon */}
             {currentStep < 9 && currentStepData && (
-              <div className="flex justify-center mb-6">
+              <div className="flex flex-col items-center mb-6 gap-2">
                 <div className="relative flex items-center justify-center">
                   <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
-                  <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${currentStepData.gradient} flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]`}>
-                    <currentStepData.icon className="w-16 h-16 text-white" />
+                  <div
+                    className={currentStep === 7 ? "cursor-pointer active:scale-95 transition-transform" : ""}
+                    onClick={currentStep === 7 ? () => {
+                      const next = lightUnit === "ppfd" ? "lux" : "ppfd";
+                      if (next === "lux" && ppfd > 0) setLuxValue(Math.round(ppfd / 0.0185));
+                      if (next === "ppfd" && luxValue > 0) setPpfd(Math.round(luxValue * 0.0185));
+                      setLightUnit(next);
+                    } : undefined}
+                  >
+                  {(currentStep === 3 || currentStep === 4) ? (
+                    /* Copo/jarro com preenchimento de água subindo de baixo */
+                    <div className="w-32 h-32 rounded-full overflow-hidden relative shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out] bg-blue-950/40">
+                      <motion.div
+                        className="absolute bottom-0 left-0 right-0 rounded-b-full"
+                        style={{ background: currentStep === 3 ? "linear-gradient(180deg,#60a5fa,#2563eb)" : "linear-gradient(180deg,#2dd4bf,#0d9488)" }}
+                        animate={{ height: `${currentStep === 3 ? waterFillPct : runoffFillPct}%` }}
+                        transition={{ type: "spring", stiffness: 80, damping: 18 }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <currentStepData.icon className="w-16 h-16 text-white drop-shadow-lg relative z-10" />
+                      </div>
+                    </div>
+                  ) : (
+                    /* Círculo normal com gradiente animado */
+                    <motion.div
+                      className="w-32 h-32 rounded-full flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]"
+                      animate={getCircleStyle()}
+                      transition={{ duration: 0.45, ease: "easeInOut" }}
+                    >
+                      <currentStepData.icon className="w-16 h-16 text-white" />
+                    </motion.div>
+                  )}
                   </div>
                 </div>
+                {/* Unit badge for light step — tap icon to switch */}
+                {currentStep === 7 && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-3">
+                    <span className={lightUnit === "ppfd" ? "text-amber-400 font-semibold" : ""}>PPFD</span>
+                    <span>/</span>
+                    <span className={lightUnit === "lux" ? "text-amber-400 font-semibold" : ""}>Lux</span>
+                    <span className="ml-1 opacity-60">↑ toque no ícone</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -424,14 +552,14 @@ export default function QuickLog() {
             )}
 
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
-              <div className="flex items-center gap-4 animate-[slide-in-from-bottom_0.6s_ease-out]">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shrink-0">
-                  <Activity className="w-7 h-7 text-white" />
+              <div className="flex items-center gap-5 animate-[slide-in-from-bottom_0.6s_ease-out]">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shrink-0">
+                  <Activity className="w-10 h-10 text-white" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs text-muted-foreground font-medium">Planta {currentPlantIndex + 1} de {plants.length} · {plants[currentPlantIndex].code}</div>
-                  <div className="text-2xl font-bold text-foreground truncate">{plants[currentPlantIndex].name}</div>
-                  <div className="text-sm text-muted-foreground">Como está a saúde?</div>
+                  <div className="text-sm text-muted-foreground font-medium">Planta {currentPlantIndex + 1} de {plants.length} · {plants[currentPlantIndex].code}</div>
+                  <div className="text-3xl font-black text-foreground truncate">{plants[currentPlantIndex].name}</div>
+                  <div className="text-base text-muted-foreground">Como está a saúde?</div>
                 </div>
               </div>
             )}
@@ -509,6 +637,19 @@ export default function QuickLog() {
                     🎯 {parseFloat(String(targets.rhMin))}–{parseFloat(String(targets.rhMax))}%
                   </p>
                 )}
+                {/* VPD ao vivo — aparece quando temp também está preenchida (L2) */}
+                {tempC && rhPct && (() => {
+                  const t = parseFloat(tempC), rh = parseFloat(rhPct);
+                  if (isNaN(t) || isNaN(rh)) return null;
+                  const v = parseFloat((0.6108 * Math.exp((17.27 * t) / (t + 237.3)) * (1 - rh / 100)).toFixed(2));
+                  const [color, label] = v < 0.4 ? ["#60a5fa","Muito baixo"] : v <= 0.8 ? ["#4ade80","Ideal – Vega"] : v <= 1.2 ? ["#a78bfa","Ideal – Flora"] : v <= 1.6 ? ["#fbbf24","Alto"] : ["#f87171","Crítico"];
+                  return (
+                    <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border" style={{ borderColor: color + "55", background: color + "12" }}>
+                      <span className="text-sm font-medium" style={{ color }}>VPD · {label}</span>
+                      <span className="font-bold text-lg tabular-nums" style={{ color }}>{v} kPa</span>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -536,6 +677,43 @@ export default function QuickLog() {
                     </div>
                   </div>
                 )}
+                {/* pH e EC do Runoff (L5) */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium block text-center">pH Runoff <span className="opacity-50">(opcional)</span></label>
+                    <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-card">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder="6.0"
+                        step="0.1"
+                        min="0"
+                        max="14"
+                        value={runoffPh}
+                        onChange={(e) => setRunoffPh(e.target.value)}
+                        className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">pH</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium block text-center">EC Runoff <span className="opacity-50">(opcional)</span></label>
+                    <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-card">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        placeholder="1.8"
+                        step="0.1"
+                        min="0"
+                        max="10"
+                        value={runoffEc}
+                        onChange={(e) => setRunoffEc(e.target.value)}
+                        className="w-full bg-transparent text-2xl font-bold text-foreground placeholder:text-muted-foreground/30 outline-none tabular-nums text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">mS/cm</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -557,6 +735,7 @@ export default function QuickLog() {
                     onChange={(v) => setPh(v.toFixed(1))}
                     trackGradient="linear-gradient(to right, #dc2626 0%, #f97316 28.5%, #eab308 42.8%, #22c55e 50%, #3b82f6 64.2%, #8b5cf6 100%)"
                     formatTooltip={(v) => `pH ${v.toFixed(1)}`}
+                    size="lg"
                     labels={[
                       { position: 0, label: "0", sublabel: "Ácido", color: "#dc2626" },
                       { position: 50, label: "7", sublabel: "Neutro", color: "#22c55e" },
@@ -581,67 +760,7 @@ export default function QuickLog() {
 
             {/* Step 7: PPFD */}
             {currentStep === 7 && (
-              <div className="space-y-6 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                {/* Toggle Lux/PPFD */}
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={() => {
-                      setLightUnit("ppfd");
-                      // Convert lux to ppfd when switching
-                      if (luxValue > 0) {
-                        setPpfd(Math.round(luxValue * 0.0185));
-                      }
-                    }}
-                    className={`px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
-                      lightUnit === "ppfd"
-                        ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-md scale-105"
-                        : "bg-card text-card-foreground border border-border"
-                    }`}
-                  >
-                    PPFD
-                  </button>
-                  <button
-                    onClick={() => {
-                      setLightUnit("lux");
-                      // Convert ppfd to lux when switching
-                      if (ppfd > 0) {
-                        setLuxValue(Math.round(ppfd / 0.0185));
-                      }
-                    }}
-                    className={`px-6 py-2 rounded-lg font-medium transition-all duration-300 ${
-                      lightUnit === "lux"
-                        ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-white shadow-md scale-105"
-                        : "bg-card text-card-foreground border border-border"
-                    }`}
-                  >
-                    Lux
-                  </button>
-                </div>
-
-                {/* Toggle AM/PM */}
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={() => setTurn("AM")}
-                    className={`px-8 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      turn === "AM"
-                        ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-lg scale-105"
-                        : "bg-card text-card-foreground border-2 border-border"
-                    }`}
-                  >
-                    ☀️ AM
-                  </button>
-                  <button
-                    onClick={() => setTurn("PM")}
-                    className={`px-8 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                      turn === "PM"
-                        ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg scale-105"
-                        : "bg-card text-card-foreground border-2 border-border"
-                    }`}
-                  >
-                    🌙 PM
-                  </button>
-                </div>
-
+              <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 {/* Light Intensity Slider */}
                 {lightUnit === "ppfd" ? (
                   <div className="space-y-4 pt-4">
@@ -665,32 +784,28 @@ export default function QuickLog() {
                         onChange={(val) => setPpfd(val)}
                         trackGradient="linear-gradient(to right, #3b82f6 0%, #10b981 33%, #eab308 66%, #ef4444 100%)"
                         formatTooltip={(v) => `${v} μmol/m²/s`}
+                        size="lg"
                       />
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-4 pt-4">
-                    <div className="flex items-center gap-3">
-                      <Input
-                        type="number"
-                        inputMode="numeric"
+                    <div>
+                      <BigStepper
+                        value={luxValue}
+                        onChange={(val) => {
+                          const v = Math.min(100000, Math.max(0, val));
+                          setLuxValue(v);
+                          setPpfd(Math.round(v * 0.0185));
+                        }}
                         step={1000}
                         min={0}
                         max={100000}
-                        value={luxValue || ""}
-                        onChange={(e) => {
-                          const val = Math.min(100000, Math.max(0, parseInt(e.target.value) || 0));
-                          setLuxValue(val);
-                          setPpfd(Math.round(val * 0.0185));
-                        }}
+                        decimals={0}
+                        unit="lux"
+                        fieldType="light"
                         placeholder="35000"
-                        className={`text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 lg:h-24 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 ${
-                          luxValue > 0
-                            ? 'border-amber-500 ring-2 ring-amber-500/20'
-                            : 'border-border focus:ring-4 focus:ring-amber-500/10'
-                        }`}
                       />
-                      <span className="text-2xl md:text-3xl lg:text-4xl font-bold text-muted-foreground">lux</span>
                     </div>
                     <div className="pb-2">
                       <RangeSlider
@@ -704,6 +819,7 @@ export default function QuickLog() {
                         }}
                         trackGradient="linear-gradient(to right, #3b82f6 0%, #10b981 33%, #eab308 66%, #ef4444 100%)"
                         formatTooltip={(v) => `${(v / 1000).toFixed(0)}k lux`}
+                        size="lg"
                       />
                     </div>
                     {luxValue > 0 && (
@@ -729,6 +845,20 @@ export default function QuickLog() {
                     <div className="text-2xl font-bold text-foreground">{rhPct}%</div>
                   </div>
                 )}
+                {/* VPD calculado (L2) */}
+                {tempC && rhPct && (() => {
+                  const t = parseFloat(tempC), rh = parseFloat(rhPct);
+                  if (isNaN(t) || isNaN(rh)) return null;
+                  const v = parseFloat((0.6108 * Math.exp((17.27 * t) / (t + 237.3)) * (1 - rh / 100)).toFixed(2));
+                  const [color, label] = v < 0.4 ? ["#60a5fa","Muito baixo"] : v <= 0.8 ? ["#4ade80","Ideal – Vega"] : v <= 1.2 ? ["#a78bfa","Ideal – Flora"] : v <= 1.6 ? ["#fbbf24","Alto"] : ["#f87171","Crítico"];
+                  return (
+                    <div className="p-4 rounded-xl border-l-4" style={{ borderColor: color, background: color + "18" }}>
+                      <div className="text-sm text-muted-foreground">VPD</div>
+                      <div className="text-2xl font-bold tabular-nums" style={{ color }}>{v} kPa</div>
+                      <div className="text-xs mt-0.5" style={{ color, opacity: 0.75 }}>{label}</div>
+                    </div>
+                  );
+                })()}
                 {wateringVolume && (
                   <div className="p-4 bg-green-500/10 rounded-xl border-l-4 border-green-500">
                     <div className="text-sm text-muted-foreground">Volume de Rega</div>
@@ -812,21 +942,21 @@ export default function QuickLog() {
             {/* Step 10+: Plant health form (expanded) */}
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
               <div className="space-y-4">
-                {/* Status buttons — empilhados com ícone à esquerda */}
-                <div className="flex flex-col gap-2">
+                {/* Status buttons */}
+                <div className="flex flex-col gap-3">
                   {[
-                    { value: "healthy",   label: "Saudável", icon: "✓", active: "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md" },
-                    { value: "attention", label: "Atenção",  icon: "⚠️", active: "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md" },
-                    { value: "sick",      label: "Doente",   icon: "✕", active: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md" },
-                  ].map(({ value, label, icon, active }) => {
+                    { value: "healthy",   label: "Saudável", Icon: CheckCircle2, active: "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg border-transparent" },
+                    { value: "attention", label: "Atenção",  Icon: AlertTriangle, active: "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg border-transparent" },
+                    { value: "sick",      label: "Doente",   Icon: XCircle,       active: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg border-transparent" },
+                  ].map(({ value, label, Icon, active }) => {
                     const selected = (plantHealthRecords.get(plants[currentPlantIndex].id)?.status || "healthy") === value;
                     return (
                       <button
                         key={value}
                         onClick={() => updatePlantHealthRecord(plants[currentPlantIndex].id, "status", value)}
-                        className={`flex items-center gap-4 w-full px-5 py-4 rounded-xl font-semibold text-base transition-all duration-300 ${selected ? active : "bg-card text-card-foreground border-2 border-border"}`}
+                        className={`flex items-center gap-5 w-full px-6 rounded-2xl font-bold text-lg transition-all duration-300 border-2 min-h-[72px] ${selected ? active : "bg-card text-card-foreground border-border active:scale-[0.98]"}`}
                       >
-                        <span className="text-xl w-6 text-center">{icon}</span>
+                        <Icon className="w-7 h-7 shrink-0" />
                         <span>{label}</span>
                       </button>
                     );

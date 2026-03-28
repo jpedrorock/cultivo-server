@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ type NavItem = {
 
 // Rotas onde o BottomNav deve ficar oculto (telas de foco total)
 const HIDDEN_NAV_ROUTES = ["/quick-log"];
+const HIDDEN_NAV_PREFIXES = ["/tent/", "/display"];
 
 export function BottomNav() {
   const [location] = useLocation();
@@ -48,7 +49,7 @@ export function BottomNav() {
   }, [alertCount]);
 
   // Ocultar nav em telas de foco (ex: registro rápido) — após todos os hooks
-  const isHidden = HIDDEN_NAV_ROUTES.includes(location);
+  const isHidden = HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display");
 
   const mainNavItems: NavItem[] = [
     { href: "/quick-log", icon: Plus, label: "Registro" },
@@ -57,6 +58,7 @@ export function BottomNav() {
   ];
 
   const moreMenuItems: NavItem[] = [
+    { href: "/morning-check", icon: Sunrise, label: "Morning Check" },
     { href: "/plants", icon: Leaf, label: "Plantas" },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },

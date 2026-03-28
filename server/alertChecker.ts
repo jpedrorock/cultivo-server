@@ -1,6 +1,6 @@
 import { getDb } from "./db";
-import { cycles, weeklyTargets, alertSettings, alertHistory, tents, notificationSettings } from "../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { cycles, weeklyTargets, alertSettings, alertHistory, tents, notificationSettings, dailyLogs } from "../drizzle/schema";
+import { eq, and, desc, gte } from "drizzle-orm";
 
 /**
  * Verifica se os valores estão dentro da faixa ideal e salva alertas no app
@@ -201,5 +201,92 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
 
   if (newAlerts.length > 0) {
     console.log(`✅ ${newAlerts.length} alerta(s) registrado(s) para ${tentName}`);
+  }
+
+  // 8. Detecção de tendências (L3)
+  await detectTrends(tentId, tentName);
+}
+
+/**
+ * L3 — Detecta tendências crescentes ou decrescentes nos últimos logs.
+ * Cria alertas de TREND no alertHistory quando 4 registros consecutivos
+ * mostram movimento consistente acima do limiar de variação.
+ */
+async function detectTrends(tentId: number, tentName: string) {
+  const database = await getDb();
+  if (!database) return;
+
+  // Buscar os últimos 6 registros da estufa
+  const recentLogs = await database
+    .select({ tempC: dailyLogs.tempC, rhPct: dailyLogs.rhPct, logDate: dailyLogs.logDate })
+    .from(dailyLogs)
+    .where(eq(dailyLogs.tentId, tentId))
+    .orderBy(desc(dailyLogs.logDate))
+    .limit(6);
+
+  if (recentLogs.length < 4) return;
+
+  // Ordenar do mais antigo ao mais recente para calcular deltas
+  const sorted = [...recentLogs].reverse();
+
+  const trendAlerts: Array<{ metric: "TEMP" | "RH"; message: string }> = [];
+
+  // ── Temperatura ───────────────────────────────────
+  const temps = sorted.map(l => l.tempC ? parseFloat(l.tempC.toString()) : null).filter((v): v is number => v !== null);
+  if (temps.length >= 4) {
+    const last4 = temps.slice(-4);
+    const deltas = last4.slice(1).map((v, i) => v - last4[i]);
+    const allRising  = deltas.every(d => d > 0);
+    const allFalling = deltas.every(d => d < 0);
+    const totalDelta = Math.abs(last4[last4.length - 1] - last4[0]);
+    if ((allRising || allFalling) && totalDelta >= 2) {
+      const dir = allRising ? "subindo" : "caindo";
+      trendAlerts.push({
+        metric: "TEMP",
+        message: `[TREND] 🌡️ ${tentName} — Temperatura ${dir} há 4 registros (${last4[0].toFixed(1)}°C → ${last4[last4.length - 1].toFixed(1)}°C)`,
+      });
+    }
+  }
+
+  // ── Umidade ───────────────────────────────────────
+  const rhs = sorted.map(l => l.rhPct ? parseFloat(l.rhPct.toString()) : null).filter((v): v is number => v !== null);
+  if (rhs.length >= 4) {
+    const last4 = rhs.slice(-4);
+    const deltas = last4.slice(1).map((v, i) => v - last4[i]);
+    const allRising  = deltas.every(d => d > 0);
+    const allFalling = deltas.every(d => d < 0);
+    const totalDelta = Math.abs(last4[last4.length - 1] - last4[0]);
+    if ((allRising || allFalling) && totalDelta >= 5) {
+      const dir = allRising ? "subindo" : "caindo";
+      trendAlerts.push({
+        metric: "RH",
+        message: `[TREND] 💧 ${tentName} — Umidade ${dir} há 4 registros (${last4[0].toFixed(0)}% → ${last4[last4.length - 1].toFixed(0)}%)`,
+      });
+    }
+  }
+
+  if (trendAlerts.length === 0) return;
+
+  // Deduplicação: não repetir o mesmo TREND nas últimas 12h
+  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+  const recentTrends = await database
+    .select({ metric: alertHistory.metric, message: alertHistory.message })
+    .from(alertHistory)
+    .where(and(eq(alertHistory.tentId, tentId), gte(alertHistory.createdAt, twelveHoursAgo)));
+
+  for (const ta of trendAlerts) {
+    const alreadySent = recentTrends.some(
+      (rt: any) => rt.metric === ta.metric && rt.message.startsWith("[TREND]")
+    );
+    if (!alreadySent) {
+      await database.insert(alertHistory).values({
+        tentId,
+        metric: ta.metric,
+        value: "0",
+        message: ta.message,
+        notificationSent: false,
+      });
+      console.log(`📈 [TREND] Alerta de tendência registrado: ${ta.message}`);
+    }
   }
 }

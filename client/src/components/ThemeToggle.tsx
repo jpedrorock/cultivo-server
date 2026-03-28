@@ -1,17 +1,18 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Apple, Contrast, Moon, Sun, Trees } from "lucide-react";
+import { Check, Apple, Contrast, Moon, Sun, Trees, Zap } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 // Theme preview component showing visual representation
 function ThemePreview({
   type,
 }: {
-  type: "light" | "dark" | "forest" | "highcontrast" | "highcontrast-dark" | "apple";
+  type: "light" | "dark" | "forest" | "hps" | "highcontrast" | "highcontrast-dark" | "apple";
 }) {
   const previewStyles = {
     light: { bg: "bg-[#faf9f6]", card: "bg-white", text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
     dark: { bg: "bg-[#111a1a]", card: "bg-[#182020]", text: "bg-[#f0f7f0]", accent: "bg-[#4db84d]" },
     forest: { bg: "bg-[#0d1a0d]", card: "bg-[#152015]", text: "bg-[#d4f0d4]", accent: "bg-[#5cd65c]" },
+    hps: { bg: "bg-[#080f08]", card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]" },
     highcontrast: { bg: "bg-white", card: "bg-gray-200", text: "bg-black", accent: "bg-black" },
     "highcontrast-dark": { bg: "bg-black", card: "bg-gray-900", text: "bg-white", accent: "bg-white" },
     apple: { bg: "bg-gray-50", card: "bg-white", text: "bg-gray-800", accent: "bg-blue-500" },
@@ -55,6 +56,12 @@ const THEMES = [
     label: "Floresta",
     description: "Verde escuro profundo, inspirado em apps de cultivo premium",
     icon: <Trees className="w-4 h-4 text-green-500 shrink-0" />,
+  },
+  {
+    value: "hps" as const,
+    label: "HPS Agrícola",
+    description: "Preto absoluto + verde neon — máximo contraste sob luz HPS/LED",
+    icon: <Zap className="w-4 h-4 text-green-400 shrink-0" />,
   },
   {
     value: "highcontrast" as const,

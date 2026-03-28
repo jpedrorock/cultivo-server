@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart, Bar, Line } from "recharts";
 import { format, subDays, differenceInHours, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageTransition } from "@/components/PageTransition";
@@ -47,6 +47,7 @@ export default function TentDetails() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [editTentOpen, setEditTentOpen] = useState(false);
   const [harvestQueueOpen, setHarvestQueueOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
 
   const openPhaseConfirm = (type: PhaseConfirmType) => {
     setPhaseConfirmType(type);
@@ -80,7 +81,25 @@ export default function TentDetails() {
     deleteMutation.mutate({ id: tentId });
   };
   const { data: cycle } = trpc.cycles.getByTent.useQuery({ tentId });
-  
+
+  // Fase e semana atuais para buscar targets
+  const currentPhase = cycle ? (cycle.floraStartDate ? "FLORA" : "VEGA") : null;
+  const currentWeek = cycle ? (() => {
+    const now = new Date();
+    const start = new Date(cycle.startDate);
+    if (isNaN(start.getTime())) return 1;
+    const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
+    if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
+      return Math.max(1, Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+    }
+    return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+  })() : null;
+
+  const { data: weekTargets } = trpc.weeklyTargets.getTargetsByTent.useQuery(
+    { tentId, phase: currentPhase! as any, weekNumber: currentWeek! },
+    { enabled: !!cycle && !!currentPhase && !!currentWeek }
+  );
+
   // Memoize dates to prevent infinite re-renders
   const dateFilter = useMemo(() => {
     const now = new Date();
@@ -199,7 +218,11 @@ export default function TentDetails() {
     temp: log.tempC ? parseFloat(log.tempC) : null,
     rh: log.rhPct ? parseFloat(log.rhPct) : null,
     ppfd: log.ppfd || null,
+    watering: log.wateringVolume || null,
   }));
+
+  // L4 — apenas logs com watering registrado (para o gráfico de correlação)
+  const wateringChartData = chartData.filter(d => d.watering !== null);
 
   // Calculate averages (filtered by period)
   const avgTemp = filteredLogs.length
@@ -268,12 +291,23 @@ export default function TentDetails() {
             {/* Ações */}
             <div className="flex items-center gap-2 shrink-0 print-hide">
               <Badge className={`${phaseInfo.color} text-white border-0 text-xs hidden sm:inline-flex`}>{phaseInfo.phase}</Badge>
-              <Button asChild size="sm" className="hidden sm:flex gap-1.5">
-                <Link href={`/tent/${tentId}/log`}>
-                  <Plus className="w-4 h-4" />
-                  Novo Registro
-                </Link>
-              </Button>
+              {/* QR + Monitor — só desktop */}
+              <div className="hidden sm:flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => setQrModalOpen(true)} title="QR Code para log rápido">
+                  <QrCode className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={() => navigate(`/tent/${tentId}/display`)} title="Modo Display">
+                  <Monitor className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="hidden sm:block">
+                <Button asChild size="sm" className="gap-1.5">
+                  <Link href={`/tent/${tentId}/log`}>
+                    <Plus className="w-4 h-4" />
+                    Novo Registro
+                  </Link>
+                </Button>
+              </div>
               {/* Dropdown de ações secundárias */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -282,17 +316,22 @@ export default function TentDetails() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  {/* "Novo Registro" só aparece no dropdown em mobile */}
+                  {/* Mobile-only: Novo Registro + QR + Monitor */}
                   <DropdownMenuItem asChild className="sm:hidden">
                     <Link href={`/tent/${tentId}/log`} className="flex items-center gap-2 cursor-pointer">
                       <Plus className="w-4 h-4" />
                       Novo Registro
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate(`/tent/${tentId}/display`)} className="gap-2">
+                  <DropdownMenuItem onClick={() => setQrModalOpen(true)} className="gap-2 sm:hidden">
+                    <QrCode className="w-4 h-4" />
+                    QR Code
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(`/tent/${tentId}/display`)} className="gap-2 sm:hidden">
                     <Monitor className="w-4 h-4" />
                     Modo Display
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator className="sm:hidden" />
                   <DropdownMenuItem onClick={() => setEditTentOpen(true)} className="gap-2">
                     <Pencil className="w-4 h-4" />
                     Editar Estufa
@@ -363,6 +402,13 @@ export default function TentDetails() {
               icon: <Zap className="w-4 h-4 text-emerald-500" />,
               ok: last?.ec ? (parseFloat(last.ec) >= 1.0 && parseFloat(last.ec) <= 2.5) : null,
             },
+            {
+              label: "Fotoperíodo",
+              value: (weekTargets as any)?.photoperiod ?? "—",
+              unit: "",
+              icon: <Sun className="w-4 h-4 text-amber-400" />,
+              ok: null,
+            },
           ];
           return (
             <div>
@@ -377,7 +423,7 @@ export default function TentDetails() {
                   )}
                 </p>
               </div>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                 {stats.map((s) => (
                   <div
                     key={s.label}
@@ -391,7 +437,7 @@ export default function TentDetails() {
                   >
                     <div className="flex items-center gap-1.5">
                       {s.icon}
-                      <span className="text-[10px] text-muted-foreground font-medium truncate">{s.label}</span>
+                      <span className="text-xs text-muted-foreground font-medium">{s.label}</span>
                     </div>
                     <p className={`text-xl font-bold leading-none ${
                       s.ok === null ? "text-muted-foreground" : s.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
@@ -613,55 +659,61 @@ export default function TentDetails() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="bg-card/90 backdrop-blur-sm border-orange-100">
+          {/* Temperatura */}
+          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #f97316" }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <ThermometerSun className="w-4 h-4 text-orange-600" />
+                    <ThermometerSun className="w-4 h-4 text-orange-500" />
                     Temperatura Média
                   </p>
                   <p className="text-3xl font-bold text-foreground">{avgTemp}°C</p>
                   <p className="text-xs text-muted-foreground mt-1">Últimos {dateRange} dias</p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                  <ThermometerSun className="w-6 h-6 text-orange-600" />
+                <div className="w-12 h-12 rounded-full bg-orange-500/10 ring-1 ring-orange-500/30 flex items-center justify-center"
+                     style={{ boxShadow: "0 0 12px rgba(249,115,22,0.25)" }}>
+                  <ThermometerSun className="w-6 h-6 text-orange-500" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-card/90 backdrop-blur-sm border-blue-100">
+          {/* Umidade */}
+          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #38bdf8" }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-blue-600" />
+                    <Droplets className="w-4 h-4 text-sky-400" />
                     Umidade Média
                   </p>
                   <p className="text-3xl font-bold text-foreground">{avgRh}%</p>
                   <p className="text-xs text-muted-foreground mt-1">Últimos {dateRange} dias</p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Droplets className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 rounded-full bg-sky-400/10 ring-1 ring-sky-400/30 flex items-center justify-center"
+                     style={{ boxShadow: "0 0 12px rgba(56,189,248,0.25)" }}>
+                  <Droplets className="w-6 h-6 text-sky-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-card/90 backdrop-blur-sm border-yellow-100">
+          {/* PPFD */}
+          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #facc15" }}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Sun className="w-4 h-4 text-yellow-600" />
+                    <Sun className="w-4 h-4 text-yellow-400" />
                     PPFD Médio
                   </p>
                   <p className="text-3xl font-bold text-foreground">{avgPpfd}</p>
                   <p className="text-xs text-muted-foreground mt-1">Últimos {dateRange} dias</p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center">
-                  <Sun className="w-6 h-6 text-yellow-600" />
+                <div className="w-12 h-12 rounded-full bg-yellow-400/10 ring-1 ring-yellow-400/30 flex items-center justify-center"
+                     style={{ boxShadow: "0 0 12px rgba(250,204,21,0.25)" }}>
+                  <Sun className="w-6 h-6 text-yellow-400" />
                 </div>
               </div>
             </CardContent>
@@ -698,12 +750,19 @@ export default function TentDetails() {
         </div>
 
         {/* Charts and History */}
-        <Tabs defaultValue="charts" className="space-y-6" id="charts-container">
+        <Tabs defaultValue="plants" className="space-y-6" id="charts-container">
           <TabsList className="bg-card/90 backdrop-blur-sm">
+            <TabsTrigger value="plants">
+              <Leaf className="w-4 h-4 mr-1.5" />
+              Plantas
+            </TabsTrigger>
             <TabsTrigger value="charts">Gráficos</TabsTrigger>
             <TabsTrigger value="history">Histórico</TabsTrigger>
-            <TabsTrigger value="plants">Plantas</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="plants">
+            <TentPlantsTab tentId={tentId} tentName={tent.name} />
+          </TabsContent>
 
           <TabsContent value="charts" className="space-y-6">
             {logsLoading ? (
@@ -846,6 +905,42 @@ export default function TentDetails() {
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
+
+                {/* L4 — Correlação Rega × Umidade */}
+                {wateringChartData.length >= 2 && (
+                  <Card className="bg-card/90 backdrop-blur-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Droplets className="w-4 h-4 text-teal-500" />
+                        Correlação Rega × Umidade
+                      </CardTitle>
+                      <CardDescription className="text-xs">Volume regado (barras) vs umidade relativa (linha)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <ComposedChart data={wateringChartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="gradWatering" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.8} />
+                              <stop offset="100%" stopColor="#14b8a6" stopOpacity={0.3} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
+                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} />
+                          <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="ml" width={48} />
+                          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="%" width={36} domain={[0, 100]} />
+                          <Tooltip
+                            contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                            formatter={(value: any, name: any) => name === "Rega" ? [`${value} ml`, name] : [`${value}%`, name]}
+                          />
+                          <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
+                          <Bar yAxisId="left" dataKey="watering" name="Rega" fill="url(#gradWatering)" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                          <Line yAxisId="right" type="monotone" dataKey="rh" name="Umidade %" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           </TabsContent>
@@ -968,9 +1063,6 @@ export default function TentDetails() {
               </Card>
             )}
           </TabsContent>
-          <TabsContent value="plants">
-            <TentPlantsTab tentId={tentId} tentName={tent.name} />
-          </TabsContent>
         </Tabs>
       </main>
 
@@ -1019,6 +1111,42 @@ export default function TentDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── QR Code Modal (D2) ── */}
+      <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
+        <DialogContent className="max-w-xs text-center">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-center gap-2">
+              <QrCode className="w-5 h-5" />
+              QR Code — {tent.name}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Escaneie para abrir o registro rápido desta estufa
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-2">
+            <div className="p-3 bg-white rounded-2xl shadow-sm">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=${encodeURIComponent(`${window.location.origin}/quick-log?tentId=${tentId}`)}`}
+                alt={`QR Code para ${tent.name}`}
+                width={220}
+                height={220}
+                className="rounded-lg"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground break-all">
+              {window.location.origin}/quick-log?tentId={tentId}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/quick-log?tentId=${tentId}`);
+              toast.success("Link copiado!");
+            }}>
+              Copiar link
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
     </PageTransition>
   );

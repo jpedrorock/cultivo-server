@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
@@ -793,6 +794,19 @@ function TentChartWidgetWrapper({ tentId, tentName }: { tentId: number; tentName
   return <TentChartWidget tentId={tentId.toString()} tentName={tentName} data={weeklyData} />;
 }
 
+function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; color: string; w?: number; h?: number }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
+  const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`);
+  const [lx, ly] = pts[pts.length - 1].split(",").map(Number);
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="opacity-60">
+      <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lx} cy={ly} r="2" fill={color} />
+    </svg>
+  );
+}
+
 // Separate component for Tent Card with Tasks
 function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlora, onInitiateCycle, onEditCycle, onFinalizeCycle, onEditTent, onDeleteTent }: any) {
   const [tasksExpanded, setTasksExpanded] = useState(false);
@@ -833,7 +847,14 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const { data: latestLog } = trpc.dailyLogs.getLatestByTent.useQuery(
     { tentId: tent.id }
   );
-  
+
+  const { data: recentLogs } = trpc.dailyLogs.list.useQuery(
+    { tentId: tent.id, limit: 7 },
+    { staleTime: 5 * 60 * 1000 }
+  );
+  const sparkTemps = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
+  const sparkRh    = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
+
   // Buscar targets ideais - usa média das strains das plantas na estufa
   const currentWeek = cycle ? (() => {
     const now = new Date();
@@ -940,12 +961,18 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const completedTasks = tasks?.filter((t) => t.isDone).length || 0;
   const totalTasks = tasks?.length || 0;
 
+  const phaseAccentColor =
+    tent.category === 'VEGA'   ? '#4ade80' :
+    tent.category === 'FLORA'  ? '#a78bfa' :
+    tent.category === 'DRYING' ? '#fbbf24' :
+    '#60a5fa';
+
   return (
     <ListItemAnimation>
-      <Card className="bg-card/90 backdrop-blur-sm shadow-md shadow-black/8 hover:shadow-xl hover:shadow-primary/12 transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-primary/30 group cursor-pointer overflow-hidden" data-tour="tent-card">
+      <Card className="bg-card/90 backdrop-blur-sm shadow-md shadow-black/8 hover:shadow-xl hover:shadow-primary/12 transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-primary/30 group cursor-pointer overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}` }}>
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
             <CardTitle className="text-xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
               {tent.name}
               <Badge 
@@ -1030,6 +1057,106 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               )}
             </CardDescription>
           </div>
+
+          {/* Monitor — acesso rápido ao display da estufa */}
+          <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
+            <button
+              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              title="Modo Display"
+            >
+              <Monitor className="w-4 h-4" />
+            </button>
+          </Link>
+
+          {/* ··· dropdown menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              {!cycle ? (
+                <>
+                  <DropdownMenuItem onClick={() => onInitiateCycle(tent.id, tent.name)}>
+                    <Sprout className="w-4 h-4 mr-2" />
+                    Novo Ciclo
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href={`/tent/${tent.id}`}>
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      Ver Detalhes
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onEditTent(tent)}>
+                    <Wrench className="w-4 h-4 mr-2" />
+                    Editar Estufa
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDeleteTent(tent.id, tent.name)} className="text-red-600 focus:text-red-600">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir Estufa
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/quick-log?tentId=${tent.id}`}>
+                      <Zap className="w-4 h-4 mr-2" />
+                      Registrar
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/tent/${tent.id}`}>
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      Ver Detalhes
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onEditCycle(cycle, tent)}>
+                    <Wrench className="w-4 h-4 mr-2" />
+                    Editar Ciclo
+                  </DropdownMenuItem>
+                  {tent.category === "MAINTENANCE" && (
+                    <DropdownMenuItem onClick={() => openPhaseConfirm("CLONING")}>
+                      <Sprout className="w-4 h-4 mr-2 text-blue-500" />
+                      Tirar Clones
+                    </DropdownMenuItem>
+                  )}
+                  {tent.category === "VEGA" && (
+                    <DropdownMenuItem onClick={() => openPhaseConfirm("FLORA")}>
+                      <Flower2 className="w-4 h-4 mr-2 text-green-500" />
+                      Avançar para Floração
+                    </DropdownMenuItem>
+                  )}
+                  {tent.category === "FLORA" && (
+                    <>
+                      <DropdownMenuItem onClick={() => setHarvestQueueOpen(true)}>
+                        <Wind className="w-4 h-4 mr-2 text-orange-500" />
+                        Colher → Aguardando Secagem
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openPhaseConfirm("DRYING")}>
+                        <Wind className="w-4 h-4 mr-2 text-amber-500" />
+                        Ir direto para Secagem
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {cycle.cloningStartDate && tent.category === "CLONING" && (
+                    <DropdownMenuItem onClick={() => setFinishCloningOpen(true)}>
+                      <ArrowRight className="w-4 h-4 mr-2 text-blue-500" />
+                      Finalizar Clonagem
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onFinalizeCycle(cycle.id, tent.name)} className="text-red-600 focus:text-red-600">
+                    <X className="w-4 h-4 mr-2" />
+                    Finalizar Ciclo
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
 
@@ -1189,13 +1316,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     {tasks.filter((task) => hideCompleted ? !task.isDone : true).map((task) => (
                       <div
                         key={task.id}
-                        className="flex items-start gap-2 p-2 rounded hover:bg-muted"
+                        className="flex items-center gap-2 p-2 rounded hover:bg-muted"
                       >
                         <Checkbox
                           id={`task-${task.id}`}
                           checked={task.isDone}
                           onCheckedChange={() => handleToggleTask(task.id, task.isDone)}
-                          className="mt-0.5"
                         />
                         <label
                           htmlFor={`task-${task.id}`}
@@ -1225,8 +1351,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               </p>
             </div>
           )}
-          {/* KPI Metrics — rich typography with Geist */}
-          <div className="grid grid-cols-4 gap-2 pt-4 border-t border-border/60">
+          {/* KPI Metrics — 3 colunas: Temp · RH · PPFD */}
+          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border/60">
             {/* Temperature */}
             <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-orange-500/15" style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(234,88,12,0.08) 60%, rgba(249,115,22,0.02) 100%)' }}>
               <ThermometerSun className="w-4 h-4 text-orange-500 mb-0.5" />
@@ -1241,6 +1367,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 </p>
                 {latestLog?.tempC && getStatusIcon(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)}
               </div>
+              <MiniSparkline values={sparkTemps} color="#f97316" />
             </div>
             {/* Humidity */}
             <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-blue-500/15" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.18) 0%, rgba(37,99,235,0.08) 60%, rgba(59,130,246,0.02) 100%)' }}>
@@ -1256,6 +1383,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 </p>
                 {latestLog?.rhPct && getStatusIcon(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)}
               </div>
+              <MiniSparkline values={sparkRh} color="#3b82f6" />
             </div>
             {/* PPFD */}
             <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-yellow-500/15" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(202,138,4,0.08) 60%, rgba(234,179,8,0.02) 100%)' }}>
@@ -1272,151 +1400,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 {latestLog?.ppfd && getStatusIcon(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)}
               </div>
             </div>
-            {/* Photoperiod */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-purple-500/15" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(139,92,246,0.08) 60%, rgba(168,85,247,0.02) 100%)' }}>
-              <Clock className="w-4 h-4 text-purple-500 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Foto</p>
-              <p className="text-base font-bold tracking-tight leading-none text-foreground">
-                {cycle?.floraStartDate ? "12/12" : "18/6"}
-              </p>
-            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col gap-2 pt-5">
-            <div key={`actions-primary-${tent.id}`} className="flex gap-2">
-              {!cycle ? (
-                <Button
-                  onClick={() => onInitiateCycle(tent.id, tent.name)}
-                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  Novo Ciclo
-                </Button>
-              ) : (
-                <Link 
-                  href={`/quick-log?tentId=${tent.id}`}
-                  className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-all duration-150 ease-out hover:scale-[1.03] hover:shadow-md hover:shadow-primary/30 active:scale-95"
-                >
-                  Registrar
-                </Link>
-              )}
-              <Link 
-                href={`/tent/${tent.id}`}
-                className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-all duration-150 ease-out hover:scale-[1.03] hover:border-primary/40 hover:shadow-sm active:scale-95"
-              >
-                Ver Detalhes
-              </Link>
-            </div>
-            {cycle && (
-              <>
-                <div key={`actions-secondary-${tent.id}`} className="flex gap-2">
-                  <Button
-                    onClick={() => onEditCycle(cycle, tent)}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                  >
-                    Editar Ciclo
-                  </Button>
-                </div>
-                
-                {/* Botões de ação baseados na fase */}
-                
-                {/* Botão "Tirar Clones" para MANUTENÇÃO — azul */}
-                {cycle && tent.category === "MAINTENANCE" && (
-                  <Button
-                    onClick={() => openPhaseConfirm("CLONING")}
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <Sprout className="w-4 h-4 mr-2" />
-                    Tirar Clones
-                  </Button>
-                )}
-
-                {/* Botão "Avançar para Floração" — verde, apenas em VEGA */}
-                {cycle && tent.category === "VEGA" && (
-                  <Button
-                    onClick={() => openPhaseConfirm("FLORA")}
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <Flower2 className="w-4 h-4 mr-2" />
-                    Avançar para Floração
-                  </Button>
-                )}
-
-                {/* Botões FLORA: Aguardando Secagem (principal) + Ir direto para Secagem */}
-                {cycle && tent.category === "FLORA" && (
-                  <>
-                    <Button
-                      onClick={() => setHarvestQueueOpen(true)}
-                      variant="default"
-                      size="sm"
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                    >
-                      <Wind className="w-4 h-4 mr-2" />
-                      Colher → Aguardando Secagem
-                    </Button>
-                    <Button
-                      onClick={() => openPhaseConfirm("DRYING")}
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-orange-300 text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-950"
-                    >
-                      <Wind className="w-4 h-4 mr-2" />
-                      Ir direto para Secagem
-                    </Button>
-                  </>
-                )}
-
-                {/* Botão "Finalizar Clonagem" — azul, apenas em CLONING */}
-                {cycle && cycle.cloningStartDate && tent.category === "CLONING" && (
-                  <Button
-                    onClick={() => setFinishCloningOpen(true)}
-                    variant="default"
-                    size="sm"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <ArrowRight className="w-4 h-4 mr-2" />
-                    Finalizar Clonagem
-                  </Button>
-                )}
-                <Button
-                  onClick={() => onFinalizeCycle(cycle.id, tent.name)}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
-                >
-                  Finalizar Ciclo
-                </Button>
-              </>
-            )}
-            {!cycle && (
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  onClick={() => onEditTent(tent)}
-                  variant="outline"
-                  size="sm"
-                  className="border-gray-500 text-gray-600 hover:bg-gray-50 dark:border-gray-400 dark:text-gray-300 dark:hover:bg-gray-800 flex items-center justify-center gap-2"
-                >
-                  <Wrench className="w-4 h-4" />
-                  Editar
-                </Button>
-                <Button
-                  onClick={() => onDeleteTent(tent.id, tent.name)}
-                  variant="outline"
-                  size="sm"
-                  className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-950 flex items-center justify-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Excluir
-                </Button>
-              </div>
-            )}
-          </div>
         </div>
       </CardContent>
       
