@@ -37,6 +37,7 @@ interface IrrigationInput {
 interface CycleEntry {
   cycleNumber: number;
   startTimeFormatted: string;
+  nextDay: boolean;
   durationMin: number;
   durationSec: number;
   mlPerPlant: number;
@@ -83,10 +84,16 @@ function calculateIrrigationSchedule(input: IrrigationInput): IrrigationResult |
 
   if (
     pumpFlowMlMin <= 0 || numOutlets <= 0 || maxRuntimeMin <= 0 ||
-    potSizeLiters <= 0 || targetPct <= 0 || lightsOffMinutes <= lightsOnMinutes
+    potSizeLiters <= 0 || targetPct <= 0
   ) return null;
 
   const warnings: string[] = [];
+
+  // Suporte a janela de luz que cruza meia-noite (ex: 18:00 → 12:00 do dia seguinte)
+  const effectiveLightsOffMinutes =
+    lightsOffMinutes <= lightsOnMinutes
+      ? lightsOffMinutes + 1440
+      : lightsOffMinutes;
 
   // 1. Vazão por planta
   const flowPerPlantMlMin = pumpFlowMlMin / numOutlets;
@@ -105,7 +112,7 @@ function calculateIrrigationSchedule(input: IrrigationInput): IrrigationResult |
   //    Primeiro ciclo: luzes ligaram + 1,5h (estômatos abertos)
   //    Último ciclo: luzes apagam - 2h (evitar raízes molhadas no escuro)
   const firstCycleStartMin = lightsOnMinutes + 90;
-  const lastCycleLatestMin = lightsOffMinutes - 120;
+  const lastCycleLatestMin = effectiveLightsOffMinutes - 120;
   const availableWindowMin = lastCycleLatestMin - firstCycleStartMin;
 
   if (availableWindowMin < 60) {
@@ -164,6 +171,7 @@ function calculateIrrigationSchedule(input: IrrigationInput): IrrigationResult |
     schedule.push({
       cycleNumber: i + 1,
       startTimeFormatted: minutesToTimeString(startMin),
+      nextDay: startMin >= 1440,
       durationMin: durationPerCycleMin,
       durationSec: durationPerCycleSec,
       mlPerPlant: Math.round(mlPerCyclePerPlant),
@@ -216,7 +224,7 @@ export function IrrigationScheduleCalculator() {
   const [restTimeStr, setRestTimeStr] = useState("30");
 
   // ── Planta ──
-  const [potSizeStr, setPotSizeStr] = useState("11");
+  const [potSizeStr, setPotSizeStr] = useState("5");
   const [phase, setPhase] = useState<"vega" | "flora">("vega");
   const [weekNumber, setWeekNumber] = useState(3);
 
@@ -687,6 +695,9 @@ export function IrrigationScheduleCalculator() {
                         <td className="px-3 py-2.5 text-muted-foreground font-medium">#{cycle.cycleNumber}</td>
                         <td className="px-3 py-2.5">
                           <span className="font-mono font-bold text-foreground text-base">{cycle.startTimeFormatted}</span>
+                          {cycle.nextDay && (
+                            <span className="ml-1 text-xs text-muted-foreground font-normal">+1d</span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 text-right">
                           <span className="font-semibold text-foreground">{cycle.durationSec}s</span>
