@@ -165,7 +165,7 @@ function calculateIrrigationSchedule(input: IrrigationInput): IrrigationResult |
       cycleNumber: i + 1,
       startTimeFormatted: minutesToTimeString(startMin),
       durationMin: durationPerCycleMin,
-      durationSec,
+      durationSec: durationPerCycleSec,
       mlPerPlant: Math.round(mlPerCyclePerPlant),
     });
   }
