@@ -18,6 +18,16 @@ import { savePendingLog, isOnline } from "@/lib/offlineStorage";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
 
+function getValidationColor(value: string, min?: number | null, max?: number | null): string {
+  if (!value || !min || !max) return "";
+  const v = parseFloat(value);
+  if (isNaN(v)) return "";
+  if (v >= min && v <= max) return "text-green-500 dark:text-green-400";
+  const tolerance = (max - min) * 0.15;
+  if (v >= min - tolerance && v <= max + tolerance) return "text-amber-500 dark:text-amber-400";
+  return "text-red-500 dark:text-red-400";
+}
+
 export default function QuickLog() {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
@@ -100,6 +110,12 @@ export default function QuickLog() {
       enabled: !!tentId && currentStep >= 9,
       select: (data) => data.filter(p => p.currentTentId === tentId)
     }
+  );
+
+  // Fetch weekly targets for color validation
+  const { data: targets } = trpc.weeklyTargets.getTargetsByTent.useQuery(
+    { tentId: tentId ?? 0, phase: "VEGA", weekNumber: 1 },
+    { enabled: !!tentId }
   );
 
   // Calculate runoff percentage
@@ -458,14 +474,24 @@ export default function QuickLog() {
             {/* Step 1: Temperature */}
             {currentStep === 1 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={tempC} onChange={setTempC} step={0.5} min={-10} max={50} decimals={1} unit="°C" />
+                <BigStepper value={tempC} onChange={setTempC} step={0.5} min={-10} max={50} decimals={1} unit="°C" colorClass={getValidationColor(tempC, targets?.tempMin ? parseFloat(String(targets.tempMin)) : null, targets?.tempMax ? parseFloat(String(targets.tempMax)) : null)} />
+                {targets?.tempMin && targets?.tempMax && (
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    🎯 {parseFloat(String(targets.tempMin))}–{parseFloat(String(targets.tempMax))}°C
+                  </p>
+                )}
               </div>
             )}
 
             {/* Step 2: Humidity */}
             {currentStep === 2 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" />
+                <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" colorClass={getValidationColor(rhPct, targets?.rhMin ? parseFloat(String(targets.rhMin)) : null, targets?.rhMax ? parseFloat(String(targets.rhMax)) : null)} />
+                {targets?.rhMin && targets?.rhMax && (
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    🎯 {parseFloat(String(targets.rhMin))}–{parseFloat(String(targets.rhMax))}%
+                  </p>
+                )}
               </div>
             )}
 
@@ -499,7 +525,12 @@ export default function QuickLog() {
             {/* Step 5: pH */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" />
+                <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" colorClass={getValidationColor(ph, targets?.phMin ? parseFloat(String(targets.phMin)) : null, targets?.phMax ? parseFloat(String(targets.phMax)) : null)} />
+                {targets?.phMin && targets?.phMax && (
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    🎯 {parseFloat(String(targets.phMin))}–{parseFloat(String(targets.phMax))} pH
+                  </p>
+                )}
                 <div className="pt-4 pb-2">
                   <RangeSlider
                     min={0}
@@ -522,7 +553,12 @@ export default function QuickLog() {
             {/* Step 6: EC */}
             {currentStep === 6 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" />
+                <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" colorClass={getValidationColor(ec, targets?.ecMin ? parseFloat(String(targets.ecMin)) : null, targets?.ecMax ? parseFloat(String(targets.ecMax)) : null)} />
+                {targets?.ecMin && targets?.ecMax && (
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    🎯 {parseFloat(String(targets.ecMin))}–{parseFloat(String(targets.ecMax))} mS/cm
+                  </p>
+                )}
               </div>
             )}
 
