@@ -49,6 +49,7 @@ const PlantArchivePage     = lazy(() => import("./pages/PlantArchivePage"));
 const HarvestQueue         = lazy(() => import("./pages/HarvestQueue"));
 const Nutrients            = lazy(() => import("./pages/Nutrients"));
 const PendingApproval      = lazy(() => import("./pages/PendingApproval"));
+const DisplayMode          = lazy(() => import("./pages/DisplayMode"));
 // QuickLog removido daqui — agora é eager (import estático acima)
 
 // Spinner minimalista usado durante carregamento lazy
@@ -93,6 +94,7 @@ function Router() {
 
         <Route path={"/tent/:id"} component={TentDetails} />
         <Route path={"/tent/:id/log"} component={TentLog} />
+        <Route path={"/tent/:id/display"} component={DisplayMode} />
         <Route path={"/quick-log"} component={QuickLog} />
         <Route path={"/admin/users"} component={AdminUsers} />
         <Route path={"/help"} component={Help} />

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -288,6 +288,10 @@ export default function TentDetails() {
                       <Plus className="w-4 h-4" />
                       Novo Registro
                     </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate(`/tent/${tentId}/display`)} className="gap-2">
+                    <Monitor className="w-4 h-4" />
+                    Modo Display
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setEditTentOpen(true)} className="gap-2">
                     <Pencil className="w-4 h-4" />
