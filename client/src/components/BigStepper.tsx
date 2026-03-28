@@ -1,6 +1,6 @@
 import { Minus, Plus } from "lucide-react";
 import { useRef, useCallback, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useAnimationControls } from "framer-motion";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 
 interface BigStepperProps {
@@ -33,9 +33,7 @@ export function BigStepper({
   const valueRef = useRef(value);
   valueRef.current = value;
 
-  // Para animação direcional do número
-  const [direction, setDirection] = useState<1 | -1>(1);
-  const [animKey, setAnimKey] = useState(0);
+  const numControls = useAnimationControls();
 
   const applyStep = useCallback((multiplier: number, dir: 1 | -1) => {
     haptic.tap();
@@ -44,10 +42,9 @@ export function BigStepper({
     const next = parseFloat((current + delta).toFixed(decimals + 1));
     if (dir === 1  && max !== undefined && next > max) return;
     if (dir === -1 && min !== undefined && next < min) return;
-    setDirection(dir);
-    setAnimKey(k => k + 1);
     onChange(String(parseFloat(next.toFixed(decimals))));
-  }, [step, min, max, decimals, onChange, haptic]);
+    numControls.start({ scale: [1, 1.12, 1], transition: { duration: 0.16, ease: "easeOut", times: [0, 0.35, 1] } });
+  }, [step, min, max, decimals, onChange, haptic, numControls]);
 
   const startHold = useCallback((dir: 1 | -1) => {
     applyStep(1, dir);
@@ -82,28 +79,20 @@ export function BigStepper({
     <div className="flex flex-col items-center gap-4 w-full">
 
       {/* Número animado */}
-      <div className="relative w-full flex flex-col items-center overflow-hidden" style={{ minHeight: "5rem" }}>
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.input
-            key={animKey}
-            type="text"
-            inputMode="decimal"
-            value={value}
-            onChange={(e) => {
-              const v = e.target.value.replace(",", ".");
-              if (v === "" || v === "-" || /^-?\d*\.?\d*$/.test(v)) {
-                setAnimKey(k => k + 1);
-                onChange(v);
-              }
-            }}
-            placeholder={placeholder ?? "0"}
-            className={`w-full text-center text-6xl font-black bg-transparent border-none outline-none leading-tight ${colorClass ?? "text-foreground"}`}
-            initial={{ opacity: 0, y: direction === 1 ? 28 : -28, scale: 0.85 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: direction === 1 ? -28 : 28, scale: 0.85 }}
-            transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.6 }}
-          />
-        </AnimatePresence>
+      <div className="relative w-full flex flex-col items-center" style={{ minHeight: "5rem" }}>
+        <motion.input
+          type="text"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => {
+            const v = e.target.value.replace(",", ".");
+            if (v === "" || v === "-" || /^-?\d*\.?\d*$/.test(v)) onChange(v);
+          }}
+          placeholder={placeholder ?? "0"}
+          className={`w-full text-center text-6xl font-black bg-transparent border-none outline-none leading-tight ${colorClass ?? "text-foreground"}`}
+          animate={numControls}
+          style={{ originX: "50%", originY: "50%", display: "block" }}
+        />
         {unit && (
           <span className="text-base text-muted-foreground font-semibold tracking-wide mt-0.5">
             {unit}
