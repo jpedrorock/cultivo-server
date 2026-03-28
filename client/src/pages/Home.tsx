@@ -948,13 +948,13 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const morningDone = todayLogs.length >= 1;
   const afternoonDone = todayLogs.length >= 2;
 
-  const phaseAccentColor =
+  const phaseAccentColor = !cycle ? '#6b7280' :
     tent.category === 'VEGA'   ? '#4ade80' :
     tent.category === 'FLORA'  ? '#a78bfa' :
     tent.category === 'DRYING' ? '#fbbf24' :
     '#60a5fa';
 
-  const phaseBg =
+  const phaseBg = !cycle ? 'none' :
     tent.category === 'VEGA'
       ? 'linear-gradient(160deg, rgba(74,222,128,0.07) 0%, transparent 50%)'
       : tent.category === 'FLORA'
@@ -965,7 +965,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
 
   return (
     <ListItemAnimation>
-      <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`)} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
+      <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => { if (cycle) e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`; }} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
       <CardHeader className="pl-8">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
