@@ -112,6 +112,23 @@ export default function QuickLog() {
     }
   );
 
+  // Pré-preencher com o último registro ao selecionar estufa
+  const { data: lastLogs } = trpc.dailyLogs.list.useQuery(
+    { tentId: tentId ?? 0, limit: 1 },
+    { enabled: !!tentId }
+  );
+  useEffect(() => {
+    const last = lastLogs?.[0];
+    if (!last) return;
+    if (last.tempC)           setTempC(String(parseFloat(String(last.tempC))));
+    if (last.rhPct)           setRhPct(String(parseFloat(String(last.rhPct))));
+    if (last.ph)              setPh(String(parseFloat(String(last.ph))));
+    if (last.ec)              setEc(String(parseFloat(String(last.ec))));
+    if (last.wateringVolume)  setWateringVolume(String(last.wateringVolume));
+    if (last.runoffCollected) setRunoffCollected(String(last.runoffCollected));
+    if (last.ppfd)            setPpfd(last.ppfd);
+  }, [lastLogs]);
+
   // Fetch weekly targets for color validation
   const { data: targets } = trpc.weeklyTargets.getTargetsByTent.useQuery(
     { tentId: tentId ?? 0, phase: "VEGA", weekNumber: 1 },
