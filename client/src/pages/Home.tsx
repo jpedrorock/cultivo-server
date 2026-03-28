@@ -974,7 +974,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   return (
     <ListItemAnimation>
       <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`)} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
-      <CardHeader>
+      <CardHeader className="pl-8">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <CardTitle className="text-xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
@@ -1173,7 +1173,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         </div>
       </CardHeader>
 
-      <CardContent className="p-6">
+      <CardContent className="pl-8 pr-6 pb-6 pt-0">
         <div className="space-y-5">
           {/* Cycle Info */}
           {cycle ? (
