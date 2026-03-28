@@ -34,24 +34,38 @@ interface IrrigationInput {
   lightsOffMinutes: number;
 }
 
-interface CycleEntry {
-  cycleNumber: number;
+interface SubCycle {
+  subNumber: number;
   startTimeFormatted: string;
-  nextDay: boolean;
-  durationMin: number;
   durationSec: number;
   mlPerPlant: number;
+}
+
+const MASTER_COLORS = [
+  { bg: "bg-blue-500/10",    border: "border-blue-400/40",    text: "text-blue-700 dark:text-blue-300",    dot: "bg-blue-500"    },
+  { bg: "bg-emerald-500/10", border: "border-emerald-400/40", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
+  { bg: "bg-amber-500/10",   border: "border-amber-400/40",   text: "text-amber-700 dark:text-amber-300",   dot: "bg-amber-500"   },
+  { bg: "bg-purple-500/10",  border: "border-purple-400/40",  text: "text-purple-700 dark:text-purple-300",  dot: "bg-purple-500"  },
+] as const;
+
+interface MasterEntry {
+  masterNumber: number;
+  masterTime: string;
+  colorIdx: number;
+  subCycles: SubCycle[];
+  totalMlPerPlant: number;
+  totalSessionMinutes: number;
 }
 
 interface IrrigationResult {
   flowPerPlantMlMin: number;
   dailyVolumePerPlantMl: number;
   totalDailyVolumeMl: number;
-  numCycles: number;
-  durationPerCycleMin: number;
+  numMasters: number;
+  maxSubCyclesPerMaster: number;
   durationPerCycleSec: number;
   mlPerCyclePerPlant: number;
-  schedule: CycleEntry[];
+  masters: MasterEntry[];
   expectedRunoffMlPerPlant: number;
   availableWindowMin: number;
   warnings: string[];
@@ -70,6 +84,63 @@ function minutesToTimeString(totalMinutes: number): string {
   const h = Math.floor(totalMinutes / 60) % 24;
   const m = Math.round(totalMinutes % 60);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// ─────────────────────────────────────────────
+// Função auxiliar: constrói masters com sub-ciclos
+// ─────────────────────────────────────────────
+
+function buildMasters(
+  masterTimeStrings: string[],
+  pumpFlowMlMin: number,
+  numOutlets: number,
+  maxRuntimeMin: number,
+  restTimeBetweenMin: number,
+  totalDailyVolumeMl: number,
+  dailyVolumePerPlantMl: number,
+): MasterEntry[] {
+  const numMasters = masterTimeStrings.length;
+  const volPerMaster = totalDailyVolumeMl / numMasters;
+  const maxVolPerRun = maxRuntimeMin * pumpFlowMlMin;
+
+  return masterTimeStrings.map((timeStr, idx) => {
+    const masterStartMin = parseTimeToMinutes(timeStr);
+    const numSubs = Math.max(1, Math.ceil(volPerMaster / maxVolPerRun));
+    const totalMlPerPlant = dailyVolumePerPlantMl / numMasters;
+
+    const subCycles: SubCycle[] = [];
+    let remaining = volPerMaster;
+
+    for (let s = 0; s < numSubs; s++) {
+      const volThisRun = Math.min(maxVolPerRun, remaining);
+      const durSec = Math.round((volThisRun / pumpFlowMlMin) * 60);
+      const mlPerPlant = Math.round(volThisRun / numOutlets);
+      const startMin = masterStartMin + s * (maxRuntimeMin + restTimeBetweenMin);
+
+      subCycles.push({
+        subNumber: s + 1,
+        startTimeFormatted: minutesToTimeString(startMin % 1440),
+        durationSec: durSec,
+        mlPerPlant,
+      });
+
+      remaining -= volThisRun;
+      if (remaining <= 0) break;
+    }
+
+    const totalSessionMinutes = subCycles.length > 1
+      ? (subCycles.length - 1) * (maxRuntimeMin + restTimeBetweenMin) + (subCycles[subCycles.length - 1].durationSec / 60)
+      : subCycles[0].durationSec / 60;
+
+    return {
+      masterNumber: idx + 1,
+      masterTime: timeStr,
+      colorIdx: idx % MASTER_COLORS.length,
+      subCycles,
+      totalMlPerPlant: Math.round(totalMlPerPlant),
+      totalSessionMinutes,
+    };
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -121,75 +192,60 @@ function calculateIrrigationSchedule(input: IrrigationInput): IrrigationResult |
     );
   }
 
-  // 6. Escolher número "bonito" de ciclos
-  const niceNumbers = [2, 3, 4, 6, 8, 12];
-  let numCycles = minCyclesByRuntime < 1 ? 1 : minCyclesByRuntime;
+  // 6. Número de masters (máx 4, "números bonitos")
+  const niceNumbers = [2, 3, 4];
+  let numMasters = Math.max(1, minCyclesByRuntime);
   for (const n of niceNumbers) {
-    if (n >= minCyclesByRuntime) {
-      numCycles = n;
-      break;
-    }
+    if (n >= minCyclesByRuntime) { numMasters = n; break; }
   }
   if (minCyclesByRuntime > niceNumbers[niceNumbers.length - 1]) {
-    numCycles = minCyclesByRuntime;
+    numMasters = 4;
     warnings.push(
-      `Número elevado de ciclos necessários (${numCycles}). Considere uma bomba com maior vazão ou vaso menor.`
+      `Volume diário elevado para essa bomba. Usando 4 masters/dia com múltiplos sub-ciclos em cada.`
     );
   }
 
-  // 7. Duração de cada ciclo
-  const durationPerCycleMin = totalDailyVolumeMl / (numCycles * pumpFlowMlMin);
-  const durationPerCycleSec = Math.round(durationPerCycleMin * 60);
+  // 7. Duração do maior sub-ciclo (referência para o display)
+  const volPerMaster = totalDailyVolumeMl / numMasters;
+  const maxVolPerRun = maxRuntimeMin * pumpFlowMlMin;
+  const maxSubCyclesPerMaster = Math.max(1, Math.ceil(volPerMaster / maxVolPerRun));
+  const durationPerCycleSec = Math.round(Math.min(volPerMaster, maxVolPerRun) / pumpFlowMlMin * 60);
+  const mlPerCyclePerPlant = (dailyVolumePerPlantMl / numMasters) / maxSubCyclesPerMaster;
 
-  if (durationPerCycleMin > maxRuntimeMin + 0.01) {
-    warnings.push(
-      `Duração por ciclo (${durationPerCycleMin.toFixed(1)} min) excede o tempo máximo configurado (${maxRuntimeMin} min).`
-    );
-  }
-
-  // 8. Validar intervalo de descanso
-  if (numCycles > 1) {
-    const intervalBetween = availableWindowMin / (numCycles - 1);
-    const minInterval = durationPerCycleMin + restTimeBetweenMin;
-    if (intervalBetween < minInterval) {
+  // 8. Validar intervalo de descanso entre masters
+  if (numMasters > 1) {
+    const intervalBetween = availableWindowMin / (numMasters - 1);
+    const sessionMin = maxSubCyclesPerMaster * maxRuntimeMin + (maxSubCyclesPerMaster - 1) * restTimeBetweenMin;
+    if (intervalBetween < sessionMin + restTimeBetweenMin) {
       warnings.push(
-        `Intervalo entre ciclos (~${intervalBetween.toFixed(0)} min) pode ser insuficiente para o descanso da bomba (${restTimeBetweenMin} min após ${durationPerCycleMin.toFixed(1)} min de bombeamento).`
+        `Intervalo entre masters (~${intervalBetween.toFixed(0)} min) pode ser insuficiente para o descanso da bomba.`
       );
     }
   }
 
-  // 9. ml por ciclo por planta
-  const mlPerCyclePerPlant = dailyVolumePerPlantMl / numCycles;
-
-  // 10. Construir schedule
-  const schedule: CycleEntry[] = [];
-  for (let i = 0; i < numCycles; i++) {
-    const startMin = numCycles === 1
+  // 9. Construir horários dos masters e sub-ciclos
+  const masterTimeStrings: string[] = [];
+  for (let i = 0; i < numMasters; i++) {
+    const startMin = numMasters === 1
       ? firstCycleStartMin
-      : firstCycleStartMin + (i * (availableWindowMin / (numCycles - 1)));
-
-    schedule.push({
-      cycleNumber: i + 1,
-      startTimeFormatted: minutesToTimeString(startMin),
-      nextDay: startMin >= 1440,
-      durationMin: durationPerCycleMin,
-      durationSec: durationPerCycleSec,
-      mlPerPlant: Math.round(mlPerCyclePerPlant),
-    });
+      : firstCycleStartMin + (i * (availableWindowMin / (numMasters - 1)));
+    masterTimeStrings.push(minutesToTimeString(Math.round(startMin) % 1440));
   }
 
-  // 11. Drenagem esperada (boas práticas: ~17,5%)
+  const masters = buildMasters(masterTimeStrings, pumpFlowMlMin, numOutlets, maxRuntimeMin, restTimeBetweenMin, totalDailyVolumeMl, dailyVolumePerPlantMl);
+
+  // 10. Drenagem esperada (boas práticas: ~17,5%)
   const expectedRunoffMlPerPlant = dailyVolumePerPlantMl * 0.175;
 
   return {
     flowPerPlantMlMin,
     dailyVolumePerPlantMl,
     totalDailyVolumeMl,
-    numCycles,
-    durationPerCycleMin,
-    durationPerCycleSec: durationPerCycleSec,
+    numMasters,
+    maxSubCyclesPerMaster,
+    durationPerCycleSec,
     mlPerCyclePerPlant,
-    schedule,
+    masters,
     expectedRunoffMlPerPlant,
     availableWindowMin,
     warnings,
@@ -216,53 +272,40 @@ function calculateManualSchedule(
   const flowPerPlantMlMin = pumpFlowMlMin / numOutlets;
   const dailyVolumePerPlantMl = potSizeLiters * 1000 * targetPct / 100;
   const totalDailyVolumeMl = dailyVolumePerPlantMl * numOutlets;
-  const numCycles = validTimes.length;
+  const numMasters = validTimes.length;
 
-  const durationPerCycleMin = totalDailyVolumeMl / (numCycles * pumpFlowMlMin);
-  const durationPerCycleSec = Math.round(durationPerCycleMin * 60);
-  const mlPerCyclePerPlant = dailyVolumePerPlantMl / numCycles;
+  const volPerMaster = totalDailyVolumeMl / numMasters;
+  const maxVolPerRun = maxRuntimeMin * pumpFlowMlMin;
+  const maxSubCyclesPerMaster = Math.max(1, Math.ceil(volPerMaster / maxVolPerRun));
+  const durationPerCycleSec = Math.round(Math.min(volPerMaster, maxVolPerRun) / pumpFlowMlMin * 60);
+  const mlPerCyclePerPlant = (dailyVolumePerPlantMl / numMasters) / maxSubCyclesPerMaster;
   const expectedRunoffMlPerPlant = dailyVolumePerPlantMl * 0.175;
 
-  if (durationPerCycleMin > maxRuntimeMin + 0.01) {
-    warnings.push(
-      `Duração por ciclo (${durationPerCycleMin.toFixed(1)} min) excede o tempo máximo configurado (${maxRuntimeMin} min).`
-    );
-  }
-
-  // Verificar intervalo mínimo entre horários consecutivos
+  // Verificar intervalo mínimo entre masters consecutivos
   const sortedMinutes = [...validTimes.map(parseTimeToMinutes)].sort((a, b) => a - b);
   for (let i = 1; i < sortedMinutes.length; i++) {
     const gap = sortedMinutes[i] - sortedMinutes[i - 1];
-    const minGap = durationPerCycleMin + restTimeBetweenMin;
-    if (gap < minGap) {
+    const sessionMin = maxSubCyclesPerMaster * maxRuntimeMin + (maxSubCyclesPerMaster - 1) * restTimeBetweenMin;
+    if (gap < sessionMin + restTimeBetweenMin) {
       warnings.push(
-        `Intervalo entre ciclos ${i} e ${i + 1} (~${gap.toFixed(0)} min) pode ser insuficiente para o descanso da bomba (${restTimeBetweenMin} min + ${durationPerCycleMin.toFixed(1)} min bombeando).`
+        `Intervalo entre masters ${i} e ${i + 1} (~${gap.toFixed(0)} min) pode ser insuficiente.`
       );
     }
   }
 
-  // Ordenar os horários por hora do dia para exibição
-  const schedule: CycleEntry[] = [...validTimes]
-    .map((t, i) => ({ t, i }))
-    .sort((a, b) => parseTimeToMinutes(a.t) - parseTimeToMinutes(b.t))
-    .map(({ t }, idx) => ({
-      cycleNumber: idx + 1,
-      startTimeFormatted: t,
-      nextDay: false,
-      durationMin: durationPerCycleMin,
-      durationSec: durationPerCycleSec,
-      mlPerPlant: Math.round(mlPerCyclePerPlant),
-    }));
+  // Ordenar horários e construir masters
+  const sortedTimes = [...validTimes].sort((a, b) => parseTimeToMinutes(a) - parseTimeToMinutes(b));
+  const masters = buildMasters(sortedTimes, pumpFlowMlMin, numOutlets, maxRuntimeMin, restTimeBetweenMin, totalDailyVolumeMl, dailyVolumePerPlantMl);
 
   return {
     flowPerPlantMlMin,
     dailyVolumePerPlantMl,
     totalDailyVolumeMl,
-    numCycles,
-    durationPerCycleMin,
+    numMasters,
+    maxSubCyclesPerMaster,
     durationPerCycleSec,
     mlPerCyclePerPlant,
-    schedule,
+    masters,
     expectedRunoffMlPerPlant,
     availableWindowMin: 0,
     warnings,
@@ -405,17 +448,22 @@ export function IrrigationScheduleCalculator() {
       `Luzes: ${lightsOnTime} – ${lightsOffTime} (${lightWindowH}h)`,
       "",
       "── RESUMO ───────────────────────────────",
-      `Ciclos por dia:       ${result.numCycles}`,
-      `Duração por ciclo:    ${result.durationPerCycleSec}s (${result.durationPerCycleMin.toFixed(2)} min)`,
-      `Volume/ciclo/planta:  ${result.mlPerCyclePerPlant.toFixed(0)} ml`,
-      `Volume diário total:  ${result.totalDailyVolumeMl.toFixed(0)} ml (${numOutlets} plantas)`,
+      `Masters por dia:      ${result.numMasters}`,
+      `Sub-ciclos/master:    ${result.maxSubCyclesPerMaster}`,
+      `Duração sub-ciclo:    ${result.durationPerCycleSec}s`,
+      `ml/master/planta:     ${result.masters[0]?.totalMlPerPlant ?? "—"} ml`,
+      `Volume diário/planta: ${result.dailyVolumePerPlantMl.toFixed(0)} ml`,
+      `Volume total:         ${result.totalDailyVolumeMl.toFixed(0)} ml (${numOutlets} plantas)`,
       `Drenagem esperada:    ~${result.expectedRunoffMlPerPlant.toFixed(0)} ml/planta (17,5%)`,
       "",
-      "── HORÁRIOS ────────────────────────────",
-      "Ciclo  Horário  Duração   ml/planta",
-      ...result.schedule.map(c =>
-        `  ${String(c.cycleNumber).padStart(2)}     ${c.startTimeFormatted}    ${String(c.durationSec).padStart(4)}s   ${String(c.mlPerPlant).padStart(6)} ml`
-      ),
+      "── CRONOGRAMA ──────────────────────────",
+      ...result.masters.flatMap(master => [
+        ``,
+        `  ▶ MASTER ${master.masterNumber} — ${master.masterTime}  (${master.totalMlPerPlant} ml/planta)`,
+        ...master.subCycles.map(sub =>
+          `      #${sub.subNumber}  ${sub.startTimeFormatted}    ${String(sub.durationSec).padStart(4)}s   ${String(sub.mlPerPlant).padStart(5)} ml/planta`
+        ),
+      ]),
       "",
       "========================================",
       "Boas práticas embutidas:",
@@ -821,11 +869,11 @@ export function IrrigationScheduleCalculator() {
             {/* Stats grid */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: "Ciclos/dia", value: String(result.numCycles), icon: "🔄" },
-                { label: "Duração/ciclo", value: `${result.durationPerCycleSec}s`, sub: `${result.durationPerCycleMin.toFixed(2)} min`, icon: "⏱️" },
-                { label: "ml/ciclo/planta", value: `${result.mlPerCyclePerPlant.toFixed(0)} ml`, icon: "💧" },
+                { label: "Masters/dia", value: String(result.numMasters), icon: "🔄" },
+                { label: "Sub-ciclos/master", value: String(result.maxSubCyclesPerMaster), sub: result.maxSubCyclesPerMaster > 1 ? `${(result.maxSubCyclesPerMaster * maxRuntimeMin + (result.maxSubCyclesPerMaster - 1) * restTimeBetweenMin).toFixed(0)} min/sessão` : undefined, icon: "⚡" },
+                { label: "Duração sub-ciclo", value: `${result.durationPerCycleSec}s`, sub: `≤${maxRuntimeMin} min máx`, icon: "⏱️" },
+                { label: "ml/master/planta", value: `${result.masters[0]?.totalMlPerPlant ?? "—"} ml`, icon: "💧" },
                 { label: "Volume diário/planta", value: `${result.dailyVolumePerPlantMl.toFixed(0)} ml`, icon: "🪣" },
-                { label: "Volume total", value: `${result.totalDailyVolumeMl.toFixed(0)} ml`, sub: `${numOutlets} plantas`, icon: "📊" },
                 { label: "Drenagem esperada", value: `~${result.expectedRunoffMlPerPlant.toFixed(0)} ml`, sub: "17,5%/planta", icon: "🌊" },
               ].map((stat) => (
                 <div key={stat.label} className="p-2.5 rounded-xl bg-background/70 border border-border/40 text-center">
@@ -837,42 +885,86 @@ export function IrrigationScheduleCalculator() {
               ))}
             </div>
 
-            {/* Tabela de horários */}
+            {/* Tabela de masters com sub-ciclos */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Horários dos ciclos</p>
-              <div className="rounded-xl border border-border/50 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/40 text-muted-foreground text-xs">
-                      <th className="text-left px-3 py-2 font-semibold">Ciclo</th>
-                      <th className="text-left px-3 py-2 font-semibold">Horário</th>
-                      <th className="text-right px-3 py-2 font-semibold">Duração</th>
-                      <th className="text-right px-3 py-2 font-semibold">ml/planta</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.schedule.map((cycle, idx) => (
-                      <tr
-                        key={cycle.cycleNumber}
-                        className={`border-t border-border/30 ${idx % 2 === 0 ? "bg-background/40" : "bg-muted/10"}`}
-                      >
-                        <td className="px-3 py-2.5 text-muted-foreground font-medium">#{cycle.cycleNumber}</td>
-                        <td className="px-3 py-2.5">
-                          <span className="font-mono font-bold text-foreground text-base">{cycle.startTimeFormatted}</span>
-                          {cycle.nextDay && (
-                            <span className="ml-1 text-xs text-muted-foreground font-normal">+1d</span>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Cronograma por master</p>
+              <div className="space-y-2">
+                {result.masters.map((master) => {
+                  const c = MASTER_COLORS[master.colorIdx];
+                  const singleSub = master.subCycles.length === 1;
+                  return (
+                    <div key={master.masterNumber} className={`rounded-xl border ${c.border} overflow-hidden`}>
+                      {/* Header do master */}
+                      <div className={`flex items-center justify-between px-3 py-2 ${c.bg}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${c.dot} shrink-0`} />
+                          <span className={`text-sm font-bold ${c.text}`}>
+                            Master {master.masterNumber}
+                          </span>
+                          <span className="font-mono font-black text-foreground text-base">
+                            {master.masterTime}
+                          </span>
+                        </div>
+                        <div className={`text-right text-xs ${c.text}`}>
+                          <span className="font-semibold">{master.totalMlPerPlant} ml/planta</span>
+                          {!singleSub && (
+                            <span className="ml-2 opacity-70">· {master.subCycles.length} sub-ciclos</span>
                           )}
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          <span className="font-semibold text-foreground">{cycle.durationSec}s</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          <span className="font-semibold text-blue-600 dark:text-blue-400">{cycle.mlPerPlant} ml</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+
+                      {/* Sub-ciclos */}
+                      {singleSub ? (
+                        /* Linha única inline quando só 1 sub-ciclo */
+                        <div className="flex items-center justify-between px-3 py-2 bg-background/60">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono font-bold text-foreground">{master.subCycles[0].startTimeFormatted}</span>
+                            <span className="text-xs text-muted-foreground">ligar bomba</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="font-bold text-foreground">{master.subCycles[0].durationSec}s</span>
+                            <span className={`font-semibold ${c.text}`}>{master.subCycles[0].mlPerPlant} ml</span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Múltiplos sub-ciclos */
+                        <div className="divide-y divide-border/30">
+                          {master.subCycles.map((sub, sidx) => (
+                            <div
+                              key={sub.subNumber}
+                              className={`flex items-center justify-between px-3 py-2 ${sidx % 2 === 0 ? "bg-background/60" : "bg-muted/10"}`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text}`}>
+                                  #{sub.subNumber}
+                                </span>
+                                <span className="font-mono font-bold text-foreground">{sub.startTimeFormatted}</span>
+                                {sidx > 0 && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    (+{((sidx) * (maxRuntimeMin + restTimeBetweenMin)).toFixed(0)} min)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-sm">
+                                <span className="font-bold text-foreground">{sub.durationSec}s</span>
+                                <span className={`font-semibold ${c.text}`}>{sub.mlPerPlant} ml</span>
+                              </div>
+                            </div>
+                          ))}
+                          {/* Linha de total da sessão */}
+                          <div className={`flex items-center justify-between px-3 py-1.5 ${c.bg}`}>
+                            <span className={`text-[11px] font-semibold ${c.text}`}>
+                              Total sessão: ~{master.totalSessionMinutes.toFixed(0)} min
+                            </span>
+                            <span className={`text-[11px] font-bold ${c.text}`}>
+                              {master.totalMlPerPlant} ml/planta
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
