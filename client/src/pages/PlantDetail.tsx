@@ -17,12 +17,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, 
-  Sprout, 
-  FileText, 
-  Droplets, 
-  Heart, 
-  Sparkles, 
+import { ArrowLeft,
+  Sprout,
+  FileText,
+  Droplets,
+  Heart,
+  Sparkles,
   Scissors,
   Edit,
   MoveRight,
@@ -33,7 +33,8 @@ import { ArrowLeft,
   Trash2,
   XCircle,
   History,
-  ArrowRight
+  ArrowRight,
+  GitFork
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -67,6 +68,8 @@ export default function PlantDetail() {
   const [harvestNotes, setHarvestNotes] = useState("");
   const [discardModalOpen, setDiscardModalOpen] = useState(false);
   const [discardReason, setDiscardReason] = useState("");
+  const [cloneDialog, setCloneDialog] = useState(false);
+  const [cloneNameInput, setCloneNameInput] = useState("");
   const haptic = useTactileFeedback();
 
   const { data: plant, isLoading, isError, refetch } = trpc.plants.getById.useQuery(
@@ -136,7 +139,18 @@ export default function PlantDetail() {
       toast.error(`Erro ao atualizar planta: ${error.message}`);
     },
   });
-  
+
+  const utils = trpc.useUtils();
+  const clonePlantMutation = trpc.plants.clone.useMutation({
+    onSuccess: (data) => {
+      haptic.confirm();
+      toast.success(`✅ Clone "${data.name}" criado!`);
+      setCloneDialog(false);
+      utils.plants.list.invalidate();
+    },
+    onError: (e) => toast.error(`Erro ao clonar: ${e.message}`),
+  });
+
   // Handlers
   const handleTransplantToFlora = () => {
     haptic.warning();
@@ -306,6 +320,18 @@ export default function PlantDetail() {
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
               </PressButton>
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden md:flex gap-2"
+                onClick={() => {
+                  setCloneNameInput(`${plant?.name} (Clone)`);
+                  setCloneDialog(true);
+                }}
+              >
+                <GitFork className="w-4 h-4" />
+                Clonar
+              </Button>
               <PressButton
                 variant="outline"
                 size="sm"
@@ -391,6 +417,10 @@ export default function PlantDetail() {
                   <PressDropdownMenuItem onClick={() => { haptic.tap(); setMoveTentModalOpen(true); }}>
                     <MoveRight className="w-4 h-4 mr-2" />
                     Mover para Outra Estufa
+                  </PressDropdownMenuItem>
+                  <PressDropdownMenuItem onClick={() => { setCloneNameInput(`${plant?.name} (Clone)`); setCloneDialog(true); }}>
+                    <GitFork className="w-4 h-4 mr-2" />
+                    Clonar Planta
                   </PressDropdownMenuItem>
                   <DropdownMenuSeparator />
                   <PressDropdownMenuItem 
@@ -754,6 +784,36 @@ export default function PlantDetail() {
                 <><XCircle className="w-4 h-4 mr-2" />Confirmar Descarte</>
               )}
             </PressButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Plant Dialog */}
+      <Dialog open={cloneDialog} onOpenChange={setCloneDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clonar Planta</DialogTitle>
+            <DialogDescription>
+              Cria uma nova muda com a mesma strain e estufa de "{plant?.name}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label>Nome do clone</Label>
+            <Input
+              value={cloneNameInput}
+              onChange={(e) => setCloneNameInput(e.target.value)}
+              placeholder="Ex: Northern Lights (Clone)"
+              onKeyDown={(e) => e.key === "Enter" && clonePlantMutation.mutate({ plantId: plant!.id, name: cloneNameInput })}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloneDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => clonePlantMutation.mutate({ plantId: plant!.id, name: cloneNameInput })}
+              disabled={clonePlantMutation.isPending || !cloneNameInput.trim()}
+            >
+              {clonePlantMutation.isPending ? "Clonando..." : "Criar Clone"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

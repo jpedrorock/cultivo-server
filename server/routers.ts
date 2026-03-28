@@ -2904,6 +2904,54 @@ export const appRouter = router({
         return { id: result.insertId };
       }),
 
+    // Clonar planta existente
+    clone: protectedProcedure
+      .input(z.object({
+        plantId: z.number(),
+        name: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const [original] = await database
+          .select()
+          .from(plants)
+          .where(and(eq(plants.id, input.plantId), eq(plants.groupId, ctx.user.groupId ?? 0)))
+          .limit(1);
+
+        if (!original) throw new Error("Planta não encontrada");
+
+        const cloneName = input.name ?? `${original.name} (Clone)`;
+
+        const [result] = await database
+          .insert(plants)
+          .values({
+            name: cloneName,
+            strainId: original.strainId,
+            currentTentId: original.currentTentId,
+            plantStage: "SEEDLING",
+            status: "ACTIVE",
+            groupId: ctx.user.groupId ?? null,
+            notes: original.notes
+              ? `Clone de: ${original.name}\n\n${original.notes}`
+              : `Clone de: ${original.name}`,
+          });
+
+        const newPlantId = (result as any).insertId;
+
+        if (original.currentTentId) {
+          await database.insert(plantTentHistory).values({
+            plantId: newPlantId,
+            tentId: original.currentTentId,
+            movedAt: new Date(),
+            reason: `Clone criado de "${original.name}"`,
+          });
+        }
+
+        return { id: newPlantId, name: cloneName };
+      }),
+
     // Listar plantas (apenas ACTIVE por padrão)
     list: protectedProcedure
       .input(z.object({
