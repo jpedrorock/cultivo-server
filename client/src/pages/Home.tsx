@@ -965,6 +965,18 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
 
   return (
     <ListItemAnimation>
+      <div className="relative">
+      {/* Badge de alertas — canto superior direito do card */}
+      {newAlerts > 0 && (
+        <Link href="/alerts" onClick={e => e.stopPropagation()}>
+          <div
+            title={`${newAlerts} alerta${newAlerts > 1 ? 's' : ''}`}
+            className="absolute -top-2 -right-2 z-30 min-w-[22px] h-[22px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-900/50 animate-pulse"
+          >
+            {newAlerts > 9 ? '9+' : newAlerts}
+          </div>
+        </Link>
+      )}
       <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => { if (cycle) e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`; }} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
       <CardHeader className="pl-8">
         <div className="flex items-start justify-between gap-2">
@@ -1053,18 +1065,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               )}
             </CardDescription>
           </div>
-
-          {/* Badge de alertas */}
-          {newAlerts > 0 && (
-            <Link href="/alerts" onClick={e => e.stopPropagation()}>
-              <div
-                title={`${newAlerts} alerta${newAlerts > 1 ? 's' : ''}`}
-                className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md shadow-red-900/40 animate-pulse flex-shrink-0"
-              >
-                {newAlerts > 9 ? '9+' : newAlerts}
-              </div>
-            </Link>
-          )}
 
           {/* Monitor — acesso rápido ao display da estufa */}
           <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
@@ -1546,6 +1546,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
       </div>
     )}
 
+      </div>
     </ListItemAnimation>
   );
 }
