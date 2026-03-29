@@ -17,7 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -44,6 +45,7 @@ export default function PlantsList() {
   const haptic = useTactileFeedback();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"ACTIVE" | "HARVESTED" | "DEAD" | "DISCARDED" | "AWAITING_DRYING" | undefined>();
+  const [filterOpen, setFilterOpen] = useState(false);
   
   // Ler query param ?tent=ID para auto-expandir estufa
   const tentParam = new URLSearchParams(window.location.search).get('tent');
@@ -318,59 +320,56 @@ export default function PlantsList() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Link href="/plants/archive">
-                <Button variant="outline">
-                  <Archive className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Arquivo</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="w-9 h-9">
+                  <MoreHorizontal className="w-4 h-4" />
                 </Button>
-              </Link>
-              <Link href="/plants/new">
-                <Button>
-                  <Plus className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Nova Planta</span>
-                </Button>
-              </Link>
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => navigate("/plants/new")}>
+                  <Plus className="w-4 h-4 mr-2" /> Adicionar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterOpen(o => !o)}>
+                  <Filter className="w-4 h-4 mr-2" /> Filtro {(searchTerm || filterStatus) ? "•" : ""}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/plants/archive")}>
+                  <Archive className="w-4 h-4 mr-2" /> Arquivo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container py-8">
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              Filtros
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="search">Buscar</Label>
+        {/* Filters — collapsible */}
+        {filterOpen && (
+          <Card className="mb-4 border-primary/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    id="search"
-                    placeholder="Nome ou código..."
+                    placeholder="Buscar por nome ou código..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-9 h-9"
                   />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="filterStatus">Status</Label>
                 <select
-                  id="filterStatus"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                   value={filterStatus || ""}
                   onChange={(e) => setFilterStatus(e.target.value as any || undefined)}
                 >
-                  <option value="">Todos</option>
+                  <option value="">Todos os status</option>
                   <option value="ACTIVE">Ativa</option>
                   <option value="AWAITING_DRYING">Aguardando Secagem</option>
                   <option value="HARVESTED">Colhida</option>
@@ -378,9 +377,9 @@ export default function PlantsList() {
                   <option value="DISCARDED">Descartada</option>
                 </select>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Plants Grouped by Tent */}
         {isError ? (

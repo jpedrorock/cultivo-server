@@ -853,7 +853,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { staleTime: 2 * 60 * 1000 }
   );
   const markAllSeen = trpc.alerts.markAllAsSeen.useMutation();
-  const newAlerts = (alertCount as any)?.count ?? 0;
+  const newAlerts = (alertCount as number) ?? 0;
   
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {

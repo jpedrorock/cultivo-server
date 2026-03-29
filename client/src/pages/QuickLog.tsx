@@ -32,6 +32,7 @@ function getValidationColor(value: string, min?: number | null, max?: number | n
 export default function QuickLog() {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
+  const [logMode, setLogMode] = useState<'status' | 'plant' | null>(null);
 
   // Lock body scroll while this page is mounted
   useEffect(() => {
@@ -482,8 +483,44 @@ export default function QuickLog() {
           >
             <X className="w-5 h-5" />
           </button>
+          {/* Seleção de tipo — aparece antes do step 0 */}
+          {logMode === null && (
+            <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6 animate-[fade-in_0.4s_ease-out]">
+              <div className="text-center space-y-1">
+                <h2 className="text-2xl font-bold text-foreground">O que deseja registrar?</h2>
+                <p className="text-sm text-muted-foreground">Escolha o tipo de registro</p>
+              </div>
+              <div className="w-full space-y-3">
+                <button
+                  onClick={() => { triggerHaptic('light'); setLogMode('status'); }}
+                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4 group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shrink-0">
+                    <ThermometerSun className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground text-base">Status da Estufa</div>
+                    <div className="text-sm text-muted-foreground">Temperatura, umidade, pH, EC, luz</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { triggerHaptic('light'); setLogMode('plant'); setCurrentStep(0); setRecordPlantHealth(true); }}
+                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4 group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shrink-0">
+                    <Heart className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground text-base">Saúde de Planta</div>
+                    <div className="text-sm text-muted-foreground">Status, sintomas e observações por planta</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Step content */}
-          <div className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {logMode !== null && <div className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="min-h-full flex flex-col justify-center p-6 space-y-6">
             {/* Icon */}
             {currentStep < 9 && currentStepData && (
@@ -593,7 +630,7 @@ export default function QuickLog() {
                 {tents.map((tent) => (
                   <button
                     key={tent.id}
-                    onClick={() => setTentId(tent.id)}
+                    onClick={() => { setTentId(tent.id); if (logMode === 'plant') setCurrentStep(9); }}
                     className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
                       tentId === tent.id
                         ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-xl scale-105"
@@ -997,9 +1034,9 @@ export default function QuickLog() {
               </div>
             )}
           </div>
-          </div>
+          </div>}
           {/* Navigation buttons — footer dentro do card */}
-          <div className="shrink-0 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-border flex gap-3 bg-card dark:bg-zinc-900">
+          {logMode !== null && <div className="shrink-0 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-border flex gap-3 bg-card dark:bg-zinc-900">
         {/* Back button - only for daily log steps */}
         {currentStep > 0 && currentStep < 9 && (
           <Button
@@ -1089,7 +1126,7 @@ export default function QuickLog() {
             </AnimatedButton>
           </>
         )}
-      </div>
+      </div>}
           </div>
         </div>
       </div>
