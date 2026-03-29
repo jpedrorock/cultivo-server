@@ -99,12 +99,11 @@ export function BottomNav() {
             href="/quick-log"
             onClick={triggerHapticFeedback}
             data-tour="quick-log-menu"
-            className="flex flex-col items-center justify-center gap-1 relative -mt-5"
+            className="flex items-center justify-center relative -mt-5"
           >
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 active:scale-95 transition-transform">
-              <Plus className="w-7 h-7 text-white stroke-[2.5]" />
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 active:scale-95 transition-transform">
+              <Plus className="w-6 h-6 text-white stroke-[2.5]" />
             </div>
-            <span className="text-[11px] font-medium text-muted-foreground">Registro</span>
           </Link>
 
           {/* Nav items — Estufas e Calculadoras */}
@@ -118,14 +117,13 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 data-tour={item.href === "/calculators" ? "calculators-menu" : undefined}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 py-2 px-5 rounded-lg transition-colors relative",
+                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
                   isActive
-                    ? "text-primary"
+                    ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
-                <Icon className={cn("w-5 h-5", isActive && "stroke-[2.5]")} />
-                <span className="text-[11px] font-medium">{item.label}</span>
+                <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
               </Link>
             );
           })}
@@ -136,15 +134,14 @@ export function BottomNav() {
               <button
                 onClick={triggerHapticFeedback}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 py-3 px-4 rounded-lg transition-colors",
+                  "flex items-center justify-center p-3 rounded-xl transition-colors",
                   "hover:bg-primary/10",
                   isMoreMenuActive
-                    ? "text-primary"
+                    ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary"
                 )}
               >
                 <MoreHorizontal className={cn("w-6 h-6", isMoreMenuActive && "stroke-[2.5]")} />
-                <span className="text-xs font-medium">Mais</span>
               </button>
             </SheetTrigger>
             <SheetContent side="bottom" className="h-auto pb-safe">
