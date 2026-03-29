@@ -966,6 +966,16 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   return (
     <ListItemAnimation>
       <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => { if (cycle) e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`; }} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
+        {/* Dot de alertas — canto superior direito */}
+        {newAlerts > 0 && (
+          <button
+            onClick={e => { e.stopPropagation(); markAllSeen.mutate({ tentId: tent.id }); }}
+            title={`${newAlerts} alerta${newAlerts > 1 ? 's' : ''} — clique para marcar como visto`}
+            className="absolute top-2.5 right-2.5 z-20 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-900/40 animate-pulse hover:animate-none hover:bg-red-600 transition-colors"
+          >
+            {newAlerts > 9 ? '9+' : newAlerts}
+          </button>
+        )}
       <CardHeader className="pl-8">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -1016,21 +1026,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   </Badge>
                 );
               })()}
-              {/* Badge de alertas não lidos */}
-              {newAlerts > 0 && (
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    markAllSeen.mutate({ tentId: tent.id });
-                  }}
-                  title="Marcar alertas como vistos"
-                >
-                  <Badge className="bg-red-500/15 text-red-500 border-red-500/30 hover:bg-red-500/25 transition-colors gap-1 cursor-pointer">
-                    <AlertTriangle className="w-3 h-3" />
-                    {newAlerts} {newAlerts === 1 ? "alerta" : "alertas"}
-                  </Badge>
-                </button>
-              )}
             </CardTitle>
             <CardDescription className="mt-2 space-y-1">
               <div className="flex items-center gap-3">
@@ -1487,7 +1482,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                       >
                         {done && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
                       </div>
-                      <span className={`text-sm font-medium flex-1 transition-colors ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                      <span className={`text-[13px] font-semibold flex-1 transition-colors ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
                         {label}
                       </span>
                       {!done && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />}
@@ -1533,7 +1528,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                       >
                         {task.isDone && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
                       </div>
-                      <span className={`text-sm flex-1 ${task.isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                      <span className={`text-xs flex-1 ${task.isDone ? "line-through text-muted-foreground" : "text-foreground/90"}`}>
                         {task.title}
                       </span>
                     </div>
