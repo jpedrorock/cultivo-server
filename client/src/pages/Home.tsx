@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
@@ -1473,11 +1473,24 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   { label: "Registro Tarde", done: afternoonDone },
                 ].map(({ label, done }) => (
                   <Link key={label} href={`/quick-log?tentId=${tent.id}`}>
-                    <div className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors ${done ? "opacity-50" : "hover:bg-primary/5"}`}>
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${done ? "bg-primary border-primary" : "border-muted-foreground/40"}`}>
-                        {done && <Check className="w-2.5 h-2.5 text-primary-foreground" />}
+                    <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200 ${
+                      done
+                        ? "border-primary/30 bg-primary/5"
+                        : "border-border/30 hover:border-primary/20 hover:bg-muted/30"
+                    }`}>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                        done
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/30"
+                      }`}
+                        style={done ? { boxShadow: "0 0 8px rgba(74,222,128,0.5)" } : {}}
+                      >
+                        {done && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
                       </div>
-                      <span className={`text-sm ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{label}</span>
+                      <span className={`text-sm font-medium flex-1 transition-colors ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                        {label}
+                      </span>
+                      {!done && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />}
                     </div>
                   </Link>
                 ))}
@@ -1504,11 +1517,25 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               ) : tasks && tasks.length > 0 ? (
                 <div className="space-y-1 max-h-48 overflow-y-auto">
                   {tasks.filter(t => hideCompleted ? !t.isDone : true).map((task) => (
-                    <div key={task.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50">
-                      <Checkbox id={`task-${task.id}`} checked={task.isDone} onCheckedChange={() => handleToggleTask(task.id, task.isDone)} />
-                      <label htmlFor={`task-${task.id}`} className={`text-sm cursor-pointer flex-1 ${task.isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                    <div
+                      key={task.id}
+                      onClick={(e) => { e.stopPropagation(); handleToggleTask(task.id, task.isDone); }}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 group ${
+                        task.isDone ? "opacity-60" : "hover:bg-muted/30"
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+                        task.isDone
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/30 group-hover:border-primary/50"
+                      }`}
+                        style={task.isDone ? { boxShadow: "0 0 8px rgba(74,222,128,0.4)" } : {}}
+                      >
+                        {task.isDone && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
+                      </div>
+                      <span className={`text-sm flex-1 ${task.isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
                         {task.title}
-                      </label>
+                      </span>
                     </div>
                   ))}
                 </div>
