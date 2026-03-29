@@ -53,12 +53,12 @@ export function BottomNav() {
 
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },
+    { href: "/plants", icon: Leaf, label: "Plantas" },
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
 
   const moreMenuItems: NavItem[] = [
     { href: "/morning-check", icon: Sunrise, label: "Status" },
-    { href: "/plants", icon: Leaf, label: "Plantas" },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
     { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },

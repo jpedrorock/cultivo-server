@@ -966,16 +966,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   return (
     <ListItemAnimation>
       <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => { if (cycle) e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`; }} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
-        {/* Dot de alertas — canto superior direito */}
-        {newAlerts > 0 && (
-          <button
-            onClick={e => { e.stopPropagation(); markAllSeen.mutate({ tentId: tent.id }); }}
-            title={`${newAlerts} alerta${newAlerts > 1 ? 's' : ''} — clique para marcar como visto`}
-            className="absolute top-2.5 right-2.5 z-20 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-900/40 animate-pulse hover:animate-none hover:bg-red-600 transition-colors"
-          >
-            {newAlerts > 9 ? '9+' : newAlerts}
-          </button>
-        )}
       <CardHeader className="pl-8">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -1063,6 +1053,18 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               )}
             </CardDescription>
           </div>
+
+          {/* Badge de alertas */}
+          {newAlerts > 0 && (
+            <Link href="/alerts" onClick={e => e.stopPropagation()}>
+              <div
+                title={`${newAlerts} alerta${newAlerts > 1 ? 's' : ''}`}
+                className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md shadow-red-900/40 animate-pulse flex-shrink-0"
+              >
+                {newAlerts > 9 ? '9+' : newAlerts}
+              </div>
+            </Link>
+          )}
 
           {/* Monitor — acesso rápido ao display da estufa */}
           <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
