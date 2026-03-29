@@ -94,7 +94,20 @@ export function BottomNav() {
     >
       <div className="max-w-screen-xl mx-auto px-2">
         <div className="flex justify-around items-end pb-1 pt-1">
-          {/* Nav items — left side */}
+          {/* FAB — Novo Registro (primeiro) */}
+          <Link
+            href="/quick-log"
+            onClick={triggerHapticFeedback}
+            data-tour="quick-log-menu"
+            className="flex flex-col items-center justify-center gap-1 relative -mt-5"
+          >
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 active:scale-95 transition-transform">
+              <Plus className="w-7 h-7 text-white stroke-[2.5]" />
+            </div>
+            <span className="text-[11px] font-medium text-muted-foreground">Registro</span>
+          </Link>
+
+          {/* Nav items — Estufas e Calculadoras */}
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
@@ -116,19 +129,6 @@ export function BottomNav() {
               </Link>
             );
           })}
-
-          {/* FAB central — Novo Registro */}
-          <Link
-            href="/quick-log"
-            onClick={triggerHapticFeedback}
-            data-tour="quick-log-menu"
-            className="flex flex-col items-center justify-center gap-1 relative -mt-5"
-          >
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 active:scale-95 transition-transform">
-              <Plus className="w-7 h-7 text-white stroke-[2.5]" />
-            </div>
-            <span className="text-[11px] font-medium text-muted-foreground">Registro</span>
-          </Link>
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
