@@ -18,6 +18,7 @@ import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
 import { FinishCloningDialog } from "@/components/FinishCloningDialog";
 import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
 import { EditTentDialog } from "@/components/EditTentDialog";
+import { EditLogDialog } from "@/components/EditLogDialog";
 import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
 import {
   Dialog,
@@ -48,6 +49,9 @@ export default function TentDetails() {
   const [editTentOpen, setEditTentOpen] = useState(false);
   const [harvestQueueOpen, setHarvestQueueOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [editLogOpen, setEditLogOpen] = useState(false);
+  const [editingLog, setEditingLog] = useState<any>(null);
+  const [deletingLogId, setDeletingLogId] = useState<number | null>(null);
 
   const openPhaseConfirm = (type: PhaseConfirmType) => {
     setPhaseConfirmType(type);
@@ -79,6 +83,38 @@ export default function TentDetails() {
 
   const handleDeleteConfirmed = () => {
     deleteMutation.mutate({ id: tentId });
+  };
+
+  const utils = trpc.useUtils();
+  const deleteLogMutation = trpc.dailyLogs.delete.useMutation({
+    onSuccess: () => {
+      utils.dailyLogs.list.invalidate({ tentId });
+      setDeletingLogId(null);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao excluir: ${error.message}`);
+      setDeletingLogId(null);
+    },
+  });
+
+  const handleDeleteLog = (logId: number) => {
+    setDeletingLogId(logId);
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) deleteLogMutation.mutate({ id: logId });
+    }, 5000);
+    toast.info("Registro será excluído em 5 segundos", {
+      duration: 5000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          cancelled = true;
+          clearTimeout(timeoutId);
+          setDeletingLogId(null);
+          toast.success("Exclusão cancelada!");
+        },
+      },
+    });
   };
   const { data: cycle } = trpc.cycles.getByTent.useQuery({ tentId });
 
@@ -960,22 +996,39 @@ export default function TentDetails() {
             ) : logs && logs.length > 0 ? (
               <div className="space-y-4">
                 {logs.map((log) => (
-                  <Card key={log.id} className="bg-card/90 backdrop-blur-sm">
-                    <CardContent className="p-6">
+                  <Card key={log.id} className={`bg-card/90 backdrop-blur-sm transition-opacity ${deletingLogId === log.id ? "opacity-40" : ""}`}>
+                    <CardContent className="p-4 sm:p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div>
-                          <p className="font-semibold text-foreground">
-                            {format(new Date(log.logDate), "EEEE, dd 'de' MMMM 'de' yyyy", {
-                              locale: ptBR,
-                            })}
+                          <p className="font-semibold text-foreground text-sm sm:text-base">
+                            {format(new Date(log.logDate), "dd/MM/yyyy", { locale: ptBR })}
                           </p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {format(new Date(log.logDate), "HH:mm", { locale: ptBR })}
                           </p>
                         </div>
-                        <Badge variant={log.turn === "AM" ? "default" : "secondary"}>
-                          {log.turn === "AM" ? "Manhã" : "Noite"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={log.turn === "AM" ? "default" : "secondary"} className="text-xs">
+                            {log.turn === "AM" ? "Manhã" : "Tarde"}
+                          </Badge>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => { setEditingLog({ ...log, tentName: tent?.name }); setEditLogOpen(true); }}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            disabled={deletingLogId === log.id}
+                            onClick={() => handleDeleteLog(log.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-4 mb-4">
@@ -1072,6 +1125,13 @@ export default function TentDetails() {
         open={editTentOpen}
         onOpenChange={setEditTentOpen}
         onSuccess={() => utils.tents.getById.invalidate({ id: tentId })}
+      />
+
+      <EditLogDialog
+        log={editingLog}
+        open={editLogOpen}
+        onOpenChange={setEditLogOpen}
+        onSuccess={() => utils.dailyLogs.list.invalidate({ tentId })}
       />
 
       {/* Dialog de confirmação de exclusão da estufa */}
