@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, BarChart3, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -51,8 +51,7 @@ export function BottomNav() {
   // Ocultar nav em telas de foco (ex: registro rápido) — após todos os hooks
   const isHidden = HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display");
 
-  const mainNavItems: NavItem[] = [
-    { href: "/quick-log", icon: Plus, label: "Registro" },
+  const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
@@ -62,7 +61,6 @@ export function BottomNav() {
     { href: "/plants", icon: Leaf, label: "Plantas" },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
-    { href: "/history", icon: BarChart3, label: "Histórico" },
     { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
     { href: "/manage-strains", icon: Sprout, label: "Strains" },
     { href: "/help", icon: BookOpen, label: "Guia do Usuário" },
@@ -94,41 +92,43 @@ export function BottomNav() {
         zIndex: 100,
       }}
     >
-      <div className="max-w-screen-xl mx-auto px-4 py-3">
-        <div className="flex justify-around items-center">
-          {mainNavItems.map((item) => {
+      <div className="max-w-screen-xl mx-auto px-2">
+        <div className="flex justify-around items-end pb-1 pt-1">
+          {/* Nav items — left side */}
+          {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
-            
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={triggerHapticFeedback}
-                data-tour={item.href === "/quick-log" ? "quick-log-menu" : item.href === "/calculators" ? "calculators-menu" : undefined}
+                data-tour={item.href === "/calculators" ? "calculators-menu" : undefined}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 py-3 px-4 rounded-lg transition-colors relative",
-                  item.href === "/quick-log"
-                    ? "bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white shadow-lg shadow-green-900/30"
-                    : isActive
-                      ? "text-primary hover:bg-primary/10"
-                      : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  "flex flex-col items-center justify-center gap-1 py-2 px-5 rounded-lg transition-colors relative",
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
-                <Icon className={cn(
-                  "w-6 h-6",
-                  isActive && "stroke-[2.5]",
-                  item.href === "/quick-log" && "stroke-[2.5]"
-                )} />
-                <span className="text-xs font-medium">{item.label}</span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
-                    {item.badge > 9 ? '9+' : item.badge}
-                  </span>
-                )}
+                <Icon className={cn("w-5 h-5", isActive && "stroke-[2.5]")} />
+                <span className="text-[11px] font-medium">{item.label}</span>
               </Link>
             );
           })}
+
+          {/* FAB central — Novo Registro */}
+          <Link
+            href="/quick-log"
+            onClick={triggerHapticFeedback}
+            data-tour="quick-log-menu"
+            className="flex flex-col items-center justify-center gap-1 relative -mt-5"
+          >
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 active:scale-95 transition-transform">
+              <Plus className="w-7 h-7 text-white stroke-[2.5]" />
+            </div>
+            <span className="text-[11px] font-medium text-muted-foreground">Registro</span>
+          </Link>
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>

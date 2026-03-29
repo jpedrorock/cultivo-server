@@ -631,7 +631,7 @@ export default function PlantsList() {
           />
         )}
       {/* ── Lixeira ── */}
-      <div className="space-y-4 pb-12">
+      <div className="space-y-4 pb-12 mt-8">
         <Card className="overflow-hidden">
           <CardHeader
             className="hover:bg-muted/50 transition-colors cursor-pointer"
