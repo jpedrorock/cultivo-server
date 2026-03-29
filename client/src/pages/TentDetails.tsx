@@ -85,7 +85,6 @@ export default function TentDetails() {
     deleteMutation.mutate({ id: tentId });
   };
 
-  const utils = trpc.useUtils();
   const deleteLogMutation = trpc.dailyLogs.delete.useMutation({
     onSuccess: () => {
       utils.dailyLogs.list.invalidate({ tentId });
