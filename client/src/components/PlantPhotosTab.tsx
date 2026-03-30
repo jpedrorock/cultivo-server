@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Camera, X, ZoomIn, Trash2 } from "lucide-react";
@@ -21,6 +21,15 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
   const [touchEnd, setTouchEnd] = useState<number>(0);
   const [swipeOffset, setSwipeOffset] = useState<number>(0);
   const [isSwiping, setIsSwiping] = useState<boolean>(false);
+
+  // Pinch-to-zoom states
+  const [scale, setScale] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const pinchRef = useRef<{ startDist: number; startScale: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
+  const lastTapRef = useRef(0);
+  const imageRef = useRef<HTMLDivElement>(null);
 
   // Query para buscar fotos da planta
   const { data: photos = [], isLoading, refetch } = trpc.plants.getPhotos.useQuery(
@@ -82,22 +91,32 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
     reader.readAsDataURL(file);
   };
 
+  const resetZoom = useCallback(() => {
+    setScale(1);
+    setPanX(0);
+    setPanY(0);
+  }, []);
+
   const openLightbox = (index: number) => {
     setCurrentImageIndex(index);
+    resetZoom();
     setLightboxOpen(true);
   };
 
   const closeLightbox = () => {
     setLightboxOpen(false);
+    resetZoom();
   };
 
-  const nextImage = () => {
+  const nextImage = useCallback(() => {
+    resetZoom();
     setCurrentImageIndex((prev) => (prev + 1) % photos.length);
-  };
+  }, [photos.length, resetZoom]);
 
-  const prevImage = () => {
+  const prevImage = useCallback(() => {
+    resetZoom();
     setCurrentImageIndex((prev) => (prev - 1 + photos.length) % photos.length);
-  };
+  }, [photos.length, resetZoom]);
 
   const handleDeletePhoto = () => {
     const photoId = photos[currentImageIndex]?.id;
@@ -106,36 +125,99 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
     }
   };
 
-  // Touch event handlers for swipe gestures
+  // Attach non-passive touch listeners to support preventDefault (required for pinch zoom)
+  useEffect(() => {
+    const el = imageRef.current;
+    if (!el) return;
+
+    const onTouchMove = (e: TouchEvent) => {
+      // Prevent browser native zoom when we have 2 fingers or when panning
+      if (e.touches.length === 2 || (e.touches.length === 1 && scale > 1)) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onTouchMove);
+  }, [scale]);
+
+  const getPinchDist = (touches: TouchList) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-    setTouchEnd(e.targetTouches[0].clientX);
-    setIsSwiping(true);
+    if (e.touches.length === 2) {
+      // Start pinch
+      setIsSwiping(false);
+      setSwipeOffset(0);
+      pinchRef.current = { startDist: getPinchDist(e.touches), startScale: scale };
+    } else if (e.touches.length === 1) {
+      const now = Date.now();
+      // Double-tap to toggle zoom
+      if (now - lastTapRef.current < 300) {
+        lastTapRef.current = 0;
+        if (scale > 1) { resetZoom(); } else { setScale(2.5); }
+        return;
+      }
+      lastTapRef.current = now;
+
+      if (scale > 1) {
+        // Pan mode
+        panRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, panX, panY };
+      } else {
+        // Swipe navigation mode
+        setTouchStart(e.targetTouches[0].clientX);
+        setTouchEnd(e.targetTouches[0].clientX);
+        setIsSwiping(true);
+      }
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSwiping) return;
-    const currentTouch = e.targetTouches[0].clientX;
-    setTouchEnd(currentTouch);
-    const offset = currentTouch - touchStart;
-    setSwipeOffset(offset);
+    if (e.touches.length === 2 && pinchRef.current) {
+      // Pinch zoom
+      const newDist = getPinchDist(e.touches);
+      const ratio = newDist / pinchRef.current.startDist;
+      const newScale = Math.min(Math.max(pinchRef.current.startScale * ratio, 1), 6);
+      setScale(newScale);
+      // If scale snapped to 1, reset pan
+      if (newScale <= 1) { setPanX(0); setPanY(0); }
+    } else if (e.touches.length === 1) {
+      if (scale > 1 && panRef.current) {
+        // Pan the zoomed image
+        const dx = e.touches[0].clientX - panRef.current.startX;
+        const dy = e.touches[0].clientY - panRef.current.startY;
+        setPanX(panRef.current.panX + dx);
+        setPanY(panRef.current.panY + dy);
+      } else if (isSwiping) {
+        // Horizontal swipe to navigate
+        const currentTouch = e.targetTouches[0].clientX;
+        setTouchEnd(currentTouch);
+        setSwipeOffset(currentTouch - touchStart);
+      }
+    }
   };
 
   const handleTouchEnd = () => {
-    if (!isSwiping) return;
-    setIsSwiping(false);
-    const swipeDistance = touchEnd - touchStart;
-    const minSwipeDistance = 50;
-    if (Math.abs(swipeDistance) > minSwipeDistance) {
-      if (swipeDistance > 0) {
-        prevImage();
-      } else if (swipeDistance < 0) {
-        nextImage();
+    pinchRef.current = null;
+    panRef.current = null;
+
+    // Snap scale back to 1 if barely pinched
+    if (scale < 1.08) resetZoom();
+
+    if (isSwiping && scale <= 1) {
+      setIsSwiping(false);
+      const swipeDistance = touchEnd - touchStart;
+      if (Math.abs(swipeDistance) > 50) {
+        if (swipeDistance > 0) prevImage();
+        else nextImage();
       }
+      setSwipeOffset(0);
+      setTouchStart(0);
+      setTouchEnd(0);
     }
-    setSwipeOffset(0);
-    setTouchStart(0);
-    setTouchEnd(0);
   };
 
   return (
@@ -247,23 +329,34 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
             ›
           </button>
 
-          <div 
-            className="max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center p-4"
+          <div
+            ref={imageRef}
+            className="max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center p-4 overflow-hidden"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            style={{
-              transform: isSwiping ? `translateX(${swipeOffset}px)` : 'translateX(0)',
-              transition: isSwiping ? 'none' : 'transform 0.3s ease-out',
-            }}
+            style={{ touchAction: scale > 1 ? 'none' : 'pan-y' }}
           >
             <img
               src={photos[currentImageIndex]?.url}
               alt={`Foto ${currentImageIndex + 1}`}
-              className="max-w-full max-h-full object-contain"
+              className="max-w-full max-h-full object-contain select-none"
+              draggable={false}
               onClick={(e) => e.stopPropagation()}
+              style={{
+                transform: `translateX(${scale > 1 ? panX : swipeOffset}px) translateY(${panY}px) scale(${scale})`,
+                transition: pinchRef.current || panRef.current || isSwiping ? 'none' : 'transform 0.25s ease-out',
+                cursor: scale > 1 ? 'grab' : 'default',
+              }}
             />
           </div>
+
+          {/* Zoom indicator */}
+          {scale > 1 && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full">
+              {Math.round(scale * 100)}%
+            </div>
+          )}
 
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white text-sm">
             {currentImageIndex + 1} / {photos.length}
