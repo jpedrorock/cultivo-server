@@ -35,12 +35,7 @@ export default function QuickLog() {
   const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(null);
   const stepScrollRef = useRef<HTMLDivElement>(null);
 
-  // Lock body scroll while this page is mounted
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  // Body scroll lock not needed — outer container uses position:fixed inset-0
 
   // Reset scroll to top whenever the step changes
   useEffect(() => {
@@ -553,11 +548,17 @@ export default function QuickLog() {
 
   return (
     <PageTransition>
-        <div className="h-dvh overflow-hidden bg-background flex flex-col pt-[env(safe-area-inset-top,0px)]">
+        <div
+          className="fixed inset-0 overflow-hidden bg-background flex flex-col"
+          style={{
+            paddingTop: 'env(safe-area-inset-top, 0px)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          }}
+        >
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden">
-        <div className="container mx-auto px-4 max-w-md h-full flex items-center">
-          <div className="bg-card dark:bg-zinc-900 dark:border dark:border-zinc-700 rounded-2xl shadow-lg h-[85%] overflow-hidden w-full flex flex-col relative">
+      <div className="flex-1 flex items-center justify-center overflow-hidden px-4 py-3">
+        <div className="w-full max-w-md h-full flex items-center">
+          <div className="bg-card dark:bg-zinc-900 dark:border dark:border-zinc-700 rounded-2xl shadow-lg h-[95%] overflow-hidden w-full flex flex-col relative">
           {/* Botão fechar — dentro do card, canto superior direito */}
           <button
             onClick={() => {
@@ -1262,7 +1263,7 @@ export default function QuickLog() {
           </div>
           </div>}
           {/* Navigation buttons — footer dentro do card */}
-          {logMode !== null && <div className="shrink-0 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-border flex gap-3 bg-card dark:bg-zinc-900">
+          {logMode !== null && <div className="shrink-0 px-4 py-3 border-t border-border flex gap-3 bg-card dark:bg-zinc-900">
         {/* Back button - only for daily log steps */}
         {currentStep > 0 && currentStep < 9 && (
           <Button
