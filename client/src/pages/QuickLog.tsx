@@ -555,10 +555,14 @@ export default function QuickLog() {
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
+      {/* Radial glow background */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
+      </div>
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden px-4 py-3">
+      <div className="flex-1 flex items-center justify-center overflow-hidden px-4 py-3 relative z-10">
         <div className="w-full max-w-md h-full flex items-center">
-          <div className="bg-card dark:bg-zinc-900 dark:border dark:border-zinc-700 rounded-2xl shadow-lg h-[95%] overflow-hidden w-full flex flex-col relative">
+          <div className="bg-card border border-border/60 rounded-2xl shadow-2xl h-[95%] overflow-hidden w-full flex flex-col relative">
           {/* Botão fechar — dentro do card, canto superior direito */}
           <button
             onClick={() => {
@@ -572,46 +576,63 @@ export default function QuickLog() {
           </button>
           {/* Seleção de tipo — aparece antes do step 0 */}
           {logMode === null && (
-            <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6 animate-[fade-in_0.4s_ease-out]">
-              <div className="text-center space-y-1">
+            <div className="flex-1 flex flex-col items-center justify-center px-5 gap-8 animate-[fade-in_0.4s_ease-out]">
+              <div className="text-center space-y-1.5">
                 <h2 className="text-2xl font-bold text-foreground">O que deseja registrar?</h2>
                 <p className="text-sm text-muted-foreground">Escolha o tipo de registro</p>
               </div>
               <div className="w-full space-y-3">
+                {/* Status da Estufa */}
                 <button
                   onClick={() => { triggerHaptic('light'); setLogMode('status'); }}
-                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4"
+                  className="w-full rounded-2xl border border-teal-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-teal-500/40 active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.08) 0%, hsl(var(--card)) 60%)' }}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shrink-0">
-                    <ThermometerSun className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-foreground text-base">Status da Estufa</div>
-                    <div className="text-sm text-muted-foreground">Temperatura, umidade, pH, EC, luz</div>
+                  <div className="p-4 flex items-center gap-4 w-full">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-900/30 shrink-0">
+                      <ThermometerSun className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-foreground text-base">Status da Estufa</div>
+                      <div className="text-sm text-muted-foreground">Temperatura, umidade, pH, EC, luz</div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-teal-400/60 shrink-0" />
                   </div>
                 </button>
+
+                {/* Saúde de Planta */}
                 <button
                   onClick={() => { triggerHaptic('light'); setLogMode('plant'); setCurrentStep(0); setRecordPlantHealth(true); }}
-                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4"
+                  className="w-full rounded-2xl border border-rose-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-rose-500/40 active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.08) 0%, hsl(var(--card)) 60%)' }}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shrink-0">
-                    <Heart className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-foreground text-base">Saúde de Planta</div>
-                    <div className="text-sm text-muted-foreground">Status, sintomas e observações por planta</div>
+                  <div className="p-4 flex items-center gap-4 w-full">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-900/30 shrink-0">
+                      <Heart className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-foreground text-base">Saúde de Planta</div>
+                      <div className="text-sm text-muted-foreground">Status, sintomas e observações por planta</div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-rose-400/60 shrink-0" />
                   </div>
                 </button>
+
+                {/* Tricomas */}
                 <button
                   onClick={() => { triggerHaptic('light'); setLogMode('trichome'); setCurrentStep(0); setRecordTrichomes(true); }}
-                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-violet-500/50 hover:bg-violet-500/5 transition-all text-left flex items-center gap-4"
+                  className="w-full rounded-2xl border border-violet-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-violet-500/40 active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, hsl(var(--card)) 60%)' }}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shrink-0">
-                    <Sparkles className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-foreground text-base">Tricomas</div>
-                    <div className="text-sm text-muted-foreground">Maturação, percentagens por planta · Flora</div>
+                  <div className="p-4 flex items-center gap-4 w-full">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-900/30 shrink-0">
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-foreground text-base">Tricomas</div>
+                      <div className="text-sm text-muted-foreground">Maturação, percentagens por planta · Flora</div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-violet-400/60 shrink-0" />
                   </div>
                 </button>
               </div>

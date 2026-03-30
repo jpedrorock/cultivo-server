@@ -101,7 +101,7 @@ export default function CalculatorMenu() {
       }
     >
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 items-start">
           {calculators.map((calc, index) => {
             const Icon = calc.icon;
             return (
