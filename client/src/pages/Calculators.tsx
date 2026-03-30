@@ -131,11 +131,25 @@ function downloadTextFile(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+import { lazy, Suspense } from "react";
 import { useRoute, useLocation, Redirect } from "wouter";
 import { ArrowLeft } from "lucide-react";
-import { FertilizationCalculator } from "@/components/FertilizationCalculator";
-import { IrrigationScheduleCalculator } from "@/components/IrrigationScheduleCalculator";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
+
+// Calculadoras pesadas — carregadas sob demanda conforme o id selecionado
+const IrrigationScheduleCalculator = lazy(() =>
+  import("@/components/IrrigationScheduleCalculator").then((m) => ({ default: m.IrrigationScheduleCalculator }))
+);
+
+function CalculatorSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse pt-2">
+      <div className="h-32 rounded-xl bg-muted/60" />
+      <div className="h-24 rounded-xl bg-muted/40" />
+      <div className="h-24 rounded-xl bg-muted/40" />
+    </div>
+  );
+}
 
 export default function Calculators() {
   const [, params] = useRoute("/calculators/:id");
@@ -182,7 +196,11 @@ export default function Calculators() {
       {/* Main Content */}
       <main className="container py-4 md:py-8">
         {calculatorId === "watering-runoff" && <WateringRunoffCalculator />}
-        {calculatorId === "irrigation-schedule" && <IrrigationScheduleCalculator />}
+        {calculatorId === "irrigation-schedule" && (
+          <Suspense fallback={<CalculatorSkeleton />}>
+            <IrrigationScheduleCalculator />
+          </Suspense>
+        )}
         {calculatorId === "lux-ppfd" && <LuxPPFDCalculator />}
         {calculatorId === "ppm-ec" && <PPMECConverter />}
         {calculatorId === "ph-adjust" && <PHAdjustCalculator />}

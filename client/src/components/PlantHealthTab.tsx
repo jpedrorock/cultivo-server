@@ -512,7 +512,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                             }}
                           >
                             {log.photoUrl
-                              ? <img src={log.photoUrl} alt="Saúde" className="w-full h-full object-cover" />
+                              ? <img src={log.photoUrl} alt="Saúde" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                               : <div className="w-full h-full flex items-center justify-center">
                                   <Heart className="w-5 h-5 text-muted-foreground/20" />
                                 </div>

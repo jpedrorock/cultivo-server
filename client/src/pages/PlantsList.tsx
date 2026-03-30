@@ -489,7 +489,7 @@ export default function PlantsList() {
                                 <Link href={`/plants/${plant.id}`} className="block w-full" style={{ aspectRatio: '3/4' }}>
                                   <div className="w-full h-full bg-white/5">
                                     {plant.lastHealthPhotoUrl
-                                      ? <img src={plant.lastHealthPhotoUrl} alt={plant.name} className="w-full h-full object-cover" />
+                                      ? <img src={plant.lastHealthPhotoUrl} alt={plant.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                                       : <div className="w-full h-full flex items-center justify-center">
                                           <Sprout className="w-6 h-6 text-muted-foreground/20" />
                                         </div>
@@ -637,7 +637,7 @@ export default function PlantsList() {
                         <div className="flex items-center gap-3 px-3 pt-3 pb-2.5">
                           <div className="w-10 h-10 rounded-lg border border-border/20 overflow-hidden bg-white/3 shrink-0 grayscale opacity-50 flex items-center justify-center">
                             {plant.photoUrl
-                              ? <img src={plant.photoUrl} alt={plant.name} className="w-full h-full object-cover" />
+                              ? <img src={plant.photoUrl} alt={plant.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                               : <Sprout className="w-5 h-5 text-muted-foreground" />
                             }
                           </div>

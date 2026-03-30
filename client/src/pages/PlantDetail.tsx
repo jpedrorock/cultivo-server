@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { ErrorState } from "@/components/ErrorState";
 import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
@@ -48,12 +48,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import PlantObservationsTab from "@/components/PlantObservationsTab";
-import PlantHealthTab from "@/components/PlantHealthTab";
-import PlantEnvironmentTab from "@/components/PlantEnvironmentTab";
-import PlantArchiveTab from "@/components/PlantArchiveTab";
-import PlantTrichomesTab from "@/components/PlantTrichomesTab";
-import PlantLSTTab from "@/components/PlantLSTTab";
 import MoveTentModal from "@/components/MoveTentModal";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
@@ -61,6 +55,25 @@ import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 import { PressButton } from "@/components/PressButton";
 import { PressDropdownMenuItem } from "@/components/PressDropdownMenuItem";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+
+// Tabs carregadas sob demanda para reduzir bundle inicial de PlantDetail
+const PlantHealthTab       = lazy(() => import("@/components/PlantHealthTab"));
+const PlantEnvironmentTab  = lazy(() => import("@/components/PlantEnvironmentTab"));
+const PlantObservationsTab = lazy(() => import("@/components/PlantObservationsTab"));
+const PlantArchiveTab      = lazy(() => import("@/components/PlantArchiveTab"));
+const PlantTrichomesTab    = lazy(() => import("@/components/PlantTrichomesTab"));
+const PlantLSTTab          = lazy(() => import("@/components/PlantLSTTab"));
+
+// Skeleton mínimo exibido enquanto os componentes de tab carregam
+function TabSkeleton() {
+  return (
+    <div className="space-y-3 pt-2 animate-pulse">
+      <div className="h-24 rounded-xl bg-muted/60" />
+      <div className="h-20 rounded-xl bg-muted/40" />
+      <div className="h-20 rounded-xl bg-muted/40" />
+    </div>
+  );
+}
 
 export default function PlantDetail() {
   const [, params] = useRoute("/plants/:id");
@@ -491,7 +504,7 @@ export default function PlantDetail() {
               {/* Foto direita — último registro de saúde */}
               <div className="w-[100px] shrink-0 border-l border-border/30" style={{ aspectRatio: "3/4" }}>
                 {lastPhoto ? (
-                  <img src={lastPhoto} alt="Último registro" className="w-full h-full object-cover" />
+                  <img src={lastPhoto} alt="Último registro" className="w-full h-full object-cover" loading="eager" fetchPriority="high" decoding="async" />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-white/[0.02]">
                     <Heart className="w-6 h-6 text-muted-foreground/15" />
@@ -531,11 +544,15 @@ export default function PlantDetail() {
               </TabsList>
 
               <TabsContent value="health">
-                <PlantHealthTab plantId={plantId} />
+                <Suspense fallback={<TabSkeleton />}>
+                  <PlantHealthTab plantId={plantId} />
+                </Suspense>
               </TabsContent>
 
               <TabsContent value="environment">
-                <PlantEnvironmentTab plantId={plantId} />
+                <Suspense fallback={<TabSkeleton />}>
+                  <PlantEnvironmentTab plantId={plantId} />
+                </Suspense>
               </TabsContent>
 
               {isPlant && (
@@ -556,20 +573,28 @@ export default function PlantDetail() {
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="observations">
-                      <PlantObservationsTab plantId={plantId} />
+                      <Suspense fallback={<TabSkeleton />}>
+                        <PlantObservationsTab plantId={plantId} />
+                      </Suspense>
                     </TabsContent>
                     <TabsContent value="lst">
-                      <PlantLSTTab plantId={plantId} />
+                      <Suspense fallback={<TabSkeleton />}>
+                        <PlantLSTTab plantId={plantId} />
+                      </Suspense>
                     </TabsContent>
                     <TabsContent value="trichomes">
-                      <PlantTrichomesTab plantId={plantId} />
+                      <Suspense fallback={<TabSkeleton />}>
+                        <PlantTrichomesTab plantId={plantId} />
+                      </Suspense>
                     </TabsContent>
                   </Tabs>
                 </TabsContent>
               )}
 
               <TabsContent value="archive">
-                <PlantArchiveTab plantId={plantId} />
+                <Suspense fallback={<TabSkeleton />}>
+                  <PlantArchiveTab plantId={plantId} />
+                </Suspense>
               </TabsContent>
             </Tabs>
           );

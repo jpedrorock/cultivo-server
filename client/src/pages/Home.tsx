@@ -226,6 +226,23 @@ export default function Home() {
 
   const utils = trpc.useUtils();
 
+  // Prefetch plants.list para cada estufa com plantas — assim a navegação tent→plantas é instantânea
+  useEffect(() => {
+    if (!tents || tents.length === 0) return;
+    const tentsWithPlants = tents.filter((t: any) => (t.plantCount ?? t.plants?.length ?? 1) > 0);
+    if (tentsWithPlants.length === 0) return;
+    // Usar requestIdleCallback para não competir com o paint inicial
+    const schedule = (fn: () => void) =>
+      "requestIdleCallback" in window
+        ? requestIdleCallback(fn, { timeout: 5000 })
+        : setTimeout(fn, 1000);
+    schedule(() => {
+      tentsWithPlants.forEach((tent: any) => {
+        utils.plants.list.prefetch({ tentId: tent.id });
+      });
+    });
+  }, [tents, utils.plants.list]);
+
   // Pull-to-refresh handler
   const handleRefresh = async () => {
     await Promise.all([

@@ -12,10 +12,10 @@ import { Toaster } from "sonner";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,          // dados válidos por 30s — sem refetch desnecessário
-      gcTime: 5 * 60_000,         // cache mantido por 5min após componente desmontar
-      refetchOnWindowFocus: false, // sem "piscar" ao trocar de aba
-      retry: 1,                   // apenas 1 retry em vez de 3
+      staleTime: 60_000,           // dados válidos por 1min — sem refetch desnecessário
+      gcTime: 5 * 60_000,          // cache mantido por 5min após componente desmontar
+      refetchOnWindowFocus: false,  // sem "piscar" ao trocar de aba
+      retry: 1,                    // apenas 1 retry em vez de 3
     },
   },
 });
