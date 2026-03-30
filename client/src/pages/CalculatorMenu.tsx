@@ -114,9 +114,9 @@ export default function CalculatorMenu() {
                     background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
                   }}
                 >
-                  <div className="p-5">
-                    {/* Top row: icon + badge */}
-                    <div className="flex items-start justify-between gap-2 mb-4">
+                  <div className="p-5 flex flex-col min-h-[230px]">
+                    {/* Top row: icon + badge — always at top */}
+                    <div className="flex items-start justify-between gap-2 mb-4 shrink-0">
                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
                         <Icon className="w-7 h-7 text-white drop-shadow-sm" />
                       </div>
@@ -127,14 +127,14 @@ export default function CalculatorMenu() {
                       )}
                     </div>
 
-                    {/* Title + description */}
-                    <div className="space-y-1 mb-4">
+                    {/* Title + description — fills remaining space */}
+                    <div className="flex-1 space-y-1.5 mb-3">
                       <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 min-h-[2.625rem]">{calc.description}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{calc.description}</p>
                     </div>
 
-                    {/* CTA */}
-                    <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200`}>
+                    {/* CTA — always at bottom */}
+                    <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200 shrink-0`}>
                       <span>Abrir calculadora</span>
                       <ArrowRight className="w-4 h-4" />
                     </div>
