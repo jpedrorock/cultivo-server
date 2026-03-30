@@ -107,14 +107,14 @@ export default function CalculatorMenu() {
             return (
               <Link key={calc.id} href={`/calculators/${calc.id}`}>
                 <div
-                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4 flex flex-col`}
+                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4`}
                   style={{
                     animationDelay: `${index * 80}ms`,
                     animationFillMode: 'backwards',
                     background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
                   }}
                 >
-                  <div className="p-5 flex flex-col gap-4 h-full">
+                  <div className="p-5 flex flex-col gap-4">
                     {/* Top row: icon + badge */}
                     <div className="flex items-start justify-between gap-2">
                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>

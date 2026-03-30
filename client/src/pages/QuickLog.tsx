@@ -194,8 +194,8 @@ export default function QuickLog() {
     onSuccess: () => {
       if (currentPlantIndex < plants.length - 1) {
         setCurrentPlantIndex(currentPlantIndex + 1);
-      } else if (isFloraPhase) {
-        // Propõe registro de tricomas após saúde
+      } else if (isFloraPhase && logMode === 'plant') {
+        // Propõe registro de tricomas após saúde (só no modo planta)
         setCurrentTrichomeIndex(0);
         setRecordTrichomes(null);
       } else {
@@ -384,7 +384,7 @@ export default function QuickLog() {
   const handleSkipPlantHealth = () => {
     if (currentPlantIndex < plants.length - 1) {
       setCurrentPlantIndex(currentPlantIndex + 1);
-    } else if (isFloraPhase) {
+    } else if (isFloraPhase && logMode === 'plant') {
       setCurrentTrichomeIndex(0);
       setRecordTrichomes(null);
     } else {
@@ -1139,8 +1139,8 @@ export default function QuickLog() {
                 )}
               </div>
             )}
-            {/* Pergunta: registrar tricomas? */}
-            {recordTrichomes === null && isFloraPhase && (
+            {/* Pergunta: registrar tricomas? — só no modo planta, nunca no modo status/estufa */}
+            {recordTrichomes === null && isFloraPhase && logMode === 'plant' && (
               <>
                 <div className="flex justify-center mb-6">
                   <div className="relative flex items-center justify-center">
