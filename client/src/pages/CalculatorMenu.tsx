@@ -130,7 +130,7 @@ export default function CalculatorMenu() {
                     {/* Title + description */}
                     <div className="space-y-1 flex-1">
                       <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{calc.description}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 min-h-[2.5rem]">{calc.description}</p>
                     </div>
 
                     {/* CTA */}
