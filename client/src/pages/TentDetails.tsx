@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -89,6 +89,7 @@ export default function TentDetails() {
     onSuccess: () => {
       utils.dailyLogs.list.invalidate({ tentId });
       setDeletingLogId(null);
+      toast.success("Registro excluído!");
     },
     onError: (error) => {
       toast.error(`Erro ao excluir: ${error.message}`);
@@ -438,6 +439,20 @@ export default function TentDetails() {
               ok: last?.ec ? (parseFloat(last.ec) >= 1.0 && parseFloat(last.ec) <= 2.5) : null,
             },
             {
+              label: "Rega",
+              value: last?.wateringVolume ? String(last.wateringVolume) : "—",
+              unit: "ml",
+              icon: <Droplets className="w-4 h-4 text-cyan-400" />,
+              ok: null,
+            },
+            {
+              label: "Runoff",
+              value: last?.runoffPercentage ? `${parseFloat(last.runoffPercentage).toFixed(0)}%` : "—",
+              unit: "",
+              icon: <Percent className="w-4 h-4 text-emerald-400" />,
+              ok: last?.runoffPercentage ? (parseFloat(last.runoffPercentage) >= 10 && parseFloat(last.runoffPercentage) <= 30) : null,
+            },
+            {
               label: "Fotoperíodo",
               value: (weekTargets as any)?.photoperiod ?? "—",
               unit: "",
@@ -458,7 +473,7 @@ export default function TentDetails() {
                   )}
                 </p>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-8 gap-2">
                 {stats.map((s) => (
                   <div
                     key={s.label}
@@ -544,103 +559,98 @@ export default function TentDetails() {
 
         {/* Cycle Info */}
         {cycle && (
-          <Card className="bg-card/90 backdrop-blur-sm mb-6">
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  {tent?.category === 'MAINTENANCE' ? (
-                    <>
-                      <p className="text-sm text-muted-foreground">Última Clonagem</p>
-                      <p className="text-lg font-semibold text-foreground">
-                        {(tent as any).lastCloningAt
-                          ? (() => {
-                              const days = Math.floor((Date.now() - (tent as any).lastCloningAt) / (24 * 60 * 60 * 1000));
-                              if (days === 0) return 'Hoje';
-                              if (days === 1) return 'Ontem';
-                              return `Há ${days} dias`;
-                            })()
-                          : 'Nenhuma'}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm text-muted-foreground">Ciclo Ativo</p>
-                      <p className="text-lg font-semibold text-foreground">
-                        Semana{" "}
-                        {Math.floor(
-                          (Date.now() - new Date(cycle.startDate).getTime()) / (7 * 24 * 60 * 60 * 1000)
-                        ) + 1}
-                      </p>
-                    </>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Data de Início</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    {new Date(cycle.startDate).toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Dias Decorridos</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    {Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / (24 * 60 * 60 * 1000))}{" "}
-                    dias
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <p className="text-lg font-semibold text-foreground">{cycle.status}</p>
-                </div>
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden mb-6">
+            {/* Grid de métricas */}
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-border/40">
+              <div className="px-4 py-3">
+                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">
+                  {tent?.category === 'MAINTENANCE' ? 'Última Clonagem' : 'Ciclo Ativo'}
+                </p>
+                <p className="text-sm font-semibold text-foreground">
+                  {tent?.category === 'MAINTENANCE'
+                    ? ((tent as any).lastCloningAt
+                        ? (() => {
+                            const days = Math.floor((Date.now() - (tent as any).lastCloningAt) / (24 * 60 * 60 * 1000));
+                            if (days === 0) return 'Hoje';
+                            if (days === 1) return 'Ontem';
+                            return `Há ${days} dias`;
+                          })()
+                        : 'Nenhuma')
+                    : `Semana ${Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1}`
+                  }
+                </p>
               </div>
+              <div className="px-4 py-3">
+                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Início</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {new Date(cycle.startDate).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Dias</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / (24 * 60 * 60 * 1000))} dias
+                </p>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Status</p>
+                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md border ${
+                  cycle.status === 'ACTIVE'
+                    ? 'bg-green-500/15 border-green-500/30 text-green-400'
+                    : cycle.status === 'FINISHED'
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                    : 'bg-muted/40 border-border/40 text-muted-foreground'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    cycle.status === 'ACTIVE' ? 'bg-green-400' : cycle.status === 'FINISHED' ? 'bg-amber-400' : 'bg-muted-foreground'
+                  }`} />
+                  {cycle.status === 'ACTIVE' ? 'Ativo' : cycle.status === 'FINISHED' ? 'Finalizado' : cycle.status}
+                </span>
+              </div>
+            </div>
 
-              {/* Botões de avanço de fase */}
-              {tent && (
-                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
-                  {tent.category === "MAINTENANCE" && (
-                    <Button
-                      onClick={() => openPhaseConfirm("CLONING")}
-                      size="sm"
-                      className="bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-500 hover:to-blue-600 text-white border-0"
+            {/* Botões de avanço de fase */}
+            {tent && (
+              <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-border/40">
+                {tent.category === "MAINTENANCE" && (
+                  <button
+                    onClick={() => openPhaseConfirm("CLONING")}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-all"
+                  >
+                    <Sprout className="w-3.5 h-3.5" />
+                    Tirar Clones
+                  </button>
+                )}
+                {tent.category === "VEGA" && (
+                  <button
+                    onClick={() => openPhaseConfirm("FLORA")}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-purple-500/15 border border-purple-500/30 text-purple-400 hover:bg-purple-500/25 active:scale-95 transition-all"
+                  >
+                    <Flower2 className="w-3.5 h-3.5" />
+                    Avançar para Floração
+                  </button>
+                )}
+                {tent.category === "FLORA" && (
+                  <>
+                    <button
+                      onClick={() => setHarvestQueueOpen(true)}
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 active:scale-95 transition-all"
                     >
-                      <Sprout className="w-4 h-4 mr-2" />
-                      Tirar Clones
-                    </Button>
-                  )}
-                  {tent.category === "VEGA" && (
-                    <Button
-                      onClick={() => openPhaseConfirm("FLORA")}
-                      size="sm"
-                      className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white border-0"
+                      <Wind className="w-3.5 h-3.5" />
+                      Colher → Secagem
+                    </button>
+                    <button
+                      onClick={() => openPhaseConfirm("DRYING")}
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold border border-border/50 text-muted-foreground hover:text-foreground hover:bg-white/5 active:scale-95 transition-all"
                     >
-                      <Flower2 className="w-4 h-4 mr-2" />
-                      Avançar para Floração
-                    </Button>
-                  )}
-                  {tent.category === "FLORA" && (
-                    <>
-                      <Button
-                        onClick={() => setHarvestQueueOpen(true)}
-                        size="sm"
-                        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black border-0"
-                      >
-                        <Wind className="w-4 h-4 mr-2" />
-                        Colher → Aguardando Secagem
-                      </Button>
-                      <Button
-                        onClick={() => openPhaseConfirm("DRYING")}
-                        size="sm"
-                        variant="outline"
-                        className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-400"
-                      >
-                        <Wind className="w-4 h-4 mr-2" />
-                        Ir direto para Secagem
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      <Wind className="w-3.5 h-3.5" />
+                      Ir direto para Secagem
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Modais de fase */}
@@ -993,114 +1003,111 @@ export default function TentDetails() {
                 </CardContent>
               </Card>
             ) : logs && logs.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {logs.map((log) => (
-                  <Card key={log.id} className={`bg-card/90 backdrop-blur-sm transition-opacity ${deletingLogId === log.id ? "opacity-40" : ""}`}>
-                    <CardContent className="p-4 sm:p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <p className="font-semibold text-foreground text-sm sm:text-base">
-                            {format(new Date(log.logDate), "dd/MM/yyyy", { locale: ptBR })}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(log.logDate), "HH:mm", { locale: ptBR })}
-                          </p>
+                  <div
+                    key={log.id}
+                    className={`rounded-2xl border border-border/40 bg-card overflow-hidden transition-opacity ${deletingLogId === log.id ? "opacity-40" : ""}`}
+                  >
+                    {/* Header — data full width */}
+                    <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
+                      <span className="text-xs font-semibold text-foreground/70 capitalize">
+                        {format(new Date(log.logDate), "EEE, dd MMM", { locale: ptBR })}
+                      </span>
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded leading-none ${
+                        log.turn === "AM"
+                          ? "bg-amber-500/10 text-amber-400/70"
+                          : "bg-indigo-500/10 text-indigo-400/70"
+                      }`}>
+                        {log.turn === "AM" ? "AM" : "PM"}
+                      </span>
+                      <div className="flex-1" />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground/40 hover:text-foreground"
+                        onClick={() => { setEditingLog({ ...log, tentName: tent?.name }); setEditLogOpen(true); }}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground/40 hover:text-destructive"
+                        disabled={deletingLogId === log.id}
+                        onClick={() => handleDeleteLog(log.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+
+                    {/* Módulos — 2 linhas de 3 */}
+                    <div className="mx-4 mb-4 rounded-xl border border-border/20 overflow-hidden">
+
+                      {/* Linha 1 — Temp · Humidade · PPFD */}
+                      <div className="grid grid-cols-3 divide-x divide-border/20 bg-white/[0.015]">
+                        <div className="px-3 py-3 flex flex-col gap-1">
+                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">Temp</span>
+                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                            <ThermometerSun className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                            {log.tempC ? `${log.tempC}°C` : <span className="text-muted-foreground/20">—</span>}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={log.turn === "AM" ? "default" : "secondary"} className="text-xs">
-                            {log.turn === "AM" ? "Manhã" : "Tarde"}
-                          </Badge>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => { setEditingLog({ ...log, tentName: tent?.name }); setEditLogOpen(true); }}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            disabled={deletingLogId === log.id}
-                            onClick={() => handleDeleteLog(log.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
+                        <div className="px-3 py-3 flex flex-col gap-1">
+                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">Humidade</span>
+                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                            <Droplets className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                            {log.rhPct ? `${log.rhPct}%` : <span className="text-muted-foreground/20">—</span>}
+                          </span>
+                        </div>
+                        <div className="px-3 py-3 flex flex-col gap-1">
+                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">PPFD</span>
+                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                            <Sun className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                            {log.ppfd ? `${log.ppfd} µmol` : <span className="text-muted-foreground/20">—</span>}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 mb-4">
-                        <div className="bg-orange-500/10 rounded-lg p-3">
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                            <ThermometerSun className="w-3 h-3" />
-                            Temperatura
-                          </p>
-                          <p className="text-lg font-bold text-foreground">
-                            {log.tempC ? `${log.tempC}°C` : "--"}
-                          </p>
+                      <div className="h-px bg-border/20" />
+
+                      {/* Linha 2 — pH · EC · Runoff */}
+                      <div className="grid grid-cols-3 divide-x divide-border/20">
+                        <div className="px-3 py-3 flex flex-col gap-1">
+                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">pH</span>
+                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                            <FlaskConical className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                            {log.ph ? `${log.ph}` : <span className="text-muted-foreground/20">—</span>}
+                          </span>
                         </div>
-                        <div className="bg-blue-500/10 rounded-lg p-3">
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                            <Droplets className="w-3 h-3" />
-                            Umidade
-                          </p>
-                          <p className="text-lg font-bold text-foreground">
-                            {log.rhPct ? `${log.rhPct}%` : "--"}
-                          </p>
+                        <div className="px-3 py-3 flex flex-col gap-1">
+                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">EC</span>
+                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                            <Zap className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                            {log.ec ? `${log.ec}` : <span className="text-muted-foreground/20">—</span>}
+                          </span>
                         </div>
-                        <div className="bg-yellow-500/10 rounded-lg p-3">
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                            <Sun className="w-3 h-3" />
-                            PPFD
-                          </p>
-                          <p className="text-lg font-bold text-foreground">
-                            {log.ppfd || "--"}
-                          </p>
+                        <div className="px-3 py-3 flex flex-col gap-1">
+                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">Runoff</span>
+                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                            <Droplets className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            {log.runoffPercentage
+                              ? `${log.runoffPercentage}%`
+                              : log.runoffCollected
+                              ? `${log.runoffCollected}ml`
+                              : <span className="text-muted-foreground/20">—</span>}
+                          </span>
                         </div>
                       </div>
+                    </div>
 
-                      {/* Runoff Section */}
-                      {(log.wateringVolume || log.runoffCollected || log.runoffPercentage) && (
-                        <div className="grid grid-cols-3 gap-4 mb-4">
-                          <div className="bg-cyan-500/10 rounded-lg p-3">
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                              <Droplets className="w-3 h-3" />
-                              Volume Regado
-                            </p>
-                            <p className="text-lg font-bold text-foreground">
-                              {log.wateringVolume ? `${log.wateringVolume}ml` : "--"}
-                            </p>
-                          </div>
-                          <div className="bg-cyan-500/10 rounded-lg p-3">
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                              <Droplets className="w-3 h-3" />
-                              Runoff Coletado
-                            </p>
-                            <p className="text-lg font-bold text-foreground">
-                              {log.runoffCollected ? `${log.runoffCollected}ml` : "--"}
-                            </p>
-                          </div>
-                          <div className="bg-cyan-500/10 rounded-lg p-3">
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                              <Droplets className="w-3 h-3" />
-                              Runoff (%)
-                            </p>
-                            <p className="text-lg font-bold text-foreground">
-                              {log.runoffPercentage ? `${log.runoffPercentage}%` : "--"}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {log.notes && (
-                        <div className="bg-muted rounded-lg p-3">
-                          <p className="text-xs text-muted-foreground mb-1">Observações</p>
-                          <p className="text-sm text-foreground">{log.notes}</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                    {/* Notes */}
+                    {log.notes && (
+                      <p className="text-[11px] text-muted-foreground/40 italic px-4 pb-3 -mt-1 truncate">
+                        {log.notes}
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -1224,11 +1231,11 @@ function TentPlantsTab({ tentId, tentName }: { tentId: number; tentName: string 
 
   const getHealthIcon = (status?: string) => {
     switch (status) {
-      case "HEALTHY": return "🟢";
-      case "STRESSED": return "🟡";
-      case "SICK": return "🔴";
-      case "RECOVERING": return "🟠";
-      default: return "⚪";
+      case "HEALTHY": return <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0 inline-block"/>;
+      case "STRESSED": return <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0 inline-block"/>;
+      case "SICK": return <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block"/>;
+      case "RECOVERING": return <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0 inline-block"/>;
+      default: return <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/30 shrink-0 inline-block"/>;
     }
   };
 

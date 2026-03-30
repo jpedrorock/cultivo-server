@@ -405,7 +405,7 @@ export async function getNewAlertsCount(tentId?: number): Promise<number> {
   }
   
   const result = await query;
-  return result[0]?.count ?? 0;
+  return Number(result[0]?.count ?? 0);
 }
 
 export async function getSafetyLimits(phase?: "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING"): Promise<SafetyLimit[]> {

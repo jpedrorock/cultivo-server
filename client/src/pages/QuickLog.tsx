@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { BigStepper } from "@/components/BigStepper";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle, Target, Smartphone, Sparkles } from "lucide-react";
 import { RangeSlider } from "@/components/ui/range-slider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -32,7 +32,8 @@ function getValidationColor(value: string, min?: number | null, max?: number | n
 export default function QuickLog() {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
-  const [logMode, setLogMode] = useState<'status' | 'plant' | null>(null);
+  const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(null);
+  const stepScrollRef = useRef<HTMLDivElement>(null);
 
   // Lock body scroll while this page is mounted
   useEffect(() => {
@@ -40,7 +41,14 @@ export default function QuickLog() {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
-  
+
+  // Reset scroll to top whenever the step changes
+  useEffect(() => {
+    if (stepScrollRef.current) {
+      stepScrollRef.current.scrollTop = 0;
+    }
+  }, [currentStep, logMode]);
+
   // Photo upload progress state
   const [uploadProgress, setUploadProgress] = useState<{
     isUploading: boolean;
@@ -85,6 +93,8 @@ export default function QuickLog() {
   const [rhPct, setRhPct] = useState("");
   const [wateringVolume, setWateringVolume] = useState("");
   const [runoffCollected, setRunoffCollected] = useState("");
+  const [runoffPh, setRunoffPh] = useState("");
+  const [runoffEc, setRunoffEc] = useState("");
   const [ph, setPh] = useState("");
   const [ec, setEc] = useState("");
   const [ppfd, setPpfd] = useState(400); // Valor inicial realista: 400 μmol/m²/s
@@ -98,12 +108,34 @@ export default function QuickLog() {
     status: string;
     symptoms: string;
     notes: string;
-    photoUrl?: string;    // URL S3 após upload
-    photoPreview?: string; // data URL local para preview
+    photoUrl?: string;
+    photoPreview?: string;
+  }>>(new Map());
+
+  // Trichome state
+  const [recordTrichomes, setRecordTrichomes] = useState<boolean | null>(null);
+  const [currentTrichomeIndex, setCurrentTrichomeIndex] = useState(0);
+  const [trichomeRecords, setTrichomeRecords] = useState<Map<number, {
+    status: "CLEAR" | "CLOUDY" | "AMBER" | "MIXED";
+    clearPct: string;
+    cloudyPct: string;
+    amberPct: string;
+    notes: string;
   }>>(new Map());
 
   // Fetch tents for selection
   const { data: tents = [], isLoading: tentsLoading } = trpc.tents.list.useQuery();
+  const selectedTent = tents.find((t: any) => t.id === tentId);
+  const isFloraPhase = selectedTent?.category === "FLORA";
+  const floraTents = tents.filter((t: any) => t.category === "FLORA");
+
+  // Auto-select single FLORA tent in trichome mode
+  useEffect(() => {
+    if (logMode === 'trichome' && floraTents.length === 1 && !tentId) {
+      setTentId(floraTents[0].id);
+      setCurrentStep(9);
+    }
+  }, [logMode, floraTents.length, tentId]);
 
   // Fetch plants for selected tent (load when reaching step 9)
   const { data: plants = [], isLoading: plantsLoading } = trpc.plants.list.useQuery(
@@ -157,14 +189,16 @@ export default function QuickLog() {
     },
   });
 
-  // Save plant health mutation (now includes photo only)
+  // Save plant health mutation
   const savePlantHealthMutation = trpc.plantHealth.create.useMutation({
     onSuccess: () => {
-      // Move to next plant or finish
       if (currentPlantIndex < plants.length - 1) {
         setCurrentPlantIndex(currentPlantIndex + 1);
+      } else if (isFloraPhase) {
+        // Propõe registro de tricomas após saúde
+        setCurrentTrichomeIndex(0);
+        setRecordTrichomes(null);
       } else {
-        // All plants done
         toast.success("✅ Registros salvos com sucesso!");
         resetForm();
         setTimeout(() => setLocation("/"), 1500);
@@ -175,14 +209,28 @@ export default function QuickLog() {
     },
   });
 
+  // Save trichome mutation
+  const saveTrichomeMutation = trpc.plantTrichomes.create.useMutation({
+    onSuccess: () => {
+      if (currentTrichomeIndex < plants.length - 1) {
+        setCurrentTrichomeIndex(currentTrichomeIndex + 1);
+      } else {
+        toast.success("✅ Todos os registros salvos!");
+        resetForm();
+        setTimeout(() => setLocation("/"), 1500);
+      }
+    },
+    onError: (error: any) => {
+      toast.error(`Erro ao salvar tricomas: ${error.message}`);
+    },
+  });
+
   // Upload photo mutation
   const uploadPhotoMutation = trpc.plantPhotos.upload.useMutation({
-    onSuccess: (data) => {
-      console.log('[QuickLog] Photo uploaded successfully:', data);
+    onSuccess: () => {
       toast.success("📸 Foto salva!");
     },
     onError: (error) => {
-      console.error('[QuickLog] Photo upload failed:', error);
       toast.error(`Erro ao salvar foto: ${error.message}`);
     },
   });
@@ -205,6 +253,42 @@ export default function QuickLog() {
     setRecordPlantHealth(null);
     setCurrentPlantIndex(0);
     setPlantHealthRecords(new Map());
+    setRecordTrichomes(null);
+    setCurrentTrichomeIndex(0);
+    setTrichomeRecords(new Map());
+  };
+
+  const updateTrichomeRecord = (plantId: number, field: string, value: any) => {
+    setTrichomeRecords((prev) => {
+      const newMap = new Map(prev);
+      const existing = newMap.get(plantId) || { status: "CLOUDY" as const, clearPct: "", cloudyPct: "", amberPct: "", notes: "" };
+      newMap.set(plantId, { ...existing, [field]: value });
+      return newMap;
+    });
+  };
+
+  const handleSaveTrichome = () => {
+    const plant = plants[currentTrichomeIndex];
+    const rec = trichomeRecords.get(plant.id);
+    saveTrichomeMutation.mutate({
+      plantId: plant.id,
+      weekNumber: (plant as any).cycleWeek || 1,
+      trichomeStatus: rec?.status || "CLOUDY",
+      clearPercent: rec?.clearPct ? parseInt(rec.clearPct) : undefined,
+      cloudyPercent: rec?.cloudyPct ? parseInt(rec.cloudyPct) : undefined,
+      amberPercent: rec?.amberPct ? parseInt(rec.amberPct) : undefined,
+      notes: rec?.notes || undefined,
+    });
+  };
+
+  const handleSkipTrichome = () => {
+    if (currentTrichomeIndex < plants.length - 1) {
+      setCurrentTrichomeIndex(currentTrichomeIndex + 1);
+    } else {
+      toast.success("✅ Registros salvos com sucesso!");
+      resetForm();
+      setTimeout(() => setLocation("/"), 1500);
+    }
   };
 
   const updatePlantHealthRecord = (plantId: number, field: string, value: any) => {
@@ -300,8 +384,10 @@ export default function QuickLog() {
   const handleSkipPlantHealth = () => {
     if (currentPlantIndex < plants.length - 1) {
       setCurrentPlantIndex(currentPlantIndex + 1);
+    } else if (isFloraPhase) {
+      setCurrentTrichomeIndex(0);
+      setRecordTrichomes(null);
     } else {
-      // Last plant - finish
       toast.success("✅ Registro salvo com sucesso!");
       resetForm();
       setTimeout(() => setLocation("/"), 1500);
@@ -493,7 +579,7 @@ export default function QuickLog() {
               <div className="w-full space-y-3">
                 <button
                   onClick={() => { triggerHaptic('light'); setLogMode('status'); }}
-                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4 group"
+                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shrink-0">
                     <ThermometerSun className="w-6 h-6 text-white" />
@@ -505,7 +591,7 @@ export default function QuickLog() {
                 </button>
                 <button
                   onClick={() => { triggerHaptic('light'); setLogMode('plant'); setCurrentStep(0); setRecordPlantHealth(true); }}
-                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4 group"
+                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left flex items-center gap-4"
                 >
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shrink-0">
                     <Heart className="w-6 h-6 text-white" />
@@ -515,12 +601,24 @@ export default function QuickLog() {
                     <div className="text-sm text-muted-foreground">Status, sintomas e observações por planta</div>
                   </div>
                 </button>
+                <button
+                  onClick={() => { triggerHaptic('light'); setLogMode('trichome'); setCurrentStep(0); setRecordTrichomes(true); }}
+                  className="w-full p-5 rounded-2xl border-2 border-border bg-card hover:border-violet-500/50 hover:bg-violet-500/5 transition-all text-left flex items-center gap-4"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shrink-0">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground text-base">Tricomas</div>
+                    <div className="text-sm text-muted-foreground">Maturação, percentagens por planta · Flora</div>
+                  </div>
+                </button>
               </div>
             </div>
           )}
 
           {/* Step content */}
-          {logMode !== null && <div className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {logMode !== null && <div ref={stepScrollRef} className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="min-h-full flex flex-col justify-center p-6 space-y-6">
             {/* Icon */}
             {currentStep < 9 && currentStepData && (
@@ -573,7 +671,7 @@ export default function QuickLog() {
               </div>
             )}
 
-            {currentStep === 9 && recordPlantHealth === null && (
+            {currentStep === 9 && recordPlantHealth === null && logMode !== 'trichome' && (
               <div className="flex justify-center mb-6">
                 <div className="relative flex items-center justify-center">
                   <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
@@ -583,6 +681,7 @@ export default function QuickLog() {
                 </div>
               </div>
             )}
+
 
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
               <div className="flex items-center gap-5 animate-[slide-in-from-bottom_0.6s_ease-out]">
@@ -602,7 +701,8 @@ export default function QuickLog() {
               <div className="text-center space-y-2 animate-[slide-in-from-bottom_0.7s_ease-out]">
                 <h2 className="text-3xl font-bold text-foreground">{currentStepData.title}</h2>
                 <p className="text-lg text-muted-foreground">
-                  {currentStep === 0 && "Selecione a estufa"}
+                  {currentStep === 0 && logMode === 'trichome' && "Selecione a estufa de floração"}
+                  {currentStep === 0 && logMode !== 'trichome' && "Selecione a estufa"}
                   {currentStep === 1 && "Qual a temperatura atual?"}
                   {currentStep === 2 && "Qual a umidade relativa?"}
                   {currentStep === 3 && "Quanto de água foi aplicado?"}
@@ -615,7 +715,7 @@ export default function QuickLog() {
               </div>
             )}
 
-            {currentStep === 9 && recordPlantHealth === null && (
+            {currentStep === 9 && recordPlantHealth === null && logMode !== 'trichome' && (
               <div className="text-center space-y-2 animate-[slide-in-from-bottom_0.7s_ease-out]">
                 <h2 className="text-3xl font-bold text-foreground">Saúde das Plantas</h2>
                 <p className="text-lg text-muted-foreground">Deseja registrar a saúde das plantas?</p>
@@ -624,25 +724,31 @@ export default function QuickLog() {
             )}
 
 
+
             {/* Step 0: Tent selection */}
             {currentStep === 0 && (
               <div className="space-y-3 animate-[slide-in-from-bottom_0.8s_ease-out]">
-                {tents.map((tent) => (
+                {logMode === 'trichome' && floraTents.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">Nenhuma estufa em floração encontrada.</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">Tricomas são registrados apenas em estufas de Floração.</p>
+                  </div>
+                )}
+                {(logMode === 'trichome' ? floraTents : tents).map((tent: any) => (
                   <button
                     key={tent.id}
-                    onClick={() => { setTentId(tent.id); if (logMode === 'plant') setCurrentStep(9); }}
+                    onClick={() => { setTentId(tent.id); if (logMode === 'plant' || logMode === 'trichome') setCurrentStep(9); }}
                     className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
                       tentId === tent.id
-                        ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-xl scale-105"
-                        : "bg-card dark:bg-zinc-800 text-card-foreground border-border dark:border-zinc-600 hover:border-green-400 dark:hover:border-green-500 hover:shadow-lg"
+                        ? logMode === 'trichome'
+                          ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white border-violet-500 shadow-xl scale-105"
+                          : "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-xl scale-105"
+                        : "bg-card dark:bg-zinc-800 text-card-foreground border-border dark:border-zinc-600 hover:border-violet-400 dark:hover:border-violet-500 hover:shadow-lg"
                     }`}
                   >
                     <div className="font-bold text-xl">{tent.name}</div>
                     <div className="text-sm opacity-90">
-                      {tent.category === "MAINTENANCE" ? "Manutenção" : 
-                       tent.category === "VEGA" ? "Vegetativa" : 
-                       tent.category === "FLORA" ? "Floração" : 
-                       tent.category === "DRYING" ? "Secagem" : tent.category} • {tent.width}×{tent.depth}×{tent.height}cm
+                      Floração • {tent.width}×{tent.depth}×{tent.height}cm
                     </div>
                   </button>
                 ))}
@@ -654,8 +760,8 @@ export default function QuickLog() {
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <BigStepper value={tempC} onChange={setTempC} step={0.1} min={-10} max={50} decimals={1} unit="°C" fieldType="temperature" colorClass={getValidationColor(tempC, targets?.tempMin ? parseFloat(String(targets.tempMin)) : null, targets?.tempMax ? parseFloat(String(targets.tempMax)) : null)} />
                 {targets?.tempMin && targets?.tempMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1">
-                    🎯 {parseFloat(String(targets.tempMin))}–{parseFloat(String(targets.tempMax))}°C
+                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.tempMin))}–{parseFloat(String(targets.tempMax))}°C
                   </p>
                 )}
               </div>
@@ -666,8 +772,8 @@ export default function QuickLog() {
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" fieldType="humidity" colorClass={getValidationColor(rhPct, targets?.rhMin ? parseFloat(String(targets.rhMin)) : null, targets?.rhMax ? parseFloat(String(targets.rhMax)) : null)} />
                 {targets?.rhMin && targets?.rhMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1">
-                    🎯 {parseFloat(String(targets.rhMin))}–{parseFloat(String(targets.rhMax))}%
+                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.rhMin))}–{parseFloat(String(targets.rhMax))}%
                   </p>
                 )}
                 {/* VPD ao vivo — aparece quando temp também está preenchida (L2) */}
@@ -705,8 +811,8 @@ export default function QuickLog() {
                       {parseFloat(runoffPercentage) >= 15 && parseFloat(runoffPercentage) <= 20
                         ? "✓ Ideal"
                         : parseFloat(runoffPercentage) < 15
-                        ? "⚠️ Baixo"
-                        : "⚠️ Alto"}
+                        ? <span className="flex items-center justify-center gap-1"><AlertTriangle className="w-3 h-3 text-amber-400"/>Baixo</span>
+                        : <span className="flex items-center justify-center gap-1"><AlertTriangle className="w-3 h-3 text-amber-400"/>Alto</span>}
                     </div>
                   </div>
                 )}
@@ -718,8 +824,8 @@ export default function QuickLog() {
               <div className="space-y-6 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" fieldType="ph" colorClass={getValidationColor(ph, targets?.phMin ? parseFloat(String(targets.phMin)) : null, targets?.phMax ? parseFloat(String(targets.phMax)) : null)} />
                 {targets?.phMin && targets?.phMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1">
-                    🎯 {parseFloat(String(targets.phMin))}–{parseFloat(String(targets.phMax))} pH
+                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.phMin))}–{parseFloat(String(targets.phMax))} pH
                   </p>
                 )}
                 <div className="pt-4 pb-2">
@@ -747,8 +853,8 @@ export default function QuickLog() {
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" colorClass={getValidationColor(ec, targets?.ecMin ? parseFloat(String(targets.ecMin)) : null, targets?.ecMax ? parseFloat(String(targets.ecMax)) : null)} />
                 {targets?.ecMin && targets?.ecMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1">
-                    🎯 {parseFloat(String(targets.ecMin))}–{parseFloat(String(targets.ecMax))} mS/cm
+                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.ecMin))}–{parseFloat(String(targets.ecMax))} mS/cm
                   </p>
                 )}
               </div>
@@ -889,10 +995,10 @@ export default function QuickLog() {
             )}
 
             {/* Step 9: Plant health question */}
-            {currentStep === 9 && recordPlantHealth === null && (
+            {currentStep === 9 && recordPlantHealth === null && logMode !== 'trichome' && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <p className="text-center text-sm text-muted-foreground">
-                  ✅ Registro da estufa salvo! Deseja também registrar a saúde das plantas?
+                  <span className="flex items-center justify-center gap-1"><CheckCircle2 className="w-4 h-4 text-green-500"/>Registro da estufa salvo! Deseja também registrar a saúde das plantas?</span>
                 </p>
                 <Button
                   onClick={() => setRecordPlantHealth(true)}
@@ -1033,6 +1139,126 @@ export default function QuickLog() {
                 )}
               </div>
             )}
+            {/* Pergunta: registrar tricomas? */}
+            {recordTrichomes === null && isFloraPhase && (
+              <>
+                <div className="flex justify-center mb-6">
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
+                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
+                      <Sparkles className="w-16 h-16 text-white" />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-center space-y-2 animate-[slide-in-from-bottom_0.7s_ease-out]">
+                  <h2 className="text-3xl font-bold text-foreground">Tricomas</h2>
+                  <p className="text-lg text-muted-foreground">Deseja registrar os tricomas das plantas?</p>
+                  <p className="text-sm text-muted-foreground">Etapa de floração detectada — momento ideal para acompanhar a maturação.</p>
+                </div>
+                <div className="space-y-3 animate-[slide-in-from-bottom_0.8s_ease-out]">
+                  <Button
+                    onClick={() => setRecordTrichomes(true)}
+                    className="w-full h-16 text-lg font-semibold rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-lg"
+                  >
+                    <Sparkles className="mr-2 h-6 w-6" />
+                    Registrar Tricomas
+                  </Button>
+                  <Button
+                    onClick={() => { toast.success("✅ Registros salvos!"); resetForm(); setTimeout(() => setLocation("/"), 1500); }}
+                    variant="outline"
+                    className="w-full h-16 text-lg font-semibold rounded-2xl border-2"
+                  >
+                    <SkipForward className="mr-2 h-6 w-6" />
+                    Finalizar
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Formulário de tricomas por planta */}
+            {recordTrichomes === true && plants[currentTrichomeIndex] && (() => {
+              const plant = plants[currentTrichomeIndex];
+              const rec = trichomeRecords.get(plant.id) || { status: "CLOUDY" as const, clearPct: "", cloudyPct: "", amberPct: "", notes: "" };
+              const trichomeOptions: { value: "CLEAR"|"CLOUDY"|"AMBER"|"MIXED"; label: string; sub: string; gradient: string }[] = [
+                { value: "CLEAR",  label: "Translúcidos",   sub: "Cedo demais",    gradient: "from-sky-400 to-blue-500" },
+                { value: "CLOUDY", label: "Opacos",         sub: "Maturação ideal",gradient: "from-slate-400 to-slate-500" },
+                { value: "AMBER",  label: "Âmbar",          sub: "Efeito sedativo",gradient: "from-amber-400 to-orange-500" },
+                { value: "MIXED",  label: "Misturado",      sub: "Equilibrado",    gradient: "from-violet-400 to-purple-500" },
+              ];
+              return (
+                <div className="space-y-4 animate-[slide-in-from-bottom_0.6s_ease-out]">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground/60 font-medium">
+                        Planta {currentTrichomeIndex + 1} de {plants.length}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold">
+                        Tricomas
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-foreground truncate">{plant.name}</div>
+                  </div>
+
+                  {/* Status buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {trichomeOptions.map(({ value, label, sub, gradient }) => (
+                      <button
+                        key={value}
+                        onClick={() => updateTrichomeRecord(plant.id, "status", value)}
+                        className={`flex flex-col items-center justify-center gap-1 p-4 rounded-2xl border-2 font-bold transition-all duration-200 ${
+                          rec.status === value
+                            ? `bg-gradient-to-br ${gradient} text-white border-transparent shadow-lg scale-[1.02]`
+                            : "bg-card text-card-foreground border-border active:scale-[0.98]"
+                        }`}
+                      >
+                        <span className="text-base font-bold">{label}</span>
+                        <span className={`text-[11px] font-normal ${rec.status === value ? "text-white/80" : "text-muted-foreground"}`}>{sub}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Percentagens — colapsável */}
+                  <Accordion type="multiple" defaultValue={[]} className="space-y-0">
+                    <AccordionItem value="pcts" className="border border-border rounded-xl bg-card shadow-sm">
+                      <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                        <span className="text-sm font-medium text-muted-foreground">Percentagens por tipo (opcional)</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4">
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { field: "clearPct",  label: "Transl. %",  val: rec.clearPct },
+                            { field: "cloudyPct", label: "Opacos %",   val: rec.cloudyPct },
+                            { field: "amberPct",  label: "Âmbar %",    val: rec.amberPct },
+                          ].map(({ field, label, val }) => (
+                            <div key={field}>
+                              <label className="text-[11px] text-muted-foreground block mb-1">{label}</label>
+                              <Input
+                                type="number"
+                                inputMode="numeric"
+                                min={0} max={100}
+                                value={val}
+                                onChange={(e) => updateTrichomeRecord(plant.id, field, e.target.value)}
+                                placeholder="0"
+                                className="h-10 text-center border-2 border-input rounded-xl"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
+                  {/* Notas */}
+                  <Input
+                    value={rec.notes}
+                    onChange={(e) => updateTrichomeRecord(plant.id, "notes", e.target.value)}
+                    placeholder="Observações (opcional)"
+                    className="h-12 border-2 border-input rounded-xl bg-card"
+                  />
+                </div>
+              );
+            })()}
+
           </div>
           </div>}
           {/* Navigation buttons — footer dentro do card */}
@@ -1092,7 +1318,7 @@ export default function QuickLog() {
         )}
 
         {/* Plant health navigation */}
-        {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
+        {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && recordTrichomes === null && (
           <>
             <AnimatedButton
               onClick={handleSkipPlantHealth}
@@ -1108,20 +1334,38 @@ export default function QuickLog() {
               className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
             >
               {(savePlantHealthMutation.isPending || uploadPhotoMutation.isPending) ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Salvando...
-                </>
+                <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Salvando...</>
               ) : currentPlantIndex < plants.length - 1 ? (
-                <>
-                  <Check className="mr-2 h-5 w-5" />
-                  Próxima Planta
-                </>
+                <><Check className="mr-2 h-5 w-5" />Próxima Planta</>
               ) : (
-                <>
-                  <Check className="mr-2 h-5 w-5" />
-                  Finalizar
-                </>  
+                <><Check className="mr-2 h-5 w-5" />{isFloraPhase ? "Tricomas →" : "Finalizar"}</>
+              )}
+            </AnimatedButton>
+          </>
+        )}
+
+        {/* Trichome navigation */}
+        {recordTrichomes === true && plants[currentTrichomeIndex] && (
+          <>
+            <AnimatedButton
+              onClick={handleSkipTrichome}
+              variant="outline"
+              className="flex-1 h-14 text-lg font-medium rounded-xl"
+            >
+              <SkipForward className="mr-2 h-5 w-5" />
+              Pular
+            </AnimatedButton>
+            <AnimatedButton
+              onClick={handleSaveTrichome}
+              disabled={saveTrichomeMutation.isPending}
+              className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
+            >
+              {saveTrichomeMutation.isPending ? (
+                <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Salvando...</>
+              ) : currentTrichomeIndex < plants.length - 1 ? (
+                <><Sparkles className="mr-2 h-5 w-5" />Próxima Planta</>
+              ) : (
+                <><Check className="mr-2 h-5 w-5" />Finalizar</>
               )}
             </AnimatedButton>
           </>

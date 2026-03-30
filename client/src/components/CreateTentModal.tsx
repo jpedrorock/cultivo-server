@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Sprout, Leaf, Flower2, Wind, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -115,10 +116,10 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MAINTENANCE">🌱 Manutenção (Plantas-mãe/Clonagem)</SelectItem>
-                  <SelectItem value="VEGA">🌿 Vegetativo (Crescimento)</SelectItem>
-                  <SelectItem value="FLORA">🌸 Floração (Produção)</SelectItem>
-                  <SelectItem value="DRYING">🍂 Secagem (2 semanas)</SelectItem>
+                  <SelectItem value="MAINTENANCE"><span className="flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-green-400"/>Manutenção (Plantas-mãe/Clonagem)</span></SelectItem>
+                  <SelectItem value="VEGA"><span className="flex items-center gap-1"><Leaf className="w-3.5 h-3.5 text-emerald-400"/>Vegetativo (Crescimento)</span></SelectItem>
+                  <SelectItem value="FLORA"><span className="flex items-center gap-1"><Flower2 className="w-3.5 h-3.5 text-purple-400"/>Floração (Produção)</span></SelectItem>
+                  <SelectItem value="DRYING"><span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5 text-amber-400"/>Secagem (2 semanas)</span></SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">

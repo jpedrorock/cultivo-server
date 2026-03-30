@@ -2,9 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AnimatedButton } from "@/components/AnimatedButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X } from "lucide-react";
+import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Flower2, Wrench } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
@@ -347,8 +345,7 @@ export default function PlantsList() {
       <main className="container py-8">
         {/* Filters — collapsible */}
         {filterOpen && (
-          <Card className="mb-4 border-primary/20">
-            <CardContent className="pt-4 pb-3">
+          <div className="mb-4 rounded-2xl border border-primary/25 bg-card overflow-hidden p-3" style={{ background: 'linear-gradient(135deg, rgba(var(--primary)/0.05) 0%, rgba(0,0,0,0) 60%)' }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -377,8 +374,7 @@ export default function PlantsList() {
                   <option value="DISCARDED">Descartada</option>
                 </select>
               </div>
-            </CardContent>
-          </Card>
+          </div>
         )}
 
         {/* Plants Grouped by Tent */}
@@ -391,218 +387,160 @@ export default function PlantsList() {
             ))}
           </div>
         ) : filteredPlants && filteredPlants.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {tents?.map((tent) => {
               const tentPlants = plantsByTent?.[tent.id] || [];
               if (tentPlants.length === 0) return null;
 
               const isExpanded = expandedTents.has(tent.id);
+              const selectedInTent = tentPlants.filter((p: any) => selectedPlants.has(p.id)).length;
+
+              // Tent category color
+              const tentColor =
+                tent.category === 'MAINTENANCE' ? { border: 'border-border/60', accent: 'text-blue-300', glow: 'rgba(59,130,246,0.12)', dot: 'bg-blue-400' }
+                : tent.category === 'DRYING'    ? { border: 'border-border/60', accent: 'text-amber-300', glow: 'rgba(245,158,11,0.12)', dot: 'bg-amber-400' }
+                : tent.category === 'FLORA'     ? { border: 'border-border/60', accent: 'text-purple-300', glow: 'rgba(168,85,247,0.12)', dot: 'bg-purple-400' }
+                : tent.category === 'VEGA'      ? { border: 'border-border/60', accent: 'text-green-300', glow: 'rgba(34,197,94,0.12)', dot: 'bg-green-400' }
+                :                                 { border: 'border-border/60', accent: 'text-emerald-300', glow: 'rgba(16,185,129,0.10)', dot: 'bg-emerald-400' };
 
               return (
-                <Card key={tent.id} className="overflow-hidden">
-                  <CardHeader className="hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div 
-                        className="flex items-center gap-3 flex-1 cursor-pointer"
-                        onClick={() => toggleTent(tent.id)}
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                        )}
-                        <div>
-                          <CardTitle className="text-xl">{tent.name}</CardTitle>
-                          <CardDescription>
-                            {tentPlants.length} {tentPlants.length === 1 ? "planta" : "plantas"}
-                            {tentPlants.filter((p: any) => selectedPlants.has(p.id)).length > 0 && (
-                              <span className="ml-2 text-primary font-medium">
-                                ({tentPlants.filter((p: any) => selectedPlants.has(p.id)).length} selecionada{tentPlants.filter((p: any) => selectedPlants.has(p.id)).length > 1 ? 's' : ''})
-                              </span>
-                            )}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      {isExpanded && tentPlants.length > 0 && (
-                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                          {tentPlants.every((p: any) => selectedPlants.has(p.id)) ? (
-                            <AnimatedButton
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deselectAllInTent(tent.id)}
-                            >
-                              Desmarcar Todas
-                            </AnimatedButton>
-                          ) : (
-                            <AnimatedButton
-                              variant="outline"
-                              size="sm"
-                              onClick={() => selectAllInTent(tent.id)}
-                            >
-                              Selecionar Todas
-                            </AnimatedButton>
-                          )}
-                        </div>
+                <div key={tent.id} className={`rounded-2xl border ${tentColor.border} bg-card overflow-hidden`}>
+                  {/* Header — gradiente de fase igual às seções da calculadora */}
+                  <div
+                    className="flex items-center justify-between px-4 py-3 border-b border-border/40 cursor-pointer"
+                    style={{ background: `linear-gradient(135deg, ${tentColor.glow} 0%, rgba(0,0,0,0) 100%)` }}
+                    onClick={() => toggleTent(tent.id)}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {isExpanded
+                        ? <ChevronDown className={`w-4 h-4 shrink-0 ${tentColor.accent}`} />
+                        : <ChevronRight className={`w-4 h-4 shrink-0 ${tentColor.accent}`} />
+                      }
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${tentColor.dot}`} />
+                      <span className="font-semibold text-foreground truncate">{tent.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {tentPlants.length} {tentPlants.length === 1 ? "planta" : "plantas"}
+                      </span>
+                      {selectedInTent > 0 && (
+                        <span className={`text-xs font-semibold shrink-0 ${tentColor.accent}`}>
+                          · {selectedInTent} selecionada{selectedInTent > 1 ? 's' : ''}
+                        </span>
                       )}
                     </div>
-                  </CardHeader>
+                    {isExpanded && tentPlants.length > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); tentPlants.every((p: any) => selectedPlants.has(p.id)) ? deselectAllInTent(tent.id) : selectAllInTent(tent.id); }}
+                        className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-lg border border-border/40 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors`}
+                      >
+                        {tentPlants.every((p: any) => selectedPlants.has(p.id)) ? 'Desmarcar' : 'Selec. todas'}
+                      </button>
+                    )}
+                  </div>
 
                   {isExpanded && (
-                    <CardContent className="pt-0">
-                      <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {tentPlants.map((plant: any) => (
+                    <div className="px-3 pb-3">
+                      <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {tentPlants.map((plant: any) => {
+                          const isSelected = selectedPlants.has(plant.id);
+                          const fitness = getFitnessScore(plant.lastHealthStatus);
+
+                          return (
                           <ListItemAnimation key={plant.id}>
-                            <Card className={`border-2 transition-all duration-200 ease-out group cursor-pointer overflow-hidden ${
-                            selectedPlants.has(plant.id)
-                              ? "border-primary bg-primary/10 dark:bg-primary/15 shadow-lg shadow-primary/20 dark:shadow-primary/25"
-                              : tent.category === 'MAINTENANCE'
-                                ? 'border-blue-500/25 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-1 hover:scale-[1.01]'
-                                : tent.category === 'DRYING' || plant.status === 'AWAITING_DRYING'
-                                ? 'border-amber-500/25 hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1 hover:scale-[1.01]'
-                                : tent.category === 'FLORA' || plant.cyclePhase === 'FLORA'
-                                ? 'border-purple-500/25 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 hover:scale-[1.01]'
-                                : tent.category === 'VEGA' || plant.cyclePhase === 'VEGA'
-                                ? 'border-green-500/25 hover:border-green-500/50 hover:shadow-xl hover:shadow-green-500/10 hover:-translate-y-1 hover:scale-[1.01]'
-                                : 'hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1 hover:scale-[1.01]'
-                          }}`}>
-                            <CardHeader className="pb-3">
-                              {/* Linha 1: checkbox + nome + status */}
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={selectedPlants.has(plant.id)}
-                                  onCheckedChange={() => togglePlantSelection(plant.id)}
-                                />
-                                <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0">
-                                  <CardTitle className="text-base leading-tight hover:text-primary transition-colors cursor-pointer truncate">
-                                    {plant.name}
-                                  </CardTitle>
-                                </Link>
-                                <div className={`shrink-0 px-2 py-0.5 rounded-md text-xs font-medium border ${getStatusColor(plant.status)}`}>
-                                  {getStatusLabel(plant.status)}
-                                </div>
-                              </div>
-                              {/* Linha 2: código + tipo */}
-                              <div className="flex items-center gap-2 mt-1 ml-6">
-                                {plant.code && (
-                                  <span className="text-xs font-mono text-muted-foreground">{plant.code}</span>
-                                )}
-                                {plant.code && <span className="text-muted-foreground/40 text-xs">·</span>}
-                                <span className={`text-xs font-medium ${
-                                  plant.plantStage === "SEEDLING" ? "text-green-500" : "text-emerald-500"
-                                }`}>
-                                  {plant.plantStage === "SEEDLING" ? "🌱 Muda" : "🌿 Planta"}
-                                </span>
-                              </div>
-                            </CardHeader>
+                            {/* Card: foto direita + info esquerda */}
+                            <div className={`rounded-2xl border overflow-hidden bg-card flex transition-all duration-200 ${
+                              isSelected ? 'border-primary/50' : 'border-border/40'
+                            }`}>
 
-                            <CardContent className="space-y-3 pt-0">
-                              {/* Foto clicável */}
-                              {plant.lastHealthPhotoUrl && (
-                                <Link href={`/plants/${plant.id}`}>
-                                  <LazyImage
-                                    src={plant.lastHealthPhotoUrl}
-                                    alt={plant.name}
-                                    aspectRatio="3/4"
-                                    className="w-full rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
-                                  />
-                                </Link>
-                              )}
-
-                              {/* Fase + Saúde — mesmo tamanho, mesma linha */}
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {plant.status === 'AWAITING_DRYING' ? (
-                                  <span className="px-2 py-1 rounded-md text-xs font-semibold border bg-amber-500/10 border-amber-500/25 text-amber-400">
-                                    ⏳ Aguardando Secagem
-                                  </span>
-                                ) : tent.category === 'MAINTENANCE' ? (
-                                  <span className="px-2 py-1 rounded-md text-xs font-semibold border bg-blue-500/10 border-blue-500/25 text-blue-400">
-                                    🔧 Manutenção
-                                  </span>
-                                ) : plant.cyclePhase && plant.cycleWeek && (
-                                  <span className={`px-2 py-1 rounded-md text-xs font-semibold border ${
-                                    plant.cyclePhase === 'VEGA'
-                                      ? 'bg-green-500/10 border-green-500/25 text-green-400'
-                                      : 'bg-purple-500/10 border-purple-500/25 text-purple-400'
-                                  }`}>
-                                    {plant.cyclePhase === 'VEGA' ? '🌱' : '🌸'} {plant.cyclePhase === 'VEGA' ? 'Vega' : 'Flora'} · Sem. {plant.cycleWeek}
-                                  </span>
-                                )}
-                                {plant.lastHealthStatus && (
-                                  <span className={`px-2 py-1 rounded-md text-xs font-medium border ${
-                                    plant.lastHealthStatus === "HEALTHY" ? "bg-green-500/10 border-green-500/25 text-green-400" :
-                                    plant.lastHealthStatus === "STRESSED" ? "bg-yellow-500/10 border-yellow-500/25 text-yellow-400" :
-                                    plant.lastHealthStatus === "SICK" ? "bg-red-500/10 border-red-500/25 text-red-400" :
-                                    "bg-blue-500/10 border-blue-500/25 text-blue-400"
-                                  }`}>
-                                    {plant.lastHealthStatus === "HEALTHY" ? "💚 Saudável" :
-                                     plant.lastHealthStatus === "STRESSED" ? "💛 Estressada" :
-                                     plant.lastHealthStatus === "SICK" ? "❤️ Doente" :
-                                     "💙 Recuperando"}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Strain inline */}
-                              <p className="text-xs text-muted-foreground truncate">
-                                🧬 {getStrainName(plant.strainId)}
-                              </p>
-
-                              {/* Ações */}
-                              <div className="flex items-center gap-2 pt-1">
-                                <Link
-                                  href={`/plants/${plant.id}`}
-                                  className="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium bg-gradient-to-br from-emerald-400 to-green-600 text-white h-8 px-3 shadow-[0_0_8px_rgba(74,222,128,0.2)] hover:shadow-[0_0_12px_rgba(74,222,128,0.35)] hover:scale-[1.02] active:scale-95 transition-all duration-150"
-                                >
-                                  Ver Planta
-                                </Link>
-                                {plant.status === "ACTIVE" && (
-                                  <AnimatedButton
-                                    variant="outline"
-                                    size="icon-sm"
-                                    className="hover:scale-[1.05] hover:border-primary/40 hover:bg-primary/10 hover:text-primary active:scale-95 transition-all duration-150"
-                                    title="Mover planta"
-                                    onClick={() => handleMovePlant(plant, tent.id)}
-                                  >
-                                    <MoveRight className="w-3.5 h-3.5" />
-                                  </AnimatedButton>
-                                )}
-                                <AnimatedButton
-                                  variant="outline"
-                                  size="icon-sm"
-                                  className="hover:scale-[1.05] hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500 active:scale-95 transition-all duration-150"
-                                  title="Excluir planta"
-                                  onClick={() => setDeletePlantDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </AnimatedButton>
-                              </div>
-                              {/* Fitness score */}
-                              {(() => {
-                                const fitness = getFitnessScore(plant.lastHealthStatus);
-                                if (!fitness) return null;
-                                return (
-                                  <div className="pt-0.5">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Fitness</span>
-                                      <span className="text-[10px] font-bold tabular-nums" style={{ color: fitness.color }}>{fitness.score}%</span>
-                                    </div>
-                                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                                      <div
-                                        className="h-full rounded-full transition-all duration-700"
-                                        style={{ width: `${fitness.score}%`, background: fitness.color }}
-                                      />
+                              {/* Info à esquerda */}
+                              <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0 px-4 pt-3 pb-3 flex flex-col justify-between gap-0 text-left">
+                                {/* Topo: nome + status */}
+                                <div>
+                                  <div className="flex items-start gap-2 mb-1">
+                                    <p className="text-sm font-semibold text-foreground leading-tight flex-1 text-left">{plant.name}</p>
+                                    <div className={`shrink-0 px-1.5 py-px rounded text-[10px] font-medium border mt-px ${getStatusColor(plant.status)}`}>
+                                      {getStatusLabel(plant.status)}
                                     </div>
                                   </div>
-                                );
-                              })()}
-                            </CardContent>
-                          </Card>
+                                  <p className="text-[11px] text-muted-foreground/60 truncate text-left">
+                                    {plant.code && <span className="font-mono">{plant.code} · </span>}
+                                    {getStrainName(plant.strainId) || '—'}
+                                  </p>
+                                </div>
+                                {/* Base: fase + saúde */}
+                                <div className="flex items-center gap-2 flex-wrap mt-2">
+                                  {(plant.cyclePhase && plant.cycleWeek) && (
+                                    <span className={`text-[11px] font-medium flex items-center gap-0.5 ${plant.cyclePhase === 'VEGA' ? 'text-green-400' : 'text-purple-400'}`}>
+                                      {plant.cyclePhase === 'VEGA' ? <Leaf className="w-3 h-3"/> : <Flower2 className="w-3 h-3"/>}
+                                      {plant.cyclePhase === 'VEGA' ? 'Vega' : 'Flora'} S{plant.cycleWeek}
+                                    </span>
+                                  )}
+                                  {fitness && (
+                                    <span className="text-[11px] flex items-center gap-1" style={{ color: fitness.color }}>
+                                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: fitness.color }}/>
+                                      {plant.lastHealthStatus === "HEALTHY" ? "Saudável" : plant.lastHealthStatus === "STRESSED" ? "Estressada" : plant.lastHealthStatus === "SICK" ? "Doente" : "Recuperando"}
+                                    </span>
+                                  )}
+                                </div>
+                              </Link>
+
+                              {/* Foto + ações à direita */}
+                              <div className="w-[96px] shrink-0 border-l border-border/30 flex flex-col">
+                                {/* Foto em aspect-ratio 3:4 (iPhone portrait) */}
+                                <Link href={`/plants/${plant.id}`} className="block w-full" style={{ aspectRatio: '3/4' }}>
+                                  <div className="w-full h-full bg-white/5">
+                                    {plant.lastHealthPhotoUrl
+                                      ? <img src={plant.lastHealthPhotoUrl} alt={plant.name} className="w-full h-full object-cover" />
+                                      : <div className="w-full h-full flex items-center justify-center">
+                                          <Sprout className="w-6 h-6 text-muted-foreground/20" />
+                                        </div>
+                                    }
+                                  </div>
+                                </Link>
+                                {/* Ações: seleção | menu */}
+                                <div className="flex border-t border-border/30 shrink-0">
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePlantSelection(plant.id); }}
+                                    className={`flex-1 h-9 flex items-center justify-center transition-colors ${
+                                      isSelected ? 'bg-primary/20 text-primary' : 'text-muted-foreground/40 hover:bg-white/5'
+                                    }`}
+                                  >
+                                    {isSelected
+                                      ? <svg className="w-3.5 h-3.5" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                      : <svg className="w-3.5 h-3.5" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+                                    }
+                                  </button>
+                                  <div className="w-px bg-border/30" />
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="flex-1 h-9 flex items-center justify-center text-muted-foreground/40 hover:bg-white/5 transition-colors">
+                                        <MoreHorizontal className="w-3.5 h-3.5" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                      {plant.status === "ACTIVE" && (
+                                        <DropdownMenuItem onClick={() => handleMovePlant(plant, tent.id)}>
+                                          <MoveRight className="w-4 h-4 mr-2" /> Mover
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => setDeletePlantDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            </div>
                           </ListItemAnimation>
-                        ))}
+                          );
+                        })}
                       </StaggerList>
-                    </CardContent>
+                    </div>
                   )}
-                </Card>
+                </div>
               );
             })}
           </div>
@@ -630,184 +568,139 @@ export default function PlantsList() {
           />
         )}
       {/* ── Lixeira ── */}
-      <div className="space-y-4 pb-12 mt-12 pt-8 border-t border-border/40">
-        <Card className="overflow-hidden">
-          <CardHeader
-            className="hover:bg-muted/50 transition-colors cursor-pointer"
+      <div className="pb-12 mt-3 pt-3 border-t border-border/20">
+        <div className="rounded-2xl border border-red-500/20 bg-card overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.05) 0%, rgba(0,0,0,0) 50%)' }}>
+          {/* Header lixeira */}
+          <div
+            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
             onClick={() => setShowTrash(!showTrash)}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1">
-                {showTrash ? (
-                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                )}
-                <div className="relative shrink-0">
-                  <div className="w-9 h-9 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
-                    <Trash2 className="w-4 h-4 text-destructive/70" />
-                  </div>
-                  {(deletedPlants?.length ?? 0) > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-[9px] font-bold text-white flex items-center justify-center">
-                      {deletedPlants!.length > 9 ? '9+' : deletedPlants!.length}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Lixeira</CardTitle>
-                  <CardDescription>
-                    {(deletedPlants?.length ?? 0) === 0
-                      ? 'Vazia · excluídas ficam 30 dias'
-                      : `${deletedPlants!.length} planta${deletedPlants!.length !== 1 ? 's' : ''} · removidas recentemente`}
-                  </CardDescription>
-                </div>
+            {showTrash
+              ? <ChevronDown className="w-4 h-4 text-red-400 shrink-0" />
+              : <ChevronRight className="w-4 h-4 text-red-400 shrink-0" />
+            }
+            <div className="relative shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/25 flex items-center justify-center">
+                <Trash2 className="w-4 h-4 text-red-400" />
               </div>
+              {(deletedPlants?.length ?? 0) > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">
+                  {deletedPlants!.length > 9 ? '9+' : deletedPlants!.length}
+                </span>
+              )}
             </div>
-          </CardHeader>
+            <div className="flex-1 min-w-0">
+              <span className="font-bold text-foreground/80">Lixeira</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                {(deletedPlants?.length ?? 0) === 0
+                  ? '· vazia · ficam 30 dias'
+                  : `· ${deletedPlants!.length} planta${deletedPlants!.length !== 1 ? 's' : ''}`}
+              </span>
+            </div>
+          </div>
 
-        {/* Lista expandida */}
-        {showTrash && (
-          <CardContent className="space-y-2 pt-0">
-            {(deletedPlants?.length ?? 0) === 0 ? (
-              /* ── Empty state ── */
-              <div className="flex flex-col items-center justify-center py-12 px-6 rounded-2xl border border-dashed border-border/50 bg-muted/20 gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                  <Sprout className="w-8 h-8 text-emerald-500/50" />
+          {/* Lista expandida */}
+          {showTrash && (
+            <div className="px-3 pb-3 space-y-2">
+              {(deletedPlants?.length ?? 0) === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 px-6 rounded-xl border border-dashed border-border/30 gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <Sprout className="w-6 h-6 text-emerald-500/50" />
+                  </div>
+                  <div className="text-center space-y-0.5">
+                    <p className="text-sm font-semibold text-foreground/70">Lixeira vazia</p>
+                    <p className="text-xs text-muted-foreground/60 max-w-xs">
+                      Plantas excluídas aparecem aqui por 30 dias.
+                    </p>
+                  </div>
                 </div>
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-semibold text-foreground">Lixeira vazia</p>
-                  <p className="text-xs text-muted-foreground max-w-xs">
-                    Plantas excluídas aparecem aqui por 30 dias antes de serem removidas permanentemente.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* ── Cards de plantas ── */}
-                {deletedPlants!.map((plant: any) => {
-                  const deletedMs = Date.now() - new Date(plant.deletedAt).getTime();
-                  const daysAgo = Math.floor(deletedMs / 86400000);
-                  const daysLeft = Math.max(0, 30 - daysAgo);
-                  const hoursLeft = Math.max(0, 720 - Math.floor(deletedMs / 3600000));
-                  const expiryPct = Math.min((daysAgo / 30) * 100, 100);
+              ) : (
+                <>
+                  {deletedPlants!.map((plant: any) => {
+                    const deletedMs = Date.now() - new Date(plant.deletedAt).getTime();
+                    const daysAgo = Math.floor(deletedMs / 86400000);
+                    const daysLeft = Math.max(0, 30 - daysAgo);
+                    const hoursLeft = Math.max(0, 720 - Math.floor(deletedMs / 3600000));
+                    const expiryPct = Math.min((daysAgo / 30) * 100, 100);
 
-                  // Cores da barra de expiração
-                  const barColor =
-                    daysLeft <= 1 ? "bg-red-500"
-                    : daysLeft <= 5 ? "bg-amber-500"
-                    : daysLeft <= 10 ? "bg-yellow-400"
-                    : "bg-emerald-500";
+                    const barColor = daysLeft <= 1 ? "#ef4444" : daysLeft <= 5 ? "#f59e0b" : daysLeft <= 10 ? "#eab308" : "#22c55e";
+                    const timeLabel =
+                      daysLeft === 0
+                        ? hoursLeft <= 1 ? "< 1h restante" : `${hoursLeft}h restantes`
+                        : daysLeft === 1 ? "1 dia restante"
+                        : `${daysLeft} dias restantes`;
+                    const deletedLabel =
+                      daysAgo === 0 ? 'excluída hoje' : daysAgo === 1 ? 'excluída ontem' : `excluída há ${daysAgo} dias`;
 
-                  const timeLabel =
-                    daysLeft === 0
-                      ? hoursLeft <= 1 ? "< 1h restante" : `${hoursLeft}h restantes`
-                      : daysLeft === 1 ? "1 dia restante"
-                      : `${daysLeft} dias restantes`;
+                    return (
+                      <div key={plant.id} className="rounded-xl border border-border/25 bg-card/60 overflow-hidden">
+                        <div className="flex items-center gap-3 px-3 pt-3 pb-2.5">
+                          <div className="w-10 h-10 rounded-lg border border-border/20 overflow-hidden bg-white/3 shrink-0 grayscale opacity-50 flex items-center justify-center">
+                            {plant.photoUrl
+                              ? <img src={plant.photoUrl} alt={plant.name} className="w-full h-full object-cover" />
+                              : <Sprout className="w-5 h-5 text-muted-foreground" />
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2">
+                              <p className="text-sm font-bold text-foreground/60 truncate">{plant.name}</p>
+                              {plant.code && <span className="text-[10px] font-mono text-muted-foreground/40 shrink-0">{plant.code}</span>}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] text-muted-foreground/50 truncate">{getStrainName(plant.strainId) || 'Sem strain'}</span>
+                              <span className="text-muted-foreground/25 text-[11px]">·</span>
+                              <span className="text-[11px] text-muted-foreground/40 shrink-0">{deletedLabel}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => restorePlant.mutate({ plantId: plant.id })}
+                              disabled={restorePlant.isPending}
+                              className="flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/20 active:scale-95 transition-all disabled:opacity-50"
+                            >
+                              <RotateCcw className="w-3 h-3" />Restaurar
+                            </button>
+                            <button
+                              onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
+                              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground/30 hover:text-red-400 hover:bg-red-500/10 active:scale-95 transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="px-3 pb-2.5">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wide font-medium">Expira em</span>
+                            <span className="text-[10px] font-bold" style={{ color: barColor }}>{timeLabel}</span>
+                          </div>
+                          <div className="h-0.5 rounded-full bg-white/5 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${expiryPct}%`, background: barColor, boxShadow: `0 0 4px ${barColor}88` }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
 
-                  const deletedLabel =
-                    daysAgo === 0 ? 'excluída hoje'
-                    : daysAgo === 1 ? 'excluída ontem'
-                    : `excluída há ${daysAgo} dias`;
-
-                  return (
-                    <div
-                      key={plant.id}
-                      className="rounded-2xl border border-border/40 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200"
+                  <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-border/20 bg-white/[0.02]">
+                    <button
+                      className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+                      onClick={() => deletedPlants!.forEach((p: any) => restorePlant.mutate({ plantId: p.id }))}
+                      disabled={restorePlant.isPending}
                     >
-                      {/* Linha de conteúdo principal */}
-                      <div className="flex items-center gap-3 px-4 pt-3.5 pb-3">
-                        {/* Avatar */}
-                        <div className="w-11 h-11 rounded-xl border border-border/30 overflow-hidden bg-muted/50 shrink-0 grayscale opacity-60 flex items-center justify-center">
-                          {plant.photoUrl ? (
-                            <img src={plant.photoUrl} alt={plant.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <Sprout className="w-5 h-5 text-muted-foreground" />
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2">
-                            <p className="text-sm font-bold text-foreground/80 truncate">{plant.name}</p>
-                            {plant.code && (
-                              <span className="text-[11px] font-mono text-muted-foreground/45 shrink-0">{plant.code}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="text-[11px] text-muted-foreground/60 truncate">
-                              {getStrainName(plant.strainId) || 'Sem strain'}
-                            </span>
-                            <span className="text-muted-foreground/25 text-[11px]">·</span>
-                            <span className="text-[11px] text-muted-foreground/50 shrink-0">{deletedLabel}</span>
-                          </div>
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            onClick={() => restorePlant.mutate({ plantId: plant.id })}
-                            disabled={restorePlant.isPending}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 active:scale-95 transition-all duration-150 disabled:opacity-50"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            Restaurar
-                          </button>
-                          <button
-                            onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: plant.id, name: plant.name } })}
-                            className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 active:scale-95 transition-all duration-150"
-                            title="Excluir permanentemente"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Barra de expiração */}
-                      <div className="px-4 pb-3.5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wide">
-                            Expira em
-                          </span>
-                          <span className={`text-[10px] font-bold ${
-                            daysLeft <= 1 ? 'text-red-500' : daysLeft <= 5 ? 'text-amber-500' : 'text-muted-foreground/60'
-                          }`}>
-                            {timeLabel}
-                          </span>
-                        </div>
-                        <div className="h-1 rounded-full bg-muted/60 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-700 ${barColor}`}
-                            style={{ width: `${expiryPct}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* ── Footer de ações em massa ── */}
-                <div className="flex items-center justify-between px-4 py-3 rounded-2xl border border-border/30 bg-muted/20">
-                  <button
-                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 transition-colors"
-                    onClick={() => deletedPlants!.forEach((p: any) => restorePlant.mutate({ plantId: p.id }))}
-                    disabled={restorePlant.isPending}
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Restaurar tudo
-                  </button>
-                  <button
-                    className="flex items-center gap-1.5 text-xs font-semibold text-destructive/70 hover:text-destructive transition-colors"
-                    onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: -1, name: `todas as ${deletedPlants!.length} plantas da lixeira` } })}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Esvaziar lixeira
-                  </button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        )}
-        </Card>
+                      <RotateCcw className="w-3.5 h-3.5" />Restaurar tudo
+                    </button>
+                    <button
+                      className="flex items-center gap-1.5 text-xs font-semibold text-red-400/60 hover:text-red-400 transition-colors"
+                      onClick={() => setPermanentDeleteDialog({ open: true, plant: { id: -1, name: `todas as ${deletedPlants!.length} plantas da lixeira` } })}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />Esvaziar lixeira
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       </main>
 
@@ -974,104 +867,74 @@ export default function PlantsList() {
 
       {/* Floating Action Bar for Bulk Operations */}
       {selectedPlants.size > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 z-50 shadow-2xl">
-          <Card className="shadow-2xl border-2">
-            <CardContent className="p-3 md:p-4">
-              <div className="flex flex-wrap items-center gap-2 md:gap-3 justify-center">
-                <span className="text-sm font-medium text-muted-foreground">
-                  {selectedPlants.size} planta{selectedPlants.size > 1 ? 's' : ''} selecionada{selectedPlants.size > 1 ? 's' : ''}
-                </span>
-                <div className="h-6 w-px bg-border" />
-                
-                {/* Promover (apenas se todas forem mudas) */}
-                {filteredPlants?.filter(p => selectedPlants.has(p.id)).every(p => p.plantStage === "SEEDLING") && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs px-2 md:px-3"
-                    onClick={() => { haptic.confirm(); setBulkPromoteConfirm(true); }}
-                    disabled={bulkPromote.isPending}
-                  >
-                    {bulkPromote.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Sprout className="w-4 h-4 mr-2" />
-                    )}
-                    Promover
-                  </Button>
-                )}
-                
-                {/* Mover */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs px-2 md:px-3"
-                  onClick={() => { haptic.confirm(); setBatchMoveDialog(true); }}
-                >
-                  <MoveRight className="w-4 h-4 mr-2" />
-                  Mover
-                </Button>
-                
-                {/* Colher */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs px-2 md:px-3"
-                  onClick={() => { haptic.destructive(); setBulkHarvestConfirm(true); }}
-                  disabled={bulkHarvest.isPending}
-                >
-                  {bulkHarvest.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <span className="mr-2">🌾</span>
-                  )}
-                  Colher
-                </Button>
-                
-                {/* Descartar */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { haptic.destructive(); setBulkDiscardConfirm(true); }}
-                  disabled={bulkDiscard.isPending}
-                  className="text-destructive hover:text-destructive text-xs px-2 md:px-3"
-                >
-                  {bulkDiscard.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <span className="mr-2">🗑️</span>
-                  )}
-                  Descartar
-                </Button>
-                
-                {/* Excluir permanentemente */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { haptic.destructive(); setBulkDeleteConfirm(true); }}
-                  disabled={bulkDelete.isPending}
-                  className="text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 text-xs px-2 md:px-3"
-                >
-                  {bulkDelete.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 mr-2" />
-                  )}
-                  Excluir
-                </Button>
+        <div className="fixed bottom-20 left-4 right-4 z-50">
+          <div className="rounded-2xl border border-primary/40 bg-card/95 backdrop-blur-md shadow-2xl shadow-primary/20 p-3" style={{ background: 'linear-gradient(135deg, rgba(var(--primary)/0.08) 0%, rgba(0,0,0,0.9) 60%)' }}>
+            <div className="flex flex-wrap items-center gap-2 justify-center">
+              <span className="text-sm font-bold text-primary">
+                {selectedPlants.size} {selectedPlants.size === 1 ? 'planta' : 'plantas'}
+              </span>
+              <div className="h-4 w-px bg-border/50" />
 
-                {/* Cancelar */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs px-2 md:px-3"
-                  onClick={() => setSelectedPlants(new Set())}
+              {/* Promover */}
+              {filteredPlants?.filter(p => selectedPlants.has(p.id)).every(p => p.plantStage === "SEEDLING") && (
+                <button
+                  onClick={() => { haptic.confirm(); setBulkPromoteConfirm(true); }}
+                  disabled={bulkPromote.isPending}
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-all disabled:opacity-50"
                 >
-                  Cancelar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  {bulkPromote.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sprout className="w-3.5 h-3.5" />}
+                  Promover
+                </button>
+              )}
+
+              {/* Mover */}
+              <button
+                onClick={() => { haptic.confirm(); setBatchMoveDialog(true); }}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-blue-500/15 border border-blue-500/40 text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-all"
+              >
+                <MoveRight className="w-3.5 h-3.5" />Mover
+              </button>
+
+              {/* Colher */}
+              <button
+                onClick={() => { haptic.destructive(); setBulkHarvestConfirm(true); }}
+                disabled={bulkHarvest.isPending}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {bulkHarvest.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Leaf className="w-3.5 h-3.5" />}
+                Colher
+              </button>
+
+              {/* Descartar */}
+              <button
+                onClick={() => { haptic.destructive(); setBulkDiscardConfirm(true); }}
+                disabled={bulkDiscard.isPending}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-orange-500/15 border border-orange-500/40 text-orange-400 hover:bg-orange-500/25 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {bulkDiscard.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Descartar
+              </button>
+
+              {/* Excluir */}
+              <button
+                onClick={() => { haptic.destructive(); setBulkDeleteConfirm(true); }}
+                disabled={bulkDelete.isPending}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {bulkDelete.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Excluir
+              </button>
+
+              <div className="h-4 w-px bg-border/50" />
+              {/* Cancelar */}
+              <button
+                onClick={() => setSelectedPlants(new Set())}
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 active:scale-95 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1171,7 +1034,7 @@ export default function PlantsList() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-green-600">
-              <span className="text-lg">🌾</span>
+              <Leaf className="w-5 h-5" />
               Colher Plantas
             </DialogTitle>
             <DialogDescription>
@@ -1187,7 +1050,7 @@ export default function PlantsList() {
               onClick={() => { bulkHarvest.mutate({ plantIds: Array.from(selectedPlants) }); setBulkHarvestConfirm(false); }}
               disabled={bulkHarvest.isPending}
             >
-              {bulkHarvest.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <span className="mr-2">🌾</span>}
+              {bulkHarvest.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Leaf className="w-4 h-4 mr-2" />}
               Confirmar Colheita
             </Button>
           </DialogFooter>

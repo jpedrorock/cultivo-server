@@ -44,7 +44,6 @@ export function InstallPWA() {
       setIsInstalled(true);
       setShowInstallBanner(false);
       setDeferredPrompt(null);
-      console.log('[PWA] App instalado com sucesso!');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -63,14 +62,7 @@ export function InstallPWA() {
     deferredPrompt.prompt();
 
     // Aguardar escolha do usuário
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log('[PWA] User choice:', outcome);
-
-    if (outcome === 'accepted') {
-      console.log('[PWA] Usuário aceitou instalar');
-    } else {
-      console.log('[PWA] Usuário recusou instalar');
-    }
+    await deferredPrompt.userChoice;
 
     // Limpar prompt
     setDeferredPrompt(null);

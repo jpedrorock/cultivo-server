@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { ErrorState } from "@/components/ErrorState";
 import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { trpc } from "@/lib/trpc";
@@ -35,7 +35,11 @@ import { ArrowLeft,
   History,
   ArrowRight,
   GitFork,
-  Camera
+  Camera,
+  Leaf,
+  Wind,
+  Wrench,
+  Thermometer,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,11 +50,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import PlantObservationsTab from "@/components/PlantObservationsTab";
 import PlantHealthTab from "@/components/PlantHealthTab";
-import PhotoTimeline from "@/components/PhotoTimeline";
+import PlantEnvironmentTab from "@/components/PlantEnvironmentTab";
+import PlantArchiveTab from "@/components/PlantArchiveTab";
 import PlantTrichomesTab from "@/components/PlantTrichomesTab";
 import PlantLSTTab from "@/components/PlantLSTTab";
 import MoveTentModal from "@/components/MoveTentModal";
-import PlantTentHistoryTab from "@/components/PlantTentHistoryTab";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
@@ -60,6 +64,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 export default function PlantDetail() {
   const [, params] = useRoute("/plants/:id");
+  const [, setLocation] = useLocation();
   const plantId = params?.id ? parseInt(params.id) : 0;
   const [moveTentModalOpen, setMoveTentModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -86,7 +91,12 @@ export default function PlantDetail() {
     { id: plant?.currentTentId || 0 },
     { enabled: !!plant?.currentTentId }
   );
-  
+  const { data: healthLogs } = trpc.plantHealth.list.useQuery(
+    { plantId },
+    { enabled: plantId > 0 }
+  );
+  const lastPhoto = healthLogs?.find((l: any) => l.photoUrl)?.photoUrl ?? null;
+
   // Mutations para ações
   const transplantMutation = trpc.plants.transplantToFlora.useMutation({
     onSuccess: (data) => {
@@ -100,11 +110,11 @@ export default function PlantDetail() {
   
   const archiveMutation = trpc.plants.archive.useMutation({
     onSuccess: (_, variables) => {
-      const message = variables.status === 'HARVESTED' 
+      const message = variables.status === 'HARVESTED'
         ? '✅ Planta marcada como colhida e arquivada!'
         : '🗑️ Planta descartada e arquivada!';
       toast.success(message);
-      window.location.href = '/plants';
+      setLocation('/plants');
     },
     onError: (error) => {
       toast.error(`Erro ao arquivar planta: ${error.message}`);
@@ -114,7 +124,7 @@ export default function PlantDetail() {
   const deleteMutation = trpc.plants.deletePermanently.useMutation({
     onSuccess: () => {
       toast.success('✅ Planta excluída permanentemente!');
-      window.location.href = '/plants';
+      setLocation('/plants');
     },
     onError: (error) => {
       toast.error(`Erro ao excluir planta: ${error.message}`);
@@ -303,80 +313,34 @@ export default function PlantDetail() {
                         ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                         : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
                     }`}>
-                      {plant.cyclePhase === 'VEGA' ? '🌱 Veg' :
-                       plant.cyclePhase === 'FLORA' ? '🌸 Flora' :
-                       tent?.category === 'VEGA' ? '🌱 Veg' :
-                       tent?.category === 'FLORA' ? '🌸 Flora' :
-                       tent?.category === 'DRYING' ? '🍂 Sec' :
-                       tent?.category === 'MAINTENANCE' ? '🔧 Man' : ''}
+                      {plant.cyclePhase === 'VEGA' ? <span className="flex items-center gap-1"><Leaf className="w-3 h-3"/>Veg</span> :
+                       plant.cyclePhase === 'FLORA' ? <span className="flex items-center gap-1"><Flower2 className="w-3 h-3"/>Flora</span> :
+                       tent?.category === 'VEGA' ? <span className="flex items-center gap-1"><Leaf className="w-3 h-3"/>Veg</span> :
+                       tent?.category === 'FLORA' ? <span className="flex items-center gap-1"><Flower2 className="w-3 h-3"/>Flora</span> :
+                       tent?.category === 'DRYING' ? <span className="flex items-center gap-1"><Wind className="w-3 h-3"/>Sec</span> :
+                       tent?.category === 'MAINTENANCE' ? <span className="flex items-center gap-1"><Wrench className="w-3 h-3"/>Man</span> : null}
                       {plant.cycleWeek ? ` S${plant.cycleWeek}` : ''}
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            {/* Direita: ações - apenas ícone MoreVertical no mobile, botões no desktop */}
+            {/* Direita: Editar + ··· dropdown */}
             <div className="flex items-center gap-1 shrink-0">
-              {/* Desktop: botões individuais com animação de toque */}
-              <PressButton variant="outline" size="sm" className="hidden md:flex" onClick={handleEditClick}>
-                <Edit className="w-4 h-4 mr-2" />
-                Editar
+              <PressButton variant="outline" size="sm" className="gap-1.5" onClick={handleEditClick}>
+                <Edit className="w-4 h-4" />
+                <span className="hidden sm:inline">Editar</span>
               </PressButton>
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden md:flex gap-2"
-                onClick={() => {
-                  setCloneNameInput(`${plant?.name} (Clone)`);
-                  setCloneDialog(true);
-                }}
-              >
-                <GitFork className="w-4 h-4" />
-                Clonar
-              </Button>
-              <PressButton
-                variant="outline"
-                size="sm"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                pressIntensity="strong"
-                className="hidden md:flex text-red-500 border-red-500/30 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-500"
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4 mr-2" />
-                )}
-                Excluir
-              </PressButton>
-              
-              {/* Dropdown de Ações - ícone no mobile, texto no desktop */}
+
+              {/* Dropdown de Ações */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <PressButton variant="outline" size="icon" className="h-9 w-9 md:w-auto md:px-3 md:gap-2 shrink-0">
+                  <PressButton variant="outline" size="icon" className="h-9 w-9 shrink-0">
                     <MoreVertical className="w-4 h-4" />
-                    <span className="hidden md:inline">Ações</span>
                   </PressButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" sideOffset={4} className="w-56">
-                  {/* Editar e Excluir: apenas no dropdown mobile */}
-                  <PressDropdownMenuItem onClick={handleEditClick} className="md:hidden">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Editar Planta
-                  </PressDropdownMenuItem>
-                  <PressDropdownMenuItem
-                    onClick={handleDelete}
-                    disabled={deleteMutation.isPending}
-                    pressIntensity="strong"
-                    className="md:hidden text-red-600"
-                  >
-                    {deleteMutation.isPending ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Excluindo...</>
-                    ) : (
-                      <><Trash2 className="w-4 h-4 mr-2" />Excluir Planta</>
-                    )}
-                  </PressDropdownMenuItem>
-                  <DropdownMenuSeparator className="md:hidden" />
+
                   {plant.plantStage === "SEEDLING" && (
                     <PressDropdownMenuItem 
                       onClick={handlePromoteToPlant}
@@ -488,96 +452,128 @@ export default function PlantDetail() {
       </header>
 
       {/* Main Content */}
-      <main className="container py-8 pb-32 md:pb-8">
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Strain</CardDescription>
-              <CardTitle className="text-xl">{strain?.name || "Unknown"}</CardTitle>
-            </CardHeader>
-          </Card>
+      <main className="container py-4 pb-32 md:pb-8">
+        {/* Hero Card — foto à direita + info à esquerda */}
+        {(() => {
+          const phaseGradient =
+            plant.cyclePhase === "VEGA" || tent?.category === "VEGA"
+              ? "from-green-500 to-emerald-400"
+              : plant.cyclePhase === "FLORA" || tent?.category === "FLORA"
+              ? "from-purple-500 to-violet-400"
+              : tent?.category === "DRYING"
+              ? "from-amber-500 to-orange-400"
+              : "from-blue-500 to-cyan-400";
+          const daysOld = Math.floor(
+            (Date.now() - new Date(plant.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return (
+            <div className="rounded-2xl border border-border/60 bg-card overflow-hidden mb-4 flex">
+              {/* Info esquerda */}
+              <div className="flex-1 min-w-0 px-4 py-4 flex flex-col justify-between">
+                {/* Topo */}
+                <div>
+                  <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-0.5">Strain</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{strain?.name || "—"}</p>
+                  {tent?.name && (
+                    <p className="text-xs text-muted-foreground/60 mt-1 truncate">📍 {tent.name}{plant.cycleWeek ? ` · S${plant.cycleWeek}` : ""}</p>
+                  )}
+                  {plant.notes && (
+                    <p className="text-xs text-muted-foreground/50 leading-relaxed mt-2 line-clamp-2 italic">{plant.notes}</p>
+                  )}
+                </div>
+                {/* Fundo — dias */}
+                <div className="mt-3">
+                  <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider leading-none">Dias de vida</p>
+                  <p className={`text-3xl font-bold tabular-nums leading-tight bg-gradient-to-r ${phaseGradient} bg-clip-text text-transparent`}>{daysOld}</p>
+                </div>
+              </div>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Estufa Atual</CardDescription>
-              <CardTitle className="text-xl">{tent?.name || "Unknown"}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+              {/* Foto direita — último registro de saúde */}
+              <div className="w-[100px] shrink-0 border-l border-border/30" style={{ aspectRatio: "3/4" }}>
+                {lastPhoto ? (
+                  <img src={lastPhoto} alt="Último registro" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-white/[0.02]">
+                    <Heart className="w-6 h-6 text-muted-foreground/15" />
+                    <p className="text-[10px] text-muted-foreground/30 text-center px-2 leading-tight">Sem foto</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
-        {/* Notes */}
-        {plant.notes && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Notas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-foreground">{plant.notes}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Tabs */}
-        <Tabs defaultValue="health" className="w-full">
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: '-1rem', marginRight: '-1rem', paddingLeft: '1rem', paddingRight: '1rem' }}>
-            <TabsList style={{ display: 'inline-flex', width: 'max-content', minWidth: '100%', height: 'auto', padding: '4px', gap: '2px' }}>
-              <TabsTrigger value="health" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
-                <Heart className="w-3.5 h-3.5" />
-                <span>Saúde</span>
-              </TabsTrigger>
-              {plant.plantStage === "PLANT" && (
-                <TabsTrigger value="trichomes" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Tricomas</span>
+        {/* 4 Tabs principais */}
+        {(() => {
+          const isPlant = plant.plantStage === "PLANT";
+          const tabCols = isPlant ? "grid-cols-4" : "grid-cols-3";
+          return (
+            <Tabs defaultValue="health" className="w-full">
+              <TabsList className={`grid w-full ${tabCols} mb-3 h-auto p-1`}>
+                <TabsTrigger value="health" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                  <Heart className="w-3.5 h-3.5" />
+                  Saúde
                 </TabsTrigger>
-              )}
-              {plant.plantStage === "PLANT" && (
-                <TabsTrigger value="lst" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
-                  <Scissors className="w-3.5 h-3.5" />
-                  <span>LST</span>
+                <TabsTrigger value="environment" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                  <Thermometer className="w-3.5 h-3.5" />
+                  Ambiente
                 </TabsTrigger>
+                {isPlant && (
+                  <TabsTrigger value="cultivation" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                    <Scissors className="w-3.5 h-3.5" />
+                    Cultivo
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="archive" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                  <History className="w-3.5 h-3.5" />
+                  Arquivo
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="health">
+                <PlantHealthTab plantId={plantId} />
+              </TabsContent>
+
+              <TabsContent value="environment">
+                <PlantEnvironmentTab plantId={plantId} />
+              </TabsContent>
+
+              {isPlant && (
+                <TabsContent value="cultivation">
+                  <Tabs defaultValue="observations" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 mb-3 h-auto p-1">
+                      <TabsTrigger value="observations" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                        <FileText className="w-3.5 h-3.5" />
+                        Obs.
+                      </TabsTrigger>
+                      <TabsTrigger value="lst" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                        <Wind className="w-3.5 h-3.5" />
+                        LST
+                      </TabsTrigger>
+                      <TabsTrigger value="trichomes" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Tricomas
+                      </TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="observations">
+                      <PlantObservationsTab plantId={plantId} />
+                    </TabsContent>
+                    <TabsContent value="lst">
+                      <PlantLSTTab plantId={plantId} />
+                    </TabsContent>
+                    <TabsContent value="trichomes">
+                      <PlantTrichomesTab plantId={plantId} />
+                    </TabsContent>
+                  </Tabs>
+                </TabsContent>
               )}
-              <TabsTrigger value="observations" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
-                <FileText className="w-3.5 h-3.5" />
-                <span>Obs.</span>
-              </TabsTrigger>
-              <TabsTrigger value="history" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
-                <History className="w-3.5 h-3.5" />
-                <span>Histórico</span>
-              </TabsTrigger>
-              <TabsTrigger value="timeline" className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-2">
-                <Camera className="w-3.5 h-3.5" />
-                <span>Timeline</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
 
-          <TabsContent value="health">
-            <PlantHealthTab plantId={plantId} />
-          </TabsContent>
-
-          <TabsContent value="trichomes">
-            <PlantTrichomesTab plantId={plantId} />
-          </TabsContent>
-
-          <TabsContent value="lst">
-            <PlantLSTTab plantId={plantId} />
-          </TabsContent>
-
-          <TabsContent value="observations">
-            <PlantObservationsTab plantId={plantId} />
-          </TabsContent>
-
-          <TabsContent value="history">
-            <PlantTentHistoryTab plantId={plantId} />
-          </TabsContent>
-
-          <TabsContent value="timeline">
-            <PhotoTimeline plantId={plantId} />
-          </TabsContent>
-
-        </Tabs>
+              <TabsContent value="archive">
+                <PlantArchiveTab plantId={plantId} />
+              </TabsContent>
+            </Tabs>
+          );
+        })()}
       </main>
       
       {/* Modal de Mover Estufa */}

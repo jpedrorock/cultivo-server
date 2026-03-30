@@ -118,7 +118,7 @@ export default function Backup() {
             • Recomendamos fazer backups regulares (semanalmente ou após mudanças importantes)
           </p>
           <p className="text-amber-600 dark:text-amber-500 font-semibold">
-            ⚠️ Restaurar um backup irá SUBSTITUIR todos os dados atuais!
+            <span className="flex items-center gap-1"><AlertTriangle className="w-4 h-4 text-amber-400"/>Restaurar um backup irá SUBSTITUIR todos os dados atuais!</span>
           </p>
         </CardContent>
       </Card>
@@ -207,7 +207,7 @@ export default function Backup() {
               Confirmar Importação de Backup
             </DialogTitle>
             <DialogDescription className="space-y-2">
-              <span className="block font-semibold text-foreground">⚠️ ATENÇÃO: Esta ação é irreversível!</span>
+              <span className="block font-semibold text-foreground flex items-center gap-1"><AlertTriangle className="w-4 h-4 text-amber-400"/>ATENÇÃO: Esta ação é irreversível!</span>
               <span className="block">Importar este backup irá <strong>substituir todos os dados atuais</strong> do aplicativo — estufas, plantas, strains, tarefas, histórico e configurações.</span>
               <span className="block text-muted-foreground text-xs">Recomendamos exportar um backup dos dados atuais antes de continuar.</span>
             </DialogDescription>

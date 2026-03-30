@@ -1,4 +1,5 @@
-import { Loader2, Check } from "lucide-react";
+import React from "react";
+import { Loader2, Check, RefreshCw, Settings2, CheckCircle2, Upload } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 export type UploadStage = "converting" | "compressing" | "uploading" | "complete";
@@ -11,11 +12,11 @@ interface PhotoUploadProgressProps {
   reduction?: number;
 }
 
-const stageLabels: Record<UploadStage, string> = {
-  converting: "🔄 Convertendo HEIC para PNG",
-  compressing: "⚙️ Comprimindo imagem",
-  uploading: "☁️ Enviando para servidor",
-  complete: "✅ Upload concluído!",
+const stageLabels: Record<UploadStage, React.ReactNode> = {
+  converting: <span className="flex items-center gap-1.5"><RefreshCw className="w-4 h-4"/>Convertendo HEIC para PNG</span>,
+  compressing: <span className="flex items-center gap-1.5"><Settings2 className="w-4 h-4"/>Comprimindo imagem</span>,
+  uploading: <span className="flex items-center gap-1.5"><Upload className="w-4 h-4"/>Enviando para servidor</span>,
+  complete: <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-green-500"/>Upload concluído!</span>,
 };
 
 export function PhotoUploadProgress({

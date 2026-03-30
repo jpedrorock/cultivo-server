@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Wind } from "lucide-react";
 import { toast } from "sonner";
 
 interface EditCycleModalProps {
@@ -193,7 +194,7 @@ export function EditCycleModal({
                   <SelectItem value="MAINTENANCE">Manutenção</SelectItem>
                   <SelectItem value="VEGA">Vegetativa</SelectItem>
                   <SelectItem value="FLORA">Floração</SelectItem>
-                  <SelectItem value="DRYING">🍂 Secagem (2 semanas)</SelectItem>
+                  <SelectItem value="DRYING"><span className="flex items-center gap-1"><Wind className="w-3 h-3 text-amber-500"/>Secagem (2 semanas)</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>

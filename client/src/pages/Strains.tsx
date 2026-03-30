@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Pencil, Trash2, Sprout, Search } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Sprout, Search, Flower2, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
@@ -213,15 +213,15 @@ export default function Strains() {
                       <CardContent className="space-y-3">
                         <div className="grid grid-cols-3 gap-2 text-sm">
                           <div className="bg-background rounded-lg p-3 text-center">
-                            <div className="text-xs text-muted-foreground mb-1">🌱 Vega</div>
+                            <div className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1"><Sprout className="w-3 h-3"/>Vega</div>
                             <div className="font-semibold text-foreground">{strain.vegaWeeks} sem</div>
                           </div>
                           <div className="bg-background rounded-lg p-3 text-center">
-                            <div className="text-xs text-muted-foreground mb-1">🌸 Flora</div>
+                            <div className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1"><Flower2 className="w-3 h-3"/>Flora</div>
                             <div className="font-semibold text-foreground">{strain.floraWeeks} sem</div>
                           </div>
                           <div className="bg-primary/10 rounded-lg p-3 text-center">
-                            <div className="text-xs text-muted-foreground mb-1">⏱️ Total</div>
+                            <div className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1"><Timer className="w-3.5 h-3.5"/>Total</div>
                             <div className="font-bold text-green-600">{strain.vegaWeeks + strain.floraWeeks} sem</div>
                           </div>
                         </div>

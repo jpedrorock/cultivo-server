@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import {
 import {
   AlertTriangle, BookmarkPlus, Trash2, Download, Timer,
   Droplets, Zap, Sun, Clock, Loader2, CheckCircle2,
+  Leaf, Flower2, Lightbulb, Bot, MapPin, Sunrise, Moon, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -491,14 +491,17 @@ export function IrrigationScheduleCalculator() {
     <div className="space-y-5 pb-10">
 
       {/* ── SEÇÃO 1: Configuração da Bomba ── */}
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-blue-500" />
-            </div>
-            <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Configuração da Bomba</h3>
+      <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12) 0%, rgba(59,130,246,0.05) 100%)' }}>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/30">
+            <Zap className="w-4 h-4 text-white" />
           </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Configuração da Bomba</p>
+            <p className="text-[11px] text-muted-foreground">Vazão, saídas e ciclos</p>
+          </div>
+        </div>
+        <div className="p-4 space-y-4">
 
           <div className="grid grid-cols-2 gap-3">
             {/* Vazão total */}
@@ -552,9 +555,9 @@ export function IrrigationScheduleCalculator() {
 
           {/* Chip derivado */}
           {flowPerPlant > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-500/8 border border-blue-500/15">
-              <Droplets className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="text-xs text-blue-700 dark:text-blue-300">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-400/20">
+              <Droplets className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="text-xs text-blue-300">
                 <strong>{flowPerPlant.toFixed(1)} ml/min</strong> por planta
                 {numOutlets > 0 && ` · ${numOutlets} ${numOutlets === 1 ? "planta" : "plantas"}`}
               </span>
@@ -562,13 +565,8 @@ export function IrrigationScheduleCalculator() {
           )}
 
           {/* Botão salvar preset */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2 text-xs"
-            onClick={() => setShowSaveDialog(true)}
-            disabled={pumpFlowMlMin <= 0 || numOutlets <= 0}
-          >
+          <Button variant="outline" size="sm" className="w-full gap-2 text-xs border-border/50 hover:border-blue-400/40 hover:text-blue-300"
+            onClick={() => setShowSaveDialog(true)} disabled={pumpFlowMlMin <= 0 || numOutlets <= 0}>
             <BookmarkPlus className="w-3.5 h-3.5" />
             Salvar Bomba como Predefinição
           </Button>
@@ -576,49 +574,39 @@ export function IrrigationScheduleCalculator() {
           {/* Lista de presets */}
           {presetsList.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Bombas salvas</p>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Bombas salvas</p>
               {presetsList.map((preset: any) => (
-                <div
-                  key={preset.id}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors"
-                >
+                <div key={preset.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/30 transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{preset.name}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {parseFloat(preset.totalFlowMlPerMin).toFixed(0)} ml/min · {preset.numOutlets} saídas ·
-                      máx {parseFloat(preset.maxRuntimeMin).toFixed(1)} min · descanso {parseFloat(preset.restTimeBetweenCyclesMin).toFixed(0)} min
+                      {parseFloat(preset.totalFlowMlPerMin).toFixed(0)} ml/min · {preset.numOutlets} saídas · máx {parseFloat(preset.maxRuntimeMin).toFixed(1)} min · descanso {parseFloat(preset.restTimeBetweenCyclesMin).toFixed(0)} min
                     </p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2.5 text-xs shrink-0"
-                    onClick={() => handleLoadPreset(preset)}
-                  >
-                    Carregar
-                  </Button>
-                  <button
-                    className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-colors shrink-0"
-                    onClick={() => setDeleteConfirm({ open: true, id: preset.id, name: preset.name })}
-                  >
+                  <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs shrink-0 border-border/40" onClick={() => handleLoadPreset(preset)}>Carregar</Button>
+                  <button className="h-7 w-7 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                    onClick={() => setDeleteConfirm({ open: true, id: preset.id, name: preset.name })}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ── SEÇÃO 2: Configuração da Planta ── */}
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-              <Droplets className="w-4 h-4 text-emerald-500" />
-            </div>
-            <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Configuração da Planta</h3>
+      <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(74,222,128,0.10) 0%, rgba(16,185,129,0.04) 100%)' }}>
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+            <Droplets className="w-4 h-4 text-white" />
           </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Configuração da Planta</p>
+            <p className="text-[11px] text-muted-foreground">Vaso, fase e volume alvo</p>
+          </div>
+        </div>
+        <div className="p-4 space-y-4">
 
           <div className="grid grid-cols-3 gap-3">
             {/* Vaso */}
@@ -641,8 +629,8 @@ export function IrrigationScheduleCalculator() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="vega">🌿 Vega</SelectItem>
-                  <SelectItem value="flora">🌺 Flora</SelectItem>
+                  <SelectItem value="vega"><span className="flex items-center gap-1"><Leaf className="w-3.5 h-3.5 text-green-400"/>Vega</span></SelectItem>
+                  <SelectItem value="flora"><span className="flex items-center gap-1"><Flower2 className="w-3.5 h-3.5 text-purple-400"/>Flora</span></SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -664,18 +652,16 @@ export function IrrigationScheduleCalculator() {
           </div>
 
           {/* Sugestão de volume */}
-          <div className="p-3 rounded-xl bg-emerald-500/8 border border-emerald-500/15">
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-400/20">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                  💡 {getSuggestedLabel(phase, weekNumber)}
-                </p>
+                <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/> {getSuggestedLabel(phase, weekNumber)}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Para {potSizeLiters > 0 ? `vaso de ${potSizeLiters}L` : "—"}:{" "}
-                  <strong>{potSizeLiters > 0 ? (potSizeLiters * 1000 * suggestedPct / 100).toFixed(0) : "—"} ml/planta/dia</strong>
+                  <strong className="text-foreground">{potSizeLiters > 0 ? (potSizeLiters * 1000 * suggestedPct / 100).toFixed(0) : "—"} ml/planta/dia</strong>
                 </p>
               </div>
-              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 shrink-0">{suggestedPct}%</span>
+              <span className="text-2xl font-black text-emerald-400 shrink-0" style={{ textShadow: '0 0 12px rgba(74,222,128,0.5)' }}>{suggestedPct}%</span>
             </div>
           </div>
 
@@ -707,40 +693,39 @@ export function IrrigationScheduleCalculator() {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ── SEÇÃO 3: Janela de Luz ── */}
-      <Card>
-        <CardContent className="p-5 space-y-4">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-yellow-500/15 flex items-center justify-center">
-                <Sun className="w-4 h-4 text-yellow-500" />
-              </div>
-              <h3 className="font-semibold text-sm text-foreground uppercase tracking-wide">Janela de Luz</h3>
+      <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.10) 0%, rgba(202,138,4,0.04) 100%)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-900/30">
+              <Sun className="w-4 h-4 text-white" />
             </div>
-            {/* Toggle modo */}
-            <div className="flex rounded-lg border border-border/60 overflow-hidden text-xs font-semibold shrink-0">
-              <button
-                onClick={() => setScheduleMode("auto")}
-                className={`px-3 py-1.5 transition-colors ${scheduleMode === "auto" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"}`}
-              >
-                🤖 Auto
-              </button>
-              <button
-                onClick={() => setScheduleMode("manual")}
-                className={`px-3 py-1.5 transition-colors ${scheduleMode === "manual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"}`}
-              >
-                📍 Fixo
-              </button>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Janela de Luz</p>
+              <p className="text-[11px] text-muted-foreground">Fotoperíodo e horários</p>
             </div>
           </div>
+          {/* Toggle modo */}
+          <div className="flex rounded-lg border border-border/50 overflow-hidden text-xs font-semibold shrink-0">
+            <button onClick={() => setScheduleMode("auto")}
+              className={`px-3 py-1.5 transition-colors ${scheduleMode === "auto" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"}`}>
+              <span className="flex items-center gap-1"><Bot className="w-3.5 h-3.5"/>Auto</span>
+            </button>
+            <button onClick={() => setScheduleMode("manual")}
+              className={`px-3 py-1.5 transition-colors ${scheduleMode === "manual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"}`}>
+              <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5"/>Fixo</span>
+            </button>
+          </div>
+        </div>
+        <div className="p-4 space-y-4">
 
           {/* Luzes ligam/apagam — sempre visível */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">🌅 Hora de acender</Label>
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Sunrise className="w-3.5 h-3.5 text-orange-400"/>Hora de acender</Label>
               <Input
                 type="time"
                 value={lightsOnTime}
@@ -749,7 +734,7 @@ export function IrrigationScheduleCalculator() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">🌙 Hora de apagar</Label>
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Moon className="w-3.5 h-3.5 text-blue-400"/>Hora de apagar</Label>
               <Input
                 type="time"
                 value={lightsOffTime}
@@ -759,9 +744,9 @@ export function IrrigationScheduleCalculator() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/8 border border-yellow-500/15">
-            <Clock className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-            <span className="text-xs text-yellow-700 dark:text-yellow-300">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-400/20">
+            <Clock className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+            <span className="text-xs text-yellow-300">
               Fotoperíodo: <strong>{lightWindowH}h</strong>
               {parseFloat(lightWindowH) >= 18 ? " · Vega (18/6)" : parseFloat(lightWindowH) >= 12 ? " · Flora (12/12)" : ""}
             </span>
@@ -769,7 +754,7 @@ export function IrrigationScheduleCalculator() {
 
           {/* ── Modo Automático ── */}
           {scheduleMode === "auto" && (
-            <div className="px-3 py-2.5 rounded-xl bg-muted/30 border border-border/40 text-xs text-muted-foreground space-y-0.5">
+            <div className="px-3 py-2.5 rounded-xl bg-muted/20 border border-border/40 text-xs text-muted-foreground space-y-0.5">
               <p className="font-semibold text-foreground/70">Boas práticas embutidas:</p>
               <p>• 1º ciclo: {lightsOnTime ? minutesToTimeString(lightsOnMinutes + 90) : "—"} (1,5h após acender)</p>
               <p>• Último ciclo até: {minutesToTimeString(effectiveLightsOffMin - 120)} (2h antes de apagar)</p>
@@ -798,7 +783,7 @@ export function IrrigationScheduleCalculator() {
                     setManualTimes(suggested);
                   }}
                 >
-                  ✨ Sugerir ideais
+                  <Sparkles className="w-3.5 h-3.5"/> Sugerir ideais
                 </Button>
               </div>
 
@@ -840,27 +825,30 @@ export function IrrigationScheduleCalculator() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* ── RESULTADO ── */}
       {result && (
-        <Card className="border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/50 dark:to-cyan-950/50">
-          <CardContent className="p-5 space-y-5">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
-                <Timer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="font-bold text-base text-foreground">Cronograma de Rega</h3>
+        <div className="rounded-2xl border border-cyan-500/30 bg-card overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-cyan-500/20" style={{ background: 'linear-gradient(135deg, rgba(34,211,238,0.12) 0%, rgba(6,182,212,0.05) 100%)' }}>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-900/30">
+              <Timer className="w-4 h-4 text-white" />
             </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Cronograma de Rega</p>
+              <p className="text-[11px] text-muted-foreground">Resultado calculado</p>
+            </div>
+          </div>
+          <div className="p-4 space-y-5">
 
             {/* Warnings */}
             {result.warnings.length > 0 && (
-              <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/30 border border-amber-400/50">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-400/30">
                 <div className="flex gap-2 items-start">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                  <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
-                    {result.warnings.map((w, i) => <li key={i}>⚠️ {w}</li>)}
+                  <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                  <ul className="text-xs text-amber-300 space-y-1">
+                    {result.warnings.map((w, i) => <li key={i} className="flex items-start gap-1"><AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"/>{w}</li>)}
                   </ul>
                 </div>
               </div>
@@ -869,16 +857,15 @@ export function IrrigationScheduleCalculator() {
             {/* Stats grid */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: "Masters/dia", value: String(result.numMasters), icon: "🔄" },
-                { label: "Sub-ciclos/master", value: String(result.maxSubCyclesPerMaster), sub: result.maxSubCyclesPerMaster > 1 ? `${(result.maxSubCyclesPerMaster * maxRuntimeMin + (result.maxSubCyclesPerMaster - 1) * restTimeBetweenMin).toFixed(0)} min/sessão` : undefined, icon: "⚡" },
-                { label: "Duração sub-ciclo", value: `${result.durationPerCycleSec}s`, sub: `≤${maxRuntimeMin} min máx`, icon: "⏱️" },
-                { label: "ml/master/planta", value: `${result.masters[0]?.totalMlPerPlant ?? "—"} ml`, icon: "💧" },
-                { label: "Volume diário/planta", value: `${result.dailyVolumePerPlantMl.toFixed(0)} ml`, icon: "🪣" },
-                { label: "Drenagem esperada", value: `~${result.expectedRunoffMlPerPlant.toFixed(0)} ml`, sub: "17,5%/planta", icon: "🌊" },
+                { label: "Masters/dia", value: String(result.numMasters), sub: undefined, color: "cyan" },
+                { label: "Sub-ciclos", value: String(result.maxSubCyclesPerMaster), sub: result.maxSubCyclesPerMaster > 1 ? `${(result.maxSubCyclesPerMaster * maxRuntimeMin + (result.maxSubCyclesPerMaster - 1) * restTimeBetweenMin).toFixed(0)}min/sessão` : undefined, color: "blue" },
+                { label: "Duração/ciclo", value: `${result.durationPerCycleSec}s`, sub: `≤${maxRuntimeMin}min`, color: "violet" },
+                { label: "ml/master/pla.", value: `${result.masters[0]?.totalMlPerPlant ?? "—"}ml`, sub: undefined, color: "teal" },
+                { label: "Vol. diário/pla.", value: `${result.dailyVolumePerPlantMl.toFixed(0)}ml`, sub: undefined, color: "emerald" },
+                { label: "Drenagem esp.", value: `~${result.expectedRunoffMlPerPlant.toFixed(0)}ml`, sub: "17,5%/pla.", color: "green" },
               ].map((stat) => (
-                <div key={stat.label} className="p-2.5 rounded-xl bg-background/70 border border-border/40 text-center">
-                  <p className="text-base mb-0.5">{stat.icon}</p>
-                  <p className="text-base font-black text-foreground leading-tight">{stat.value}</p>
+                <div key={stat.label} className="p-2.5 rounded-xl bg-muted/30 border border-border/40 text-center">
+                  <p className="text-base font-black text-cyan-300 leading-tight" style={{ textShadow: '0 0 10px rgba(34,211,238,0.4)' }}>{stat.value}</p>
                   {stat.sub && <p className="text-[10px] text-muted-foreground leading-tight">{stat.sub}</p>}
                   <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{stat.label}</p>
                 </div>
@@ -971,16 +958,13 @@ export function IrrigationScheduleCalculator() {
             </div>
 
             {/* Exportar */}
-            <Button
-              onClick={handleExportTxt}
-              variant="outline"
-              className="w-full gap-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50"
-            >
+            <Button onClick={handleExportTxt} variant="outline"
+              className="w-full gap-2 border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-400/50">
               <Download className="w-4 h-4" />
               Exportar Cronograma (TXT)
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Placeholder quando não há resultado */}

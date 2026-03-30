@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BellOff, Clock, AlertTriangle, Volume2 } from "lucide-react";
+import { Bell, BellOff, Clock, AlertTriangle, Volume2, ClipboardList } from "lucide-react";
 import { Link } from "wouter";
 import { testSound, saveSoundConfig } from "@/lib/notificationSounds";
 import { trpc } from "@/lib/trpc";
@@ -382,7 +382,7 @@ export function NotificationSettings() {
                       size="sm"
                       className="flex-col h-auto py-3 gap-1"
                     >
-                      <span className="text-xl">🔔</span>
+                      <Bell className="w-5 h-5" />
                       <span className="text-xs">Lembrete</span>
                     </Button>
                     <Button
@@ -391,7 +391,7 @@ export function NotificationSettings() {
                       size="sm"
                       className="flex-col h-auto py-3 gap-1"
                     >
-                      <span className="text-xl">⚠️</span>
+                      <AlertTriangle className="w-5 h-5 text-amber-400" />
                       <span className="text-xs">Alerta</span>
                     </Button>
                     <Button
@@ -400,7 +400,7 @@ export function NotificationSettings() {
                       size="sm"
                       className="flex-col h-auto py-3 gap-1"
                     >
-                      <span className="text-xl">📋</span>
+                      <ClipboardList className="w-5 h-5" />
                       <span className="text-xs">Tarefa</span>
                     </Button>
                   </div>

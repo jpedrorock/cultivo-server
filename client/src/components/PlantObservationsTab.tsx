@@ -21,6 +21,7 @@ export default function PlantObservationsTab({ plantId }: PlantObservationsTabPr
       setNewObservation("");
       refetch();
     },
+    onError: (e) => toast.error(`Erro ao salvar observação: ${e.message}`),
   });
 
   const handleSubmit = () => {
@@ -45,7 +46,7 @@ export default function PlantObservationsTab({ plantId }: PlantObservationsTabPr
             onChange={(e) => setNewObservation(e.target.value)}
             rows={4}
           />
-          <Button onClick={handleSubmit} disabled={!newObservation.trim()}>
+          <Button onClick={handleSubmit} disabled={!newObservation.trim() || createObservation.isPending}>
             Adicionar Observação
           </Button>
         </CardContent>

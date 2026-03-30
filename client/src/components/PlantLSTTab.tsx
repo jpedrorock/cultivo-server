@@ -15,7 +15,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Plus, Scissors, Check, Info, ChevronDown } from "lucide-react";
+import { Plus, Scissors, Check, Info, ChevronDown, Pencil, Waves, Leaf, Zap, Wind, Sprout, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { LSTTabSkeleton } from "@/components/TabSkeletons";
 
@@ -30,7 +30,7 @@ const TECHNIQUES = [
     shortDesc: "Corte do broto principal",
     description:
       "Corte do broto principal acima do 3º-5º nó para criar 2+ colas principais. Aumenta rendimento ao distribuir hormônios de crescimento igualmente. Melhor aplicar na fase vegetativa quando a planta tem pelo menos 6 nós. Recuperação: 3-7 dias.",
-    icon: "✏️",
+    icon: <Pencil className="w-4 h-4"/>,
     phase: "vega",
     recovery: "3-7 dias",
     color: "bg-red-500/10 border-red-500/30",
@@ -43,7 +43,7 @@ const TECHNIQUES = [
     shortDesc: "Corte parcial do topo",
     description:
       "Corte parcial (75-80%) do novo crescimento do topo, deixando pequena porção intacta. Resulta em 4+ colas principais ao invés de 2. Menos estressante que topping tradicional. Ideal para fase vegetativa média. Recuperação: 2-5 dias.",
-    icon: "🔪",
+    icon: <Scissors className="w-4 h-4"/>,
     phase: "vega",
     recovery: "2-5 dias",
     color: "bg-orange-500/10 border-orange-500/30",
@@ -57,7 +57,7 @@ const TECHNIQUES = [
     shortDesc: "Dobrar e amarrar galhos",
     description:
       "Técnica de baixo estresse: dobrar e amarrar galhos horizontalmente para expor mais área à luz. Use arames macios ou cordas. Comece cedo na vegetação (2-3 semanas). Ajuste diariamente conforme crescimento. Aumenta penetração de luz e cria canopy uniforme sem cortes.",
-    icon: "🩹",
+    icon: <Leaf className="w-4 h-4"/>,
     phase: "vega",
     recovery: "Sem pausa",
     color: "bg-green-500/10 border-green-500/30",
@@ -71,7 +71,7 @@ const TECHNIQUES = [
     shortDesc: "Apertar e dobrar caule",
     description:
       "Técnica avançada: apertar suavemente o caule entre dedos até sentir fibras internas quebrarem, depois dobrar 90°. Cria 'nó' que aumenta fluxo de nutrientes. Estimula produção de resina. Aplicar no final da vegetação ou início da floração. Recuperação: 5-10 dias.",
-    icon: "💪",
+    icon: <Zap className="w-4 h-4"/>,
     phase: "vega/flora",
     recovery: "5-10 dias",
     color: "bg-blue-500/10 border-blue-500/30",
@@ -84,7 +84,7 @@ const TECHNIQUES = [
     shortDesc: "Limpar terço inferior",
     description:
       "Remover todo crescimento (galhos, folhas, brotos) do terço inferior da planta. Direciona energia para colas superiores que recebem mais luz. Melhora circulação de ar, reduz risco de mofo. Aplicar 2-3 semanas antes da floração ou na primeira semana de flora.",
-    icon: "🍭",
+    icon: <Wind className="w-4 h-4"/>,
     phase: "flora",
     recovery: "2-3 dias",
     color: "bg-purple-500/10 border-purple-500/30",
@@ -98,7 +98,7 @@ const TECHNIQUES = [
     shortDesc: "Remover folhas grandes",
     description:
       "Remover folhas grandes (especialmente leques) que bloqueiam luz dos brotos inferiores. Melhora penetração de luz e circulação de ar. Não remover mais de 20-30% de folhas por vez. Aplicar gradualmente durante vegetação e nas semanas 1 e 3 da floração.",
-    icon: "🍃",
+    icon: <Leaf className="w-4 h-4"/>,
     phase: "vega/flora",
     recovery: "1-3 dias",
     color: "bg-yellow-500/10 border-yellow-500/30",
@@ -112,7 +112,7 @@ const TECHNIQUES = [
     shortDesc: "Estrutura simétrica perfeita",
     description:
       "Técnica avançada: combina topping repetido + LST + lollipopping para criar estrutura perfeitamente simétrica com 8-16 colas principais iguais. Requer tempo (vegetação longa de 6-8 semanas). Resultado: canopy uniforme, fácil manejo, flores de tamanho consistente.",
-    icon: "🌳",
+    icon: <Sprout className="w-4 h-4"/>,
     phase: "vega",
     recovery: "7-14 dias",
     color: "bg-indigo-500/10 border-indigo-500/30",
@@ -126,7 +126,7 @@ const TECHNIQUES = [
     shortDesc: "Tela horizontal para canopy",
     description:
       "Instalar tela/rede horizontal (10-30cm acima dos vasos) e tecer galhos através dela durante vegetação. Força canopy plano e uniforme, maximiza exposição à luz. Ideal para poucas plantas (1-4) em espaço pequeno. Rendimento: muito alto por m².",
-    icon: "🕸️",
+    icon: <LayoutGrid className="w-4 h-4"/>,
     phase: "vega",
     recovery: "Sem pausa",
     color: "bg-pink-500/10 border-pink-500/30",
@@ -139,7 +139,7 @@ const TECHNIQUES = [
     shortDesc: "Muitas plantas pequenas",
     description:
       "Cultivar muitas plantas pequenas (9-16 por m²) com vegetação curta (2-3 semanas) e forçar floração cedo. Cria 'mar' de colas principais. Ciclo rápido (8-10 semanas total). Ideal para clones. Rendimento: alto por m², médio por planta.",
-    icon: "🌊",
+    icon: <Waves className="w-4 h-4"/>,
     phase: "vega",
     recovery: "Sem pausa",
     color: "bg-cyan-500/10 border-cyan-500/30",
@@ -307,11 +307,11 @@ export default function PlantLSTTab({ plantId }: PlantLSTTabProps) {
               className="w-full px-3 py-2 border rounded-md bg-background text-sm"
             >
               <option value="">Selecione...</option>
-              <option value="Excelente">✅ Excelente</option>
-              <option value="Boa">👍 Boa</option>
-              <option value="Normal">😐 Normal</option>
-              <option value="Estressada">😰 Estressada</option>
-              <option value="Ruim">❌ Ruim</option>
+              <option value="Excelente">Excelente</option>
+              <option value="Boa">Boa</option>
+              <option value="Normal">Normal</option>
+              <option value="Estressada">Estressada</option>
+              <option value="Ruim">Ruim</option>
             </select>
           </div>
 

@@ -3579,6 +3579,91 @@ export const appRouter = router({
         }));
       }),
 
+    getEnvironmentHistory: protectedProcedure
+      .input(z.object({ plantId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        // 1. Buscar planta
+        const [plant] = await database.select().from(plants).where(eq(plants.id, input.plantId));
+        if (!plant) throw new Error("Plant not found");
+
+        // 2. Buscar histórico de movimentação de estufas
+        const history = await database
+          .select()
+          .from(plantTentHistory)
+          .where(eq(plantTentHistory.plantId, input.plantId))
+          .orderBy(asc(plantTentHistory.movedAt));
+
+        // 3. Buscar todas as estufas para mapeamento de nomes
+        const allTents = await database.select({ id: tents.id, name: tents.name }).from(tents);
+        const tentMap = Object.fromEntries(allTents.map((t: any) => [t.id, t.name]));
+
+        // 4. Reconstruir períodos: quando a planta estava em qual estufa
+        // Cada entrada: plant entra em toTentId em movedAt, sai quando a próxima entrada começa
+        const periods: Array<{ tentId: number; tentName: string; start: Date; end: Date | null }> = [];
+
+        for (let i = 0; i < history.length; i++) {
+          const entry = history[i] as any;
+          if (!entry.toTentId) continue;
+          const start = new Date(entry.movedAt);
+          const end = i + 1 < history.length ? new Date((history[i + 1] as any).movedAt) : null;
+          periods.push({
+            tentId: entry.toTentId,
+            tentName: tentMap[entry.toTentId] ?? `Estufa #${entry.toTentId}`,
+            start,
+            end,
+          });
+        }
+
+        // Se não há histórico mas planta tem estufa atual, criar período desde criação
+        if (periods.length === 0 && plant.currentTentId) {
+          periods.push({
+            tentId: plant.currentTentId,
+            tentName: tentMap[plant.currentTentId] ?? `Estufa #${plant.currentTentId}`,
+            start: new Date(plant.createdAt),
+            end: null,
+          });
+        }
+
+        // 5. Para cada período, buscar logs da estufa naquele intervalo de datas
+        const periodsWithLogs = await Promise.all(
+          periods.map(async (period) => {
+            const allLogs = await database
+              .select()
+              .from(dailyLogs)
+              .where(eq(dailyLogs.tentId, period.tentId))
+              .orderBy(asc(dailyLogs.logDate), asc(dailyLogs.turn));
+
+            // Filtrar por intervalo de datas em JS (evita imports adicionais de drizzle)
+            const logs = (allLogs as any[]).filter((log) => {
+              const logDate = new Date(log.logDate);
+              if (logDate < period.start) return false;
+              if (period.end && logDate >= period.end) return false;
+              return true;
+            });
+
+            const daysInTent = period.end
+              ? Math.floor((period.end.getTime() - period.start.getTime()) / (1000 * 60 * 60 * 24))
+              : Math.floor((Date.now() - period.start.getTime()) / (1000 * 60 * 60 * 24));
+
+            return {
+              tentId: period.tentId,
+              tentName: period.tentName,
+              start: period.start.toISOString(),
+              end: period.end?.toISOString() ?? null,
+              daysInTent,
+              logCount: logs.length,
+              logs,
+            };
+          })
+        );
+
+        return periodsWithLogs;
+      }),
+
     // Buscar fotos da planta
     getPhotos: protectedProcedure
       .input(z.object({ plantId: z.number() }))

@@ -49,28 +49,28 @@ const STATUS_OPTIONS = [
   {
     value: "HEALTHY",
     label: "Saudável",
-    emoji: "🟢",
+    dot: "bg-green-500",
     color: "bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30",
     selectedColor: "bg-green-500/25 border-green-500 ring-2 ring-green-500/40",
   },
   {
     value: "STRESSED",
     label: "Estressada",
-    emoji: "🟡",
+    dot: "bg-yellow-400",
     color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30",
     selectedColor: "bg-yellow-500/25 border-yellow-500 ring-2 ring-yellow-500/40",
   },
   {
     value: "SICK",
     label: "Doente",
-    emoji: "🔴",
+    dot: "bg-red-500",
     color: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30",
     selectedColor: "bg-red-500/25 border-red-500 ring-2 ring-red-500/40",
   },
   {
     value: "RECOVERING",
     label: "Recuperando",
-    emoji: "🟣",
+    dot: "bg-purple-500",
     color: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30",
     selectedColor: "bg-purple-500/25 border-purple-500 ring-2 ring-purple-500/40",
   },
@@ -122,7 +122,6 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
 
   const createHealthLog = trpc.plantHealth.create.useMutation({
     onSuccess: () => {
-      console.log('[PlantHealthTab] Health log created successfully');
       toast.success("Registro de saúde adicionado!");
       setSymptoms("");
       setTreatment("");
@@ -137,7 +136,6 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
       utils.plants.getById.invalidate({ id: plantId });
     },
     onError: (error) => {
-      console.error('[PlantHealthTab] Failed to create health log:', error);
       setUploadStatus("error");
       setUploadMessage("Erro ao salvar foto");
       toast.error(`Erro: ${error.message}`);
@@ -317,7 +315,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                           : `${option.color} hover:scale-[1.02]`
                       }`}
                     >
-                      <span>{option.emoji}</span>
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 inline-block ${option.dot}`}/>
                       <span>{option.label}</span>
                     </button>
                   ))}
@@ -480,174 +478,93 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
               const status = getStatusOption(log.healthStatus);
               const hasDetails = log.symptoms || log.treatment || log.notes;
               return (
-                <div
-                  key={log.id}
-                  className="border rounded-lg bg-card overflow-hidden"
-                >
-                  {/* Main Row - Always Visible */}
+                <div key={log.id} className="rounded-2xl border border-border/40 bg-card overflow-hidden">
                   <Accordion type="single" collapsible>
                     <AccordionItem value={`log-${log.id}`} className="border-0">
-                      <div className="flex items-center gap-3 px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        {/* Photo Thumbnail */}
-                        {log.photoUrl ? (
-                          <div
-                            className="flex-shrink-0 cursor-pointer ring-1 ring-border hover:ring-2 hover:ring-primary/50 transition-all rounded-lg"
-                            onClick={() => {
-                              const photoLogs =
-                                healthLogs?.filter(
-                                  (l: any) => l.photoUrl
-                                ) || [];
-                              const index = photoLogs.findIndex(
-                                (l: any) => l.id === log.id
-                              );
-                              setLightboxIndex(index);
-                              setLightboxPhoto(log.photoUrl);
-                            }}
-                          >
-                            <LazyImage
-                              src={log.photoUrl}
-                              alt="Plant health photo"
-                              aspectRatio="1/1"
-                              className="w-12 h-12 rounded-lg"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
-                            <Heart className="w-5 h-5 text-muted-foreground/40" />
-                          </div>
-                        )}
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
+                      {/* Layout horizontal: info esquerda + foto direita */}
+                      <div className="flex" onClick={(e) => e.stopPropagation()}>
+                        {/* Info à esquerda */}
+                        <div className="flex-1 min-w-0 px-4 py-3.5 flex flex-col justify-start gap-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span
-                              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${status.color}`}
-                            >
-                              {status.emoji} {status.label}
+                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium border ${status.color}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dot}`}/>{status.label}
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(log.logDate).toLocaleString("pt-BR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                            <span className="text-[11px] text-muted-foreground/60">
+                              {new Date(log.logDate).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                             </span>
                           </div>
                           {log.symptoms && (
-                            <p className="text-xs text-muted-foreground mt-1 truncate">
-                              {log.symptoms}
-                            </p>
+                            <p className="text-[11px] text-muted-foreground/70 truncate">{log.symptoms}</p>
                           )}
                         </div>
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Foto + ações à direita */}
+                        <div className="w-[72px] shrink-0 border-l border-border/30 flex flex-col">
+                          {/* Foto 3:4 clicável */}
                           <div
-                            role="button"
-                            tabIndex={0}
-                            className="p-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingLog(log);
-                              setIsEditModalOpen(true);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setEditingLog(log);
-                                setIsEditModalOpen(true);
-                              }
+                            className="flex-1 cursor-pointer bg-white/5"
+                            style={{ aspectRatio: '3/4' }}
+                            onClick={() => {
+                              if (!log.photoUrl) return;
+                              const photoLogs = healthLogs?.filter((l: any) => l.photoUrl) || [];
+                              setLightboxIndex(photoLogs.findIndex((l: any) => l.id === log.id));
+                              setLightboxPhoto(log.photoUrl);
                             }}
                           >
-                            <Edit className="w-3.5 h-3.5 text-muted-foreground" />
+                            {log.photoUrl
+                              ? <img src={log.photoUrl} alt="Saúde" className="w-full h-full object-cover" />
+                              : <div className="w-full h-full flex items-center justify-center">
+                                  <Heart className="w-5 h-5 text-muted-foreground/20" />
+                                </div>
+                            }
                           </div>
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
-                            onClick={() => setDeleteHealthLogConfirm({ open: true, id: log.id })}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setDeleteHealthLogConfirm({ open: true, id: log.id });
-                              }
-                            }}
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          {/* Ações: editar | expandir | excluir */}
+                          <div className="flex border-t border-border/30 shrink-0">
+                            <button
+                              className="flex-1 h-8 flex items-center justify-center text-muted-foreground/40 hover:text-muted-foreground hover:bg-white/5 transition-colors"
+                              onClick={(e) => { e.stopPropagation(); setEditingLog(log); setIsEditModalOpen(true); }}
+                            >
+                              <Edit className="w-3 h-3" />
+                            </button>
+                            {(hasDetails || log.photoUrl) && (
+                              <>
+                                <div className="w-px bg-border/30" />
+                                <AccordionTrigger className="flex-1 h-8 flex items-center justify-center hover:no-underline hover:bg-white/5 [&>svg]:w-3 [&>svg]:h-3 [&>svg]:text-muted-foreground/40" />
+                              </>
+                            )}
+                            <div className="w-px bg-border/30" />
+                            <button
+                              className="flex-1 h-8 flex items-center justify-center text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              onClick={() => setDeleteHealthLogConfirm({ open: true, id: log.id })}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
-                          {(hasDetails || log.photoUrl) && (
-                            <AccordionTrigger className="p-1.5 hover:no-underline [&>svg]:w-3.5 [&>svg]:h-3.5" />
-                          )}
                         </div>
                       </div>
 
-                      {/* Expandable Details */}
+                      {/* Detalhes expansíveis */}
                       {(hasDetails || log.photoUrl) && (
                         <AccordionContent>
-                          <div className="px-4 pb-4 pt-1 border-t">
-                            <div className="flex flex-col md:flex-row gap-4 pt-3">
-                              {/* Text Details */}
-                              {hasDetails && (
-                                <div className="flex-1 space-y-2.5">
-                                  {log.symptoms && (
-                                    <div className="bg-muted/40 rounded-lg p-3">
-                                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                                        Sintomas
-                                      </p>
-                                      <p className="text-sm">{log.symptoms}</p>
-                                    </div>
-                                  )}
-                                  {log.treatment && (
-                                    <div className="bg-muted/40 rounded-lg p-3">
-                                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                                        Tratamento
-                                      </p>
-                                      <p className="text-sm">
-                                        {log.treatment}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {log.notes && (
-                                    <div className="bg-muted/40 rounded-lg p-3">
-                                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                                        Notas
-                                      </p>
-                                      <p className="text-sm">{log.notes}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Photo */}
-                              {log.photoUrl && (
-                                <div className="md:w-48 flex-shrink-0">
-                                  <div
-                                    className="relative group aspect-[3/4] w-full cursor-pointer rounded-lg overflow-hidden"
-                                    onClick={() => {
-                                      const photoLogs =
-                                        healthLogs?.filter(
-                                          (l: any) => l.photoUrl
-                                        ) || [];
-                                      const index = photoLogs.findIndex(
-                                        (l: any) => l.id === log.id
-                                      );
-                                      setLightboxIndex(index);
-                                      setLightboxPhoto(log.photoUrl);
-                                    }}
-                                  >
-                                    <img
-                                      src={log.photoUrl}
-                                      alt="Foto da planta"
-                                      className="w-full h-full object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                      <ZoomIn className="w-6 h-6 text-white" />
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                          <div className="px-4 pb-4 pt-1 border-t border-border/30 space-y-2">
+                            {log.symptoms && (
+                              <div className="rounded-xl border border-border/40 bg-card/50 px-3 py-2.5">
+                                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Sintomas</p>
+                                <p className="text-sm text-foreground">{log.symptoms}</p>
+                              </div>
+                            )}
+                            {log.treatment && (
+                              <div className="rounded-xl border border-border/40 bg-card/50 px-3 py-2.5">
+                                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Tratamento</p>
+                                <p className="text-sm text-foreground">{log.treatment}</p>
+                              </div>
+                            )}
+                            {log.notes && (
+                              <div className="rounded-xl border border-border/40 bg-card/50 px-3 py-2.5">
+                                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Notas</p>
+                                <p className="text-sm text-foreground">{log.notes}</p>
+                              </div>
+                            )}
                           </div>
                         </AccordionContent>
                       )}
@@ -658,17 +575,13 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
             })}
           </div>
         ) : (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <Heart className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">
-                Nenhum registro de saúde ainda
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Clique em "Registrar Saúde" para adicionar o primeiro registro
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl border border-border/40 bg-card py-10 text-center">
+            <Heart className="w-8 h-8 mx-auto text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">Nenhum registro de saúde ainda</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Clique em "Registrar Saúde" para adicionar o primeiro registro
+            </p>
+          </div>
         )}
       </div>
 

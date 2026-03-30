@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PageTransition } from '@/components/PageTransition';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
+import { toast } from 'sonner';
 
 export default function AccountSettings() {
   const { user } = useAuth();
@@ -81,6 +82,7 @@ function ProfileCard() {
 
   const deleteAccount = trpc.profile.deleteAccount.useMutation({
     onSuccess: async () => { await logout(); setLocation('/login'); },
+    onError: (e) => setError(e.message),
   });
 
   const handleDeleteAccount = () => {
@@ -180,8 +182,14 @@ function GroupCard() {
   const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
 
   const { data: group, refetch } = trpc.groups.mine.useQuery();
-  const regenerate = trpc.groups.regenerateCode.useMutation({ onSuccess: () => refetch() });
-  const removeMember = trpc.groups.removeMember.useMutation({ onSuccess: () => refetch() });
+  const regenerate = trpc.groups.regenerateCode.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e) => toast.error(`Erro ao gerar código: ${e.message}`),
+  });
+  const removeMember = trpc.groups.removeMember.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e) => toast.error(`Erro ao remover membro: ${e.message}`),
+  });
 
   const handleCopy = () => {
     if (!group?.inviteCode) return;

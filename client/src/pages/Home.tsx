@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
@@ -597,7 +597,7 @@ export default function Home() {
               {/* Blockers */}
               {!deletePreview.canDelete && (
                 <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                  <p className="text-sm font-medium text-destructive mb-2">⚠️ Não é possível excluir:
+                  <p className="text-sm font-medium text-destructive mb-2 flex items-center gap-1"><AlertTriangle className="w-4 h-4"/>Não é possível excluir:
                   </p>
                   <ul className="text-sm space-y-1 text-destructive/90">
                     {deletePreview.blockers.activeCycles > 0 && (
@@ -636,14 +636,14 @@ export default function Home() {
                   </ul>
                   <p className="text-xs text-muted-foreground mt-2 font-medium">
                     Total: {deletePreview.totalRecords} registro(s)
-                    {deletePreview.totalRecords > 100 && " ⚠️ Grande quantidade de dados!"}
+                    {deletePreview.totalRecords > 100 && <span className="inline-flex items-center gap-1 ml-1"><AlertTriangle className="w-3 h-3 text-amber-400"/>Grande quantidade de dados!</span>}
                   </p>
                 </div>
               )}
               
               {deletePreview.totalRecords === 0 && deletePreview.canDelete && (
                 <div className="p-3 bg-muted/30 rounded-md">
-                  <p className="text-sm text-muted-foreground">✅ Estufa vazia, sem dados relacionados.</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-green-500"/>Estufa vazia, sem dados relacionados.</p>
                 </div>
               )}
             </div>
@@ -658,7 +658,7 @@ export default function Home() {
                 className="w-full"
                 disabled={deleteTent.isPending || moveAllPlants.isPending}
               >
-                🚚 Mover Todas as Plantas Primeiro
+                <span className="flex items-center gap-2"><ArrowRight className="w-4 h-4"/>Mover Todas as Plantas Primeiro</span>
               </Button>
             </div>
           ) : (
@@ -826,8 +826,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { tentId: tent.id, limit: 7 },
     { staleTime: 5 * 60 * 1000 }
   );
-  const sparkTemps = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
-  const sparkRh    = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
+  const sparkTemps    = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
+  const sparkRh       = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
 
   // Buscar targets ideais - usa média das strains das plantas na estufa
   const currentWeek = cycle ? (() => {
@@ -853,7 +853,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { staleTime: 2 * 60 * 1000 }
   );
   const markAllSeen = trpc.alerts.markAllAsSeen.useMutation();
-  const newAlerts = (alertCount as number) ?? 0;
+  const newAlerts = alertCount != null ? Number(alertCount) : 0;
   
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
@@ -971,7 +971,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         <Link href="/alerts" onClick={e => e.stopPropagation()}>
           <div
             title={`${newAlerts} alerta${newAlerts > 1 ? 's' : ''}`}
-            className="absolute -top-2 -right-2 z-30 min-w-[22px] h-[22px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-900/50 animate-pulse"
+            className="absolute -top-3 right-2 z-30 min-w-[32px] h-[32px] px-2 rounded-full bg-red-500 text-white text-sm font-bold flex items-center justify-center shadow-lg shadow-red-900/50 animate-pulse"
           >
             {newAlerts > 9 ? '9+' : newAlerts}
           </div>
@@ -1318,7 +1318,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           {targets?._isAverage && (
             <div className="pt-3 pb-1">
               <p className="text-xs text-center text-muted-foreground bg-accent/30 rounded px-2 py-1">
-                📊 Parâmetros médios ({targets._strainCount} strains)
+                <span className="inline-flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5 text-blue-400"/>Parâmetros médios ({targets._strainCount} strains)</span>
               </p>
             </div>
           )}

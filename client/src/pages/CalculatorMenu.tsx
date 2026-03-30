@@ -1,7 +1,5 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { Calculator, Droplets, Sun, Beaker, TestTube, Timer } from "lucide-react";
+import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 
 export default function CalculatorMenu() {
@@ -9,60 +7,80 @@ export default function CalculatorMenu() {
     {
       id: "watering-runoff",
       title: "Rega e Runoff",
-      description: "Calcule volume ideal de rega e meça runoff real",
+      description: "Volume ideal de rega e medição de runoff real",
       icon: Droplets,
-      color: "from-teal-500 to-cyan-500",
-      bgColor: "bg-teal-500/10",
-      iconColor: "text-teal-600 dark:text-teal-400",
+      gradient: "from-teal-400 to-cyan-500",
+      border: "border-teal-500/20",
+      glow: "rgba(20,184,166,0.09)",
+      accentColor: "text-teal-400",
+      shadowColor: "shadow-teal-900/20",
       badge: "Popular",
+      badgeStyle: "bg-teal-500/15 text-teal-300 border border-teal-500/25",
     },
     {
       id: "irrigation-schedule",
       title: "Rega Automática",
-      description: "Cronograma de ciclos por bomba gotejadora, vaso e janela de luz",
+      description: "Cronograma de ciclos por bomba gotejadora e janela de luz",
       icon: Timer,
-      color: "from-blue-500 to-cyan-600",
-      bgColor: "bg-blue-500/10",
-      iconColor: "text-blue-600 dark:text-blue-400",
+      gradient: "from-blue-400 to-cyan-500",
+      border: "border-blue-500/20",
+      glow: "rgba(59,130,246,0.09)",
+      accentColor: "text-blue-400",
+      shadowColor: "shadow-blue-900/20",
       badge: "Novo",
+      badgeStyle: "bg-blue-500/15 text-blue-300 border border-blue-500/25",
     },
     {
       id: "nutrients",
       title: "Fertilização",
-      description: "Calcule receitas de sais minerais por fase e semana",
-      icon: Beaker,
-      color: "from-green-500 to-emerald-500",
-      bgColor: "bg-green-500/10",
-      iconColor: "text-green-600",
+      description: "Receitas de sais minerais por fase e semana de cultivo",
+      icon: FlaskConical,
+      gradient: "from-emerald-400 to-green-500",
+      border: "border-emerald-500/20",
+      glow: "rgba(16,185,129,0.09)",
+      accentColor: "text-emerald-400",
+      shadowColor: "shadow-emerald-900/20",
       badge: "Popular",
+      badgeStyle: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25",
     },
     {
       id: "lux-ppfd",
       title: "Conversor Lux → PPFD",
-      description: "Converta leitura de lux para PPFD",
+      description: "Converta leitura de luxímetro para PPFD por tipo de luz",
       icon: Sun,
-      color: "from-yellow-500 to-orange-500",
-      bgColor: "bg-yellow-500/10",
-      iconColor: "text-yellow-600 dark:text-yellow-400",
+      gradient: "from-yellow-400 to-amber-500",
+      border: "border-yellow-500/20",
+      glow: "rgba(234,179,8,0.08)",
+      accentColor: "text-yellow-400",
+      shadowColor: "shadow-yellow-900/20",
+      badge: null,
+      badgeStyle: "",
     },
     {
       id: "ppm-ec",
       title: "Conversor PPM ↔ EC",
-      description: "Converta entre PPM e EC bidirecionalmente",
+      description: "Converta entre partes por milhão e condutividade elétrica",
       icon: Calculator,
-      color: "from-gray-500 to-gray-600",
-      bgColor: "bg-gray-500/10",
-      iconColor: "text-gray-600 dark:text-gray-400",
+      gradient: "from-violet-400 to-purple-500",
+      border: "border-violet-500/20",
+      glow: "rgba(139,92,246,0.08)",
+      accentColor: "text-violet-400",
+      shadowColor: "shadow-violet-900/20",
+      badge: null,
+      badgeStyle: "",
     },
     {
       id: "ph-adjust",
       title: "Calculadora de pH",
-      description: "Calcule ajustes necessários de pH",
+      description: "Calcule quanto ácido ou base adicionar para ajustar o pH",
       icon: TestTube,
-      color: "from-red-600 to-red-700",
-      bgColor: "bg-red-500/10",
-      iconColor: "text-red-600 dark:text-red-400",
+      gradient: "from-rose-400 to-red-500",
+      border: "border-rose-500/20",
+      glow: "rgba(244,63,94,0.08)",
+      accentColor: "text-rose-400",
+      shadowColor: "shadow-rose-900/20",
       badge: "Novo",
+      badgeStyle: "bg-rose-500/15 text-rose-300 border border-rose-500/25",
     },
   ];
 
@@ -71,7 +89,7 @@ export default function CalculatorMenu() {
       header={
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/40">
               <Calculator className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
@@ -82,76 +100,62 @@ export default function CalculatorMenu() {
         </div>
       }
     >
-      {/* Content */}
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {calculators.map((calc, index) => {
             const Icon = calc.icon;
             return (
               <Link key={calc.id} href={`/calculators/${calc.id}`}>
-                <Card 
-                  className={`cursor-pointer hover:shadow-xl transition-all duration-300 hover:scale-[1.02] border-2 ${calc.bgColor} hover:border-primary/50 w-full overflow-hidden p-5 md:p-6 animate-in fade-in slide-in-from-bottom-4`}
-                  style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'backwards' }}
+                <div
+                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4`}
+                  style={{
+                    animationDelay: `${index * 80}ms`,
+                    animationFillMode: 'backwards',
+                    background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
+                  }}
                 >
-                  <CardHeader className="p-4 md:p-6 space-y-3 md:space-y-4">
+                  <div className="p-5 space-y-4">
+                    {/* Top row: icon + badge */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className={`w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br ${calc.color} flex items-center justify-center shadow-lg`}>
-                        <Icon className="w-7 h-7 md:w-8 md:h-8 text-white" />
+                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300`}>
+                        <Icon className="w-7 h-7 text-white drop-shadow-sm" />
                       </div>
                       {calc.badge && (
-                        <Badge 
-                          variant={calc.badge === "Novo" ? "default" : "secondary"}
-                          className="text-xs font-semibold"
-                        >
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${calc.badgeStyle}`}>
                           {calc.badge}
-                        </Badge>
+                        </span>
                       )}
                     </div>
-                    <div className="space-y-1.5">
-                      <CardTitle className="text-xl md:text-2xl font-bold leading-tight">{calc.title}</CardTitle>
-                      <CardDescription className="text-sm md:text-base leading-relaxed">
-                        {calc.description}
-                      </CardDescription>
+
+                    {/* Title + description */}
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{calc.description}</p>
                     </div>
-                  </CardHeader>
-                  <CardContent className="px-4 pb-4 md:px-6 md:pb-6 pt-0">
-                    <div className="flex items-center text-sm md:text-base font-medium text-primary">
+
+                    {/* CTA */}
+                    <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200`}>
                       <span>Abrir calculadora</span>
-                      <span className="ml-2 text-xl">→</span>
+                      <ArrowRight className="w-4 h-4" />
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </Link>
             );
           })}
         </div>
 
         {/* Info Card */}
-        <Card className="mt-4 md:mt-8 bg-primary/10 border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Beaker className="w-5 h-5 text-green-600 dark:text-green-400" />
-              Sobre as Calculadoras
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-foreground">
-            <p>
-              <strong>💧 Rega e Runoff:</strong> Calcule o volume ideal de rega e meça o runoff real com recomendações de ajuste
-            </p>
-            <p>
-              <strong>🧪 Fertilização:</strong> Calcule receitas de sais minerais (Nitrato de Cálcio, Potássio, MKP, Sulfato de Magnésio) por fase e semana
-            </p>
-            <p>
-              <strong>☀️ Lux → PPFD:</strong> Converta leituras de luxímetro para PPFD (medida usada em cultivo)
-            </p>
-            <p>
-              <strong>🧪 PPM ↔ EC:</strong> Converta entre partes por milhão e condutividade elétrica
-            </p>
-            <p>
-              <strong>🔬 pH:</strong> Calcule quanto ácido/base adicionar para ajustar o pH da solução
-            </p>
-          </CardContent>
-        </Card>
+        <div className="mt-4 rounded-2xl border border-border/50 bg-muted/10 p-4 space-y-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Beaker className="w-3.5 h-3.5" /> Sobre as Calculadoras
+          </p>
+          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Droplets className="w-3 h-3 text-cyan-400"/>Rega e Runoff:</strong> Volume ideal de rega com recomendações de ajuste por runoff</p>
+          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><FlaskConical className="w-3 h-3 text-emerald-400"/>Fertilização:</strong> Receitas de sais minerais (Ca, K, MKP, Mg) por fase e semana</p>
+          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Sun className="w-3 h-3 text-yellow-400"/>Lux → PPFD:</strong> Converta leituras de luxímetro para PPFD por tipo de luminária</p>
+          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Calculator className="w-3 h-3 text-violet-400"/>PPM ↔ EC:</strong> Conversão bidirecional entre partes por milhão e condutividade</p>
+          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Microscope className="w-3 h-3 text-rose-400"/>pH:</strong> Calcule quanto ácido ou base adicionar para ajustar o pH da solução</p>
+        </div>
       </main>
     </PageLayout>
   );

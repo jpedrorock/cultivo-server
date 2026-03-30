@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, Droplets, Sprout, Sun, Download, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Calculator, Droplets, Sprout, Sun, Download, AlertCircle, CheckCircle2, Target, Lightbulb, AlertTriangle, BarChart2, ClipboardList } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PageTransition } from "@/components/PageTransition";
 import { RangeSlider } from "@/components/ui/range-slider";
@@ -331,289 +331,237 @@ function WateringRunoffCalculator() {
     }
   };
 
+  // helpers de estilo neon reutilizáveis
+  const chipBase = "py-2.5 rounded-xl font-bold text-sm transition-all duration-200 active:scale-95";
+  const chipInactive = "bg-card border border-border/60 text-muted-foreground hover:border-primary/40 hover:text-foreground";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "calculator" | "history")}>
         <TabsList className="w-full">
           <TabsTrigger value="calculator" className="flex-1">Calculadora</TabsTrigger>
           <TabsTrigger value="history" className="flex-1">Histórico</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="calculator" className="space-y-6 mt-6">
-          {/* Calculadora de Rega */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Droplets className="w-5 h-5 text-blue-500" />
-                Calculadora de Rega
-              </CardTitle>
-              <CardDescription>
-                Calcule o volume ideal de água baseado no tamanho do vaso
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+        <TabsContent value="calculator" className="space-y-4 mt-4">
+
+          {/* ── Bloco principal: parâmetros ── */}
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+            {/* Header do bloco */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.12) 0%, rgba(6,182,212,0.05) 100%)' }}>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg shadow-cyan-900/30">
+                <Droplets className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Calculadora de Rega</p>
+                <p className="text-[11px] text-muted-foreground">Volume ideal por vaso e por sessão</p>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-5">
               {/* Número de plantas */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Label className="text-base font-semibold">Número de Plantas</Label>
-                  <span className="text-2xl font-bold text-primary">{numPlants}</span>
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nº de Plantas</span>
+                  <span className="text-xl font-bold text-cyan-400" style={{ textShadow: '0 0 12px rgba(34,211,238,0.5)' }}>{numPlants}</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[2, 4, 6, 8].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => { haptic.tap(); setNumPlants(n); }}
-                      className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
-                        numPlants === n
-                          ? "bg-blue-500 text-white shadow-md scale-105"
-                          : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-blue-400"
-                      }`}
-                    >
+                    <button key={n} onClick={() => { haptic.tap(); setNumPlants(n); }}
+                      className={`${chipBase} ${numPlants === n
+                        ? "bg-cyan-500/15 border border-cyan-400/60 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
+                        : chipInactive}`}>
                       {n}
                     </button>
                   ))}
                 </div>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="Outro número de plantas..."
+                <Input type="number" inputMode="numeric" placeholder="Outro número..."
                   value={![2,4,6,8].includes(numPlants) ? numPlants : ""}
                   onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) setNumPlants(v); }}
-                  className="h-11 text-center text-lg font-bold"
-                />
+                  className="h-10 text-center font-bold bg-muted/30 border-border/50" />
               </div>
 
+              <div className="h-px bg-border/40" />
+
               {/* Tamanho do vaso */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Label className="text-base font-semibold">Tamanho do Vaso</Label>
-                  <span className="text-2xl font-bold text-primary">{potSize}L</span>
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tamanho do Vaso</span>
+                  <span className="text-xl font-bold text-cyan-400" style={{ textShadow: '0 0 12px rgba(34,211,238,0.5)' }}>{potSize}L</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[5, 11, 20, 50].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => { haptic.tap(); setPotSize(n); }}
-                      className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
-                        potSize === n
-                          ? "bg-blue-500 text-white shadow-md scale-105"
-                          : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-blue-400"
-                      }`}
-                    >
+                    <button key={n} onClick={() => { haptic.tap(); setPotSize(n); }}
+                      className={`${chipBase} ${potSize === n
+                        ? "bg-cyan-500/15 border border-cyan-400/60 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]"
+                        : chipInactive}`}>
                       {n}L
                     </button>
                   ))}
                 </div>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="Outro tamanho (L)..."
+                <Input type="text" inputMode="decimal" placeholder="Outro tamanho (L)..."
                   value={![5,11,20,50].includes(potSize) ? potSize : ""}
-                  onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v > 0) setPotSize(v); }}
-                  className="h-11 text-center text-lg font-bold"
-                />
+                  onChange={(e) => { const raw = e.target.value.replace(",", "."); const v = parseFloat(raw); if (!isNaN(v) && v > 0) setPotSize(v); }}
+                  className="h-10 text-center font-bold bg-muted/30 border-border/50" />
               </div>
 
+              <div className="h-px bg-border/40" />
+
               {/* Runoff desejado */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <Label className="text-base font-semibold">Runoff Desejado</Label>
-                  <span className={`text-2xl font-bold ${
-                    desiredRunoff < 10 ? "text-red-500" : desiredRunoff <= 25 ? "text-green-500" : "text-yellow-500"
-                  }`}>{desiredRunoff}%</span>
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runoff Desejado</span>
+                  <span className={`text-xl font-bold ${desiredRunoff < 10 ? "text-red-400" : desiredRunoff <= 25 ? "text-emerald-400" : "text-yellow-400"}`}
+                    style={{ textShadow: desiredRunoff <= 25 && desiredRunoff >= 10 ? '0 0 12px rgba(74,222,128,0.5)' : undefined }}>
+                    {desiredRunoff}%
+                  </span>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[10, 15, 20, 25].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => { haptic.tap(); setDesiredRunoff(n); }}
-                      className={`py-2.5 rounded-xl font-bold text-sm transition-all duration-200 ${
-                        desiredRunoff === n
-                          ? "bg-green-500 text-white shadow-md scale-105"
-                          : "bg-card dark:bg-zinc-800 border-2 border-border dark:border-zinc-600 text-foreground hover:border-green-400"
-                      }`}
-                    >
+                    <button key={n} onClick={() => { haptic.tap(); setDesiredRunoff(n); }}
+                      className={`${chipBase} ${desiredRunoff === n
+                        ? "bg-emerald-500/15 border border-emerald-400/60 text-emerald-300 shadow-[0_0_12px_rgba(74,222,128,0.2)]"
+                        : chipInactive}`}>
                       {n}%
-                      {(n === 15 || n === 20) && (
-                        <span className="block text-[10px] font-normal opacity-75">ideal</span>
-                      )}
+                      {(n === 15 || n === 20) && <span className="block text-[9px] font-normal opacity-60">ideal</span>}
                     </button>
                   ))}
                 </div>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="Outro % de runoff..."
+                <Input type="number" inputMode="numeric" placeholder="Outro %..."
                   value={![10,15,20,25].includes(desiredRunoff) ? desiredRunoff : ""}
                   onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v) && v >= 0) setDesiredRunoff(v); }}
-                  className="h-11 text-center text-lg font-bold"
-                />
+                  className="h-10 text-center font-bold bg-muted/30 border-border/50" />
               </div>
 
-              {/* Runoff real (opcional) */}
+              <div className="h-px bg-border/40" />
+
+              {/* Runoff real opcional */}
               <div className="space-y-2">
-                <Label htmlFor="lastRunoff" className="text-sm text-muted-foreground">
-                  Runoff Real da Última Rega (opcional)
-                </Label>
-                <Input
-                  id="lastRunoff"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="Ex: 15"
-                  value={lastRunoff}
-                  onChange={(e) => setLastRunoff(e.target.value)}
-                  className="h-12 text-center text-lg font-bold"
-                />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runoff Real da Última Rega <span className="normal-case font-normal">(opcional)</span></span>
+                <Input id="lastRunoff" type="text" inputMode="decimal" placeholder="Ex: 15"
+                  value={lastRunoff} onChange={(e) => setLastRunoff(e.target.value)}
+                  className="h-10 text-center font-bold bg-muted/30 border-border/50" />
               </div>
+            </div>
 
-              {/* Resultado */}
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5 space-y-3">
-                <h3 className="font-semibold text-foreground">Resultado:</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-background/60 rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Por planta</p>
-                    <p className="text-2xl font-bold text-blue-600">{wateringResult.adjustedVolume}L</p>
-                  </div>
-                  <div className="bg-background/60 rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Total ({numPlants} plantas)</p>
-                    <p className="text-2xl font-bold text-blue-600">{wateringResult.totalVolume}L</p>
-                  </div>
-                </div>
-                {wateringResult.adjustment && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                    <p className="text-sm">🎯 {wateringResult.adjustment}</p>
-                  </div>
-                )}
+            {/* Resultado — dentro do mesmo card, separado */}
+            <div className="mx-4 mb-4 rounded-xl overflow-hidden border border-cyan-500/20" style={{ background: 'linear-gradient(135deg, rgba(34,211,238,0.12) 0%, rgba(6,182,212,0.06) 100%)' }}>
+              <div className="px-4 py-2 border-b border-cyan-500/15">
+                <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400/80">Resultado</p>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Calculadora de Runoff */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Droplets className="w-5 h-5 text-cyan-500" />
-                Verificar Runoff Real
-              </CardTitle>
-              <CardDescription>
-                Meça o volume coletado e calcule o runoff real
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="volumeIn">Volume Aplicado (L)</Label>
-                  <Input
-                    id="volumeIn"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="Ex: 3.5"
-                    value={volumeIn}
-                    onChange={(e) => setVolumeIn(e.target.value)}
-                    className="h-12 text-center text-lg font-bold"
-                  />
+              <div className="grid grid-cols-2 divide-x divide-cyan-500/15">
+                <div className="p-4 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Por Planta</p>
+                  <p className="text-3xl font-bold text-cyan-300" style={{ textShadow: '0 0 20px rgba(34,211,238,0.4)' }}>{wateringResult.adjustedVolume}<span className="text-base font-medium text-cyan-400/70 ml-0.5">L</span></p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="volumeOut">Volume Coletado (L)</Label>
-                  <Input
-                    id="volumeOut"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="Ex: 0.7"
-                    value={volumeOut}
-                    onChange={(e) => setVolumeOut(e.target.value)}
-                    className="h-12 text-center text-lg font-bold"
-                  />
+                <div className="p-4 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Total · {numPlants} plantas</p>
+                  <p className="text-3xl font-bold text-cyan-300" style={{ textShadow: '0 0 20px rgba(34,211,238,0.4)' }}>{wateringResult.totalVolume}<span className="text-base font-medium text-cyan-400/70 ml-0.5">L</span></p>
+                </div>
+              </div>
+              {wateringResult.adjustment && (
+                <div className="mx-3 mb-3 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                  <p className="text-xs text-yellow-300 flex items-center gap-1"><Target className="w-3 h-3"/> {wateringResult.adjustment}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Verificar Runoff Real ── */}
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(74,222,128,0.10) 0%, rgba(16,185,129,0.04) 100%)' }}>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+                <CheckCircle2 className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Verificar Runoff Real</p>
+                <p className="text-[11px] text-muted-foreground">Meça o volume coletado e calcule o %</p>
+              </div>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Volume Aplicado</span>
+                  <Input id="volumeIn" type="text" inputMode="decimal" placeholder="Ex: 3.5"
+                    value={volumeIn} onChange={(e) => setVolumeIn(e.target.value)}
+                    className="h-12 text-center text-lg font-bold bg-muted/30 border-border/50" />
+                  <p className="text-[10px] text-center text-muted-foreground">litros (L)</p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Volume Coletado</span>
+                  <Input id="volumeOut" type="text" inputMode="decimal" placeholder="Ex: 0.7"
+                    value={volumeOut} onChange={(e) => setVolumeOut(e.target.value)}
+                    className="h-12 text-center text-lg font-bold bg-muted/30 border-border/50" />
+                  <p className="text-[10px] text-center text-muted-foreground">litros (L)</p>
                 </div>
               </div>
 
               {runoffResult && (
-                <div className="space-y-3 pt-2">
-                  <div className="bg-muted/50 p-4 rounded-lg flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Runoff Real:</span>
-                    <span className="font-bold text-2xl text-foreground">{runoffResult.runoffPercent}%</span>
-                  </div>
-                  <div className={`p-4 rounded-lg flex items-start gap-3 ${
-                    runoffResult.status === "ideal"
-                      ? "bg-green-500/10 border border-green-500/30"
-                      : "bg-amber-500/10 border border-amber-500/30"
-                  }`}>
-                    {runoffResult.status === "ideal" ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    )}
-                    <div>
-                      <p className={`font-semibold ${runoffResult.status === "ideal" ? "text-green-600" : "text-amber-600"}`}>
-                        {runoffResult.status === "ideal" ? "✅ Ideal!" : "⚠️ Ajuste Necessário"}
-                      </p>
-                      <p className="text-sm text-foreground mt-1">{runoffResult.recommendation}</p>
+                <div className={`rounded-xl border p-4 space-y-2 ${
+                  runoffResult.status === "ideal"
+                    ? "bg-emerald-500/10 border-emerald-500/30"
+                    : "bg-amber-500/10 border-amber-500/30"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {runoffResult.status === "ideal"
+                        ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        : <AlertCircle className="w-4 h-4 text-amber-400" />}
+                      <span className={`text-sm font-semibold ${runoffResult.status === "ideal" ? "text-emerald-400" : "text-amber-400"}`}>
+                        {runoffResult.status === "ideal" ? "Ideal" : "Ajuste Necessário"}
+                      </span>
                     </div>
+                    <span className={`text-2xl font-bold ${runoffResult.status === "ideal" ? "text-emerald-300" : "text-amber-300"}`}
+                      style={{ textShadow: runoffResult.status === "ideal" ? '0 0 16px rgba(74,222,128,0.5)' : '0 0 16px rgba(251,191,36,0.4)' }}>
+                      {runoffResult.runoffPercent}%
+                    </span>
                   </div>
+                  <p className="text-xs text-muted-foreground">{runoffResult.recommendation}</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Dicas */}
-          <Card>
-            <CardHeader>
-              <CardTitle>💡 Dicas de Uso</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                <strong className="text-foreground">Runoff Ideal:</strong> Entre 15-25%.
-                Runoff muito baixo pode causar acúmulo de sais, muito alto desperdiça água e nutrientes.
-              </p>
-              <p>
-                <strong className="text-foreground">Ajuste Automático:</strong> Informe o runoff real da última rega
-                para o sistema ajustar o volume automaticamente.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Botão Salvar Receita */}
-          <Card>
-            <CardHeader>
-              <CardTitle>💾 Salvar Receita de Rega</CardTitle>
-              <CardDescription>Registre esta receita para consulta futura</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tent-select">Estufa</Label>
-                <select
-                  id="tent-select"
-                  className="w-full px-3 py-2 border rounded-md bg-background"
-                  value={selectedTent || ""}
-                  onChange={(e) => setSelectedTent(e.target.value ? Number(e.target.value) : null)}
-                >
+          {/* ── Salvar Receita ── */}
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.10) 0%, rgba(109,40,217,0.04) 100%)' }}>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-900/30">
+                <Download className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Salvar Receita</p>
+                <p className="text-[11px] text-muted-foreground">Registre para consulta futura</p>
+              </div>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Estufa</span>
+                <select className="w-full h-10 px-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-foreground"
+                  value={selectedTent || ""} onChange={(e) => setSelectedTent(e.target.value ? Number(e.target.value) : null)}>
                   <option value="">Selecione uma estufa</option>
-                  {tents.data?.map((tent) => (
-                    <option key={tent.id} value={tent.id}>
-                      {tent.name}
-                    </option>
-                  ))}
+                  {tents.data?.map((tent) => <option key={tent.id} value={tent.id}>{tent.name}</option>)}
                 </select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes-input">Observações (opcional)</Label>
-                <textarea
-                  id="notes-input"
-                  className="w-full px-3 py-2 border rounded-md min-h-[80px] bg-background"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex: Ajustado volume devido ao runoff baixo..."
-                />
+              <div className="space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Observações <span className="normal-case font-normal">(opcional)</span></span>
+                <textarea className="w-full px-3 py-2 rounded-lg border border-border/50 bg-muted/30 text-sm min-h-[72px] resize-none text-foreground placeholder:text-muted-foreground/50"
+                  value={notes} onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ex: Ajustado volume devido ao runoff baixo..." />
               </div>
-              <Button
-                onClick={handleSaveRecipe}
-                disabled={!selectedTent || saveApplication.isPending}
-                className="w-full"
-              >
+              <Button onClick={handleSaveRecipe} disabled={!selectedTent || saveApplication.isPending}
+                className="w-full h-11 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-violet-900/30 border-0">
                 {saveApplication.isPending ? "Salvando..." : "Salvar Receita"}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+
+          {/* ── Dicas ── */}
+          <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-yellow-400/80 flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/>Dicas de Uso</p>
+            <p className="text-xs text-muted-foreground"><span className="text-foreground font-medium">Runoff Ideal:</span> Entre 15–25%. Muito baixo acumula sais, muito alto desperdiça nutrientes.</p>
+            <p className="text-xs text-muted-foreground"><span className="text-foreground font-medium">Ajuste Automático:</span> Informe o runoff da última rega para o sistema corrigir o volume.</p>
+          </div>
+
         </TabsContent>
 
         <TabsContent value="history" className="space-y-6">
@@ -663,7 +611,7 @@ function WateringRunoffCalculator() {
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div>
-                          <CardTitle className="text-lg">💧 {app.recipeName}</CardTitle>
+                          <CardTitle className="text-lg flex items-center gap-1.5"><Droplets className="w-4 h-4 text-cyan-400"/>{app.recipeName}</CardTitle>
                           <CardDescription>
                             {new Date(app.applicationDate).toLocaleDateString('pt-BR')}
                           </CardDescription>
@@ -751,17 +699,17 @@ function LuxPPFDCalculator() {
   ];
 
   return (
-    <Card className="bg-card/90 backdrop-blur-sm" data-tour="calculator-lux-ppfd">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sun className="w-8 h-8 text-yellow-500" />
-          Calculadora Lux ↔ PPFD
-        </CardTitle>
-        <CardDescription>
-          Converta entre Lux (luxímetro) e PPFD (µmol/m²/s) baseado no tipo de luz
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden" data-tour="calculator-lux-ppfd">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.12) 0%, rgba(202,138,4,0.05) 100%)' }}>
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-900/30">
+          <Sun className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">Calculadora Lux ↔ PPFD</p>
+          <p className="text-[11px] text-muted-foreground">Converta entre Lux (luxímetro) e PPFD (µmol/m²/s) baseado no tipo de luz</p>
+        </div>
+      </div>
+      <div className="p-4 space-y-6">
         {/* Seletor de modo */}
         <div className="flex gap-2 p-1 bg-muted rounded-lg">
           <button
@@ -857,12 +805,12 @@ function LuxPPFDCalculator() {
 
         {/* Resultado */}
         {result !== null && (
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-6 space-y-3">
+          <div className="rounded-xl border border-yellow-400/30 p-4 space-y-3" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.10) 0%, rgba(202,138,4,0.04) 100%)' }}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">
                 {conversionMode === "lux-to-ppfd" ? "PPFD estimado:" : "Lux estimado:"}
               </span>
-              <span className="text-3xl font-bold text-yellow-600">
+              <span className="text-3xl font-bold text-yellow-400" style={{ textShadow: '0 0 16px rgba(234,179,8,0.6)' }}>
                 {conversionMode === "lux-to-ppfd"
                   ? `${result} µmol/m²/s`
                   : `${result.toLocaleString('pt-BR')} lux`}
@@ -878,7 +826,7 @@ function LuxPPFDCalculator() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              💡 <strong>Dica:</strong> Esta é uma estimativa. Para medições precisas, use um medidor PPFD (quantum sensor).
+              <span className="inline-flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/><strong>Dica:</strong></span> Esta é uma estimativa. Para medições precisas, use um medidor PPFD (quantum sensor).
             </p>
             <Button onClick={() => exportLuxPPFDRecipe(lux, lightType, result)} variant="outline" className="w-full mt-4">
               <Download className="w-4 h-4 mr-2" />
@@ -886,8 +834,8 @@ function LuxPPFDCalculator() {
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -911,17 +859,17 @@ function PPMECConverter() {
   }, [inputValue, conversionType, scale]);
 
   return (
-    <Card className="bg-card/90 backdrop-blur-sm" data-tour="calculator-ppm-ec">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calculator className="w-5 h-5 text-purple-500" />
-          Conversão PPM ↔ EC
-        </CardTitle>
-        <CardDescription>
-          Converta entre PPM (partes por milhão) e EC (condutividade elétrica)
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden" data-tour="calculator-ppm-ec">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(139,92,246,0.05) 100%)' }}>
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-900/30">
+          <Calculator className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">Conversão PPM ↔ EC</p>
+          <p className="text-[11px] text-muted-foreground">Converta entre PPM (partes por milhão) e EC (condutividade elétrica)</p>
+        </div>
+      </div>
+      <div className="p-4 space-y-6">
         {/* Modo */}
         <div className="flex gap-2 p-1 bg-muted rounded-lg">
           <button
@@ -982,25 +930,25 @@ function PPMECConverter() {
 
         {/* Resultado */}
         {result !== null && (
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-6">
+          <div className="rounded-xl border border-purple-400/30 p-4" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.10) 0%, rgba(139,92,246,0.04) 100%)' }}>
             <h4 className="font-semibold text-foreground mb-3">Resultado:</h4>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">
                 {conversionType === "ppm-to-ec" ? "EC (mS/cm):" : "PPM:"}
               </span>
-              <span className="text-3xl font-bold text-purple-600">
+              <span className="text-3xl font-bold text-purple-400" style={{ textShadow: '0 0 16px rgba(168,85,247,0.6)' }}>
                 {result} {conversionType === "ppm-to-ec" ? "mS/cm" : "PPM"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              📊 <strong>Referência:</strong> Vega: 1.0-1.8 EC | Flora: 1.8-2.4 EC
+              <span className="inline-flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5 text-blue-400"/><strong>Referência:</strong></span> Vega: 1.0-1.8 EC | Flora: 1.8-2.4 EC
             </p>
           </div>
         )}
 
         {/* Tabela */}
-        <div className="bg-muted border border-border rounded-lg p-4">
-          <h5 className="text-sm font-semibold text-foreground mb-3">📋 Tabela de Referência (Escala {scale}):</h5>
+        <div className="rounded-xl border border-border/50 p-4 bg-muted/30">
+          <h5 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-muted-foreground"/>Tabela de Referência (Escala {scale}):</h5>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Clonagem:</span>
@@ -1020,8 +968,8 @@ function PPMECConverter() {
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -1176,14 +1124,14 @@ function PHAdjustCalculator() {
               <span className="text-3xl font-bold text-blue-600">{result.amount} ml</span>
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              ⚠️ <strong>Importante:</strong> Adicione aos poucos, misture bem e meça novamente. Nunca adicione tudo de uma vez!
+              <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-amber-400"/><strong>Importante:</strong></span> Adicione aos poucos, misture bem e meça novamente. Nunca adicione tudo de uma vez!
             </p>
           </div>
         )}
 
         {/* Tabela de Referência */}
         <div className="bg-muted border border-border rounded-lg p-4">
-          <h5 className="text-sm font-semibold text-foreground mb-3">📋 pH Ideal por Substrato:</h5>
+          <h5 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-muted-foreground"/>pH Ideal por Substrato:</h5>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Solo/Terra:</span>
@@ -1199,7 +1147,7 @@ function PHAdjustCalculator() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            💡 <strong>Dica:</strong> pH fora da faixa ideal bloqueia absorção de nutrientes, causando deficiências mesmo com fertilização adequada.
+            <span className="inline-flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/><strong>Dica:</strong></span> pH fora da faixa ideal bloqueia absorção de nutrientes, causando deficiências mesmo com fertilização adequada.
           </p>
         </div>
       </CardContent>

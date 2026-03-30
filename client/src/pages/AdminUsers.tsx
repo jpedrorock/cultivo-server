@@ -6,6 +6,7 @@ import { useAuth } from '@/_core/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageTransition } from '@/components/PageTransition';
+import { toast } from 'sonner';
 
 export default function AdminUsers() {
   const { user } = useAuth();
@@ -14,10 +15,22 @@ export default function AdminUsers() {
   const [tab, setTab] = useState<'approved' | 'pending'>('approved');
 
   const { data: users, isLoading, refetch } = trpc.admin.listUsers.useQuery();
-  const deleteUser = trpc.admin.deleteUser.useMutation({ onSuccess: () => refetch() });
-  const setRole = trpc.admin.setRole.useMutation({ onSuccess: () => refetch() });
-  const approveUser = trpc.admin.approveUser.useMutation({ onSuccess: () => refetch() });
-  const revokeUser = trpc.admin.revokeUser.useMutation({ onSuccess: () => refetch() });
+  const deleteUser = trpc.admin.deleteUser.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e) => toast.error(`Erro ao excluir usuário: ${e.message}`),
+  });
+  const setRole = trpc.admin.setRole.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e) => toast.error(`Erro ao alterar role: ${e.message}`),
+  });
+  const approveUser = trpc.admin.approveUser.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e) => toast.error(`Erro ao aprovar usuário: ${e.message}`),
+  });
+  const revokeUser = trpc.admin.revokeUser.useMutation({
+    onSuccess: () => refetch(),
+    onError: (e) => toast.error(`Erro ao revogar acesso: ${e.message}`),
+  });
 
   // Redirecionar se não for admin
   if (user && user.role !== 'admin') {

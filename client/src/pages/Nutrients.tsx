@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast as showToast } from "sonner";
-import { Beaker, Printer, Loader2, ArrowLeft, Download, Droplets, Zap, FlaskConical } from "lucide-react";
+import { Beaker, Printer, Loader2, ArrowLeft, Download, Droplets, Zap, FlaskConical, Sprout, Leaf, Flower2, Wrench, Wind, ClipboardList } from "lucide-react";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageTransition } from "@/components/PageTransition";
 import { useLocation } from "wouter";
@@ -35,23 +35,23 @@ const PHASE_NAMES: Record<Phase, string> = {
   DRYING: "Secagem",
 };
 
-const PHASE_ICONS: Record<Phase, string> = {
-  CLONING: "🌱",
-  VEGA: "🌿",
-  FLORA: "🌸",
-  MAINTENANCE: "🔧",
-  DRYING: "💨",
+const PHASE_ICONS: Record<Phase, React.ReactElement> = {
+  CLONING: <Sprout className="w-4 h-4 text-green-400 inline"/>,
+  VEGA: <Leaf className="w-4 h-4 text-emerald-400 inline"/>,
+  FLORA: <Flower2 className="w-4 h-4 text-purple-400 inline"/>,
+  MAINTENANCE: <Wrench className="w-4 h-4 text-blue-400 inline"/>,
+  DRYING: <Wind className="w-4 h-4 text-amber-400 inline"/>,
 };
 
-// Cores por produto para o layout colorido no app
+// Cores por produto — estilo neon dark
 const PRODUCT_COLORS: Record<string, { bg: string; border: string; badge: string; dot: string }> = {
-  "Nitrato de Cálcio":           { bg: "bg-blue-50 dark:bg-blue-950/40",    border: "border-blue-200 dark:border-blue-800",    badge: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",    dot: "bg-blue-500"   },
-  "Nitrato de Potássio":         { bg: "bg-purple-50 dark:bg-purple-950/40", border: "border-purple-200 dark:border-purple-800", badge: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300", dot: "bg-purple-500" },
-  "MKP (Fosfato Monopotássico)": { bg: "bg-orange-50 dark:bg-orange-950/40", border: "border-orange-200 dark:border-orange-800", badge: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300", dot: "bg-orange-500" },
-  "Sulfato de Magnésio":         { bg: "bg-teal-50 dark:bg-teal-950/40",    border: "border-teal-200 dark:border-teal-800",    badge: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",    dot: "bg-teal-500"   },
-  "Micronutrientes":             { bg: "bg-rose-50 dark:bg-rose-950/40",    border: "border-rose-200 dark:border-rose-800",    badge: "bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-300",    dot: "bg-rose-500"   },
+  "Nitrato de Cálcio":           { bg: "bg-blue-500/8",    border: "border-blue-400/25",    badge: "bg-blue-500/15 text-blue-300",    dot: "bg-blue-400"   },
+  "Nitrato de Potássio":         { bg: "bg-purple-500/8",  border: "border-purple-400/25",  badge: "bg-purple-500/15 text-purple-300", dot: "bg-purple-400" },
+  "MKP (Fosfato Monopotássico)": { bg: "bg-orange-500/8",  border: "border-orange-400/25",  badge: "bg-orange-500/15 text-orange-300", dot: "bg-orange-400" },
+  "Sulfato de Magnésio":         { bg: "bg-teal-500/8",    border: "border-teal-400/25",    badge: "bg-teal-500/15 text-teal-300",    dot: "bg-teal-400"   },
+  "Micronutrientes":             { bg: "bg-rose-500/8",    border: "border-rose-400/25",    badge: "bg-rose-500/15 text-rose-300",    dot: "bg-rose-400"   },
 };
-const DEFAULT_COLOR = { bg: "bg-gray-50 dark:bg-gray-900", border: "border-gray-200 dark:border-gray-700", badge: "bg-gray-100 text-gray-700", dot: "bg-gray-400" };
+const DEFAULT_COLOR = { bg: "bg-muted/20", border: "border-border/50", badge: "bg-muted/30 text-muted-foreground", dot: "bg-muted-foreground" };
 
 const getProductsByPhaseWeek = (phase: Phase, week: number) => {
   if (phase === "CLONING") return [
@@ -411,8 +411,8 @@ export default function Nutrients() {
 
         <Tabs defaultValue="calculator" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="calculator">🧪 Calculadora</TabsTrigger>
-            <TabsTrigger value="history">📋 Histórico</TabsTrigger>
+            <TabsTrigger value="calculator" className="flex items-center gap-1.5"><FlaskConical className="w-4 h-4"/>Calculadora</TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4"/>Histórico</TabsTrigger>
           </TabsList>
 
           {/* ── CALCULADORA ── */}
@@ -430,11 +430,11 @@ export default function Nutrients() {
                     <Select value={phase} onValueChange={(v) => setPhase(v as Phase)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="CLONING">🌱 Clonagem</SelectItem>
-                        <SelectItem value="VEGA">🌿 Vegetativa</SelectItem>
-                        <SelectItem value="FLORA">🌸 Floração</SelectItem>
-                        <SelectItem value="MAINTENANCE">🔧 Manutenção</SelectItem>
-                        <SelectItem value="DRYING">💨 Secagem</SelectItem>
+                        <SelectItem value="CLONING"><span className="flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-green-400"/>Clonagem</span></SelectItem>
+                        <SelectItem value="VEGA"><span className="flex items-center gap-1"><Leaf className="w-3.5 h-3.5 text-emerald-400"/>Vegetativa</span></SelectItem>
+                        <SelectItem value="FLORA"><span className="flex items-center gap-1"><Flower2 className="w-3.5 h-3.5 text-purple-400"/>Floração</span></SelectItem>
+                        <SelectItem value="MAINTENANCE"><span className="flex items-center gap-1"><Wrench className="w-3.5 h-3.5 text-blue-400"/>Manutenção</span></SelectItem>
+                        <SelectItem value="DRYING"><span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5 text-amber-400"/>Secagem</span></SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -507,22 +507,22 @@ export default function Nutrients() {
               <CardContent className="pt-0 space-y-3">
                 {/* EC / PPM */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
-                    <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center shrink-0">
-                      <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <div className="flex items-center gap-3 bg-amber-500/8 border border-amber-400/25 rounded-xl p-3">
+                    <div className="w-9 h-9 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+                      <Zap className="w-4 h-4 text-amber-400" />
                     </div>
                     <div>
                       <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">EC Estimado</p>
-                      <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{ecEstimated} <span className="text-xs font-normal">mS/cm</span></p>
+                      <p className="text-xl font-bold text-amber-300">{ecEstimated} <span className="text-xs font-normal">mS/cm</span></p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 rounded-xl p-3">
-                    <div className="w-9 h-9 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center shrink-0">
-                      <Droplets className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                  <div className="flex items-center gap-3 bg-sky-500/8 border border-sky-400/25 rounded-xl p-3">
+                    <div className="w-9 h-9 rounded-full bg-sky-500/15 flex items-center justify-center shrink-0">
+                      <Droplets className="w-4 h-4 text-sky-400" />
                     </div>
                     <div>
                       <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">PPM Aprox.</p>
-                      <p className="text-xl font-bold text-sky-700 dark:text-sky-300">{ppmApprox} <span className="text-xs font-normal">ppm</span></p>
+                      <p className="text-xl font-bold text-sky-300">{ppmApprox} <span className="text-xs font-normal">ppm</span></p>
                     </div>
                   </div>
                 </div>
@@ -588,7 +588,7 @@ export default function Nutrients() {
                     onClick={saveAsImage}
                     disabled={isSavingImage}
                     variant="outline"
-                    className="w-full sm:flex-1 border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/30"
+                    className="w-full sm:flex-1 border-green-500/40 text-green-400 hover:bg-green-500/10"
                   >
                     {isSavingImage ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin shrink-0" />Gerando...</>
@@ -599,7 +599,7 @@ export default function Nutrients() {
                   <Button
                     onClick={saveRecipe}
                     disabled={recordApplication.isPending}
-                    className="w-full sm:flex-1 bg-green-600 hover:bg-green-700"
+                    className="w-full sm:flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white border-0"
                   >
                     {recordApplication.isPending ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin shrink-0" />Salvando...</>
@@ -634,7 +634,7 @@ export default function Nutrients() {
                     <SelectContent>
                       <SelectItem value="all">Todas as Fases</SelectItem>
                       {(Object.keys(PHASE_NAMES) as Phase[]).map(p => (
-                        <SelectItem key={p} value={p}>{PHASE_ICONS[p]} {PHASE_NAMES[p]}</SelectItem>
+                        <SelectItem key={p} value={p}><span className="flex items-center gap-1">{PHASE_ICONS[p]}{PHASE_NAMES[p]}</span></SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

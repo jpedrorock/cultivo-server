@@ -224,7 +224,7 @@ export default function PlantPhotosTab({ plantId }: PlantPhotosTabProps) {
               setDeletePhotoConfirm(true);
             }}
           >
-            <span className="text-sm">🗑️ Excluir</span>
+            <span className="text-sm flex items-center gap-1"><Trash2 className="w-4 h-4"/>Excluir</span>
           </button>
 
           <button

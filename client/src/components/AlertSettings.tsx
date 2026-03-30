@@ -6,37 +6,37 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Bell, Save, Loader2, Sprout, Flower2, Droplets, Wind, RotateCcw } from "lucide-react";
+import { Bell, Save, Loader2, Sprout, Flower2, Droplets, Wind, RotateCcw, Wrench, Leaf } from "lucide-react";
 import { toast } from "sonner";
 
 const PHASE_INFO = {
   MAINTENANCE: {
     label: "Manutenção",
-    icon: "🔧",
+    icon: <Wrench className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400"/>,
     color: "text-blue-600",
     description: "Margens para estufas em manutenção ou sem ciclo ativo",
   },
   CLONING: {
     label: "Clonagem",
-    icon: "🌱",
+    icon: <Sprout className="w-5 h-5 sm:w-6 sm:h-6 text-green-400"/>,
     color: "text-green-600",
     description: "Margens para estufas com clones/mudas",
   },
   VEGA: {
     label: "Vegetativa",
-    icon: "🌿",
+    icon: <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400"/>,
     color: "text-emerald-600",
     description: "Margens para estufas em fase vegetativa",
   },
   FLORA: {
     label: "Floração",
-    icon: "🌺",
+    icon: <Flower2 className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400"/>,
     color: "text-purple-600",
     description: "Margens para estufas em fase de floração",
   },
   DRYING: {
     label: "Secagem",
-    icon: "🍂",
+    icon: <Wind className="w-5 h-5 sm:w-6 sm:h-6 text-orange-400"/>,
     color: "text-orange-600",
     description: "Margens para estufas em processo de secagem (controle mais rigoroso)",
   },
@@ -158,7 +158,7 @@ export function AlertSettings() {
               <AccordionItem key={phase} value={phase} className="border rounded-lg mb-3 px-4">
                 <AccordionTrigger className="hover:no-underline py-3 sm:py-4">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <span className="text-xl sm:text-2xl shrink-0">{info.icon}</span>
+                    <span className="shrink-0">{info.icon}</span>
                     <div className="text-left min-w-0">
                       <div className={`font-semibold text-sm sm:text-base ${info.color}`}>{info.label}</div>
                       <div className="text-xs sm:text-sm text-muted-foreground line-clamp-1 sm:line-clamp-none">{info.description}</div>

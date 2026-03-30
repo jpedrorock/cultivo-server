@@ -187,8 +187,8 @@
   --popover: oklch(0.200 0.030 145);
   --popover-foreground: oklch(0.95 0.012 145);
 
-  /* Secondary */
-  --secondary: oklch(0.215 0.030 145);
+  /* Secondary: clearly distinct from card (0.185) and background (0.135) */
+  --secondary: oklch(0.240 0.032 145);
   --secondary-foreground: oklch(0.95 0.012 145);
 
   /* Muted */
@@ -203,9 +203,9 @@
   --destructive: oklch(0.65 0.18 20);
   --destructive-foreground: oklch(0.98 0 0);
 
-  /* Borders: very subtle, close to card surface */
-  --border: oklch(0.200 0.025 145);
-  --input: oklch(0.210 0.032 145);   /* raised so input fields are visible */
+  /* Borders: clearly visible against dark card/background surfaces */
+  --border: oklch(0.260 0.030 145);  /* raised from 0.200 — enough contrast against card (0.185) */
+  --input: oklch(0.230 0.035 145);   /* above card (0.185) so input fields are visibly elevated */
   --ring: oklch(0.68 0.20 140);
 
   /* Charts */
@@ -226,6 +226,7 @@
 
 .hps {
   /* === HPS AGRÍCOLA — alto contraste para ambientes com luz HPS/LED === */
+  color-scheme: dark;
   --primary: oklch(0.86 0.29 142);
   --primary-foreground: oklch(0.08 0.015 145);
   --sidebar-primary: oklch(0.86 0.29 142);
@@ -235,7 +236,7 @@
   --foreground: oklch(0.97 0.004 0);
   --card: oklch(0.12 0.008 145);
   --card-foreground: oklch(0.97 0.004 0);
-  --popover: oklch(0.12 0.008 145);
+  --popover: oklch(0.14 0.009 145);
   --popover-foreground: oklch(0.97 0.004 0);
   --secondary: oklch(0.18 0.010 145);
   --secondary-foreground: oklch(0.97 0.004 0);
@@ -245,24 +246,25 @@
   --accent-foreground: oklch(0.97 0.004 0);
   --destructive: oklch(0.68 0.26 25);
   --destructive-foreground: oklch(0.97 0 0);
-  --border: oklch(0.22 0.010 145);
-  --input: oklch(0.16 0.008 145);
+  --border: oklch(0.24 0.012 145);
+  --input: oklch(0.17 0.010 145);  /* slightly above card (0.12) so inputs appear as raised fields, not holes */
   --ring: oklch(0.86 0.29 142);
   --chart-1: oklch(0.86 0.29 142);
   --chart-2: oklch(0.78 0.22 200);
   --chart-3: oklch(0.85 0.26 55);
   --chart-4: oklch(0.75 0.24 280);
   --chart-5: oklch(0.70 0.27 25);
-  --sidebar: oklch(0.09 0.006 145);
+  --sidebar: oklch(0.05 0.005 145);
   --sidebar-foreground: oklch(0.97 0.004 0);
   --sidebar-accent: oklch(0.18 0.014 145);
   --sidebar-accent-foreground: oklch(0.97 0.004 0);
-  --sidebar-border: oklch(0.18 0.008 145);
+  --sidebar-border: oklch(0.20 0.010 145);
   --sidebar-ring: oklch(0.86 0.29 142);
 }
 
 .highcontrast {
   /* High Contrast theme - Pure black and white, no colors */
+  color-scheme: light;
   --primary: oklch(0 0 0);
   --primary-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0 0 0);
@@ -292,8 +294,8 @@
   --accent: oklch(0.90 0 0);
   --accent-foreground: oklch(0 0 0);
   
-  /* Destructive colors - Pure black (no red) */
-  --destructive: oklch(0 0 0);
+  /* Destructive colors - Dark gray (distinct from primary black, still no color) */
+  --destructive: oklch(0.30 0 0);
   --destructive-foreground: oklch(1 0 0);
   
   /* Border and input colors - Medium gray for definition */
@@ -319,6 +321,7 @@
 
 .highcontrast-dark {
   /* High Contrast Dark theme - Pure white and black inverted, no colors */
+  color-scheme: dark;
   --primary: oklch(1 0 0);
   --primary-foreground: oklch(0 0 0);
   --sidebar-primary: oklch(1 0 0);
@@ -348,8 +351,8 @@
   --accent: oklch(0.20 0 0);
   --accent-foreground: oklch(1 0 0);
   
-  /* Destructive colors - Pure white (no red) */
-  --destructive: oklch(1 0 0);
+  /* Destructive colors - Light gray (distinct from primary white, still no color) */
+  --destructive: oklch(0.70 0 0);
   --destructive-foreground: oklch(0 0 0);
   
   /* Border and input colors - Medium gray for definition */
@@ -364,13 +367,13 @@
   --chart-4: oklch(0.35 0 0);
   --chart-5: oklch(0.20 0 0);
   
-  /* Sidebar colors - Pure white sidebar */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0 0 0);
-  --sidebar-accent: oklch(0.90 0 0);
-  --sidebar-accent-foreground: oklch(0 0 0);
-  --sidebar-border: oklch(0.75 0 0);
-  --sidebar-ring: oklch(0 0 0);
+  /* Sidebar colors - Deepest black for max contrast on dark theme */
+  --sidebar: oklch(0 0 0);
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.15 0 0);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.35 0 0);
+  --sidebar-ring: oklch(1 0 0);
 }
 
 .apple {
@@ -482,7 +485,7 @@
     transition: none !important;
   }
 
-  @keyframes shimmer {
+  @keyframes shimmer-bg {
     0% {
       background-position: 200% 0;
     }

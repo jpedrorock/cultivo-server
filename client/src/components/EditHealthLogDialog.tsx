@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Image, X, Upload, Loader2 } from "lucide-react";
+import { Camera, Image, X, Upload, Loader2, FolderOpen, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
 
@@ -147,7 +147,7 @@ export default function EditHealthLogDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span className="text-2xl">✏️</span>
+            <Pencil className="w-4 h-4"/>
             Editar Registro de Saúde
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
@@ -165,10 +165,10 @@ export default function EditHealthLogDialog({
               onChange={(e) => setHealthStatus(e.target.value as any)}
               className="w-full px-3 py-2 border rounded-md"
             >
-              <option value="HEALTHY">🟢 Saudável</option>
-              <option value="STRESSED">🟡 Estressada</option>
-              <option value="SICK">🔴 Doente</option>
-              <option value="RECOVERING">🟣 Recuperando</option>
+              <option value="HEALTHY">● Saudável</option>
+              <option value="STRESSED">● Estressada</option>
+              <option value="SICK">● Doente</option>
+              <option value="RECOVERING">● Recuperando</option>
             </select>
           </div>
 
@@ -223,7 +223,7 @@ export default function EditHealthLogDialog({
                 <label className="flex items-center justify-center gap-2 w-full h-14 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors bg-primary/5 border-primary/30">
                   <Camera className="w-5 h-5 text-primary" />
                   <span className="text-sm font-medium text-primary">
-                    📸 Tirar Nova Foto
+                    Tirar Nova Foto
                   </span>
                   <input
                     type="file"
@@ -235,9 +235,9 @@ export default function EditHealthLogDialog({
                 </label>
                 {/* Botão Escolher Arquivo */}
                 <label className="flex items-center justify-center gap-2 w-full h-14 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                  <Image className="w-5 h-5 text-muted-foreground" />
+                  <FolderOpen className="w-5 h-5 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
-                    📁 Escolher da Galeria
+                    Escolher da Galeria
                   </span>
                   <input
                     type="file"

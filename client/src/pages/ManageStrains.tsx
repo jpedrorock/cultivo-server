@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit, Trash2, ArrowLeft, Copy, Search, Sprout, Clock } from "lucide-react";
+import { Plus, Edit, Trash2, ArrowLeft, Copy, Search, Sprout, Clock, Flower2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
@@ -250,11 +250,11 @@ export default function ManageStrains() {
                   {/* Badges de semanas */}
                   <div className="flex gap-2 mt-2 flex-wrap">
                     <Badge variant="outline" className="text-xs gap-1">
-                      <span className="text-green-600">🌱</span>
+                      <Sprout className="w-3 h-3 text-green-600"/>
                       Vega: {strain.vegaWeeks} sem
                     </Badge>
                     <Badge variant="outline" className="text-xs gap-1">
-                      <span className="text-purple-500">🌸</span>
+                      <Flower2 className="w-3 h-3 text-purple-500"/>
                       Flora: {strain.floraWeeks} sem
                     </Badge>
                     <Badge className="text-xs bg-primary/10 text-primary border-0 gap-1">

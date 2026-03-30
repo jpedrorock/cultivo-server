@@ -1,12 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Apple, Contrast, Moon, Sun, Trees, Zap } from "lucide-react";
+import { Check, Contrast, Moon, Sun, Trees, Zap } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 // Theme preview component showing visual representation
 function ThemePreview({
   type,
 }: {
-  type: "light" | "dark" | "forest" | "hps" | "highcontrast" | "highcontrast-dark" | "apple";
+  type: "light" | "dark" | "forest" | "hps" | "highcontrast" | "highcontrast-dark";
 }) {
   const previewStyles = {
     light: { bg: "bg-[#faf9f6]", card: "bg-white", text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
@@ -15,7 +15,6 @@ function ThemePreview({
     hps: { bg: "bg-[#080f08]", card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]" },
     highcontrast: { bg: "bg-white", card: "bg-gray-200", text: "bg-black", accent: "bg-black" },
     "highcontrast-dark": { bg: "bg-black", card: "bg-gray-900", text: "bg-white", accent: "bg-white" },
-    apple: { bg: "bg-gray-50", card: "bg-white", text: "bg-gray-800", accent: "bg-blue-500" },
   };
 
   const colors = previewStyles[type];
@@ -74,12 +73,6 @@ const THEMES = [
     label: "Alto Contraste Escuro",
     description: "Preto e branco invertido (fundo preto, texto branco)",
     icon: <Contrast className="w-4 h-4 shrink-0" />,
-  },
-  {
-    value: "apple" as const,
-    label: "Apple",
-    description: "Inspirado no design macOS/iOS com bordas arredondadas",
-    icon: <Apple className="w-4 h-4 text-blue-500 shrink-0" />,
   },
 ] as const;
 

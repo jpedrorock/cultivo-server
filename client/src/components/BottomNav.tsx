@@ -93,7 +93,7 @@ export function BottomNav() {
       }}
     >
       <div className="max-w-screen-xl mx-auto px-2">
-        <div className="flex justify-around items-end pb-1 pt-1">
+        <div className="flex justify-around items-end pb-3 pt-3">
           {/* FAB — Novo Registro (primeiro) */}
           <Link
             href="/quick-log"

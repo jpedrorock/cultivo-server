@@ -37,7 +37,7 @@ const STATUS_OPTIONS = [
   {
     value: "CLEAR",
     label: "Transparente",
-    emoji: "⚪",
+    dot: "bg-gray-400",
     color: "bg-gray-500/15 text-gray-700 dark:text-gray-300 border-gray-500/30",
     selectedColor: "bg-gray-500/25 border-gray-500 ring-2 ring-gray-500/40",
     barColor: "bg-gray-400",
@@ -45,7 +45,7 @@ const STATUS_OPTIONS = [
   {
     value: "CLOUDY",
     label: "Leitoso",
-    emoji: "🔵",
+    dot: "bg-blue-400",
     color: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30",
     selectedColor: "bg-blue-500/25 border-blue-500 ring-2 ring-blue-500/40",
     barColor: "bg-blue-400",
@@ -53,7 +53,7 @@ const STATUS_OPTIONS = [
   {
     value: "AMBER",
     label: "Âmbar",
-    emoji: "🟠",
+    dot: "bg-orange-400",
     color: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30",
     selectedColor: "bg-orange-500/25 border-orange-500 ring-2 ring-orange-500/40",
     barColor: "bg-orange-400",
@@ -61,7 +61,7 @@ const STATUS_OPTIONS = [
   {
     value: "MIXED",
     label: "Misto",
-    emoji: "🟣",
+    dot: "bg-purple-500",
     color: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30",
     selectedColor: "bg-purple-500/25 border-purple-500 ring-2 ring-purple-500/40",
     barColor: "bg-purple-400",
@@ -188,7 +188,7 @@ export default function PlantTrichomesTab({
     if (status === "CLEAR") {
       return {
         text: "Ainda cedo - aguarde mais tempo",
-        emoji: "⏳",
+        icon: null,
         color: "text-gray-600 dark:text-gray-400",
         border: "border-gray-400",
       };
@@ -196,7 +196,7 @@ export default function PlantTrichomesTab({
     if (status === "CLOUDY" && (cloudyPct || 0) >= 70) {
       return {
         text: "Ponto ideal para efeito cerebral",
-        emoji: "🧠",
+        icon: null,
         color: "text-blue-600 dark:text-blue-400",
         border: "border-blue-500",
       };
@@ -204,7 +204,7 @@ export default function PlantTrichomesTab({
     if (status === "AMBER" || (amberPct || 0) >= 30) {
       return {
         text: "Ponto ideal para efeito corporal",
-        emoji: "💪",
+        icon: null,
         color: "text-orange-600 dark:text-orange-400",
         border: "border-orange-500",
       };
@@ -212,14 +212,14 @@ export default function PlantTrichomesTab({
     if (status === "MIXED") {
       return {
         text: "Efeito balanceado - colha quando preferir",
-        emoji: "⚖️",
+        icon: null,
         color: "text-purple-600 dark:text-purple-400",
         border: "border-purple-500",
       };
     }
     return {
       text: "Continue monitorando",
-      emoji: "🔍",
+      icon: <ZoomIn className="w-3.5 h-3.5 inline mr-1"/>,
       color: "text-muted-foreground",
       border: "border-muted",
     };
@@ -288,7 +288,7 @@ export default function PlantTrichomesTab({
                             : `${option.color} hover:scale-[1.02]`
                         }`}
                       >
-                        <span>{option.emoji}</span>
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 inline-block ${option.dot}`}/>
                         <span className="hidden sm:inline">
                           {option.label}
                         </span>
@@ -312,7 +312,7 @@ export default function PlantTrichomesTab({
                       className="text-sm pr-6"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      ⚪
+                      <span className="w-2.5 h-2.5 rounded-full bg-gray-200 shrink-0 inline-block"/>
                     </span>
                   </div>
                   <div className="relative">
@@ -325,7 +325,7 @@ export default function PlantTrichomesTab({
                       className="text-sm pr-6"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      🔵
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-400 shrink-0 inline-block"/>
                     </span>
                   </div>
                   <div className="relative">
@@ -338,7 +338,7 @@ export default function PlantTrichomesTab({
                       className="text-sm pr-6"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      🟠
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 inline-block"/>
                     </span>
                   </div>
                 </div>
@@ -495,7 +495,7 @@ export default function PlantTrichomesTab({
                           <span
                             className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${status.color}`}
                           >
-                            {status.emoji} {status.label}
+                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 inline-block ${status.dot}`}/> {status.label}
                           </span>
                           {log.weekNumber && (
                             <span className="text-xs font-medium text-foreground bg-muted px-2 py-0.5 rounded-full">
@@ -515,7 +515,7 @@ export default function PlantTrichomesTab({
                         <p
                           className={`text-xs mt-1 ${recommendation.color}`}
                         >
-                          {recommendation.emoji} {recommendation.text}
+                          {recommendation.icon}{recommendation.text}
                         </p>
                       </div>
                     </div>
@@ -554,13 +554,13 @@ export default function PlantTrichomesTab({
                         </div>
                         <div className="flex justify-between text-xs sm:text-[10px] text-foreground sm:text-muted-foreground font-medium sm:font-normal">
                           {log.clearPercent !== null && (
-                            <span>⚪ {log.clearPercent}%</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200 shrink-0 inline-block"/> {log.clearPercent}%</span>
                           )}
                           {log.cloudyPercent !== null && (
-                            <span>🔵 {log.cloudyPercent}%</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 shrink-0 inline-block"/> {log.cloudyPercent}%</span>
                           )}
                           {log.amberPercent !== null && (
-                            <span>🟠 {log.amberPercent}%</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 inline-block"/> {log.amberPercent}%</span>
                           )}
                         </div>
                       </div>

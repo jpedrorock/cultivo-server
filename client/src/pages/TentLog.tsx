@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Save,
   Beaker, FlaskConical, Clock, Sunrise, Moon, NotebookPen, Zap,
+  FileText, Target,
 } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { toast } from "sonner";
@@ -286,9 +287,9 @@ export default function TentLog() {
           {/* ── D4: Tabs por contexto ── */}
           <Tabs defaultValue="manha" className="space-y-4 mt-4">
             <TabsList className="grid w-full grid-cols-3 h-11">
-              <TabsTrigger value="manha" className="gap-1.5 text-sm">🌅 Manhã</TabsTrigger>
-              <TabsTrigger value="lab" className="gap-1.5 text-sm">🧪 Lab</TabsTrigger>
-              <TabsTrigger value="notas" className="gap-1.5 text-sm">📝 Notas</TabsTrigger>
+              <TabsTrigger value="manha" className="gap-1.5 text-sm"><Sunrise className="w-3.5 h-3.5"/>Manhã</TabsTrigger>
+              <TabsTrigger value="lab" className="gap-1.5 text-sm"><FlaskConical className="w-3.5 h-3.5"/>Lab</TabsTrigger>
+              <TabsTrigger value="notas" className="gap-1.5 text-sm"><FileText className="w-3.5 h-3.5"/>Notas</TabsTrigger>
             </TabsList>
 
             {/* ── Tab: Manhã ─────────────────────────────────────────── */}
@@ -371,8 +372,8 @@ export default function TentLog() {
               </div>
 
               {currentTargets && (
-                <p className={`text-xs mt-1 font-medium ${validationText(ppfdValidation)}`}>
-                  🎯 Target semana {currentPhaseInfo?.weekNumber}: {currentTargets.ppfdMin}–{currentTargets.ppfdMax} µmol
+                <p className={`text-xs mt-1 font-medium flex items-center gap-1 ${validationText(ppfdValidation)}`}>
+                  <Target className="w-3 h-3 text-primary/60"/>Target semana {currentPhaseInfo?.weekNumber}: {currentTargets.ppfdMin}–{currentTargets.ppfdMax} µmol
                 </p>
               )}
             </CardContent>
@@ -399,8 +400,8 @@ export default function TentLog() {
                   </div>
                   <BigStepper value={tempC} onChange={setTempC} step={0.1} min={-10} max={50} decimals={1} unit="°C" fieldType="temperature" />
                   {currentTargets && (
-                    <p className={`text-xs font-medium ${validationText(tempValidation)}`}>
-                      🎯 {currentTargets.tempMin}–{currentTargets.tempMax}°C
+                    <p className={`text-xs font-medium flex items-center gap-1 ${validationText(tempValidation)}`}>
+                      <Target className="w-3 h-3 text-primary/60"/>{currentTargets.tempMin}–{currentTargets.tempMax}°C
                     </p>
                   )}
                 </div>
@@ -418,8 +419,8 @@ export default function TentLog() {
                   </div>
                   <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" fieldType="humidity" />
                   {currentTargets && (
-                    <p className={`text-xs font-medium ${validationText(rhValidation)}`}>
-                      🎯 {currentTargets.rhMin}–{currentTargets.rhMax}%
+                    <p className={`text-xs font-medium flex items-center gap-1 ${validationText(rhValidation)}`}>
+                      <Target className="w-3 h-3 text-primary/60"/>{currentTargets.rhMin}–{currentTargets.rhMax}%
                     </p>
                   )}
                 </div>
@@ -449,8 +450,8 @@ export default function TentLog() {
                     </div>
                     <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" fieldType="ph" />
                     {currentTargets && (
-                      <p className={`text-xs font-medium ${validationText(phValidation)}`}>
-                        🎯 {currentTargets.phMin}–{currentTargets.phMax}
+                      <p className={`text-xs font-medium flex items-center gap-1 ${validationText(phValidation)}`}>
+                        <Target className="w-3 h-3 text-primary/60"/>{currentTargets.phMin}–{currentTargets.phMax}
                       </p>
                     )}
                   </div>
@@ -467,8 +468,8 @@ export default function TentLog() {
                     </div>
                     <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" />
                     {currentTargets && (
-                      <p className={`text-xs font-medium ${validationText(ecValidation)}`}>
-                        🎯 {currentTargets.ecMin}–{currentTargets.ecMax} mS/cm
+                      <p className={`text-xs font-medium flex items-center gap-1 ${validationText(ecValidation)}`}>
+                        <Target className="w-3 h-3 text-primary/60"/>{currentTargets.ecMin}–{currentTargets.ecMax} mS/cm
                       </p>
                     )}
                   </div>
