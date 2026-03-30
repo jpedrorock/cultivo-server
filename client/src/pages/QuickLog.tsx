@@ -756,24 +756,37 @@ export default function QuickLog() {
                     <p className="text-xs text-muted-foreground/60 mt-1">Tricomas são registrados apenas em estufas de Floração.</p>
                   </div>
                 )}
-                {(logMode === 'trichome' ? floraTents : tents).map((tent: any) => (
-                  <button
-                    key={tent.id}
-                    onClick={() => { setTentId(tent.id); if (logMode === 'plant' || logMode === 'trichome') setCurrentStep(9); }}
-                    className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left ${
-                      tentId === tent.id
-                        ? logMode === 'trichome'
-                          ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white border-violet-500 shadow-xl scale-105"
-                          : "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-500 shadow-xl scale-105"
-                        : "bg-card dark:bg-zinc-800 text-card-foreground border-border dark:border-zinc-600 hover:border-violet-400 dark:hover:border-violet-500 hover:shadow-lg"
-                    }`}
-                  >
-                    <div className="font-bold text-xl">{tent.name}</div>
-                    <div className="text-sm opacity-90">
-                      Floração • {tent.width}×{tent.depth}×{tent.height}cm
-                    </div>
-                  </button>
-                ))}
+                {(logMode === 'trichome' ? floraTents : tents).map((tent: any) => {
+                  const isSelected = tentId === tent.id;
+                  const catLabel = tent.category === "FLORA" ? "Floração" : tent.category === "VEGA" ? "Vegetativa" : tent.category === "CLONING" ? "Clonagem" : (tent.category ?? "");
+                  const accentRgba = logMode === 'trichome' ? "139,92,246" : "16,185,129";
+                  const accentBorder = logMode === 'trichome' ? "border-violet-500" : "border-primary";
+                  return (
+                    <button
+                      key={tent.id}
+                      onClick={() => { setTentId(tent.id); if (logMode === 'plant' || logMode === 'trichome') setCurrentStep(9); }}
+                      className={`w-full rounded-2xl border transition-all duration-200 text-left overflow-hidden active:scale-[0.98] ${
+                        isSelected
+                          ? `${accentBorder} shadow-lg`
+                          : logMode === 'trichome'
+                            ? "border-violet-500/20 hover:border-violet-500/40"
+                            : "border-border/60 hover:border-primary/30"
+                      }`}
+                      style={{ background: isSelected
+                        ? `linear-gradient(135deg, rgba(${accentRgba},0.25) 0%, rgba(${accentRgba},0.12) 100%)`
+                        : `linear-gradient(135deg, rgba(${accentRgba},0.05) 0%, hsl(var(--card)) 65%)`
+                      }}
+                    >
+                      <div className="px-5 py-4 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-bold text-lg truncate ${isSelected ? "text-foreground" : "text-foreground"}`}>{tent.name}</div>
+                          <div className="text-sm text-muted-foreground mt-0.5">{catLabel} · {tent.width}×{tent.depth}×{tent.height}cm</div>
+                        </div>
+                        {isSelected && <Check className={`w-5 h-5 shrink-0 ${logMode === 'trichome' ? 'text-violet-400' : 'text-primary'}`} />}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -1284,7 +1297,7 @@ export default function QuickLog() {
           </div>
           </div>}
           {/* Navigation buttons — footer dentro do card */}
-          {logMode !== null && <div className="shrink-0 px-4 py-3 border-t border-border flex gap-3 bg-card dark:bg-zinc-900">
+          {logMode !== null && <div className="shrink-0 px-4 py-3 border-t border-border/60 flex gap-3 bg-card">
         {/* Back button - only for daily log steps */}
         {currentStep > 0 && currentStep < 9 && (
           <Button

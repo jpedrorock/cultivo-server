@@ -105,7 +105,7 @@ export default function CalculatorMenu() {
           {calculators.map((calc, index) => {
             const Icon = calc.icon;
             return (
-              <Link key={calc.id} href={`/calculators/${calc.id}`}>
+              <Link key={calc.id} href={`/calculators/${calc.id}`} className="block self-start">
                 <div
                   className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4`}
                   style={{
@@ -114,9 +114,9 @@ export default function CalculatorMenu() {
                     background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
                   }}
                 >
-                  <div className="p-5 flex flex-col gap-4">
+                  <div className="p-5">
                     {/* Top row: icon + badge */}
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2 mb-4">
                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
                         <Icon className="w-7 h-7 text-white drop-shadow-sm" />
                       </div>
@@ -128,9 +128,9 @@ export default function CalculatorMenu() {
                     </div>
 
                     {/* Title + description */}
-                    <div className="space-y-1 flex-1">
+                    <div className="space-y-1 mb-4">
                       <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 min-h-[2.5rem]">{calc.description}</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 min-h-[2.625rem]">{calc.description}</p>
                     </div>
 
                     {/* CTA */}
