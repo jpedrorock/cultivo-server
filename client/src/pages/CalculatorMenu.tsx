@@ -114,7 +114,7 @@ export default function CalculatorMenu() {
                     background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
                   }}
                 >
-                  <div className="p-5 flex flex-col min-h-[230px]">
+                  <div className="p-5 flex flex-col h-[230px]">
                     {/* Top row: icon + badge — always at top */}
                     <div className="flex items-start justify-between gap-2 mb-4 shrink-0">
                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>

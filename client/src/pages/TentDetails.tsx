@@ -246,8 +246,8 @@ export default function TentDetails() {
     }
   };
 
-  // Prepare chart data (filtered by period)
-  const chartData = filteredLogs.map((log) => ({
+  // Prepare chart data (filtered by period, ASC: oldest → newest = left → right)
+  const chartData = filteredLogs.slice().reverse().map((log) => ({
     date: format(new Date(log.logDate), "dd/MM", { locale: ptBR }),
     fullDate: format(new Date(log.logDate), "dd/MM/yyyy HH:mm", { locale: ptBR }),
     turn: log.turn,
