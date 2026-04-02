@@ -1100,11 +1100,11 @@ export default function QuickLog() {
                   })}
                 </div>
 
-                {/* Sintomas e Notas — colapsável, fechado por padrão */}
-                <Accordion type="multiple" defaultValue={[]} className="space-y-0">
+                {/* Sintomas e Notas — aberto por padrão */}
+                <Accordion type="multiple" defaultValue={["details"]} className="space-y-0">
                   <AccordionItem value="details" className="border border-border rounded-xl bg-card shadow-sm">
                     <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                      <span className="text-sm font-medium text-muted-foreground">Sintomas e Notas (opcional)</span>
+                      <span className="text-sm font-medium text-muted-foreground">Sintomas e Notas</span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-4">
                       <div>
@@ -1162,7 +1162,7 @@ export default function QuickLog() {
                 ) : (
                   <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-500/5 transition-colors">
                     <Camera className="h-7 w-7 text-muted-foreground mb-1" />
-                    <span className="text-sm text-muted-foreground">Foto (opcional)</span>
+                    <span className="text-sm text-muted-foreground">Adicionar Foto</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1297,7 +1297,20 @@ export default function QuickLog() {
           </div>
           </div>}
           {/* Navigation buttons — footer dentro do card */}
-          {logMode !== null && <div className="shrink-0 px-4 py-3 border-t border-border/60 flex gap-3 bg-card">
+          {logMode !== null && <div className="shrink-0 border-t border-border/60 bg-card">
+          {/* Hint: obrigatório foto/sintoma/nota para avançar na saúde da planta */}
+          {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && recordTrichomes === null && (() => {
+            const rec = plantHealthRecords.get(plants[currentPlantIndex].id);
+            const hasDetail = !!(rec?.photoUrl || rec?.photoPreview || rec?.notes?.trim() || rec?.symptoms?.trim());
+            if (hasDetail) return null;
+            return (
+              <p className="text-xs text-center text-amber-400 px-4 pt-2.5 pb-0.5 flex items-center justify-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                Adicione uma foto, sintoma ou anotação para avançar
+              </p>
+            );
+          })()}
+          <div className="px-4 py-3 flex gap-3">
         {/* Back button - only for daily log steps */}
         {currentStep > 0 && currentStep < 9 && (
           <Button
@@ -1353,7 +1366,10 @@ export default function QuickLog() {
         )}
 
         {/* Plant health navigation */}
-        {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && recordTrichomes === null && (
+        {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && recordTrichomes === null && (() => {
+          const rec = plantHealthRecords.get(plants[currentPlantIndex].id);
+          const hasDetail = !!(rec?.photoUrl || rec?.photoPreview || rec?.notes?.trim() || rec?.symptoms?.trim());
+          return (
           <>
             <AnimatedButton
               onClick={handleSkipPlantHealth}
@@ -1365,7 +1381,7 @@ export default function QuickLog() {
             </AnimatedButton>
             <AnimatedButton
               onClick={handleSavePlantHealth}
-              disabled={savePlantHealthMutation.isPending || uploadPhotoMutation.isPending}
+              disabled={savePlantHealthMutation.isPending || uploadPhotoMutation.isPending || !hasDetail}
               className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
             >
               {(savePlantHealthMutation.isPending || uploadPhotoMutation.isPending) ? (
@@ -1377,7 +1393,8 @@ export default function QuickLog() {
               )}
             </AnimatedButton>
           </>
-        )}
+          );
+        })()}
 
         {/* Trichome navigation */}
         {recordTrichomes === true && plants[currentTrichomeIndex] && (
@@ -1405,7 +1422,7 @@ export default function QuickLog() {
             </AnimatedButton>
           </>
         )}
-      </div>}
+      </div></div>}
           </div>
         </div>
       </div>
