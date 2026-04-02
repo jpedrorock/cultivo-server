@@ -127,14 +127,14 @@ export default function CalculatorMenu() {
                       )}
                     </div>
 
-                    {/* Title + description — fills remaining space */}
-                    <div className="flex-1 space-y-1.5 mb-3">
+                    {/* Title + description */}
+                    <div className="space-y-1.5 mb-3">
                       <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
                       <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{calc.description}</p>
                     </div>
 
-                    {/* CTA — always at bottom */}
-                    <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200 shrink-0`}>
+                    {/* CTA — imediatamente após a descrição */}
+                    <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200`}>
                       <span>Abrir calculadora</span>
                       <ArrowRight className="w-4 h-4" />
                     </div>
