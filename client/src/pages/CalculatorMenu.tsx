@@ -101,22 +101,22 @@ export default function CalculatorMenu() {
       }
     >
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {calculators.map((calc, index) => {
             const Icon = calc.icon;
             return (
-              <Link key={calc.id} href={`/calculators/${calc.id}`} className="block self-start">
+              <Link key={calc.id} href={`/calculators/${calc.id}`} className="block h-full">
                 <div
-                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4`}
+                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4 h-full`}
                   style={{
                     animationDelay: `${index * 80}ms`,
                     animationFillMode: 'backwards',
                     background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
                   }}
                 >
-                  <div className="p-5 flex flex-col h-[230px]">
-                    {/* Top row: icon + badge — always at top */}
-                    <div className="flex items-start justify-between gap-2 mb-4 shrink-0">
+                  <div className="p-5 flex flex-col h-full">
+                    {/* Top row: icon + badge */}
+                    <div className="flex items-start justify-between gap-2 mb-4">
                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
                         <Icon className="w-7 h-7 text-white drop-shadow-sm" />
                       </div>
@@ -127,13 +127,13 @@ export default function CalculatorMenu() {
                       )}
                     </div>
 
-                    {/* Title + description */}
-                    <div className="space-y-1.5 mb-3">
+                    {/* Title + description — flex-1 pushes CTA to bottom */}
+                    <div className="flex-1 space-y-1.5 mb-3">
                       <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
                       <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{calc.description}</p>
                     </div>
 
-                    {/* CTA — imediatamente após a descrição */}
+                    {/* CTA — always at bottom */}
                     <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200`}>
                       <span>Abrir calculadora</span>
                       <ArrowRight className="w-4 h-4" />
