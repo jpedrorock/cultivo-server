@@ -114,8 +114,8 @@ export default function CalculatorMenu() {
                     background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
                   }}
                 >
-                  {/* Mobile: horizontal layout (icon left, text right) — consistent height driven by icon */}
-                  <div className="flex md:hidden items-center gap-4 px-4 py-4">
+                  {/* Mobile: horizontal layout — fixed h-[88px] = 56px icon + 16px padding each side */}
+                  <div className="flex md:hidden items-center gap-4 px-4 h-[88px] overflow-hidden">
                     <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} shrink-0`}>
                       <Icon className="w-7 h-7 text-white drop-shadow-sm" />
                     </div>
