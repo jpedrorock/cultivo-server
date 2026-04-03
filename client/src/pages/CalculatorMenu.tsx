@@ -114,8 +114,30 @@ export default function CalculatorMenu() {
                     background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
                   }}
                 >
-                  <div className="p-5 flex flex-col h-full">
-                    {/* Top row: icon + badge */}
+                  {/* Mobile: horizontal layout (icon left, text right) — consistent height driven by icon */}
+                  <div className="flex md:hidden items-center gap-4 px-4 py-4">
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} shrink-0`}>
+                      <Icon className="w-7 h-7 text-white drop-shadow-sm" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-0.5">
+                        <h3 className="text-base font-bold text-foreground leading-tight">{calc.title}</h3>
+                        {calc.badge && (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${calc.badgeStyle}`}>
+                            {calc.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-snug line-clamp-1 mb-1.5">{calc.description}</p>
+                      <div className={`flex items-center gap-1 text-xs font-medium ${calc.accentColor}`}>
+                        <span>Abrir calculadora</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tablet/Desktop: vertical layout — CSS Grid equalizes row heights */}
+                  <div className="hidden md:flex flex-col p-5 h-full">
                     <div className="flex items-start justify-between gap-2 mb-4">
                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
                         <Icon className="w-7 h-7 text-white drop-shadow-sm" />
@@ -126,14 +148,10 @@ export default function CalculatorMenu() {
                         </span>
                       )}
                     </div>
-
-                    {/* Title + description — flex-1 pushes CTA to bottom */}
                     <div className="flex-1 space-y-1.5 mb-3">
                       <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
                       <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{calc.description}</p>
                     </div>
-
-                    {/* CTA — always at bottom */}
                     <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200`}>
                       <span>Abrir calculadora</span>
                       <ArrowRight className="w-4 h-4" />
