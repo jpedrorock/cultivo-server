@@ -1108,8 +1108,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         {phaseBg !== 'none' && (
           <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
         )}
-        {/* Linha de acento na base */}
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-[2px] z-20" style={{ background: `linear-gradient(90deg, ${phaseAccentColor}99 0%, ${phaseAccentColor}33 100%)` }} />
+        {/* Linha de acento no topo */}
+        <div className="pointer-events-none absolute top-0 left-0 right-0 h-[2px] z-20" style={{ background: `linear-gradient(90deg, ${phaseAccentColor}99 0%, ${phaseAccentColor}33 100%)` }} />
       <CardHeader className="relative z-10 px-5 pt-5 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
