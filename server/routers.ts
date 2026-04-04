@@ -3536,14 +3536,16 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await database.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
-        await database.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
-        await database.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
-        await database.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
-        await database.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
-        await database.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
-        await database.delete(plantTentHistory).where(eq(plantTentHistory.plantId, input.plantId));
-        await database.delete(plants).where(eq(plants.id, input.plantId));
+        await database.transaction(async (tx) => {
+          await tx.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
+          await tx.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
+          await tx.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
+          await tx.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
+          await tx.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
+          await tx.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
+          await tx.delete(plantTentHistory).where(eq(plantTentHistory.plantId, input.plantId));
+          await tx.delete(plants).where(eq(plants.id, input.plantId));
+        });
         return { success: true };
       }),
 
@@ -3910,19 +3912,19 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        // Deletar todos os registros relacionados primeiro (cascade manual)
-        await database.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
-        await database.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
-        await database.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
-        await database.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
-        await database.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
-        await database.delete(plantTentHistory).where(eq(plantTentHistory.plantId, input.plantId));
-        await database.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
-        
-        // Deletar planta
-        await database.delete(plants).where(eq(plants.id, input.plantId));
-        
+
+        // Deletar todos os registros relacionados + planta em transação (cascade manual atômico)
+        await database.transaction(async (tx) => {
+          await tx.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
+          await tx.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
+          await tx.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
+          await tx.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
+          await tx.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
+          await tx.delete(plantTentHistory).where(eq(plantTentHistory.plantId, input.plantId));
+          await tx.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
+          await tx.delete(plants).where(eq(plants.id, input.plantId));
+        });
+
         return { success: true };
       }),
   }),
