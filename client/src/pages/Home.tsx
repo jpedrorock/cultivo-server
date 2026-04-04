@@ -1103,8 +1103,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           </div>
         </Link>
       )}
-      <Card className="relative z-10 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'hsl(var(--card))' }}>
-      <CardHeader className="px-5 pt-5 pb-3">
+      <Card className="relative z-10 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'hsl(var(--card))', background: phaseBg !== 'none' ? `hsl(var(--card))` : undefined, borderLeft: `3px solid ${phaseAccentColor}` }}>
+        {/* Fundo gradiente da fase */}
+        {phaseBg !== 'none' && (
+          <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
+        )}
+      <CardHeader className="relative z-10 px-5 pt-5 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             {/* Linha 1: nome + freshness badge */}
@@ -1252,7 +1256,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         )}
       </CardHeader>
 
-      <CardContent className="px-5 pb-5 pt-0">
+      <CardContent className="relative z-10 px-5 pb-5 pt-0">
         <div className="space-y-3">
           {/* Cycle Info — compacto, sem barra de progresso */}
           {cycle ? (
