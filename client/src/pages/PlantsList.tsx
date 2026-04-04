@@ -452,22 +452,21 @@ export default function PlantsList() {
                             }`}>
 
                               {/* Info à esquerda */}
-                              <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0 px-4 pt-3 pb-3 flex flex-col justify-between gap-0 text-left">
-                                {/* Topo: nome + status */}
-                                <div>
-                                  <div className="flex items-start gap-2 mb-1">
-                                    <p className="text-sm font-semibold text-foreground leading-tight flex-1 text-left">{plant.name}</p>
-                                    <div className={`shrink-0 px-1.5 py-px rounded text-[10px] font-medium border mt-px ${getStatusColor(plant.status)}`}>
-                                      {getStatusLabel(plant.status)}
-                                    </div>
+                              <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0 pl-3 pr-1 pt-3 pb-3 flex flex-col justify-start items-start gap-1.5">
+                                {/* Nome + badge na mesma linha, ambos à esquerda */}
+                                <div className="flex items-center gap-1.5 flex-wrap w-full">
+                                  <p className="text-sm font-semibold text-foreground leading-tight">{plant.name}</p>
+                                  <div className={`px-1.5 py-px rounded text-[10px] font-medium border ${getStatusColor(plant.status)}`}>
+                                    {getStatusLabel(plant.status)}
                                   </div>
-                                  <p className="text-[11px] text-muted-foreground/60 truncate text-left">
-                                    {plant.code && <span className="font-mono">{plant.code} · </span>}
-                                    {getStrainName(plant.strainId) || '—'}
-                                  </p>
                                 </div>
-                                {/* Base: fase + saúde */}
-                                <div className="flex items-center gap-2 flex-wrap mt-2">
+                                {/* Código + strain */}
+                                <p className="text-[11px] text-muted-foreground/60 truncate w-full">
+                                  {plant.code && <span className="font-mono">{plant.code} · </span>}
+                                  {getStrainName(plant.strainId) || '—'}
+                                </p>
+                                {/* Fase + saúde */}
+                                <div className="flex items-center gap-2 flex-wrap w-full">
                                   {(plant.cyclePhase && plant.cycleWeek) && (
                                     <span className={`text-[11px] font-medium flex items-center gap-0.5 ${plant.cyclePhase === 'VEGA' ? 'text-green-400' : 'text-purple-400'}`}>
                                       {plant.cyclePhase === 'VEGA' ? <Leaf className="w-3 h-3"/> : <Flower2 className="w-3 h-3"/>}
@@ -484,7 +483,7 @@ export default function PlantsList() {
                               </Link>
 
                               {/* Foto + ações à direita */}
-                              <div className="w-[96px] shrink-0 border-l border-border/30 flex flex-col">
+                              <div className="w-[128px] shrink-0 border-l border-border/30 flex flex-col">
                                 {/* Foto em aspect-ratio 3:4 (iPhone portrait) */}
                                 <Link href={`/plants/${plant.id}`} className="block w-full" style={{ aspectRatio: '3/4' }}>
                                   <div className="w-full h-full bg-white/5">
@@ -494,8 +493,8 @@ export default function PlantsList() {
                                             ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=192&h=256&q=72`
                                             : plant.lastHealthPhotoUrl}
                                           alt={plant.name}
-                                          width={96}
-                                          height={128}
+                                          width={128}
+                                          height={171}
                                           className="w-full h-full object-cover"
                                           loading="lazy"
                                           decoding="async"
