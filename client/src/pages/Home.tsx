@@ -1344,7 +1344,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           {/* KPI Metrics — 3 colunas: Temp · RH · PPFD */}
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/40">
             {/* Temperature */}
-            <div className="metric-glow-orange flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08]">
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08]">
               <ThermometerSun className="w-3.5 h-3.5 text-orange-400" />
               <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">Temp</p>
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
@@ -1353,7 +1353,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               <MiniSparkline values={sparkTemps} color="#f97316" />
             </div>
             {/* Humidity */}
-            <div className="metric-glow-teal flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08]">
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08]">
               <Droplets className="w-3.5 h-3.5 text-teal-400" />
               <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">RH</p>
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
@@ -1362,13 +1362,16 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               <MiniSparkline values={sparkRh} color="#2dd4bf" />
             </div>
             {/* PPFD */}
-            <div className="metric-glow-yellow flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.08]">
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.08]">
               <Sun className="w-3.5 h-3.5 text-yellow-400" />
               <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">PPFD</p>
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
                 {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
               </p>
-              <div className="h-[18px]" /> {/* espaço para alinhar com os sparklines */}
+              {/* Linha de lâmpada — pulsa como luz aumentando e diminuindo */}
+              <div className="h-[18px] flex items-center w-full px-1">
+                <div className="ppfd-lamp-line w-full h-[2px] rounded-full" />
+              </div>
             </div>
           </div>
 

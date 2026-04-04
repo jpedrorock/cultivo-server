@@ -1322,6 +1322,18 @@ input[type="range"]::-moz-range-track {
 .metric-glow-teal   { animation: metric-glow-teal   2.5s ease-in-out infinite 0.8s; }
 .metric-glow-yellow { animation: metric-glow-yellow 2.5s ease-in-out infinite 1.6s; }
 
+/* Linha de lâmpada PPFD — pulsa como luz de filamento aumentando/diminuindo */
+@keyframes ppfd-lamp {
+  0%, 100% { opacity: 0.18; transform: scaleX(0.55); }
+  50%       { opacity: 0.75; transform: scaleX(1); }
+}
+
+.ppfd-lamp-line {
+  background: linear-gradient(90deg, transparent 0%, #fbbf24 30%, #fde68a 50%, #fbbf24 70%, transparent 100%);
+  animation: ppfd-lamp 2.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
 /* ─── Frosted glass toasts (Sonner) ─────────────────────────────────
    Sonner usa [data-sonner-toast][data-type="success"] (especificidade
    de 2 atributos). Precisamos igualar ou superar com os mesmos seletores
