@@ -197,7 +197,63 @@ export default function TentDetails() {
   const phaseInfo = getPhaseInfo();
 
   const handlePrint = () => {
-    window.print();
+    // Gera relatório HTML em nova janela → Salvar como PDF via diálogo do browser
+    const phase = getPhaseInfo().phase;
+    const lastLog = logs?.[0];
+    const startStr = cycle ? format(new Date(cycle.startDate), "dd/MM/yyyy", { locale: ptBR }) : '—';
+
+    const rows = (logs ?? []).slice(0, 30).map((l: any) => `
+      <tr>
+        <td>${format(new Date(l.logDate), "dd/MM HH:mm", { locale: ptBR })}</td>
+        <td>${l.tempC ?? '—'}</td>
+        <td>${l.rhPct ?? '—'}</td>
+        <td>${l.ppfd ?? '—'}</td>
+        <td>${l.ph ?? '—'}</td>
+        <td>${l.ec ?? '—'}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Relatório — ${tent.name}</title>
+    <style>
+      body { font-family: -apple-system, sans-serif; margin: 32px; color: #111; }
+      h1 { font-size: 22px; margin-bottom: 4px; }
+      .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+      .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
+      .card .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+      .card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th { background: #f9fafb; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 11px; text-transform: uppercase; color: #666; }
+      td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
+      tr:hover td { background: #fafafa; }
+      h2 { font-size: 15px; margin: 24px 0 10px; color: #374151; }
+      .footer { margin-top: 32px; font-size: 11px; color: #aaa; text-align: center; }
+      @media print { body { margin: 16px; } }
+    </style></head><body>
+    <h1>${tent.name}</h1>
+    <p class="sub">${phase} &nbsp;·&nbsp; Ciclo iniciado em ${startStr} &nbsp;·&nbsp; Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+
+    <div class="grid">
+      <div class="card"><div class="label">Temp. Média</div><div class="value">${avgTemp}°C</div></div>
+      <div class="card"><div class="label">UR Média</div><div class="value">${avgRh}%</div></div>
+      <div class="card"><div class="label">PPFD Médio</div><div class="value">${avgPpfd}</div></div>
+      <div class="card"><div class="label">Registros (${dateRange}d)</div><div class="value">${filteredLogs.length}</div></div>
+    </div>
+
+    <h2>Últimos 30 registros</h2>
+    <table>
+      <thead><tr><th>Data/Hora</th><th>Temp (°C)</th><th>UR (%)</th><th>PPFD</th><th>pH</th><th>EC</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="footer">App Cultivo &nbsp;·&nbsp; ${window.location.origin}</p>
+    <script>window.onload = () => { window.print(); }<\/script>
+    </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) { toast.error('Permita pop-ups para exportar o relatório'); return; }
+    win.document.write(html);
+    win.document.close();
   };
 
   const handleShare = async () => {
@@ -391,8 +447,8 @@ export default function TentDetails() {
                     Compartilhar
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handlePrint} className="gap-2">
-                    <Printer className="w-4 h-4" />
-                    Imprimir
+                    <FileDown className="w-4 h-4" />
+                    Exportar Relatório PDF
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
