@@ -149,6 +149,9 @@ export default function TentDetails() {
     tentId,
   });
 
+  // Plants — loaded at page level so the PDF export has access
+  const { data: tentPlants } = trpc.plants.list.useQuery({ tentId });
+
   // Filter logs by dateRange client-side for charts/averages (must be before conditional returns — Rules of Hooks)
   const filteredLogs = useMemo(() => {
     if (!logs) return [];
@@ -197,58 +200,169 @@ export default function TentDetails() {
   const phaseInfo = getPhaseInfo();
 
   const handlePrint = () => {
-    // Gera relatório HTML em nova janela → Salvar como PDF via diálogo do browser
     const phase = getPhaseInfo().phase;
-    const lastLog = logs?.[0];
     const startStr = cycle ? format(new Date(cycle.startDate), "dd/MM/yyyy", { locale: ptBR }) : '—';
+    const generatedAt = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+    const exportLogs = filteredLogs.slice().reverse(); // ASC para a tabela
 
-    const rows = (logs ?? []).slice(0, 30).map((l: any) => `
+    // ── Estatísticas por parâmetro ────────────────────────────────────────
+    const stat = (vals: number[]) => vals.length === 0
+      ? { avg: '—', min: '—', max: '—' }
+      : {
+          avg: (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1),
+          min: Math.min(...vals).toFixed(1),
+          max: Math.max(...vals).toFixed(1),
+        };
+
+    const temps  = exportLogs.map(l => l.tempC  ? parseFloat(l.tempC)  : null).filter(Boolean) as number[];
+    const rhs    = exportLogs.map(l => l.rhPct   ? parseFloat(l.rhPct)  : null).filter(Boolean) as number[];
+    const ppfds  = exportLogs.map(l => l.ppfd    ?? null).filter(Boolean) as number[];
+    const phs    = exportLogs.map(l => l.ph      ? parseFloat(l.ph)     : null).filter(Boolean) as number[];
+    const ecs    = exportLogs.map(l => l.ec      ? parseFloat(l.ec)     : null).filter(Boolean) as number[];
+
+    const sTemp  = stat(temps);
+    const sRh    = stat(rhs);
+    const sPpfd  = stat(ppfds);
+    const sPh    = stat(phs);
+    const sEc    = stat(ecs);
+
+    // ── Plantas ───────────────────────────────────────────────────────────
+    const plantRows = (tentPlants ?? []).map((p: any) => `
       <tr>
-        <td>${format(new Date(l.logDate), "dd/MM HH:mm", { locale: ptBR })}</td>
+        <td>${p.name}</td>
+        <td>${p.code ?? '—'}</td>
+        <td>${p.plantStage ?? '—'}</td>
+        <td>${p.cycleWeek != null ? `Sem ${p.cycleWeek}` : '—'}</td>
+        <td>${p.status ?? '—'}</td>
+      </tr>
+    `).join('');
+
+    // ── Linhas de log ─────────────────────────────────────────────────────
+    const logRows = exportLogs.map((l: any) => `
+      <tr>
+        <td>${format(new Date(l.logDate), "dd/MM/yy HH:mm", { locale: ptBR })}</td>
+        <td>${l.turn === 'AM' ? 'AM' : 'PM'}</td>
         <td>${l.tempC ?? '—'}</td>
         <td>${l.rhPct ?? '—'}</td>
         <td>${l.ppfd ?? '—'}</td>
         <td>${l.ph ?? '—'}</td>
         <td>${l.ec ?? '—'}</td>
+        <td>${l.wateringVolume ? `${l.wateringVolume}ml` : '—'}</td>
+        <td>${l.runoffPercentage ? `${parseFloat(l.runoffPercentage).toFixed(0)}%` : '—'}</td>
       </tr>
     `).join('');
 
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-    <title>Relatório — ${tent.name}</title>
-    <style>
-      body { font-family: -apple-system, sans-serif; margin: 32px; color: #111; }
-      h1 { font-size: 22px; margin-bottom: 4px; }
-      .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
-      .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
-      .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
-      .card .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
-      .card .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      th { background: #f9fafb; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e5e7eb; font-size: 11px; text-transform: uppercase; color: #666; }
-      td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; }
-      tr:hover td { background: #fafafa; }
-      h2 { font-size: 15px; margin: 24px 0 10px; color: #374151; }
-      .footer { margin-top: 32px; font-size: 11px; color: #aaa; text-align: center; }
-      @media print { body { margin: 16px; } }
-    </style></head><body>
-    <h1>${tent.name}</h1>
-    <p class="sub">${phase} &nbsp;·&nbsp; Ciclo iniciado em ${startStr} &nbsp;·&nbsp; Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+    const statCard = (label: string, s: ReturnType<typeof stat>, unit: string) => `
+      <div class="stat-card">
+        <div class="stat-label">${label}</div>
+        <div class="stat-avg">${s.avg}${s.avg !== '—' ? unit : ''}</div>
+        <div class="stat-minmax">
+          ${s.min !== '—' ? `<span>↓ ${s.min}${unit}</span><span>↑ ${s.max}${unit}</span>` : '<span style="color:#bbb">sem dados</span>'}
+        </div>
+      </div>`;
 
-    <div class="grid">
-      <div class="card"><div class="label">Temp. Média</div><div class="value">${avgTemp}°C</div></div>
-      <div class="card"><div class="label">UR Média</div><div class="value">${avgRh}%</div></div>
-      <div class="card"><div class="label">PPFD Médio</div><div class="value">${avgPpfd}</div></div>
-      <div class="card"><div class="label">Registros (${dateRange}d)</div><div class="value">${filteredLogs.length}</div></div>
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório — ${tent.name}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111; background: #fff; padding: 32px; font-size: 13px; }
+    /* Header */
+    .header { display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 16px; margin-bottom: 20px; }
+    .header-left h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .header-left .sub { color: #666; font-size: 12px; margin-top: 4px; }
+    .header-right { text-align: right; font-size: 11px; color: #888; line-height: 1.6; }
+    .phase-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #f3f4f6; color: #374151; }
+    /* Stat cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 24px; }
+    .stat-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+    .stat-label { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .stat-avg { font-size: 20px; font-weight: 700; color: #111; margin-bottom: 4px; }
+    .stat-minmax { font-size: 10px; color: #6b7280; display: flex; justify-content: space-between; }
+    /* Section */
+    h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #374151; margin: 20px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #f9fafb; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+    tr:nth-child(even) td { background: #fafafa; }
+    /* Cycle info */
+    .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+    .info-cell { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; }
+    .info-cell .lbl { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; }
+    .info-cell .val { font-size: 14px; font-weight: 600; margin-top: 2px; }
+    /* Footer */
+    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #bbb; display: flex; justify-content: space-between; }
+    @media print {
+      body { padding: 16px; }
+      .no-break { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>🌱 ${tent.name}</h1>
+      <div class="sub">${tent.width}×${tent.depth}×${tent.height}cm &nbsp;·&nbsp; ${tent.powerW ? tent.powerW + 'W' : ''}</div>
     </div>
+    <div class="header-right">
+      <div><span class="phase-badge">${phase}</span></div>
+      <div style="margin-top:6px">Gerado em ${generatedAt}</div>
+      <div>Período: últimos ${dateRange} dias</div>
+    </div>
+  </div>
 
-    <h2>Últimos 30 registros</h2>
-    <table>
-      <thead><tr><th>Data/Hora</th><th>Temp (°C)</th><th>UR (%)</th><th>PPFD</th><th>pH</th><th>EC</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <p class="footer">App Cultivo &nbsp;·&nbsp; ${window.location.origin}</p>
-    <script>window.onload = () => { window.print(); }<\/script>
-    </body></html>`;
+  <!-- Cycle info -->
+  ${cycle ? `
+  <div class="info-grid">
+    <div class="info-cell"><div class="lbl">Início do Ciclo</div><div class="val">${startStr}</div></div>
+    <div class="info-cell"><div class="lbl">Dias de Ciclo</div><div class="val">${Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / 86400000)}</div></div>
+    <div class="info-cell"><div class="lbl">Status</div><div class="val">${cycle.status === 'ACTIVE' ? 'Ativo' : 'Finalizado'}</div></div>
+    <div class="info-cell"><div class="lbl">Registros no período</div><div class="val">${exportLogs.length}</div></div>
+  </div>` : ''}
+
+  <!-- Stats -->
+  <h2>Médias do período (${dateRange} dias)</h2>
+  <div class="stat-grid">
+    ${statCard('Temperatura', sTemp, '°C')}
+    ${statCard('Umidade', sRh, '%')}
+    ${statCard('PPFD', sPpfd, '')}
+    ${statCard('pH', sPh, '')}
+    ${statCard('EC', sEc, ' mS')}
+  </div>
+
+  <!-- Plants -->
+  ${(tentPlants ?? []).length > 0 ? `
+  <h2>Plantas (${tentPlants!.length})</h2>
+  <table class="no-break">
+    <thead><tr><th>Nome</th><th>Código</th><th>Estágio</th><th>Semana</th><th>Status</th></tr></thead>
+    <tbody>${plantRows}</tbody>
+  </table>` : ''}
+
+  <!-- Logs table -->
+  <h2>Registros diários (${exportLogs.length})</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Data/Hora</th><th>Turno</th><th>Temp °C</th><th>UR %</th>
+        <th>PPFD</th><th>pH</th><th>EC</th><th>Rega</th><th>Runoff</th>
+      </tr>
+    </thead>
+    <tbody>${logRows}</tbody>
+  </table>
+
+  <div class="footer">
+    <span>App Cultivo &nbsp;·&nbsp; ${window.location.origin}</span>
+    <span>${tent.name} &nbsp;·&nbsp; ${phase} &nbsp;·&nbsp; ${generatedAt}</span>
+  </div>
+
+  <script>window.onload = () => { window.print(); }<\/script>
+</body>
+</html>`;
 
     const win = window.open('', '_blank');
     if (!win) { toast.error('Permita pop-ups para exportar o relatório'); return; }
