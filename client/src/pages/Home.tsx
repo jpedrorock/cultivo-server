@@ -1045,93 +1045,37 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           </div>
         </Link>
       )}
-      <Card className="backdrop-blur-sm relative z-10 shadow-xl shadow-black/20 transition-all duration-200 ease-out hover:-translate-y-0.5 group overflow-hidden" data-tour="tent-card" style={{ borderLeft: `3px solid ${phaseAccentColor}`, background: phaseBg, backgroundColor: 'hsl(var(--card) / 0.92)' }} onMouseEnter={e => { if (cycle) e.currentTarget.style.boxShadow = `0 20px 40px -12px ${phaseAccentColor}40, 0 8px 16px -8px ${phaseAccentColor}20`; }} onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}>
-      <CardHeader className="pl-8">
+      <Card className="relative z-10 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'hsl(var(--card))' }}>
+      <CardHeader className="px-5 pt-5 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
-              {tent.name}
-              <Badge 
-                className={`${phaseInfo.color} text-white border-0`}
-              >
-                <PhaseIcon className="w-3 h-3 mr-1" />
-                {phaseInfo.phase}
-              </Badge>
+            {/* Linha 1: nome + freshness badge */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle className="text-xl font-bold tracking-tight">{tent.name}</CardTitle>
               {(() => {
-                if (!tent.lastReadingAt) {
-                  return (
-                    <Badge variant="outline" className="text-gray-500 border-gray-300">
-                      <Clock className="w-3 h-3 mr-1" />
-                      Sem registros
-                    </Badge>
-                  );
-                }
-                const now = Date.now();
-                const diffMs = now - tent.lastReadingAt;
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                
-                let badgeColor = "bg-green-500/10 text-green-700 border-green-300 dark:bg-green-500/20 dark:text-green-400 dark:border-green-600";
-                let timeText = "";
-                
-                // Smart time-based colors: green <6h, yellow 6-20h, red >20h
-                if (diffHours === 0) {
-                  timeText = `há ${diffMinutes}min`;
-                  badgeColor = "bg-green-500/10 text-green-700 border-green-300 dark:bg-green-500/20 dark:text-green-400 dark:border-green-600";
-                } else if (diffHours < 6) {
-                  timeText = `há ${diffHours}h`;
-                  badgeColor = "bg-green-500/10 text-green-700 border-green-300 dark:bg-green-500/20 dark:text-green-400 dark:border-green-600";
-                } else if (diffHours < 20) {
-                  timeText = `há ${diffHours}h`;
-                  badgeColor = "bg-yellow-500/10 text-yellow-700 border-yellow-300 dark:bg-yellow-500/20 dark:text-yellow-400 dark:border-yellow-600";
-                } else {
-                  timeText = `há ${diffHours}h`;
-                  badgeColor = "bg-red-500/10 text-red-700 border-red-300 dark:bg-red-500/20 dark:text-red-400 dark:border-red-600";
-                }
-                
+                if (!tent.lastReadingAt) return (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground">
+                    <Clock className="w-3 h-3" /> Sem registros
+                  </span>
+                );
+                const diffMs = Date.now() - tent.lastReadingAt;
+                const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMin = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                const timeText = diffH === 0 ? `há ${diffMin}min` : `há ${diffH}h`;
+                const pill = diffH < 6
+                  ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                  : diffH < 20
+                  ? "border-amber-400/40 text-amber-400 bg-amber-500/10"
+                  : "border-red-500/40 text-red-400 bg-red-500/10";
                 return (
-                  <Badge variant="outline" className={badgeColor}>
-                    <Clock className="w-3 h-3 mr-1" />
-                    {timeText}
-                  </Badge>
+                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${pill}`}>
+                    <Clock className="w-3 h-3" />{timeText}
+                  </span>
                 );
               })()}
-            </CardTitle>
-            <CardDescription className="mt-2 space-y-1">
-              <div className="flex items-center gap-3">
-                <span>{tent.category === 'MAINTENANCE' ? 'Manutenção' : tent.category === 'VEGA' ? 'Vegetativa' : tent.category === 'FLORA' ? 'Floração' : 'Secagem'} • {tent.width}×{tent.depth}×{tent.height}cm</span>
-                {(tent.plantCount !== undefined || tent.seedlingCount !== undefined) && (
-                  <Link href={`/plants?tent=${tent.id}`}>
-                    <div className="flex items-center gap-2">
-                      {tent.plantCount > 0 && (
-                        <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-primary/10 hover:border-primary/50 transition-colors">
-                          <Sprout className="w-3 h-3" />
-                          {tent.plantCount} {tent.plantCount === 1 ? 'planta' : 'plantas'}
-                        </Badge>
-                      )}
-                      {tent.seedlingCount > 0 && (
-                        <Badge variant="outline" className="gap-1 cursor-pointer transition-colors bg-cyan-50/50 text-cyan-700 border-cyan-200 hover:bg-cyan-100/60 dark:bg-white/5 dark:text-muted-foreground dark:border-border dark:hover:bg-white/8">
-                          <Scissors className="w-3 h-3" />
-                          {tent.seedlingCount} {tent.seedlingCount === 1 ? 'muda' : 'mudas'}
-                        </Badge>
-                      )}
-                    </div>
-                  </Link>
-                )}
-              </div>
-              {tent.tentStrains && tent.tentStrains.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {tent.tentStrains.map((s: any) => (
-                    <Badge key={s.id} variant="secondary" className="text-xs px-2 py-0">
-                      {s.name}
-                    </Badge>
-                  ))}
-                  {tent.tentStrains.length > 1 && (
-                    <span className="text-xs text-muted-foreground italic">(média)</span>
-                  )}
-                </div>
-              )}
-            </CardDescription>
+            </div>
+            {/* Linha 2: dimensões */}
+            <p className="text-xs text-muted-foreground mt-0.5">{tent.width}×{tent.depth}×{tent.height}cm</p>
           </div>
 
           {/* Monitor — acesso rápido ao display da estufa */}
@@ -1228,216 +1172,128 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Plant count chips — abaixo do header */}
+        {(tent.plantCount > 0 || tent.seedlingCount > 0) && (
+          <Link href={`/plants?tent=${tent.id}`}>
+            <div className="flex items-center gap-2 mt-3">
+              {tent.plantCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors">
+                  <Sprout className="w-3.5 h-3.5 text-primary" />
+                  {tent.plantCount} {tent.plantCount === 1 ? 'planta' : 'plantas'}
+                </span>
+              )}
+              {tent.seedlingCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors">
+                  <Scissors className="w-3.5 h-3.5 text-cyan-500" />
+                  {tent.seedlingCount} {tent.seedlingCount === 1 ? 'muda' : 'mudas'}
+                </span>
+              )}
+            </div>
+          </Link>
+        )}
       </CardHeader>
 
-      <CardContent className="pl-8 pr-6 pb-6 pt-0">
-        <div className="space-y-5">
-          {/* Cycle Info */}
+      <CardContent className="px-5 pb-5 pt-0">
+        <div className="space-y-3">
+          {/* Cycle Info — compacto, sem barra de progresso */}
           {cycle ? (
             <div
               onClick={() => navigate(`/tent/${tent.id}`)}
-              className={`rounded-lg p-4 space-y-2 border cursor-pointer hover:brightness-110 transition-all duration-150 ${
-                tent.category === 'VEGA'
-                  ? 'border-green-500/20 dark:border-green-500/15'
-                  : tent.category === 'FLORA'
-                  ? 'border-purple-500/20 dark:border-purple-500/15'
-                  : tent.category === 'DRYING'
-                  ? 'border-amber-500/20 dark:border-amber-500/15'
-                  : 'border-blue-500/20 dark:border-blue-500/15'
+              className={`rounded-xl p-3.5 border cursor-pointer active:scale-[0.99] transition-all duration-150 ${
+                tent.category === 'VEGA'        ? 'border-green-500/20'
+                : tent.category === 'FLORA'     ? 'border-purple-500/20'
+                : tent.category === 'DRYING'    ? 'border-amber-500/20'
+                : 'border-blue-500/20'
               }`}
               style={{
                 background:
                   tent.category === 'VEGA'
-                    ? 'linear-gradient(135deg, rgba(34,197,94,0.22) 0%, rgba(16,185,129,0.10) 60%, rgba(34,197,94,0.03) 100%)'
+                    ? 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)'
                     : tent.category === 'FLORA'
-                    ? 'linear-gradient(135deg, rgba(168,85,247,0.24) 0%, rgba(139,92,246,0.11) 60%, rgba(168,85,247,0.03) 100%)'
+                    ? 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(168,85,247,0.04) 100%)'
                     : tent.category === 'DRYING'
-                    ? 'linear-gradient(135deg, rgba(245,158,11,0.22) 0%, rgba(234,179,8,0.10) 60%, rgba(245,158,11,0.03) 100%)'
-                    : 'linear-gradient(135deg, rgba(59,130,246,0.22) 0%, rgba(99,102,241,0.10) 60%, rgba(59,130,246,0.03) 100%)',
+                    ? 'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 100%)'
+                    : 'linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%)',
               }}
             >
+              {/* Linha 1: fase | semana / clonagem */}
               <div className="flex justify-between items-center">
                 <span className={`text-sm font-semibold flex items-center gap-1.5 ${
-                  tent.category === 'VEGA' ? 'text-green-700 dark:text-green-400'
-                  : tent.category === 'FLORA' ? 'text-purple-700 dark:text-purple-400'
-                  : tent.category === 'DRYING' ? 'text-amber-700 dark:text-amber-400'
-                  : 'text-blue-700 dark:text-blue-400'
+                  tent.category === 'VEGA'    ? 'text-green-400'
+                  : tent.category === 'FLORA' ? 'text-purple-400'
+                  : tent.category === 'DRYING'? 'text-amber-400'
+                  : 'text-blue-400'
                 }`}>
                   <PhaseIcon className="w-3.5 h-3.5" />
                   {tent.category === 'MAINTENANCE' ? 'Manutenção Perpétua' : 'Ciclo Ativo'}
                 </span>
-                {tent.category === 'MAINTENANCE' ? (
-                  <span className="text-sm font-bold text-blue-700 dark:text-blue-400">
-                    {tent.lastCloningAt
-                      ? (() => {
-                          const days = Math.floor((Date.now() - tent.lastCloningAt) / (24 * 60 * 60 * 1000));
-                          if (days === 0) return 'Hoje';
-                          if (days === 1) return 'Ontem';
-                          return `Há ${days} dias`;
-                        })()
-                      : 'Sem clonagem'}
-                  </span>
-                ) : (
-                  <span className={`text-sm font-bold ${
-                    tent.category === 'VEGA' ? 'text-green-700 dark:text-green-400'
-                    : tent.category === 'FLORA' ? 'text-purple-700 dark:text-purple-400'
-                    : tent.category === 'DRYING' ? 'text-amber-700 dark:text-amber-400'
-                    : 'text-blue-700 dark:text-blue-400'
-                  }`}>
-                    Semana {(() => {
-                      const now = new Date();
-                      const start = new Date(cycle.startDate);
-                      if (isNaN(start.getTime())) return '?';
-                      const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                      if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
-                        return Math.max(1, Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-                      }
-                      return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-                    })()}
-                  </span>
-                )}
+                <span className={`text-sm font-bold ${
+                  tent.category === 'VEGA'    ? 'text-green-400'
+                  : tent.category === 'FLORA' ? 'text-purple-400'
+                  : tent.category === 'DRYING'? 'text-amber-400'
+                  : 'text-blue-400'
+                }`}>
+                  {tent.category === 'MAINTENANCE'
+                    ? (tent.lastCloningAt
+                        ? (() => { const d = Math.floor((Date.now() - tent.lastCloningAt) / 86400000); return d === 0 ? 'Hoje' : d === 1 ? 'Ontem' : `Há ${d}d`; })()
+                        : 'Sem clonagem')
+                    : `Semana ${(() => {
+                        const now = new Date(); const start = new Date(cycle.startDate);
+                        if (isNaN(start.getTime())) return '?';
+                        const fs = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
+                        if (fs && !isNaN(fs.getTime()) && now >= fs) return Math.max(1, Math.floor((now.getTime() - fs.getTime()) / 604800000) + 1);
+                        return Math.max(1, Math.floor((now.getTime() - start.getTime()) / 604800000) + 1);
+                      })()}`
+                  }
+                </span>
               </div>
-              <div className="flex justify-between items-center">
-                {tent.category === 'MAINTENANCE' ? (
-                  <>
-                    <span className="text-xs text-muted-foreground">Última Clonagem</span>
-                    <span className="text-xs font-medium text-foreground">
-                      {tent.lastCloningAt
-                        ? new Date(tent.lastCloningAt).toLocaleDateString('pt-BR')
-                        : '—'}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xs text-muted-foreground">Semana Atual</span>
-                    <span className="text-xs font-medium text-foreground">
-                      {(() => {
-                        const now = new Date();
-                        const start = new Date(cycle.startDate);
-                        if (isNaN(start.getTime())) return '—';
-                        const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                        let weekStart;
-                        if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
-                          const weeksSinceFlora = Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                          weekStart = new Date(floraStart.getTime() + (weeksSinceFlora * 7 * 24 * 60 * 60 * 1000));
-                        } else {
-                          const weeksSinceStart = Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000));
-                          weekStart = new Date(start.getTime() + (weeksSinceStart * 7 * 24 * 60 * 60 * 1000));
-                        }
-                        return weekStart.toLocaleDateString('pt-BR');
-                      })()}
-                    </span>
-                  </>
-                )}
+              {/* Linha 2: label | data */}
+              <div className="flex justify-between items-center mt-1.5">
+                <span className="text-xs text-muted-foreground">
+                  {tent.category === 'MAINTENANCE' ? 'Última Clonagem' : 'Iniciado em'}
+                </span>
+                <span className="text-xs font-medium text-foreground/70">
+                  {tent.category === 'MAINTENANCE'
+                    ? (tent.lastCloningAt ? new Date(tent.lastCloningAt).toLocaleDateString('pt-BR') : '—')
+                    : new Date(cycle.startDate).toLocaleDateString('pt-BR')}
+                </span>
               </div>
-
-              {/* ── Barra de progresso do ciclo ── */}
-              {tent.category !== 'MAINTENANCE' && (() => {
-                const now = new Date();
-                const start = new Date(cycle.startDate);
-                if (isNaN(start.getTime())) return null;
-                const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                const isFlora = !!(floraStart && !isNaN(floraStart.getTime()) && now >= floraStart);
-                const weekNum = isFlora
-                  ? Math.max(1, Math.floor((now.getTime() - floraStart!.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1)
-                  : Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-                const totalEstWeeks = 16; // ~8 vega + 8 flora
-                const totalWeekNum = isFlora
-                  ? Math.floor((floraStart!.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + weekNum
-                  : weekNum;
-                const pct = Math.min((totalWeekNum / totalEstWeeks) * 100, 100);
-                const barColor =
-                  tent.category === 'VEGA'   ? '#4ade80' :
-                  tent.category === 'FLORA'  ? '#a78bfa' :
-                  tent.category === 'DRYING' ? '#fbbf24' : '#60a5fa';
-                return (
-                  <div className="pt-1 space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <div className="flex gap-2">
-                        {['Vega','Flora','Colheita'].map((label, i) => {
-                          const active = i === 0 && !isFlora || i === 1 && isFlora;
-                          return (
-                            <span key={label} className={`text-[10px] font-medium ${active ? '' : 'text-muted-foreground/50'}`}
-                                  style={active ? { color: barColor } : {}}>
-                              {label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">{Math.round(pct)}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-black/20 dark:bg-white/10 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${pct}%`, backgroundColor: barColor, boxShadow: `0 0 6px ${barColor}80` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           ) : (
-            <div className="bg-muted rounded-lg p-4 text-center">
+            <div className="rounded-xl border border-border/40 bg-muted/20 p-3.5 text-center">
               <p className="text-sm text-muted-foreground">Nenhum ciclo ativo</p>
             </div>
           )}
 
-          {/* Latest Readings */}
-          {targets?._isAverage && (
-            <div className="pt-3 pb-1">
-              <p className="text-xs text-center text-muted-foreground bg-accent/30 rounded px-2 py-1">
-                <span className="inline-flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5 text-blue-400"/>Parâmetros médios ({targets._strainCount} strains)</span>
-              </p>
-            </div>
-          )}
           {/* KPI Metrics — 3 colunas: Temp · RH · PPFD */}
-          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border/60">
+          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/40">
             {/* Temperature */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-orange-500/15" style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(234,88,12,0.08) 60%, rgba(249,115,22,0.02) 100%)' }}>
-              <ThermometerSun className="w-4 h-4 text-orange-500 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Temp</p>
-              <div className="flex items-center gap-0.5">
-                <p className={`text-base font-bold tracking-tight leading-none ${
-                  latestLog?.tempC
-                    ? getValueColor(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)
-                    : "text-foreground"
-                }`}>
-                  {latestLog?.tempC ? <AnimatedCounter value={parseFloat(latestLog.tempC)} decimals={1} suffix="°" /> : "--"}
-                </p>
-                {latestLog?.tempC && getStatusIcon(parseFloat(latestLog.tempC), targets?.tempMin, targets?.tempMax)}
-              </div>
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08]">
+              <ThermometerSun className="w-3.5 h-3.5 text-orange-400" />
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">Temp</p>
+              <p className="text-xl font-bold tracking-tight leading-none text-foreground">
+                {latestLog?.tempC ? <AnimatedCounter value={parseFloat(latestLog.tempC)} decimals={1} suffix="°" /> : <span className="text-muted-foreground/40">--</span>}
+              </p>
               <MiniSparkline values={sparkTemps} color="#f97316" />
             </div>
             {/* Humidity */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-teal-400/20" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.15) 0%, rgba(20,184,166,0.07) 60%, rgba(45,212,191,0.02) 100%)' }}>
-              <Droplets className="w-4 h-4 text-teal-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">RH</p>
-              <div className="flex items-center gap-0.5">
-                <p className={`text-base font-bold tracking-tight leading-none ${
-                  latestLog?.rhPct
-                    ? getValueColor(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)
-                    : "text-foreground"
-                }`}>
-                  {latestLog?.rhPct ? <AnimatedCounter value={parseFloat(latestLog.rhPct)} decimals={0} suffix="%" /> : "--"}
-                </p>
-                {latestLog?.rhPct && getStatusIcon(parseFloat(latestLog.rhPct), targets?.rhMin, targets?.rhMax)}
-              </div>
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08]">
+              <Droplets className="w-3.5 h-3.5 text-teal-400" />
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">RH</p>
+              <p className="text-xl font-bold tracking-tight leading-none text-foreground">
+                {latestLog?.rhPct ? <AnimatedCounter value={parseFloat(latestLog.rhPct)} decimals={0} suffix="%" /> : <span className="text-muted-foreground/40">--</span>}
+              </p>
               <MiniSparkline values={sparkRh} color="#2dd4bf" />
             </div>
             {/* PPFD */}
-            <div className="flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-yellow-500/15" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(202,138,4,0.08) 60%, rgba(234,179,8,0.02) 100%)' }}>
-              <Sun className="w-4 h-4 text-yellow-500 dark:text-yellow-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PPFD</p>
-              <div className="flex items-center gap-0.5">
-                <p className={`text-base font-bold tracking-tight leading-none ${
-                  latestLog?.ppfd
-                    ? getValueColor(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)
-                    : "text-foreground"
-                }`}>
-                  {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : "--"}
-                </p>
-                {latestLog?.ppfd && getStatusIcon(latestLog.ppfd, targets?.ppfdMin, targets?.ppfdMax)}
-              </div>
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.08]">
+              <Sun className="w-3.5 h-3.5 text-yellow-400" />
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">PPFD</p>
+              <p className="text-xl font-bold tracking-tight leading-none text-foreground">
+                {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
+              </p>
+              <div className="h-[18px]" /> {/* espaço para alinhar com os sparklines */}
             </div>
           </div>
 
