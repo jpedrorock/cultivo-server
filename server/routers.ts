@@ -1830,6 +1830,66 @@ export const appRouter = router({
         }
         return latest;
       }),
+
+    // Streak de registros diários consecutivos para uma estufa
+    streak: protectedProcedure
+      .input(z.object({ tentId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
+
+        // Busca todos os logs da estufa em DESC — precisamos de datas únicas por dia
+        const rows = await database
+          .select({ logDate: dailyLogs.logDate })
+          .from(dailyLogs)
+          .where(eq(dailyLogs.tentId, input.tentId))
+          .orderBy(desc(dailyLogs.logDate));
+
+        if (rows.length === 0) return { current: 0, longest: 0, todayDone: false };
+
+        // Extrair set de datas únicas (YYYY-MM-DD) em ordem DESC
+        const toDay = (d: Date | string) => {
+          const dt = typeof d === 'string' ? new Date(d) : d;
+          return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        };
+
+        const uniqueDays = Array.from(new Set(rows.map((r: { logDate: Date | string }) => toDay(r.logDate))));
+
+        const today = toDay(new Date());
+        const yesterday = toDay(new Date(Date.now() - 86400_000));
+
+        const todayDone = uniqueDays[0] === today;
+
+        // Contar streak atual a partir do dia mais recente
+        let current = 0;
+        let longest = 0;
+        let streak = 0;
+
+        // Construir array de dias consecutivos
+        let refDay = new Date(uniqueDays[0]);
+        for (const day of uniqueDays) {
+          const refStr = toDay(refDay);
+          if (day === refStr) {
+            streak++;
+            refDay = new Date(refDay.getTime() - 86400_000);
+          } else {
+            if (streak > longest) longest = streak;
+            if (current === 0) current = streak; // primeiro break = fim do streak atual
+            streak = 1;
+            refDay = new Date(new Date(day).getTime() - 86400_000);
+          }
+        }
+        if (streak > longest) longest = streak;
+        if (current === 0) current = streak;
+
+        // Se o último log não é hoje nem ontem, streak atual = 0
+        if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) {
+          current = 0;
+        }
+
+        return { current, longest, todayDone };
+      }),
   }),
 
   // Alerts (Alertas)

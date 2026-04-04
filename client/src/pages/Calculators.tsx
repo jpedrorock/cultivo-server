@@ -167,6 +167,7 @@ export default function Calculators() {
     "lux-ppfd": "Conversor Lux → PPFD",
     "ppm-ec": "Conversor PPM ↔ EC",
     "ph-adjust": "Calculadora de pH",
+    "vpd": "Calculadora VPD",
   };
 
   return (
@@ -204,6 +205,7 @@ export default function Calculators() {
         {calculatorId === "lux-ppfd" && <LuxPPFDCalculator />}
         {calculatorId === "ppm-ec" && <PPMECConverter />}
         {calculatorId === "ph-adjust" && <PHAdjustCalculator />}
+        {calculatorId === "vpd" && <VPDCalculator />}
       </main>
     </div>
     </PageTransition>
@@ -1226,4 +1228,125 @@ function RunoffCalculator() {
 // Calculadora de Rega legada (mantida para compatibilidade)
 function IrrigationCalculator() {
   return <div />;
+}
+
+// ── VPD Calculator ────────────────────────────────────────────────────────────
+function VPDCalculator() {
+  const [tempC, setTempC] = useState(25);
+  const [rh, setRh] = useState(60);
+
+  // SVP(T) = 0.6108 × e^(17.27×T / (T+237.3))
+  const svp = (t: number) => 0.6108 * Math.exp((17.27 * t) / (t + 237.3));
+  const tLeaf = tempC - 2; // leaf temp ≈ air − 2°C
+  const vpd = svp(tLeaf) * (1 - rh / 100);
+  const vpdFixed = Math.max(0, vpd).toFixed(2);
+
+  type Zone = { min: number; max: number; label: string; sub: string; color: string; textColor: string; borderColor: string };
+  const zones: Zone[] = [
+    { min: 0,    max: 0.4,  label: "Risco de Mofo",    sub: "VPD muito baixo — ventile mais",        color: "bg-red-500/15",    textColor: "text-red-400",    borderColor: "border-red-500/30" },
+    { min: 0.4,  max: 0.8,  label: "Mudas / Clones",   sub: "Zona segura para plantas jovens",        color: "bg-yellow-500/15", textColor: "text-yellow-400", borderColor: "border-yellow-500/30" },
+    { min: 0.8,  max: 1.2,  label: "Ideal — Vegetativa", sub: "Ótimo para vega e crescimento",         color: "bg-emerald-500/15", textColor: "text-emerald-400", borderColor: "border-emerald-500/30" },
+    { min: 1.0,  max: 1.5,  label: "Ideal — Floração",  sub: "Ótimo para flora e produção",           color: "bg-green-500/15",  textColor: "text-green-400",  borderColor: "border-green-500/30" },
+    { min: 1.5,  max: 99,   label: "Estresse Hídrico",  sub: "VPD alto — plantas perdem água rápido", color: "bg-red-500/15",    textColor: "text-red-400",    borderColor: "border-red-500/30" },
+  ];
+
+  const vpdNum = parseFloat(vpdFixed);
+  // Pick best matching zone — if multiple overlap (0.8-1.2 vs 1.0-1.5) prefer the more specific range
+  const activeZone = zones.slice().reverse().find(z => vpdNum >= z.min && vpdNum < z.max) ?? zones[zones.length - 1];
+
+  const haptic = useTactileFeedback();
+
+  return (
+    <div className="space-y-6 pb-8">
+      {/* Result hero */}
+      <div className={`rounded-2xl border p-6 text-center ${activeZone.color} ${activeZone.borderColor}`}>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">VPD Atual</p>
+        <p className={`text-7xl font-black tabular-nums leading-none ${activeZone.textColor}`} style={{ textShadow: '0 0 30px currentColor' }}>
+          {vpdFixed}
+        </p>
+        <p className="text-sm text-muted-foreground mt-1">kPa</p>
+        <div className="mt-4 space-y-0.5">
+          <p className={`text-base font-bold ${activeZone.textColor}`}>{activeZone.label}</p>
+          <p className="text-sm text-muted-foreground">{activeZone.sub}</p>
+        </div>
+      </div>
+
+      {/* Sliders */}
+      <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-6">
+        {/* Temperature */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              🌡️ Temperatura
+            </span>
+            <span className="text-lg font-bold text-orange-400">{tempC}°C</span>
+          </div>
+          <input
+            type="range"
+            min={15} max={35} step={0.5}
+            value={tempC}
+            onChange={(e) => { setTempC(parseFloat(e.target.value)); haptic.tap(); }}
+            className="w-full h-2 rounded-full appearance-none cursor-pointer"
+            style={{ accentColor: '#f97316' }}
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground/50">
+            <span>15°C</span>
+            <span>25°C</span>
+            <span>35°C</span>
+          </div>
+        </div>
+
+        {/* Humidity */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+              💧 Umidade Relativa
+            </span>
+            <span className="text-lg font-bold text-teal-400">{rh}%</span>
+          </div>
+          <input
+            type="range"
+            min={20} max={90} step={1}
+            value={rh}
+            onChange={(e) => { setRh(parseInt(e.target.value)); haptic.tap(); }}
+            className="w-full h-2 rounded-full appearance-none cursor-pointer"
+            style={{ accentColor: '#2dd4bf' }}
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground/50">
+            <span>20%</span>
+            <span>55%</span>
+            <span>90%</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-2.5 flex justify-between text-xs text-muted-foreground">
+          <span>Temp. folha estimada</span>
+          <span className="font-semibold text-foreground">{tLeaf.toFixed(1)}°C</span>
+        </div>
+      </div>
+
+      {/* Zone guide */}
+      <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-2.5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Guia de Zonas VPD</p>
+        {[
+          { range: "< 0.4 kPa",    label: "Risco de Mofo",     color: "bg-red-500", tip: "Muito úmido — aumentar ventilação" },
+          { range: "0.4–0.8 kPa",  label: "Mudas / Clones",    color: "bg-yellow-500", tip: "OK para plantas jovens" },
+          { range: "0.8–1.2 kPa",  label: "Vegetativa",        color: "bg-emerald-500", tip: "Zona ideal para vega" },
+          { range: "1.0–1.5 kPa",  label: "Floração",          color: "bg-green-400", tip: "Zona ideal para flora" },
+          { range: "> 1.5 kPa",    label: "Estresse Hídrico",  color: "bg-red-500", tip: "Umidificar ou reduzir temperatura" },
+        ].map((z) => (
+          <div key={z.range} className="flex items-center gap-3">
+            <div className={`w-2.5 h-2.5 rounded-full ${z.color} shrink-0`} />
+            <span className="text-xs font-medium text-foreground w-28 shrink-0">{z.range}</span>
+            <span className="text-xs text-muted-foreground">{z.label} — {z.tip}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-border/40 bg-muted/20 p-4 text-xs text-muted-foreground space-y-1">
+        <p><strong className="text-foreground">Fórmula:</strong> SVP(T) = 0.6108 × e<sup>17.27T/(T+237.3)</sup></p>
+        <p>VPD = SVP(T<sub>folha</sub>) × (1 − UR/100) &nbsp;·&nbsp; T<sub>folha</sub> ≈ T<sub>ar</sub> − 2°C</p>
+      </div>
+    </div>
+  );
 }

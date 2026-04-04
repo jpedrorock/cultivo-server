@@ -134,39 +134,45 @@ export function BottomNav() {
                 <div className="absolute bottom-0 left-7 translate-y-full w-0 h-0 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-border/60" />
                 <div className="absolute bottom-0 left-7 translate-y-[5px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-card/95" />
 
-                <Link href="/quick-log?mode=status" onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}>
-                  <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-teal-500/8 active:bg-teal-500/15 transition-colors border-b border-border/30">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
-                      <ThermometerSun className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground leading-tight">Status da Estufa</p>
-                      <p className="text-[11px] text-muted-foreground/60">Temp, RH, pH, EC, luz</p>
-                    </div>
+                <Link
+                  href="/quick-log?mode=status"
+                  onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
+                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-teal-500/8 active:bg-teal-500/15 transition-colors border-b border-border/30 w-full"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                    <ThermometerSun className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight">Status da Estufa</p>
+                    <p className="text-[11px] text-muted-foreground/60">Temp, RH, pH, EC, luz</p>
                   </div>
                 </Link>
 
-                <Link href="/quick-log?mode=plant" onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}>
-                  <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors border-b border-border/30">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shrink-0 shadow-sm">
-                      <Heart className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground leading-tight">Saúde de Planta</p>
-                      <p className="text-[11px] text-muted-foreground/60">Status, sintomas, foto</p>
-                    </div>
+                <Link
+                  href="/quick-log?mode=plant"
+                  onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
+                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors border-b border-border/30 w-full"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <Heart className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight">Saúde de Planta</p>
+                    <p className="text-[11px] text-muted-foreground/60">Status, sintomas, foto</p>
                   </div>
                 </Link>
 
-                <Link href="/quick-log?mode=trichome" onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}>
-                  <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
-                      <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground leading-tight">Tricomas</p>
-                      <p className="text-[11px] text-muted-foreground/60">Maturação · Flora</p>
-                    </div>
+                <Link
+                  href="/quick-log?mode=trichome"
+                  onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
+                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors w-full"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight">Tricomas</p>
+                    <p className="text-[11px] text-muted-foreground/60">Maturação · Flora</p>
                   </div>
                 </Link>
               </div>

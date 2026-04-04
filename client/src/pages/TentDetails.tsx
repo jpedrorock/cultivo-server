@@ -370,6 +370,31 @@ export default function TentDetails() {
     win.document.close();
   };
 
+  const handleExportCSV = () => {
+    const exportLogs = filteredLogs.slice().reverse(); // ASC — mais antigo primeiro
+    const header = "Data,Turno,Temp°C,UR%,PPFD,pH,EC,Rega(ml),Runoff%";
+    const rows = exportLogs.map((l: any) => [
+      format(new Date(l.logDate), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+      l.turn ?? "",
+      l.tempC ?? "",
+      l.rhPct ?? "",
+      l.ppfd ?? "",
+      l.ph ?? "",
+      l.ec ?? "",
+      l.wateringVolume ?? "",
+      l.runoffPercentage ? parseFloat(l.runoffPercentage).toFixed(1) : "",
+    ].join(","));
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${tent.name.replace(/\s+/g, "_")}_logs_${format(new Date(), "yyyyMMdd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportado!");
+  };
+
   const handleShare = async () => {
     const phase = phaseInfo.phase;
     const lastLog = logs?.[0];
@@ -565,6 +590,10 @@ export default function TentDetails() {
                   <DropdownMenuItem onClick={handlePrint} className="gap-2">
                     <FileDown className="w-4 h-4" />
                     Exportar Relatório PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportCSV} className="gap-2">
+                    <FileDown className="w-4 h-4 text-emerald-500" />
+                    Exportar CSV
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem

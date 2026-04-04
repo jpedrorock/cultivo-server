@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight } from "lucide-react";
+import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight, Wind } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 
 export default function CalculatorMenu() {
@@ -81,6 +81,19 @@ export default function CalculatorMenu() {
       shadowColor: "shadow-rose-900/20",
       badge: "Novo",
       badgeStyle: "bg-rose-500/15 text-rose-300 border border-rose-500/25",
+    },
+    {
+      id: "vpd",
+      title: "VPD",
+      description: "Pressão de vapor deficit — zona ideal de temperatura e umidade",
+      icon: Wind,
+      gradient: "from-indigo-400 to-sky-500",
+      border: "border-indigo-500/20",
+      glow: "rgba(99,102,241,0.09)",
+      accentColor: "text-indigo-400",
+      shadowColor: "shadow-indigo-900/20",
+      badge: "Novo",
+      badgeStyle: "bg-indigo-500/15 text-indigo-300 border border-indigo-500/25",
     },
   ];
 
@@ -173,6 +186,7 @@ export default function CalculatorMenu() {
           <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Sun className="w-3 h-3 text-yellow-400"/>Lux → PPFD:</strong> Converta leituras de luxímetro para PPFD por tipo de luminária</p>
           <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Calculator className="w-3 h-3 text-violet-400"/>PPM ↔ EC:</strong> Conversão bidirecional entre partes por milhão e condutividade</p>
           <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Microscope className="w-3 h-3 text-rose-400"/>pH:</strong> Calcule quanto ácido ou base adicionar para ajustar o pH da solução</p>
+          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Wind className="w-3 h-3 text-indigo-400"/>VPD:</strong> Pressão de vapor deficit — parâmetro essencial para growers avançados</p>
         </div>
       </main>
     </PageLayout>
