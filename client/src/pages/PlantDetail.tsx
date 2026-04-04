@@ -65,6 +65,7 @@ const PlantObservationsTab = lazy(() => import("@/components/PlantObservationsTa
 const PlantArchiveTab      = lazy(() => import("@/components/PlantArchiveTab"));
 const PlantTrichomesTab    = lazy(() => import("@/components/PlantTrichomesTab"));
 const PlantLSTTab          = lazy(() => import("@/components/PlantLSTTab"));
+const PlantPhotosTab       = lazy(() => import("@/components/PlantPhotosTab"));
 
 // Skeleton mínimo exibido enquanto os componentes de tab carregam
 function TabSkeleton() {
@@ -551,6 +552,10 @@ export default function PlantDetail() {
                       Cultivo
                     </TabsTrigger>
                   )}
+                  <TabsTrigger value="photos" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                    <Camera className="w-3.5 h-3.5" />
+                    Fotos
+                  </TabsTrigger>
                   <TabsTrigger value="archive" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
                     <History className="w-3.5 h-3.5" />
                     Arquivo
@@ -605,6 +610,12 @@ export default function PlantDetail() {
                   </Tabs>
                 </TabsContent>
               )}
+
+              <TabsContent value="photos">
+                <Suspense fallback={<TabSkeleton />}>
+                  <PlantPhotosTab plantId={plantId} />
+                </Suspense>
+              </TabsContent>
 
               <TabsContent value="archive">
                 <Suspense fallback={<TabSkeleton />}>
