@@ -43,8 +43,8 @@ export function RangeSlider({
   const progress = ((value - min) / (max - min)) * 100;
   const tooltipLabel = formatTooltip ? formatTooltip(value) : String(value);
 
-  const trackH = isLg ? "h-[22px]" : "h-[6px]";
-  const thumbSize = isLg ? "w-[52px] h-[52px]" : "w-[28px] h-[28px]";
+  const trackH = isLg ? "h-[20px]" : "h-[6px]";
+  const thumbSize = isLg ? "w-16 h-16" : "w-[28px] h-[28px]";
 
   return (
     <div className={cn("relative w-full select-none", className)}>
@@ -56,7 +56,7 @@ export function RangeSlider({
         onValueChange={([v]) => onChange(v)}
         disabled={disabled}
         className="relative flex items-center w-full touch-none"
-        style={{ paddingTop: isLg ? 24 : 16, paddingBottom: isLg ? 24 : 16 }}
+        style={{ paddingTop: isLg ? 32 : 16, paddingBottom: isLg ? 32 : 16 }}
       >
         {/* Track */}
         <SliderPrimitive.Track
@@ -93,7 +93,7 @@ export function RangeSlider({
                 "bg-foreground text-background font-bold rounded-md shadow-lg whitespace-nowrap",
                 isLg ? "text-sm px-2.5 py-1" : "text-xs px-2 py-0.5",
               )}
-              style={{ bottom: isLg ? "calc(100% + 10px)" : "calc(100% + 8px)" }}
+              style={{ bottom: isLg ? "calc(100% + 14px)" : "calc(100% + 8px)" }}
             >
               {tooltipLabel}
               <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-foreground" />
