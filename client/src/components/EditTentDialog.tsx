@@ -170,12 +170,13 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
                 <Label htmlFor="width">Largura (cm)</Label>
                 <Input
                   id="width"
-                  type="text"
+                  type="number"
                   inputMode="numeric"
                   value={width}
                   onChange={(e) => setWidth(e.target.value)}
                   placeholder="120"
                   min="1"
+                  max="9999"
                   required
                 />
               </div>
@@ -184,12 +185,13 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
                 <Label htmlFor="depth">Profundidade (cm)</Label>
                 <Input
                   id="depth"
-                  type="text"
+                  type="number"
                   inputMode="numeric"
                   value={depth}
                   onChange={(e) => setDepth(e.target.value)}
                   placeholder="120"
                   min="1"
+                  max="9999"
                   required
                 />
               </div>
@@ -198,12 +200,13 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
                 <Label htmlFor="height">Altura (cm)</Label>
                 <Input
                   id="height"
-                  type="text"
+                  type="number"
                   inputMode="numeric"
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
                   placeholder="200"
                   min="1"
+                  max="9999"
                   required
                 />
               </div>
@@ -213,12 +216,13 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
               <Label htmlFor="powerW">Potência da Luz (W) - Opcional</Label>
               <Input
                 id="powerW"
-                type="text"
+                type="number"
                 inputMode="numeric"
                 value={powerW}
                 onChange={(e) => setPowerW(e.target.value)}
                 placeholder="600"
                 min="1"
+                max="99999"
               />
             </div>
 

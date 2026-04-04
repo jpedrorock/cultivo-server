@@ -133,9 +133,11 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
                 <Label htmlFor="width">Largura (cm) *</Label>
                 <Input
                   id="width"
-                  type="text"
+                  type="number"
                   inputMode="numeric"
                   placeholder="45"
+                  min="1"
+                  max="9999"
                   value={formData.width}
                   onChange={(e) => setFormData({ ...formData, width: e.target.value })}
                   required
@@ -145,9 +147,11 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
                 <Label htmlFor="depth">Profundidade (cm) *</Label>
                 <Input
                   id="depth"
-                  type="text"
+                  type="number"
                   inputMode="numeric"
                   placeholder="75"
+                  min="1"
+                  max="9999"
                   value={formData.depth}
                   onChange={(e) => setFormData({ ...formData, depth: e.target.value })}
                   required
@@ -157,9 +161,11 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
                 <Label htmlFor="height">Altura (cm) *</Label>
                 <Input
                   id="height"
-                  type="text"
+                  type="number"
                   inputMode="numeric"
                   placeholder="90"
+                  min="1"
+                  max="9999"
                   value={formData.height}
                   onChange={(e) => setFormData({ ...formData, height: e.target.value })}
                   required
@@ -172,9 +178,11 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
               <Label htmlFor="powerW">Potência da Luz (W)</Label>
               <Input
                 id="powerW"
-                type="text"
+                type="number"
                 inputMode="numeric"
                 placeholder="Ex: 600"
+                min="1"
+                max="99999"
                 value={formData.powerW}
                 onChange={(e) => setFormData({ ...formData, powerW: e.target.value })}
               />
