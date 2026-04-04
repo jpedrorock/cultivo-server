@@ -486,6 +486,64 @@ export default function Home() {
               <TentCardSkeleton key={i} />
             ))}
           </div>
+        ) : tents && tents.length === 0 ? (
+          /* ── Onboarding Empty State ── */
+          <div className="flex flex-col items-center py-10 px-4 max-w-md mx-auto">
+            {/* Ícone central */}
+            <div className="w-20 h-20 rounded-3xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center mb-6">
+              <Sprout className="w-10 h-10 text-primary" />
+            </div>
+
+            <h2 className="text-xl font-bold text-foreground mb-1 text-center">Bem-vindo ao Cultivo</h2>
+            <p className="text-sm text-muted-foreground text-center mb-8">
+              Siga os passos abaixo para começar a monitorar seu cultivo.
+            </p>
+
+            {/* Passos */}
+            <div className="w-full space-y-3 mb-8">
+              {/* Passo 1 */}
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-primary-foreground">1</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Crie sua primeira estufa</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Defina nome, tamanho e categoria (Vega, Flora, Manutenção…)</p>
+                </div>
+              </div>
+
+              {/* Passo 2 */}
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-muted-foreground/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-muted-foreground">2</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-muted-foreground">Adicione suas plantas</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">Cadastre mudas, clones ou plantas com strain e semana</p>
+                </div>
+              </div>
+
+              {/* Passo 3 */}
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-full bg-muted-foreground/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-xs font-bold text-muted-foreground">3</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-muted-foreground">Registre os parâmetros diários</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5">Temperatura, umidade, PPFD, pH, EC e rega — tudo num só lugar</p>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <button
+              onClick={() => setCreateTentModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-semibold py-4 text-sm active:scale-[0.98] transition-transform shadow-lg shadow-primary/20"
+            >
+              <Sprout className="w-5 h-5" />
+              Criar primeira estufa
+            </button>
+          </div>
         ) : (
           <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tents?.map((tent) => {
@@ -513,8 +571,8 @@ export default function Home() {
           </StaggerList>
         )}
 
-        {/* Botão nova estufa — abaixo dos cards em todas as telas */}
-        {!isLoading && (
+        {/* Botão nova estufa — abaixo dos cards em todas as telas (só quando já há estufas) */}
+        {!isLoading && tents && tents.length > 0 && (
           <button
             onClick={() => setCreateTentModalOpen(true)}
             className="w-full mt-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200 py-4"
