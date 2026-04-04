@@ -1108,7 +1108,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         {phaseBg !== 'none' && (
           <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
         )}
-      <CardHeader className="relative z-10 px-5 pt-5 pb-3">
+      <CardHeader className="relative z-10 pl-6 pr-5 pt-5 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             {/* Linha 1: nome + freshness badge */}
@@ -1256,7 +1256,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         )}
       </CardHeader>
 
-      <CardContent className="relative z-10 px-5 pb-5 pt-0">
+      <CardContent className="relative z-10 pl-6 pr-5 pb-5 pt-0">
         <div className="space-y-3">
           {/* Cycle Info — compacto, sem barra de progresso */}
           {cycle ? (
