@@ -789,17 +789,20 @@ function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; co
   const pts = values.map((v, i) =>
     `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`
   );
-  // SVG path "d" — necessário para animateMotion
   const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
-  // ID único por cor para não colidir os filtros entre múltiplos sparklines
   const uid = `ecg-${color.replace(/[^a-z0-9]/gi, "")}`;
+  const dur = "3.5s";
+
+  // Fórmula do rastro: todas as camadas terminam no mesmo ponto de varredura P.
+  // Com pathLength="1": stroke-dasharray="L (1-L)" e values="L;-(1-L)"
+  // garante que o traço de tamanho L sempre TERMINA em P para qualquer instante t.
+  // O efeito: L grande = rastro largo e tênue, L pequeno = ponta fina e brilhante.
 
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="opacity-80" style={{ overflow: "visible" }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: "visible", opacity: 0.85 }}>
       <defs>
-        {/* Glow filter para o ponto de varredura */}
         <filter id={`${uid}-glow`} x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
@@ -807,64 +810,38 @@ function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; co
         </filter>
       </defs>
 
-      {/* Linha "fantasma" — trilha atenuada sempre visível */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke={color}
-        strokeWidth="1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeOpacity="0.18"
-      />
+      {/* Traço de fundo — sempre visível, muito apagado (o "papel" do ECG) */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1"
+        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.10" />
 
-      {/* Linha de varredura ECG — desenha da esquerda para a direita em loop */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        pathLength="1"
-        strokeDasharray="1"
-      >
-        {/* dashoffset 1→0: linha invisível → totalmente desenhada */}
-        <animate
-          attributeName="stroke-dashoffset"
-          values="1;0"
-          dur="3s"
-          repeatCount="indefinite"
-          calcMode="linear"
-        />
-        {/* A linha fica brilhante enquanto "escreve", depois atenua levemente */}
-        <animate
-          attributeName="stroke-opacity"
-          values="0.3;1;0.9"
-          keyTimes="0;0.15;1"
-          dur="3s"
-          repeatCount="indefinite"
-        />
+      {/* Rastro longo e tênue — 35% do path, termina no ponto de varredura */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.18"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.35 0.65">
+        <animate attributeName="stroke-dashoffset" values="0.35;-0.65" dur={dur} repeatCount="indefinite" calcMode="linear" />
       </path>
 
-      {/* Ponto brilhante que percorre o path — o "cursor" do ECG */}
-      <circle r="2.5" fill={color} filter={`url(#${uid}-glow)`}>
-        <animateMotion path={pathD} dur="3s" repeatCount="indefinite" calcMode="linear" />
-        {/* Surge suavemente no início e fica opaco durante a varredura */}
-        <animate
-          attributeName="opacity"
-          values="0;1;1"
-          keyTimes="0;0.08;1"
-          dur="3s"
-          repeatCount="indefinite"
-        />
-      </circle>
+      {/* Rastro médio — 18% do path, mais brilhante */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.45"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.18 0.82">
+        <animate attributeName="stroke-dashoffset" values="0.18;-0.82" dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </path>
 
-      {/* Halo externo do ponto — anel que expande na ponta do ECG */}
-      <circle r="2.5" fill="none" stroke={color} strokeWidth="1.5">
-        <animateMotion path={pathD} dur="3s" repeatCount="indefinite" calcMode="linear" />
-        <animate attributeName="r"       values="2.5;5.5;2.5" keyTimes="0;0.5;1" dur="3s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="0.6;0;0.6"   keyTimes="0;0.5;1" dur="3s" repeatCount="indefinite" />
+      {/* Rastro curto — 7% do path, quase total */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.80"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.07 0.93">
+        <animate attributeName="stroke-dashoffset" values="0.07;-0.93" dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </path>
+
+      {/* Ponta brilhante — 2% com glow, a frente do scanner */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeOpacity="1"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.02 0.98"
+        filter={`url(#${uid}-glow)`}>
+        <animate attributeName="stroke-dashoffset" values="0.02;-0.98" dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </path>
+
+      {/* Ponto de luz na frente da varredura */}
+      <circle r="2.2" fill={color} filter={`url(#${uid}-glow)`} opacity="0.95">
+        <animateMotion path={pathD} dur={dur} repeatCount="indefinite" calcMode="linear" />
       </circle>
     </svg>
   );
