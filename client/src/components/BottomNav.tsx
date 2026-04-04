@@ -66,8 +66,21 @@ export function BottomNav() {
     };
   }, [fabMenuOpen]);
 
-  // Ocultar nav em telas de foco (ex: registro rápido) — após todos os hooks
-  const isHidden = HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display");
+  // Detectar teclado virtual iOS (visualViewport encolhe quando teclado abre)
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const handleResize = () => {
+      // Se a viewport visual é <75% da janela inteira, teclado está aberto
+      setKeyboardOpen(vv.height < window.innerHeight * 0.75);
+    };
+    vv.addEventListener('resize', handleResize);
+    return () => vv.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Ocultar nav em telas de foco (ex: registro rápido) ou com teclado aberto — após todos os hooks
+  const isHidden = HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display") || keyboardOpen;
 
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },

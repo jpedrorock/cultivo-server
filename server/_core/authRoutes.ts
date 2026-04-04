@@ -17,6 +17,35 @@ import {
 } from './auth';
 import { ENV } from './env';
 
+// ---------------------------------------------------------------------------
+// Rate limiter in-memory simples — sem dependência externa
+// Protege login e register de brute force
+// ---------------------------------------------------------------------------
+interface RateLimitEntry { count: number; resetAt: number }
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+    return true; // dentro do limite
+  }
+  entry.count++;
+  if (entry.count > maxRequests) return false; // bloqueado
+  return true;
+}
+
+// Limpar entradas expiradas a cada 10 minutos
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (now > entry.resetAt) rateLimitStore.delete(key);
+  }
+}, 10 * 60 * 1000);
+
+// ---------------------------------------------------------------------------
+
 /**
  * Registra as rotas de autenticação JWT
  */
@@ -27,6 +56,12 @@ export function registerAuthRoutes(app: Express) {
    * Registra um novo usuário com email e senha
    */
   app.post('/api/auth/register', async (req: Request, res: Response) => {
+    // Rate limit: 5 registros por hora por IP
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    if (!checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000)) {
+      res.status(429).json({ error: 'Muitas tentativas de registro. Tente novamente em 1 hora.' });
+      return;
+    }
     try {
       const { email, password, name } = req.body as {
         email: string;
@@ -66,6 +101,16 @@ export function registerAuthRoutes(app: Express) {
       });
 
       if (!isFirst) {
+        // Notificar admins via push notification (fire-and-forget)
+        import('../pushService').then(({ sendPushToAll }) => {
+          sendPushToAll({
+            title: 'Novo usuário aguardando aprovação',
+            body: `${name || email} solicitou acesso ao app Cultivo`,
+            url: '/settings',
+            tag: 'new-user-pending',
+          }).catch(() => {/* ignora erros de push — não bloqueia registro */});
+        }).catch(() => {});
+
         // Usuário aguardando aprovação — não faz login ainda
         res.status(201).json({
           success: true,
@@ -95,6 +140,12 @@ export function registerAuthRoutes(app: Express) {
    * Autentica um usuário com email e senha
    */
   app.post('/api/auth/login', async (req: Request, res: Response) => {
+    // Rate limit: 10 tentativas de login por 15 minutos por IP
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    if (!checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000)) {
+      res.status(429).json({ error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' });
+      return;
+    }
     try {
       const { email, password } = req.body as { email: string; password: string };
 

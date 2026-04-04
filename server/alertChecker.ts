@@ -186,8 +186,25 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     }
   }
 
-  // 7. Salvar alertas no histórico do app (sem envio por email)
+  // 7. Salvar alertas no histórico — com deduplicação de 4h por métrica
+  //    Evita flood de alertas idênticos a cada ciclo de verificação
+  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+
+  // Buscar alertas recentes (últimas 4h) para este tent de uma vez
+  const recentAlerts = await database
+    .select({ metric: alertHistory.metric })
+    .from(alertHistory)
+    .where(and(eq(alertHistory.tentId, tentId), gte(alertHistory.createdAt, fourHoursAgo)));
+
+  const recentMetrics = new Set(recentAlerts.map(a => a.metric));
+
+  let saved = 0;
   for (const alert of newAlerts) {
+    // Pular se já existe alerta recente para a mesma métrica
+    if (recentMetrics.has(alert.metric)) {
+      console.log(`⏭️  Alerta duplicado ignorado (${alert.metric} — já existe nas últimas 4h)`);
+      continue;
+    }
     await database.insert(alertHistory).values({
       tentId,
       metric: alert.metric,
@@ -197,10 +214,13 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
       message: alert.message,
       notificationSent: false,
     });
+    // Adicionar ao set local para evitar duplicatas dentro do mesmo lote
+    recentMetrics.add(alert.metric);
+    saved++;
   }
 
-  if (newAlerts.length > 0) {
-    console.log(`✅ ${newAlerts.length} alerta(s) registrado(s) para ${tentName}`);
+  if (saved > 0) {
+    console.log(`✅ ${saved} alerta(s) registrado(s) para ${tentName}`);
   }
 
   // 8. Detecção de tendências (L3)

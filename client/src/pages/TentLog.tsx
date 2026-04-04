@@ -111,7 +111,7 @@ export default function TentLog() {
     return parseFloat((0.6108 * Math.exp((17.27 * t) / (t + 237.3)) * (1 - rh / 100)).toFixed(2));
   }, [tempC, rhPct]);
 
-  // Runoff % calculado
+  // Runoff % calculado — com validação de valores impossíveis
   const runoffPercentage = useMemo(() => {
     const watering = parseFloat(wateringVolume);
     const runoff   = parseFloat(runoffCollected);
@@ -119,6 +119,13 @@ export default function TentLog() {
       return ((runoff / watering) * 100).toFixed(1);
     }
     return null;
+  }, [wateringVolume, runoffCollected]);
+
+  // true quando runoff é fisicamente impossível (> volume regado)
+  const runoffInvalid = useMemo(() => {
+    const watering = parseFloat(wateringVolume);
+    const runoff   = parseFloat(runoffCollected);
+    return !isNaN(watering) && !isNaN(runoff) && watering > 0 && runoff > watering;
   }, [wateringVolume, runoffCollected]);
 
   const { saveLog, pendingCount, isSyncing, syncNow, isLoading } = useOfflineSync();
@@ -219,7 +226,8 @@ export default function TentLog() {
 
   // Runoff % color
   const runoffNum = runoffPercentage ? parseFloat(runoffPercentage) : null;
-  const runoffColor = runoffNum == null ? "text-muted-foreground"
+  const runoffColor = runoffInvalid ? "text-red-500 dark:text-red-400"
+    : runoffNum == null ? "text-muted-foreground"
     : runoffNum >= 10 && runoffNum <= 20 ? "text-emerald-600 dark:text-emerald-400"
     : runoffNum >= 5  && runoffNum <= 30 ? "text-amber-600 dark:text-amber-400"
     : "text-red-600 dark:text-red-400";
@@ -517,7 +525,7 @@ export default function TentLog() {
                 {/* Runoff Coletado */}
                 <div className="space-y-1.5">
                   <label className="text-xs text-muted-foreground font-medium block">Runoff Coletado</label>
-                  <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-border px-2 py-3 bg-background dark:bg-zinc-900">
+                  <div className={`flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 bg-background dark:bg-zinc-900 transition-colors ${runoffInvalid ? 'border-red-500/70' : 'border-border'}`}>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -528,17 +536,22 @@ export default function TentLog() {
                     />
                     <span className="text-xs text-muted-foreground">ml</span>
                   </div>
+                  {runoffInvalid && (
+                    <p className="text-[10px] text-red-400 text-center font-medium">
+                      Runoff maior que o volume regado
+                    </p>
+                  )}
                 </div>
 
                 {/* Runoff % calculado */}
                 <div className="space-y-1.5">
                   <label className="text-xs text-muted-foreground font-medium block">Runoff %</label>
-                  <div className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border px-2 py-3 bg-muted/30">
+                  <div className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-2 py-3 bg-muted/30 transition-colors ${runoffInvalid ? 'border-red-500/50' : 'border-border'}`}>
                     <span className={`text-2xl font-bold tabular-nums ${runoffColor}`}>
-                      {runoffPercentage ?? "—"}
+                      {runoffInvalid ? '!' : (runoffPercentage ?? "—")}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {runoffPercentage ? "%" : "auto"}
+                      {runoffInvalid ? 'inválido' : runoffPercentage ? "%" : "auto"}
                     </span>
                   </div>
                   <p className="text-[10px] text-muted-foreground text-center">Ideal: 10–20%</p>
