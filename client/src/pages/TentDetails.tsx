@@ -324,6 +324,8 @@ export default function TentDetails() {
     temp: log.tempC ? parseFloat(log.tempC) : null,
     rh: log.rhPct ? parseFloat(log.rhPct) : null,
     ppfd: log.ppfd || null,
+    ph: log.ph ? parseFloat(log.ph) : null,
+    ec: log.ec ? parseFloat(log.ec) : null,
     watering: log.wateringVolume || null,
   }));
 
@@ -1037,6 +1039,106 @@ export default function TentDetails() {
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
+
+                {/* pH Chart */}
+                {chartData.some(d => d.ph !== null) && (
+                  <Card className="bg-card/90 backdrop-blur-sm relative overflow-hidden group/chart">
+                    <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover/chart:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 0 1px rgba(168,85,247,0.15) inset' }} />
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FlaskConical className="w-5 h-5 text-purple-500" />
+                        pH
+                      </CardTitle>
+                      <CardDescription>Evolução do pH ao longo do tempo (ideal: 5.8 – 6.5)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="gradPh" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%"  stopColor="#a855f7" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
+                          <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
+                          <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[4.5, 8]} tickCount={8} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
+                            labelStyle={{ color: "hsl(var(--foreground))" }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="ph"
+                            stroke="#a855f7"
+                            strokeWidth={2.5}
+                            fill="url(#gradPh)"
+                            dot={(props: any) => {
+                              const isLast = props.index === chartData.filter(d => d.ph != null).length - 1;
+                              if (!isLast) return <circle key={props.key} cx={props.cx} cy={props.cy} r={2.5} fill="#a855f7" opacity={0.5} />;
+                              return <PulsingDot key={props.key} cx={props.cx} cy={props.cy} color="#a855f7" />;
+                            }}
+                            activeDot={{ r: 5, fill: "#a855f7" }}
+                            name="pH"
+                            connectNulls
+                            animationDuration={800}
+                            animationEasing="ease-out"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* EC Chart */}
+                {chartData.some(d => d.ec !== null) && (
+                  <Card className="bg-card/90 backdrop-blur-sm relative overflow-hidden group/chart">
+                    <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover/chart:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 0 1px rgba(16,185,129,0.15) inset' }} />
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-emerald-500" />
+                        EC
+                      </CardTitle>
+                      <CardDescription>Evolução da condutividade elétrica em mS/cm (ideal: 1.0 – 2.5)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="gradEc" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%"  stopColor="#10b981" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
+                          <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
+                          <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 4]} tickCount={9} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
+                            labelStyle={{ color: "hsl(var(--foreground))" }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="ec"
+                            stroke="#10b981"
+                            strokeWidth={2.5}
+                            fill="url(#gradEc)"
+                            dot={(props: any) => {
+                              const isLast = props.index === chartData.filter(d => d.ec != null).length - 1;
+                              if (!isLast) return <circle key={props.key} cx={props.cx} cy={props.cy} r={2.5} fill="#10b981" opacity={0.5} />;
+                              return <PulsingDot key={props.key} cx={props.cx} cy={props.cy} color="#10b981" />;
+                            }}
+                            activeDot={{ r: 5, fill: "#10b981" }}
+                            name="EC (mS/cm)"
+                            connectNulls
+                            animationDuration={800}
+                            animationEasing="ease-out"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* L4 — Correlação Rega × Umidade */}
                 {wateringChartData.length >= 2 && (
