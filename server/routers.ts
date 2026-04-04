@@ -79,6 +79,66 @@ async function validatePlantOwnership(plantId: number, groupId: number | null | 
   }
 }
 
+/**
+ * D3 — Seed task instances for a tent immediately after cycle creation.
+ * This ensures tasks appear on the Home/Tasks tab without the user
+ * needing to navigate to the tasks tab first.
+ */
+async function seedWeekTasks(
+  database: Awaited<ReturnType<typeof getDb>>,
+  tentId: number,
+  tentCategory: string,
+  phase: "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING",
+  weekNumber: number
+): Promise<void> {
+  if (!database) return;
+
+  const context = tentCategory === "MAINTENANCE" ? "TENT_A" : "TENT_BC";
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // MAINTENANCE and DRYING don't filter by weekNumber
+  const noWeekFilter = phase === "MAINTENANCE" || phase === "DRYING" || phase === "CLONING";
+
+  const templates = await database
+    .select()
+    .from(taskTemplates)
+    .where(
+      noWeekFilter
+        ? and(eq(taskTemplates.context, context), eq(taskTemplates.phase, phase))
+        : and(
+            eq(taskTemplates.context, context),
+            eq(taskTemplates.phase, phase),
+            eq(taskTemplates.weekNumber, weekNumber)
+          )
+    );
+
+  for (const template of templates) {
+    const existing = await database
+      .select({ id: taskInstances.id })
+      .from(taskInstances)
+      .where(
+        and(
+          eq(taskInstances.tentId, tentId),
+          eq(taskInstances.taskTemplateId, template.id),
+          eq(taskInstances.occurrenceDate, startOfWeek)
+        )
+      )
+      .limit(1);
+
+    if (existing.length === 0) {
+      await database.insert(taskInstances).values({
+        tentId,
+        taskTemplateId: template.id,
+        occurrenceDate: startOfWeek,
+        isDone: false,
+      });
+    }
+  }
+}
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -508,6 +568,10 @@ export const appRouter = router({
       }),
   }),
 
+  // ── Helper: seed week-1 task instances after cycle creation ──────────────
+  // Called by cycles.create and cycles.initiate so tasks appear immediately
+  // without the user needing to open the Tasks tab first (D3).
+
   // Cycles (Ciclos)
   cycles: router({
     listActive: protectedProcedure.query(async ({ ctx }) => {
@@ -641,6 +705,22 @@ export const appRouter = router({
         }
         await validateTentOwnership(input.tentId, ctx.user.groupId);
         await database.insert(cycles).values(input);
+
+        // D3 — seed week-1 tasks immediately after cycle creation
+        const [tent] = await database
+          .select({ category: tents.category })
+          .from(tents)
+          .where(eq(tents.id, input.tentId))
+          .limit(1);
+        if (tent) {
+          const phase = tent.category === "MAINTENANCE"
+            ? "MAINTENANCE"
+            : tent.category === "DRYING"
+            ? "DRYING"
+            : (tent.category as "VEGA" | "FLORA");
+          await seedWeekTasks(database, input.tentId, tent.category, phase, 1);
+        }
+
         return { success: true };
       }),
     transitionToFlora: protectedProcedure
@@ -995,7 +1075,10 @@ export const appRouter = router({
           ? "MAINTENANCE"
           : input.phase as "VEGA" | "FLORA" | "DRYING";
         await applyPhaseTransitionLimits(input.tentId, initPhase);
-        
+
+        // D3 — seed task instances for the current week immediately
+        await seedWeekTasks(database, input.tentId, category, input.phase, input.weekNumber);
+
         return { success: true };
       }),
     edit: protectedProcedure
