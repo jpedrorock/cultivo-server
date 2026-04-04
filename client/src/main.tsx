@@ -20,6 +20,11 @@ const queryClient = new QueryClient({
   },
 });
 
+// Dados semi-estáticos — staleTime maior para reduzir refetches desnecessários
+// tRPC key format: [["routerName", "procedureName"], { type: "query", ... }]
+queryClient.setQueryDefaults([["strains"]], { staleTime: 10 * 60_000 });      // strains: 10min
+queryClient.setQueryDefaults([["weeklyTargets"]], { staleTime: 60 * 60_000 }); // weeklyTargets: 1h
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
