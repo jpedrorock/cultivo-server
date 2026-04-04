@@ -1103,7 +1103,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           </div>
         </Link>
       )}
-      <Card className="relative z-10 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'hsl(var(--card))' }}>
+      <Card className="relative z-10 py-0 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'hsl(var(--card))' }}>
         {/* Fundo gradiente da fase */}
         {phaseBg !== 'none' && (
           <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
