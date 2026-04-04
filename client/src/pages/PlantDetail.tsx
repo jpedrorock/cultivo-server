@@ -489,20 +489,27 @@ export default function PlantDetail() {
           return (
             <div className="rounded-2xl border border-border/60 bg-card overflow-hidden mb-4 flex">
               {/* Info esquerda */}
-              <div className="flex-1 min-w-0 px-4 py-4 flex flex-col justify-between">
-                {/* Topo */}
-                <div>
-                  <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-0.5">Strain</p>
-                  <p className="text-sm font-semibold text-foreground truncate">{strain?.name || "—"}</p>
-                  {tent?.name && (
-                    <p className="text-xs text-muted-foreground/60 mt-1 truncate">📍 {tent.name}{plant.cycleWeek ? ` · S${plant.cycleWeek}` : ""}</p>
-                  )}
-                  {plant.notes && (
-                    <p className="text-xs text-muted-foreground/50 leading-relaxed mt-2 line-clamp-2 italic">{plant.notes}</p>
-                  )}
+              <div className="flex-1 min-w-0 py-4 flex flex-col justify-between">
+                {/* Topo — Strain | Estufa em divide-x */}
+                <div className="flex divide-x divide-border/40 px-0">
+                  <div className="flex-1 px-4">
+                    <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-0.5">Strain</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{strain?.name || "—"}</p>
+                  </div>
+                  <div className="flex-1 px-4">
+                    <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-0.5">Estufa</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{tent?.name || "—"}</p>
+                    {plant.cycleWeek && (
+                      <p className="text-[11px] text-muted-foreground/50 mt-0.5">Semana {plant.cycleWeek}</p>
+                    )}
+                  </div>
                 </div>
+                {/* Notes */}
+                {plant.notes && (
+                  <p className="text-xs text-muted-foreground/50 leading-relaxed mt-2.5 px-4 line-clamp-2 italic">{plant.notes}</p>
+                )}
                 {/* Fundo — dias */}
-                <div className="mt-3">
+                <div className="mt-3 px-4">
                   <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider leading-none">Dias de vida</p>
                   <p className={`text-3xl font-bold tabular-nums leading-tight bg-gradient-to-r ${phaseGradient} bg-clip-text text-transparent`}>{daysOld}</p>
                 </div>
@@ -526,29 +533,30 @@ export default function PlantDetail() {
         {/* 4 Tabs principais */}
         {(() => {
           const isPlant = plant.plantStage === "PLANT";
-          const tabCols = isPlant ? "grid-cols-4" : "grid-cols-3";
           return (
             <Tabs defaultValue="health" className="w-full">
-              <TabsList className={`grid w-full ${tabCols} mb-3 h-auto p-1`}>
-                <TabsTrigger value="health" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
-                  <Heart className="w-3.5 h-3.5" />
-                  Saúde
-                </TabsTrigger>
-                <TabsTrigger value="environment" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
-                  <Thermometer className="w-3.5 h-3.5" />
-                  Ambiente
-                </TabsTrigger>
-                {isPlant && (
-                  <TabsTrigger value="cultivation" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
-                    <Scissors className="w-3.5 h-3.5" />
-                    Cultivo
+              <div className="overflow-x-auto -mx-4 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mb-3">
+                <TabsList className="inline-flex w-max min-w-full h-auto p-1 gap-0.5">
+                  <TabsTrigger value="health" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                    <Heart className="w-3.5 h-3.5" />
+                    Saúde
                   </TabsTrigger>
-                )}
-                <TabsTrigger value="archive" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
-                  <History className="w-3.5 h-3.5" />
-                  Arquivo
-                </TabsTrigger>
-              </TabsList>
+                  <TabsTrigger value="environment" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                    <Thermometer className="w-3.5 h-3.5" />
+                    Ambiente
+                  </TabsTrigger>
+                  {isPlant && (
+                    <TabsTrigger value="cultivation" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                      <Scissors className="w-3.5 h-3.5" />
+                      Cultivo
+                    </TabsTrigger>
+                  )}
+                  <TabsTrigger value="archive" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                    <History className="w-3.5 h-3.5" />
+                    Arquivo
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="health">
                 <Suspense fallback={<TabSkeleton />}>
