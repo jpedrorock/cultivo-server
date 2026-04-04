@@ -368,7 +368,7 @@ export function IrrigationScheduleCalculator() {
   const createPreset = trpc.pumpPresets.create.useMutation({
     onSuccess: () => {
       utils.pumpPresets.list.invalidate();
-      toast.success(`✅ Bomba "${presetName}" salva!`);
+      toast.success(`Bomba "${presetName}" salva!`);
       setShowSaveDialog(false);
       setPresetName("");
     },
@@ -378,7 +378,7 @@ export function IrrigationScheduleCalculator() {
   const deletePreset = trpc.pumpPresets.delete.useMutation({
     onSuccess: () => {
       utils.pumpPresets.list.invalidate();
-      toast.success("🗑️ Predefinição removida");
+      toast.success("Predefinição removida");
       setDeleteConfirm({ open: false, id: 0, name: "" });
     },
     onError: (e) => toast.error(`Erro ao excluir: ${e.message}`),

@@ -246,6 +246,20 @@ export default function TentDetails() {
     }
   };
 
+  // Pulsing dot at the last data point — "live data" feel
+  const PulsingDot = ({ cx, cy, color }: { cx?: number; cy?: number; color: string }) => {
+    if (cx == null || cy == null) return null;
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={4} fill={color} opacity={0.9} />
+        <circle cx={cx} cy={cy} r={4} fill="none" stroke={color} strokeWidth={2} opacity={0.6}>
+          <animate attributeName="r" values="4;11;4" dur="2.5s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.6;0;0.6" dur="2.5s" repeatCount="indefinite" />
+        </circle>
+      </g>
+    );
+  };
+
   // Prepare chart data (filtered by period, ASC: oldest → newest = left → right)
   const chartData = filteredLogs.slice().reverse().map((log) => ({
     date: format(new Date(log.logDate), "dd/MM", { locale: ptBR }),
@@ -826,7 +840,10 @@ export default function TentDetails() {
             ) : (
               <>
                 {/* Temperature Chart */}
-                <Card className="bg-card/90 backdrop-blur-sm">
+                <Card className="bg-card/90 backdrop-blur-sm relative overflow-hidden group/chart">
+                  {/* Pulsing glow — subtle "live data" feel */}
+                  <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover/chart:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 0 1px rgba(249,115,22,0.15) inset' }} />
+                  <div className="chart-glow-line pointer-events-none absolute bottom-0 left-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <ThermometerSun className="w-5 h-5 text-orange-500" />
@@ -856,7 +873,11 @@ export default function TentDetails() {
                           stroke="#f97316"
                           strokeWidth={2.5}
                           fill="url(#gradTemp)"
-                          dot={{ fill: "#f97316", r: 3.5, strokeWidth: 0 }}
+                          dot={(props: any) => {
+                            const isLast = props.index === chartData.filter(d => d.temp != null).length - 1;
+                            if (!isLast) return <circle key={props.key} cx={props.cx} cy={props.cy} r={2.5} fill="#f97316" opacity={0.5} />;
+                            return <PulsingDot key={props.key} cx={props.cx} cy={props.cy} color="#f97316" />;
+                          }}
                           activeDot={{ r: 5, fill: "#f97316" }}
                           name="Temperatura (°C)"
                           animationDuration={800}
@@ -868,7 +889,9 @@ export default function TentDetails() {
                 </Card>
 
                 {/* Humidity Chart */}
-                <Card className="bg-card/90 backdrop-blur-sm">
+                <Card className="bg-card/90 backdrop-blur-sm relative overflow-hidden group/chart">
+                  <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover/chart:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 0 1px rgba(59,130,246,0.15) inset' }} />
+                  <div className="chart-glow-line-delayed pointer-events-none absolute bottom-0 left-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Droplets className="w-5 h-5 text-blue-500" />
@@ -898,7 +921,11 @@ export default function TentDetails() {
                           stroke="#3b82f6"
                           strokeWidth={2.5}
                           fill="url(#gradRh)"
-                          dot={{ fill: "#3b82f6", r: 3.5, strokeWidth: 0 }}
+                          dot={(props: any) => {
+                            const isLast = props.index === chartData.filter(d => d.rh != null).length - 1;
+                            if (!isLast) return <circle key={props.key} cx={props.cx} cy={props.cy} r={2.5} fill="#3b82f6" opacity={0.5} />;
+                            return <PulsingDot key={props.key} cx={props.cx} cy={props.cy} color="#3b82f6" />;
+                          }}
                           activeDot={{ r: 5, fill: "#3b82f6" }}
                           name="Umidade (%)"
                           animationDuration={800}
@@ -940,7 +967,11 @@ export default function TentDetails() {
                           stroke="#eab308"
                           strokeWidth={2.5}
                           fill="url(#gradPpfd)"
-                          dot={{ fill: "#eab308", r: 3.5, strokeWidth: 0 }}
+                          dot={(props: any) => {
+                            const isLast = props.index === chartData.filter(d => d.ppfd != null).length - 1;
+                            if (!isLast) return <circle key={props.key} cx={props.cx} cy={props.cy} r={2.5} fill="#eab308" opacity={0.5} />;
+                            return <PulsingDot key={props.key} cx={props.cx} cy={props.cy} color="#eab308" />;
+                          }}
                           activeDot={{ r: 5, fill: "#eab308" }}
                           name="PPFD (µmol/m²/s)"
                           animationDuration={800}
@@ -980,7 +1011,13 @@ export default function TentDetails() {
                           />
                           <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
                           <Bar yAxisId="left" dataKey="watering" name="Rega" fill="url(#gradWatering)" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                          <Line yAxisId="right" type="monotone" dataKey="rh" name="Umidade %" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
+                          <Line yAxisId="right" type="monotone" dataKey="rh" name="Umidade %" stroke="#3b82f6" strokeWidth={2}
+                            dot={(props: any) => {
+                              const isLast = props.index === wateringChartData.length - 1;
+                              if (!isLast) return <circle key={props.key} cx={props.cx} cy={props.cy} r={2.5} fill="#3b82f6" opacity={0.5} />;
+                              return <PulsingDot key={props.key} cx={props.cx} cy={props.cy} color="#3b82f6" />;
+                            }}
+                            activeDot={{ r: 5 }} connectNulls />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </CardContent>

@@ -236,7 +236,7 @@ export default function PlantArchivePage() {
 
   const unarchiveMutation = trpc.plants.unarchive.useMutation({
     onSuccess: () => {
-      toast.success("✅ Planta restaurada com sucesso!");
+      toast.success("Planta restaurada com sucesso!");
       setRestoreDialogOpen(false);
       setSelectedPlantId(null);
       setTargetTentId(null);
@@ -249,7 +249,7 @@ export default function PlantArchivePage() {
 
   const deleteMutation = trpc.plants.deletePermanently.useMutation({
     onSuccess: () => {
-      toast.success("🗑️ Planta excluída permanentemente!");
+      toast.success("Planta excluída permanentemente!");
       setDeleteConfirm({ open: false, plant: null });
       refetch();
     },

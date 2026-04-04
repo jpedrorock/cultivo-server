@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,8 @@ const HIDDEN_NAV_PREFIXES = ["/tent/", "/display"];
 export function BottomNav() {
   const [location] = useLocation();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const fabRef = useRef<HTMLDivElement>(null);
 
   // TODOS os hooks devem ser chamados antes de qualquer return condicional (regra do React)
   const { alertCount, harvestQueueCount } = useNavBadges();
@@ -47,6 +49,22 @@ export function BottomNav() {
     }
     prevCountRef.current = alertCount;
   }, [alertCount]);
+
+  // Close FAB menu when clicking outside
+  useEffect(() => {
+    if (!fabMenuOpen) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (fabRef.current && !fabRef.current.contains(e.target as Node)) {
+        setFabMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [fabMenuOpen]);
 
   // Ocultar nav em telas de foco (ex: registro rápido) — após todos os hooks
   const isHidden = HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display");
@@ -94,17 +112,63 @@ export function BottomNav() {
     >
       <div className="max-w-screen-xl mx-auto px-2">
         <div className="flex justify-around items-end pb-3 pt-3">
-          {/* FAB — Novo Registro (primeiro) */}
-          <Link
-            href="/quick-log"
-            onClick={triggerHapticFeedback}
-            data-tour="quick-log-menu"
-            className="flex items-center justify-center relative -mt-5"
-          >
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 active:scale-95 transition-transform">
+          {/* FAB — Mini menu Force Touch style */}
+          <div ref={fabRef} className="relative flex items-center justify-center -mt-5" data-tour="quick-log-menu">
+            {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
+            {fabMenuOpen && (
+              <div className="fixed bottom-[72px] left-3 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                {/* Seta apontando para o FAB (FAB está ~28px do left-3, então seta perto da esquerda) */}
+                <div className="absolute bottom-0 left-7 translate-y-full w-0 h-0 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-border/60" />
+                <div className="absolute bottom-0 left-7 translate-y-[5px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-card/95" />
+
+                <Link href="/quick-log?mode=status" onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}>
+                  <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-teal-500/8 active:bg-teal-500/15 transition-colors border-b border-border/30">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                      <ThermometerSun className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground leading-tight">Status da Estufa</p>
+                      <p className="text-[11px] text-muted-foreground/60">Temp, RH, pH, EC, luz</p>
+                    </div>
+                  </div>
+                </Link>
+
+                <Link href="/quick-log?mode=plant" onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}>
+                  <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors border-b border-border/30">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shrink-0 shadow-sm">
+                      <Heart className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground leading-tight">Saúde de Planta</p>
+                      <p className="text-[11px] text-muted-foreground/60">Status, sintomas, foto</p>
+                    </div>
+                  </div>
+                </Link>
+
+                <Link href="/quick-log?mode=trichome" onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}>
+                  <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground leading-tight">Tricomas</p>
+                      <p className="text-[11px] text-muted-foreground/60">Maturação · Flora</p>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            )}
+
+            <button
+              onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
+              className={cn(
+                "w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 transition-all duration-200",
+                fabMenuOpen ? "scale-90 rotate-45" : "active:scale-95"
+              )}
+            >
               <Plus className="w-6 h-6 text-white stroke-[2.5]" />
-            </div>
-          </Link>
+            </button>
+          </div>
 
           {/* Nav items — Estufas e Calculadoras */}
           {navItems.map((item) => {

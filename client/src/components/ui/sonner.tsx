@@ -3,25 +3,22 @@ import { useTheme } from "@/contexts/ThemeContext";
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme } = useTheme();
-  
-  // Map our theme names to sonner's theme options
+
   const sonnerTheme = theme === "dark" || theme === "highcontrast-dark" ? "dark" : "light";
 
   return (
     <Sonner
       theme={sonnerTheme}
-      position="top-right"
-      expand={true}
-      richColors
-      closeButton
-      duration={4000}
+      position="bottom-center"
+      expand={false}
+      richColors={false}
+      closeButton={false}
+      duration={3000}
+      offset={80}
       className="toaster group"
       toastOptions={{
-        style: {
-          background: "var(--popover)",
-          color: "var(--popover-foreground)",
-          border: "1px solid var(--border)",
-        },
+        // Sem estilos inline — o CSS em index.css via [data-sonner-toast] controla tudo
+        // e garante vidro fosco mesmo em error/success (que ignoram style inline)
       }}
       {...props}
     />

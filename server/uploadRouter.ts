@@ -6,11 +6,22 @@
  * O browser já faz a compressão e conversão antes de enviar (via canvas no frontend).
  * Retorna { url: string } com a URL pública do S3.
  *
- * Nota: Não usa sharp para evitar problemas com binários nativos no ambiente de deploy.
+ * Também expõe GET /thumbnail?url=...&w=200&h=267&q=70
+ * para servir imagens redimensionadas com sharp (evita carregar originais 1920px em cards pequenos).
  */
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import path from "path";
+import fs from "fs";
 import { storagePut } from "./storage";
+
+// Sharp: importado dinamicamente para não quebrar em ambientes sem binários nativos
+let sharpLib: typeof import("sharp") | null = null;
+try {
+  sharpLib = require("sharp");
+} catch {
+  console.warn("[thumbnail] sharp não disponível — thumbnails servem original");
+}
 
 const router = Router();
 
@@ -73,5 +84,56 @@ router.post(
     }
   }
 );
+
+// GET /thumbnail?url=/uploads/plant-photos/xxx.jpg&w=200&h=267&q=70
+router.get("/thumbnail", async (req: Request, res: Response) => {
+  try {
+    const { url, w, h, q } = req.query as Record<string, string>;
+    if (!url) return res.status(400).json({ error: "url param required" });
+
+    const width  = Math.min(parseInt(w || "200", 10) || 200, 800);
+    const height = parseInt(h || "0", 10) || undefined;
+    const quality = Math.min(parseInt(q || "70", 10) || 70, 100);
+
+    // Only serve local /uploads files for security
+    if (!url.startsWith("/uploads/")) {
+      return res.redirect(url);
+    }
+
+    const uploadsDir = path.resolve(process.cwd(), "uploads");
+    const relativePath = url.replace(/^\/uploads\//, "");
+    const filePath = path.resolve(uploadsDir, relativePath);
+
+    // Prevent path traversal
+    if (!filePath.startsWith(uploadsDir)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    if (!sharpLib) {
+      // Fallback: serve original
+      return res.sendFile(filePath);
+    }
+
+    const sharp = sharpLib as any;
+    const buffer = await sharp(filePath)
+      .resize(width, height || null, { fit: "cover", position: "centre" })
+      .jpeg({ quality, mozjpeg: true })
+      .toBuffer();
+
+    res.set({
+      "Content-Type": "image/jpeg",
+      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      "Vary": "Accept",
+    });
+    return res.send(buffer);
+  } catch (error) {
+    console.error("[thumbnail] Error:", error);
+    return res.status(500).json({ error: "Thumbnail error" });
+  }
+});
 
 export default router;

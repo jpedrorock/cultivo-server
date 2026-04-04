@@ -22,7 +22,7 @@ export function AlertsWidget() {
   // Agrupar alertas por estufa
   const tentAlertStatuses: TentAlertStatus[] = (tents || []).map((tent: any) => {
     const tentAlerts = (allAlerts || []).filter(
-      (alert: any) => alert.tentId === tent.id && (alert.status === "NEW" || alert.status === "SEEN")
+      (alert: any) => alert.tentId === tent.id && alert.status === "NEW"
     );
     
     const alertTypes = {

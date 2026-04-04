@@ -344,7 +344,7 @@ export function FertilizationCalculator() {
             onClick={() => {
               // Força recalcular (useEffect já faz isso automaticamente, mas o botão dá feedback visual)
               if (volume > 0 && targetEC > 0) {
-                toast.success("✅ Receita calculada com sucesso!");
+                toast.success("Receita calculada com sucesso!");
                 // Scroll suave até o resultado
                 setTimeout(() => {
                   const resultElement = document.querySelector('[data-result-card]');
@@ -353,7 +353,7 @@ export function FertilizationCalculator() {
                   }
                 }, 100);
               } else {
-                toast.error("⚠️ Preencha volume e EC para calcular");
+                toast.error("Preencha volume e EC para calcular");
               }
             }}
             size="lg"
@@ -518,7 +518,7 @@ Gerado por App Cultivo em ${now.toLocaleString('pt-BR')}
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
                 
-                toast.success('✅ Receita exportada para TXT!');
+                toast.success('Receita exportada para TXT!');
               }}
               className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white"
               size="lg"

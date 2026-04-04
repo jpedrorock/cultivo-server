@@ -109,7 +109,7 @@ export default function Home() {
       const remaining = await countPendingLogs();
       setPendingLogsCount(remaining);
       if (synced > 0) {
-        toast.success(`✅ ${synced} registro${synced > 1 ? 's' : ''} sincronizado${synced > 1 ? 's' : ''} com sucesso!`);
+        toast.success(`${synced} registro${synced > 1 ? 's' : ''} sincronizado${synced > 1 ? 's' : ''} com sucesso!`);
       }
     });
 
@@ -155,7 +155,7 @@ export default function Home() {
 
   const moveAllPlants = trpc.plants.moveAllPlants.useMutation({
     onSuccess: (data) => {
-      toast.success(`✅ ${data.movedCount} planta(s) movida(s) com sucesso!`);
+      toast.success(`${data.movedCount} planta(s) movida(s) com sucesso!`);
       utils.plants.list.invalidate();
       utils.tents.list.invalidate();
       setShowMoveAllPlants(false);
@@ -789,9 +789,15 @@ function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; co
   const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`);
   const [lx, ly] = pts[pts.length - 1].split(",").map(Number);
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="opacity-60">
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="opacity-70">
       <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={lx} cy={ly} r="2" fill={color} />
+      {/* Static dot */}
+      <circle cx={lx} cy={ly} r="2.5" fill={color} />
+      {/* Pulsing ring */}
+      <circle cx={lx} cy={ly} r="2.5" fill="none" stroke={color} strokeWidth="1.5" opacity="0.7">
+        <animate attributeName="r" values="2.5;6;2.5" dur="2.5s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.7;0;0.7" dur="2.5s" repeatCount="indefinite" />
+      </circle>
     </svg>
   );
 }
@@ -1059,7 +1065,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                         </Badge>
                       )}
                       {tent.seedlingCount > 0 && (
-                        <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-cyan-10 hover:border-cyan-50 transition-colors bg-cyan-50/50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-700 dark:hover:bg-cyan-900/50">
+                        <Badge variant="outline" className="gap-1 cursor-pointer transition-colors bg-cyan-50/50 text-cyan-700 border-cyan-200 hover:bg-cyan-100/60 dark:bg-white/5 dark:text-muted-foreground dark:border-border dark:hover:bg-white/8">
                           <Scissors className="w-3 h-3" />
                           {tent.seedlingCount} {tent.seedlingCount === 1 ? 'muda' : 'mudas'}
                         </Badge>

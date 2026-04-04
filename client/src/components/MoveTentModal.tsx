@@ -47,7 +47,7 @@ export default function MoveTentModal({
   const moveMutation = trpc.plants.moveTent.useMutation({
     onSuccess: () => {
       const targetTent = tents?.find((t) => t.id === selectedTentId);
-      toast.success(`✅ Planta movida para ${targetTent?.name} com sucesso!`);
+      toast.success(`Planta movida para ${targetTent?.name} com sucesso!`);
       onSuccess();
       onOpenChange(false);
       setSelectedTentId(null);

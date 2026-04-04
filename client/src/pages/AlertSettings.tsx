@@ -160,7 +160,7 @@ export default function AlertSettings() {
     const newTimes = [...reminderTimes, newReminderTime].sort();
     saveTimesToDb(newTimes);
     syncPushWithTimes(newTimes);
-    toast.success(`✅ Lembrete das ${newReminderTime} adicionado!`);
+    toast.success(`Lembrete das ${newReminderTime} adicionado!`);
   }, [newReminderTime, reminderTimes, permission, saveTimesToDb, syncPushWithTimes]);
 
   const handleRemoveReminderTime = useCallback((index: number) => {
@@ -183,7 +183,7 @@ export default function AlertSettings() {
     const times = ["08:00", "20:00"];
     saveTimesToDb(times);
     syncPushWithTimes(times);
-    toast.success("✅ Lembretes das 8h e 20h configurados!");
+    toast.success("Lembretes das 8h e 20h configurados!");
   }, [permission, saveTimesToDb, syncPushWithTimes]);
 
   const handleToggleAlerts = useCallback((enabled: boolean) => {
@@ -281,7 +281,7 @@ export default function AlertSettings() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">Status:</span>
-                    {permission === "granted" && <Badge variant="default" className="bg-green-600">✅ Ativado</Badge>}
+                    {permission === "granted" && <Badge variant="default" className="bg-green-600">Ativado</Badge>}
                     {permission === "denied" && <Badge variant="destructive">❌ Negado</Badge>}
                     {permission === "default" && <Badge variant="secondary">⏸️ Não configurado</Badge>}
                   </div>

@@ -124,8 +124,8 @@ export default function PlantDetail() {
   const archiveMutation = trpc.plants.archive.useMutation({
     onSuccess: (_, variables) => {
       const message = variables.status === 'HARVESTED'
-        ? '✅ Planta marcada como colhida e arquivada!'
-        : '🗑️ Planta descartada e arquivada!';
+        ? 'Planta marcada como colhida e arquivada!'
+        : 'Planta descartada e arquivada!';
       toast.success(message);
       setLocation('/plants');
     },
@@ -136,7 +136,7 @@ export default function PlantDetail() {
   
   const deleteMutation = trpc.plants.deletePermanently.useMutation({
     onSuccess: () => {
-      toast.success('✅ Planta excluída permanentemente!');
+      toast.success('Planta excluída permanentemente!');
       setLocation('/plants');
     },
     onError: (error) => {
@@ -156,7 +156,7 @@ export default function PlantDetail() {
 
   const updateMutation = trpc.plants.update.useMutation({
     onSuccess: () => {
-      toast.success('✅ Planta atualizada com sucesso!');
+      toast.success('Planta atualizada com sucesso!');
       setEditModalOpen(false);
       refetch();
     },
@@ -169,7 +169,7 @@ export default function PlantDetail() {
   const clonePlantMutation = trpc.plants.clone.useMutation({
     onSuccess: (data) => {
       haptic.confirm();
-      toast.success(`✅ Clone "${data.name}" criado!`);
+      toast.success(`Clone "${data.name}" criado!`);
       setCloneDialog(false);
       utils.plants.list.invalidate();
     },

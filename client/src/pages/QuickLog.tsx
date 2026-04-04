@@ -31,8 +31,16 @@ function getValidationColor(value: string, min?: number | null, max?: number | n
 
 export default function QuickLog() {
   const [, setLocation] = useLocation();
+
+  // Read ?mode= URL param to pre-select mode (from FAB mini menu)
+  const urlMode = (() => {
+    const m = new URLSearchParams(window.location.search).get('mode');
+    if (m === 'status' || m === 'plant' || m === 'trichome') return m;
+    return null;
+  })();
+
   const [currentStep, setCurrentStep] = useState(0);
-  const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(null);
+  const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(urlMode);
   const stepScrollRef = useRef<HTMLDivElement>(null);
 
   // Body scroll lock not needed — outer container uses position:fixed inset-0
@@ -97,7 +105,7 @@ export default function QuickLog() {
   const [luxValue, setLuxValue] = useState(20000); // Valor inicial realista: 20.000 lux
 
   // Plant health state - expanded
-  const [recordPlantHealth, setRecordPlantHealth] = useState<boolean | null>(null);
+  const [recordPlantHealth, setRecordPlantHealth] = useState<boolean | null>(urlMode === 'plant' ? true : null);
   const [currentPlantIndex, setCurrentPlantIndex] = useState(0);
   const [plantHealthRecords, setPlantHealthRecords] = useState<Map<number, {
     status: string;
@@ -108,7 +116,7 @@ export default function QuickLog() {
   }>>(new Map());
 
   // Trichome state
-  const [recordTrichomes, setRecordTrichomes] = useState<boolean | null>(null);
+  const [recordTrichomes, setRecordTrichomes] = useState<boolean | null>(urlMode === 'trichome' ? true : null);
   const [currentTrichomeIndex, setCurrentTrichomeIndex] = useState(0);
   const [trichomeRecords, setTrichomeRecords] = useState<Map<number, {
     status: "CLEAR" | "CLOUDY" | "AMBER" | "MIXED";
@@ -194,7 +202,7 @@ export default function QuickLog() {
         setCurrentTrichomeIndex(0);
         setRecordTrichomes(null);
       } else {
-        toast.success("✅ Registros salvos com sucesso!");
+        toast.success("Registros salvos com sucesso!");
         resetForm();
         setTimeout(() => setLocation("/"), 1500);
       }
@@ -210,7 +218,7 @@ export default function QuickLog() {
       if (currentTrichomeIndex < plants.length - 1) {
         setCurrentTrichomeIndex(currentTrichomeIndex + 1);
       } else {
-        toast.success("✅ Todos os registros salvos!");
+        toast.success("Todos os registros salvos!");
         resetForm();
         setTimeout(() => setLocation("/"), 1500);
       }
@@ -223,7 +231,7 @@ export default function QuickLog() {
   // Upload photo mutation
   const uploadPhotoMutation = trpc.plantPhotos.upload.useMutation({
     onSuccess: () => {
-      toast.success("📸 Foto salva!");
+      toast.success("Foto salva!");
     },
     onError: (error) => {
       toast.error(`Erro ao salvar foto: ${error.message}`);
@@ -280,7 +288,7 @@ export default function QuickLog() {
     if (currentTrichomeIndex < plants.length - 1) {
       setCurrentTrichomeIndex(currentTrichomeIndex + 1);
     } else {
-      toast.success("✅ Registros salvos com sucesso!");
+      toast.success("Registros salvos com sucesso!");
       resetForm();
       setTimeout(() => setLocation("/"), 1500);
     }
@@ -334,7 +342,7 @@ export default function QuickLog() {
       setUploadProgress(prev => ({ ...prev, stage: "complete", progress: 100 }));
       setTimeout(() => {
         setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
-        toast.success("📸 Foto enviada com sucesso!");
+        toast.success("Foto enviada com sucesso!");
       }, 1000);
     } catch (error: any) {
       console.error("[QuickLog] Erro ao enviar imagem:", error);
@@ -383,7 +391,7 @@ export default function QuickLog() {
       setCurrentTrichomeIndex(0);
       setRecordTrichomes(null);
     } else {
-      toast.success("✅ Registro salvo com sucesso!");
+      toast.success("Registro salvo com sucesso!");
       resetForm();
       setTimeout(() => setLocation("/"), 1500);
     }
@@ -556,7 +564,7 @@ export default function QuickLog() {
           }}
         >
       {/* Radial glow background */}
-      <div className="pointer-events-none absolute inset-0 z-0">
+      <div className="pointer-events-none absolute inset-0 z-0 will-change-transform">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
       </div>
       {/* Content */}
@@ -640,7 +648,7 @@ export default function QuickLog() {
           )}
 
           {/* Step content */}
-          {logMode !== null && <div ref={stepScrollRef} className="flex-1 overflow-y-auto relative z-10 animate-[fade-in_0.5s_ease-out] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {logMode !== null && <div ref={stepScrollRef} className="flex-1 overflow-y-auto overscroll-none relative z-10 animate-[fade-in_0.5s_ease-out] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="min-h-full flex flex-col justify-center p-6 space-y-6">
             {/* Icon */}
             {currentStep < 9 && currentStepData && (
@@ -1199,7 +1207,7 @@ export default function QuickLog() {
                     Registrar Tricomas
                   </Button>
                   <Button
-                    onClick={() => { toast.success("✅ Registros salvos!"); resetForm(); setTimeout(() => setLocation("/"), 1500); }}
+                    onClick={() => { toast.success("Registros salvos!"); resetForm(); setTimeout(() => setLocation("/"), 1500); }}
                     variant="outline"
                     className="w-full h-16 text-lg font-semibold rounded-2xl border-2"
                   >

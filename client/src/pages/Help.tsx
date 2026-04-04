@@ -160,22 +160,22 @@ const sections: Section[] = [
     badge: "Principal",
     content: (
       <div className="space-y-4">
-        <p>O <strong>Registro Rápido</strong> é o coração do app — acessível pelo botão <strong>+</strong> na navegação. Ao abrir, escolha o tipo de registro:</p>
+        <p>O <strong>Registro Rápido</strong> é o coração do app — acessível pelo botão <strong>+</strong> na navegação. Toque uma vez para abrir o mini menu com as 3 opções:</p>
         <div className="space-y-2">
           <div className="rounded-xl border border-border/20 bg-card/50 px-3 py-2.5 space-y-1">
-            <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5"><Home className="w-3.5 h-3.5" /> Registro da Estufa</p>
+            <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5"><Home className="w-3.5 h-3.5" /> Status da Estufa</p>
             <p className="text-xs text-muted-foreground/70">Temperatura, umidade, PPFD, pH, EC, volume de rega e runoff. Ao finalizar, opcionalmente registra saúde das plantas e tricomas.</p>
           </div>
           <div className="rounded-xl border border-border/20 bg-card/50 px-3 py-2.5 space-y-1">
             <p className="text-xs font-semibold text-rose-400 flex items-center gap-1.5"><Heart className="w-3.5 h-3.5" /> Saúde de Planta</p>
-            <p className="text-xs text-muted-foreground/70">Registra status (Saudável, Estressada, Doente, Recuperando), sintomas, tratamento e foto para cada planta da estufa selecionada.</p>
+            <p className="text-xs text-muted-foreground/70">Registra status, sintomas, anotações e foto para cada planta. É necessário adicionar pelo menos uma foto, sintoma ou anotação para avançar — só o status de saúde não é suficiente.</p>
           </div>
           <div className="rounded-xl border border-border/20 bg-card/50 px-3 py-2.5 space-y-1">
             <p className="text-xs font-semibold text-violet-400 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Tricomas</p>
             <p className="text-xs text-muted-foreground/70">Exclusivo para estufas de floração. Registra estado (Translúcidos, Opacos, Âmbar, Misturado) e percentuais por planta. Se só houver uma estufa em floração, vai direto para as plantas.</p>
           </div>
         </div>
-        <Tip text="O modo Tricomas detecta automaticamente estufas de floração. Com uma só estufa FLORA, pula a seleção e vai direto ao formulário por planta." />
+        <Tip text="Toque fora do menu ou pressione o botão + novamente para fechar. O botão gira 45° quando o menu está aberto." />
       </div>
     ),
   },
@@ -416,7 +416,7 @@ const sections: Section[] = [
       <div className="space-y-3">
         <p>Ferramentas de cálculo acessíveis pelo ícone de calculadora na navegação.</p>
         {[
-          { icon: Timer, color: "text-blue-400", name: "Rega Automática", desc: "Gera cronograma de ciclos por bomba (fluxo, saídas, tempo máx.) + vaso + janela de luz. Calcula horários, duração por ciclo e ml/planta." },
+          { icon: Timer, color: "text-blue-400", name: "Rega Automática", desc: "Gera cronograma de ciclos por bomba (fluxo, saídas, tempo máx. e descanso) + tamanho do vaso + janela de luz. Calcula horários, duração por ciclo em segundos e ml/planta. Salve predefinições de bomba para reutilizar." },
           { icon: Droplets, color: "text-cyan-400", name: "Rega e Runoff", desc: "Volume ideal de rega por planta e percentual de runoff. Histórico salvo por estufa." },
           { icon: FlaskConical, color: "text-green-400", name: "Fertilização", desc: "Receita de sais minerais com EC estimado e NPK resultante. Salve e carregue predefinições." },
           { icon: Thermometer, color: "text-orange-400", name: "Lux → PPFD", desc: "Converte luxímetro para PPFD (µmol/m²/s) com slider visual." },
@@ -455,7 +455,7 @@ const sections: Section[] = [
           <Step number={2} text="Selecione a estufa e expanda a fase desejada." />
           <Step number={3} text="Ajuste os limites mínimos e máximos para cada parâmetro." />
         </div>
-        <Tip text="Desvios acima de 10% geram alertas de atenção e acima de 20% geram alertas críticos. Veja o histórico completo em Alertas → Histórico." />
+        <Tip text="Desvios acima de 10% geram alertas de atenção e acima de 20% geram alertas críticos. Alertas marcados como vistos saem do badge — apenas alertas novos são contados. Alertas somem automaticamente após 10 dias." />
       </div>
     ),
   },
@@ -554,12 +554,14 @@ const sections: Section[] = [
     content: (
       <div className="space-y-3">
         {[
-          ["📲 Instale como PWA", "Toque em Compartilhar → Adicionar à Tela de Início para acesso rápido e experiência de app nativo, sem abrir o navegador."],
-          ["📷 Fotos direto da câmera", "Use a câmera no app para registrar plantas. Fotos HEIC são convertidas automaticamente para JPEG e comprimidas para 3:4."],
-          ["📳 Feedback tátil", "Botões de ação têm vibração ao toque. Ações destrutivas (excluir, descartar) têm vibração mais forte como aviso."],
-          ["📴 Modo offline", "Registros feitos sem internet são salvos localmente e sincronizados automaticamente ao reconectar. Um banner âmbar indica sincronização pendente."],
-          ["🔢 Teclado numérico", "Campos de temperatura, umidade e PPFD abrem o teclado numérico automaticamente para agilizar o registro."],
-          ["↔️ Abas deslizáveis", "No perfil da planta, deslize horizontalmente para navegar entre as abas Saúde, Ambiente, Cultivo e Arquivo."],
+          ["Instale como PWA", "Toque em Compartilhar → Adicionar à Tela de Início para acesso rápido e experiência de app nativo, sem abrir o navegador."],
+          ["Fotos direto da câmera", "Use a câmera no app para registrar plantas. Fotos HEIC são convertidas automaticamente para JPEG e comprimidas para 3:4."],
+          ["Feedback tátil", "Botões de ação têm vibração ao toque. Ações destrutivas (excluir, descartar) têm vibração mais forte como aviso."],
+          ["Modo offline", "Registros feitos sem internet são salvos localmente e sincronizados automaticamente ao reconectar. Um banner âmbar na tela inicial indica registros pendentes com a contagem exata."],
+          ["Teclado numérico", "Campos de temperatura, umidade e PPFD abrem o teclado numérico automaticamente para agilizar o registro."],
+          ["Abas deslizáveis", "No perfil da planta, deslize horizontalmente para navegar entre as abas Saúde, Ambiente, Cultivo e Arquivo."],
+          ["Gráficos cronológicos", "Os gráficos da estufa exibem dados da data mais antiga (esquerda) para a mais recente (direita), com linhas de target sobrepostas para comparação visual."],
+          ["Ações em lote", "No menu Plantas, selecione múltiplas plantas e use a barra flutuante para mover, colher, descartar ou excluir em lote de uma só vez."],
         ].map(([title, desc]) => (
           <div key={title as string} className="rounded-xl border border-border/20 bg-card/50 px-3 py-2.5">
             <p className="font-semibold text-xs text-foreground/80 mb-1">{title}</p>

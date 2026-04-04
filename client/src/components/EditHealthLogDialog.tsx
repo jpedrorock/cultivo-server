@@ -87,7 +87,7 @@ export default function EditHealthLogDialog({
 
     try {
       setIsUploading(true);
-      toast.info("📸 Enviando foto...");
+      toast.info("Enviando foto...");
 
       // Upload direto ao servidor: converte HEIC + comprime com sharp
       const url = await uploadImage(file);
@@ -96,7 +96,7 @@ export default function EditHealthLogDialog({
       setHasNewPhoto(true);
       setIsUploading(false);
 
-      toast.success("📸 Foto enviada com sucesso!");
+      toast.success("Foto enviada com sucesso!");
     } catch (error: any) {
       console.error("[EditHealthLogDialog] Erro ao enviar imagem:", error);
       setPhotoPreview(null);

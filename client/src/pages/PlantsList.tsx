@@ -71,7 +71,7 @@ export default function PlantsList() {
   const moveMultiplePlants = trpc.plants.moveSelectedPlants.useMutation({
     onSuccess: (data) => {
       utils.plants.list.invalidate();
-      toast.success(`✅ ${data.movedCount} planta(s) movida(s) com sucesso!`);
+      toast.success(`${data.movedCount} planta(s) movida(s) com sucesso!`);
       setBatchMoveDialog(false);
       setSelectedPlants(new Set());
       setBatchTargetTentId(undefined);
@@ -84,7 +84,7 @@ export default function PlantsList() {
   const bulkPromote = trpc.plants.bulkPromote.useMutation({
     onSuccess: (data) => {
       utils.plants.list.invalidate();
-      toast.success(`🌿 ${data.count} muda(s) promovida(s) para planta com sucesso!`);
+      toast.success(`${data.count} muda(s) promovida(s) para planta com sucesso!`);
       setSelectedPlants(new Set());
     },
     onError: (error) => {
@@ -95,7 +95,7 @@ export default function PlantsList() {
   const bulkMove = trpc.plants.bulkMove.useMutation({
     onSuccess: (data) => {
       utils.plants.list.invalidate();
-      toast.success(`✅ ${data.count} planta(s) movida(s) com sucesso!`);
+      toast.success(`${data.count} planta(s) movida(s) com sucesso!`);
       setBatchMoveDialog(false);
       setSelectedPlants(new Set());
       setBatchTargetTentId(undefined);
@@ -108,7 +108,7 @@ export default function PlantsList() {
   const bulkHarvest = trpc.plants.bulkHarvest.useMutation({
     onSuccess: (data) => {
       utils.plants.list.invalidate();
-      toast.success(`✅ ${data.count} planta(s) colhida(s) com sucesso!`);
+      toast.success(`${data.count} planta(s) colhida(s) com sucesso!`);
       setSelectedPlants(new Set());
     },
     onError: (error) => {
@@ -119,7 +119,7 @@ export default function PlantsList() {
   const bulkDiscard = trpc.plants.bulkDiscard.useMutation({
     onSuccess: (data) => {
       utils.plants.list.invalidate();
-      toast.success(`✅ ${data.count} planta(s) descartada(s) com sucesso!`);
+      toast.success(`${data.count} planta(s) descartada(s) com sucesso!`);
       setSelectedPlants(new Set());
     },
     onError: (error) => {
@@ -144,7 +144,7 @@ export default function PlantsList() {
     onSuccess: (data) => {
       utils.plants.list.invalidate();
       utils.plants.listDeleted.invalidate();
-      toast.success(`🗑️ ${data.count} planta(s) movida(s) para a lixeira!`);
+      toast.success(`${data.count} planta(s) movida(s) para a lixeira!`);
       setSelectedPlants(new Set());
       setBulkDeleteConfirm(false);
     },
@@ -157,7 +157,7 @@ export default function PlantsList() {
     onSuccess: () => {
       utils.plants.list.invalidate();
       utils.plants.listDeleted.invalidate();
-      toast.success("🗑️ Planta movida para a lixeira!");
+      toast.success("Planta movida para a lixeira!");
       setDeletePlantDialog({ open: false });
     },
     onError: (error) => {
@@ -171,7 +171,7 @@ export default function PlantsList() {
     onSuccess: () => {
       utils.plants.list.invalidate();
       utils.plants.listDeleted.invalidate();
-      toast.success("✅ Planta restaurada com sucesso!");
+      toast.success("Planta restaurada com sucesso!");
     },
     onError: (error) => toast.error(`Erro ao restaurar: ${error.message}`),
   });
@@ -179,7 +179,7 @@ export default function PlantsList() {
   const permanentDeletePlant = trpc.plants.permanentDelete.useMutation({
     onSuccess: () => {
       utils.plants.listDeleted.invalidate();
-      toast.success("🗑️ Planta excluída permanentemente!");
+      toast.success("Planta excluída permanentemente!");
       setPermanentDeleteDialog({ open: false });
     },
     onError: (error) => toast.error(`Erro ao excluir: ${error.message}`),
@@ -489,7 +489,17 @@ export default function PlantsList() {
                                 <Link href={`/plants/${plant.id}`} className="block w-full" style={{ aspectRatio: '3/4' }}>
                                   <div className="w-full h-full bg-white/5">
                                     {plant.lastHealthPhotoUrl
-                                      ? <img src={plant.lastHealthPhotoUrl} alt={plant.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                                      ? <img
+                                          src={plant.lastHealthPhotoUrl.startsWith('/uploads/')
+                                            ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=192&h=256&q=72`
+                                            : plant.lastHealthPhotoUrl}
+                                          alt={plant.name}
+                                          width={96}
+                                          height={128}
+                                          className="w-full h-full object-cover"
+                                          loading="lazy"
+                                          decoding="async"
+                                        />
                                       : <div className="w-full h-full flex items-center justify-center">
                                           <Sprout className="w-6 h-6 text-muted-foreground/20" />
                                         </div>
@@ -865,73 +875,102 @@ export default function PlantsList() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Action Bar for Bulk Operations */}
+      {/* Floating Action Bar for Bulk Operations — frosted glass */}
       {selectedPlants.size > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 z-50">
-          <div className="rounded-2xl border border-primary/40 bg-card/95 backdrop-blur-md shadow-2xl shadow-primary/20 p-3" style={{ background: 'linear-gradient(135deg, rgba(var(--primary)/0.08) 0%, rgba(0,0,0,0.9) 60%)' }}>
-            <div className="flex flex-wrap items-center gap-2 justify-center">
-              <span className="text-sm font-bold text-primary">
-                {selectedPlants.size} {selectedPlants.size === 1 ? 'planta' : 'plantas'}
-              </span>
-              <div className="h-4 w-px bg-border/50" />
+        <div className="fixed bottom-24 left-4 right-4 z-[150] animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: 'rgba(14, 14, 16, 0.82)',
+              backdropFilter: 'blur(32px) saturate(200%)',
+              WebkitBackdropFilter: 'blur(32px) saturate(200%)',
+              border: '1px solid rgba(255,255,255,0.07)',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset',
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                </div>
+                <span className="text-xs font-semibold text-white/70 tracking-wide">
+                  {selectedPlants.size} {selectedPlants.size === 1 ? 'planta selecionada' : 'plantas selecionadas'}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedPlants(new Set())}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/8 transition-all active:scale-90"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
 
-              {/* Promover */}
+            {/* Actions — grid of cells with dividers */}
+            <div className="flex" style={{ divideColor: 'rgba(255,255,255,0.05)' }}>
+              {/* Promover (condicional) */}
               {filteredPlants?.filter(p => selectedPlants.has(p.id)).every(p => p.plantStage === "SEEDLING") && (
                 <button
                   onClick={() => { haptic.confirm(); setBulkPromoteConfirm(true); }}
                   disabled={bulkPromote.isPending}
-                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-all disabled:opacity-50"
+                  className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
+                  style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(16,185,129,0.06)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  {bulkPromote.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sprout className="w-3.5 h-3.5" />}
-                  Promover
+                  {bulkPromote.isPending ? <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" /> : <Sprout className="w-4 h-4 text-emerald-400" />}
+                  <span className="text-[10px] font-medium text-white/45 leading-none">Promover</span>
                 </button>
               )}
 
               {/* Mover */}
               <button
                 onClick={() => { haptic.confirm(); setBatchMoveDialog(true); }}
-                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-blue-500/15 border border-blue-500/40 text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-all"
+                className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95"
+                style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                <MoveRight className="w-3.5 h-3.5" />Mover
+                <MoveRight className="w-4 h-4 text-blue-400" />
+                <span className="text-[10px] font-medium text-white/45 leading-none">Mover</span>
               </button>
 
               {/* Colher */}
               <button
                 onClick={() => { haptic.destructive(); setBulkHarvestConfirm(true); }}
                 disabled={bulkHarvest.isPending}
-                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 active:scale-95 transition-all disabled:opacity-50"
+                className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
+                style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                {bulkHarvest.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Leaf className="w-3.5 h-3.5" />}
-                Colher
+                {bulkHarvest.isPending ? <Loader2 className="w-4 h-4 text-amber-400 animate-spin" /> : <Leaf className="w-4 h-4 text-amber-400" />}
+                <span className="text-[10px] font-medium text-white/45 leading-none">Colher</span>
               </button>
 
               {/* Descartar */}
               <button
                 onClick={() => { haptic.destructive(); setBulkDiscardConfirm(true); }}
                 disabled={bulkDiscard.isPending}
-                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-orange-500/15 border border-orange-500/40 text-orange-400 hover:bg-orange-500/25 active:scale-95 transition-all disabled:opacity-50"
+                className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
+                style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(249,115,22,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                {bulkDiscard.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Descartar
+                {bulkDiscard.isPending ? <Loader2 className="w-4 h-4 text-orange-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-orange-400/80" />}
+                <span className="text-[10px] font-medium text-white/45 leading-none">Descartar</span>
               </button>
 
               {/* Excluir */}
               <button
                 onClick={() => { haptic.destructive(); setBulkDeleteConfirm(true); }}
                 disabled={bulkDelete.isPending}
-                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 active:scale-95 transition-all disabled:opacity-50"
+                className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.07)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                {bulkDelete.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Excluir
-              </button>
-
-              <div className="h-4 w-px bg-border/50" />
-              {/* Cancelar */}
-              <button
-                onClick={() => setSelectedPlants(new Set())}
-                className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 active:scale-95 transition-all"
-              >
-                <X className="w-4 h-4" />
+                {bulkDelete.isPending ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-400" />}
+                <span className="text-[10px] font-medium text-white/45 leading-none">Excluir</span>
               </button>
             </div>
           </div>

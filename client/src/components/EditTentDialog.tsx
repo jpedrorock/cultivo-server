@@ -43,7 +43,7 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
 
   const updateMutation = trpc.tents.update.useMutation({
     onSuccess: () => {
-      toast.success("✅ Estufa atualizada com sucesso!");
+      toast.success("Estufa atualizada com sucesso!");
       onSuccess();
       onOpenChange(false);
     },

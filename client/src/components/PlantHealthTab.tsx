@@ -209,7 +209,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
 
       setTimeout(() => {
         setUploadProgress({ isUploading: false, stage: "converting", progress: 0 });
-        toast.success("📸 Foto enviada com sucesso!");
+        toast.success("Foto enviada com sucesso!");
         setUploadStatus("idle");
       }, 1000);
     } catch (error: any) {
@@ -274,7 +274,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
       a.download = `fotos-planta-${plantId}.zip`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`✅ ${photoLogs.length} foto(s) baixada(s)!`);
+      toast.success(`${photoLogs.length} foto(s) baixada(s)!`);
     } catch (e) {
       toast.error("Erro ao baixar fotos. Tente novamente.");
     } finally {

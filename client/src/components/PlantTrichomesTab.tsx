@@ -137,13 +137,13 @@ export default function PlantTrichomesTab({
 
     try {
       setIsUploadingPhoto(true);
-      toast.info("📸 Enviando foto...");
+      toast.info("Enviando foto...");
 
       const url = await uploadImage(file);
 
       setPhotoUploadedUrl(url);
       setIsUploadingPhoto(false);
-      toast.success("📸 Foto enviada com sucesso!");
+      toast.success("Foto enviada com sucesso!");
     } catch (error: any) {
       console.error("[PlantTrichomesTab] Erro ao enviar imagem:", error);
       setPhotoPreview(null);

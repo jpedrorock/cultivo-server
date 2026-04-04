@@ -1290,6 +1290,94 @@ input[type="range"]::-moz-range-track {
   animation: badge-shake 0.6s ease-in-out;
 }
 
+/* Chart live glow — pulsing gradient line at bottom of chart cards */
+@keyframes chart-glow-pulse {
+  0%, 100% { opacity: 0.15; transform: translateX(-50%) scaleX(0.6); }
+  50%       { opacity: 0.55; transform: translateX(-50%) scaleX(1); }
+}
+
+.chart-glow-line {
+  animation: chart-glow-pulse 3s ease-in-out infinite;
+}
+
+.chart-glow-line-delayed {
+  animation: chart-glow-pulse 3s ease-in-out infinite 1.5s;
+}
+
+/* ─── Frosted glass toasts (Sonner) ─────────────────────────────────
+   Sonner usa [data-sonner-toast][data-type="success"] (especificidade
+   de 2 atributos). Precisamos igualar ou superar com os mesmos seletores
+   para que background: rgba() !important ganhe do verde padrão do Sonner.
+   ──────────────────────────────────────────────────────────────────── */
+[data-sonner-toast],
+[data-sonner-toast][data-type="success"],
+[data-sonner-toast][data-type="error"],
+[data-sonner-toast][data-type="warning"],
+[data-sonner-toast][data-type="info"],
+[data-sonner-toast][data-type="loading"] {
+  --normal-bg: rgba(14, 14, 16, 0.82) !important;
+  --success-bg: rgba(14, 14, 16, 0.82) !important;
+  --error-bg: rgba(14, 14, 16, 0.82) !important;
+  --warning-bg: rgba(14, 14, 16, 0.82) !important;
+  --info-bg: rgba(14, 14, 16, 0.82) !important;
+  background: rgba(14, 14, 16, 0.82) !important;
+  background-color: rgba(14, 14, 16, 0.82) !important;
+  backdrop-filter: blur(32px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.50), 0 1px 0 rgba(255, 255, 255, 0.04) inset !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  min-width: 220px !important;
+  max-width: 340px !important;
+  padding: 11px 16px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Título: peso maior, levemente mais brilhante */
+[data-sonner-toast] [data-title] {
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Descrição: cor atenuada */
+[data-sonner-toast] [data-description] {
+  color: rgba(255, 255, 255, 0.48) !important;
+  font-size: 12px !important;
+  margin-top: 2px !important;
+}
+
+/* Ícone: cor padrão neutra, sobrescrita por tipo */
+[data-sonner-toast] [data-icon] {
+  color: rgba(255, 255, 255, 0.50) !important;
+}
+
+/* Cores semânticas nos ícones — SEM fundo colorido */
+[data-sonner-toast][data-type="success"] [data-icon] { color: #4ade80 !important; }
+[data-sonner-toast][data-type="error"]   [data-icon] { color: #f87171 !important; }
+[data-sonner-toast][data-type="warning"] [data-icon] { color: #fbbf24 !important; }
+[data-sonner-toast][data-type="info"]    [data-icon] { color: #60a5fa !important; }
+
+/* Linha de acento colorida no topo do toast (pseudo-elemento) */
+[data-sonner-toast][data-type="success"]::before { background: #4ade80; }
+[data-sonner-toast][data-type="error"]::before   { background: #f87171; }
+[data-sonner-toast][data-type="warning"]::before { background: #fbbf24; }
+[data-sonner-toast][data-type="info"]::before    { background: #60a5fa; }
+[data-sonner-toast][data-type]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 1.5px;
+  border-radius: 0 0 2px 2px;
+  opacity: 0.6;
+}
+
 /* Safe area utilities para iOS com notch/home indicator */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

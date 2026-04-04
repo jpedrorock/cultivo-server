@@ -105,9 +105,9 @@ export default function CalculatorMenu() {
           {calculators.map((calc, index) => {
             const Icon = calc.icon;
             return (
-              <Link key={calc.id} href={`/calculators/${calc.id}`} className="block h-full">
+              <Link key={calc.id} href={`/calculators/${calc.id}`} className="block md:h-full">
                 <div
-                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4 h-full`}
+                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4 md:h-full`}
                   style={{
                     animationDelay: `${index * 80}ms`,
                     animationFillMode: 'backwards',
