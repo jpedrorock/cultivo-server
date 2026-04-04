@@ -915,8 +915,8 @@ export default function PlantsList() {
                   disabled={bulkPromote.isPending}
                   className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
                   style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(16,185,129,0.06)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(16,185,129,0.06)')}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
                   {bulkPromote.isPending ? <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" /> : <Sprout className="w-4 h-4 text-emerald-400" />}
                   <span className="text-[10px] font-medium text-white/45 leading-none">Promover</span>
@@ -928,8 +928,8 @@ export default function PlantsList() {
                 onClick={() => { haptic.confirm(); setBatchMoveDialog(true); }}
                 className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95"
                 style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,130,246,0.06)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 <MoveRight className="w-4 h-4 text-blue-400" />
                 <span className="text-[10px] font-medium text-white/45 leading-none">Mover</span>
@@ -941,8 +941,8 @@ export default function PlantsList() {
                 disabled={bulkHarvest.isPending}
                 className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
                 style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.06)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 {bulkHarvest.isPending ? <Loader2 className="w-4 h-4 text-amber-400 animate-spin" /> : <Leaf className="w-4 h-4 text-amber-400" />}
                 <span className="text-[10px] font-medium text-white/45 leading-none">Colher</span>
@@ -954,8 +954,8 @@ export default function PlantsList() {
                 disabled={bulkDiscard.isPending}
                 className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
                 style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(249,115,22,0.06)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(249,115,22,0.06)')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 {bulkDiscard.isPending ? <Loader2 className="w-4 h-4 text-orange-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-orange-400/80" />}
                 <span className="text-[10px] font-medium text-white/45 leading-none">Descartar</span>
@@ -966,8 +966,8 @@ export default function PlantsList() {
                 onClick={() => { haptic.destructive(); setBulkDeleteConfirm(true); }}
                 disabled={bulkDelete.isPending}
                 className="flex-1 flex flex-col items-center gap-1.5 px-2 py-3.5 transition-colors active:scale-95 disabled:opacity-40"
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.07)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.07)')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 {bulkDelete.isPending ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-400" />}
                 <span className="text-[10px] font-medium text-white/45 leading-none">Excluir</span>

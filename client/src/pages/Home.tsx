@@ -786,17 +786,85 @@ export default function Home() {
 function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; color: string; w?: number; h?: number }) {
   if (values.length < 2) return null;
   const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
-  const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`);
-  const [lx, ly] = pts[pts.length - 1].split(",").map(Number);
+  const pts = values.map((v, i) =>
+    `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`
+  );
+  // SVG path "d" — necessário para animateMotion
+  const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
+  // ID único por cor para não colidir os filtros entre múltiplos sparklines
+  const uid = `ecg-${color.replace(/[^a-z0-9]/gi, "")}`;
+
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="opacity-70">
-      <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Static dot */}
-      <circle cx={lx} cy={ly} r="2.5" fill={color} />
-      {/* Pulsing ring */}
-      <circle cx={lx} cy={ly} r="2.5" fill="none" stroke={color} strokeWidth="1.5" opacity="0.7">
-        <animate attributeName="r" values="2.5;6;2.5" dur="2.5s" repeatCount="indefinite" />
-        <animate attributeName="opacity" values="0.7;0;0.7" dur="2.5s" repeatCount="indefinite" />
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="opacity-80" style={{ overflow: "visible" }}>
+      <defs>
+        {/* Glow filter para o ponto de varredura */}
+        <filter id={`${uid}-glow`} x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Linha "fantasma" — trilha atenuada sempre visível */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke={color}
+        strokeWidth="1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeOpacity="0.18"
+      />
+
+      {/* Linha de varredura ECG — desenha da esquerda para a direita em loop */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pathLength="1"
+        strokeDasharray="1"
+      >
+        {/* dashoffset 1→0: linha invisível → totalmente desenhada */}
+        <animate
+          attributeName="stroke-dashoffset"
+          values="1;0"
+          dur="3s"
+          repeatCount="indefinite"
+          calcMode="linear"
+        />
+        {/* A linha fica brilhante enquanto "escreve", depois atenua levemente */}
+        <animate
+          attributeName="stroke-opacity"
+          values="0.3;1;0.9"
+          keyTimes="0;0.15;1"
+          dur="3s"
+          repeatCount="indefinite"
+        />
+      </path>
+
+      {/* Ponto brilhante que percorre o path — o "cursor" do ECG */}
+      <circle r="2.5" fill={color} filter={`url(#${uid}-glow)`}>
+        <animateMotion path={pathD} dur="3s" repeatCount="indefinite" calcMode="linear" />
+        {/* Surge suavemente no início e fica opaco durante a varredura */}
+        <animate
+          attributeName="opacity"
+          values="0;1;1"
+          keyTimes="0;0.08;1"
+          dur="3s"
+          repeatCount="indefinite"
+        />
+      </circle>
+
+      {/* Halo externo do ponto — anel que expande na ponta do ECG */}
+      <circle r="2.5" fill="none" stroke={color} strokeWidth="1.5">
+        <animateMotion path={pathD} dur="3s" repeatCount="indefinite" calcMode="linear" />
+        <animate attributeName="r"       values="2.5;5.5;2.5" keyTimes="0;0.5;1" dur="3s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.6;0;0.6"   keyTimes="0;0.5;1" dur="3s" repeatCount="indefinite" />
       </circle>
     </svg>
   );
