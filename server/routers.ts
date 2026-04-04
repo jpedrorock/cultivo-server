@@ -1719,8 +1719,33 @@ export const appRouter = router({
         await database
           .delete(dailyLogs)
           .where(eq(dailyLogs.id, input.id));
-        
+
         return { success: true };
+      }),
+
+    // Buscar último log de cada estufa em batch (evita N+1 no MorningCheck)
+    latestByTents: protectedProcedure
+      .input(z.object({ tentIds: z.array(z.number()) }))
+      .query(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        if (input.tentIds.length === 0) return {};
+
+        // 1 query: buscar todos os logs das estufas solicitadas, ordenado por data desc
+        const rows = await database
+          .select()
+          .from(dailyLogs)
+          .where(inArray(dailyLogs.tentId, input.tentIds))
+          .orderBy(desc(dailyLogs.logDate));
+
+        // Manter apenas o mais recente por estufa
+        const latest: Record<number, typeof rows[0]> = {};
+        for (const row of rows) {
+          if (row.tentId != null && !(row.tentId in latest)) {
+            latest[row.tentId] = row;
+          }
+        }
+        return latest;
       }),
   }),
 
