@@ -42,7 +42,6 @@ import { ArrowLeft,
   Thermometer,
   QrCode,
   Download,
-  Images,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -74,92 +73,6 @@ function TabSkeleton() {
       <div className="h-24 rounded-xl bg-muted/60" />
       <div className="h-20 rounded-xl bg-muted/40" />
       <div className="h-20 rounded-xl bg-muted/40" />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// PhotoTimeline — Aba de fotos cronológica
-// ---------------------------------------------------------------------------
-function PhotoTimeline({ plantId, plantName }: { plantId: number; plantName: string }) {
-  const { data: logs, isLoading } = trpc.plantHealth.list.useQuery({ plantId }, { enabled: plantId > 0 });
-  const withPhoto = logs?.filter((l: any) => l.photoUrl) ?? [];
-
-  if (isLoading) return (
-    <div className="space-y-3 pt-2 animate-pulse">
-      {[1,2,3].map(i => <div key={i} className="h-28 rounded-2xl bg-muted/50" />)}
-    </div>
-  );
-
-  if (withPhoto.length === 0) return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center">
-        <Images className="w-6 h-6 text-muted-foreground/40" />
-      </div>
-      <p className="text-sm text-muted-foreground">Nenhuma foto registrada ainda</p>
-      <p className="text-[11px] text-muted-foreground/60">Fotos são adicionadas nos registros de saúde</p>
-    </div>
-  );
-
-  const statusColors: Record<string, string> = {
-    HEALTHY:    "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    STRESSED:   "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    SICK:       "text-red-400 bg-red-500/10 border-red-500/20",
-    RECOVERING: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  };
-  const statusLabels: Record<string, string> = {
-    HEALTHY: "Saudável", STRESSED: "Estressada", SICK: "Doente", RECOVERING: "Recuperando",
-  };
-
-  return (
-    <div className="space-y-3 pt-1">
-      <p className="text-[11px] text-muted-foreground/60 text-center">{withPhoto.length} foto{withPhoto.length !== 1 ? 's' : ''} — cronologia</p>
-      {withPhoto.map((log: any, idx: number) => {
-        const date = new Date(log.logDate);
-        const isFirst = idx === withPhoto.length - 1;
-        const isLast = idx === 0;
-        return (
-          <div key={log.id} className="flex gap-3 items-start">
-            {/* Timeline line + dot */}
-            <div className="flex flex-col items-center pt-1 shrink-0" style={{ width: 20 }}>
-              <div className={`w-2.5 h-2.5 rounded-full border-2 ${isLast ? 'border-primary bg-primary/30' : 'border-border bg-muted'}`} />
-              {!isFirst && <div className="w-px flex-1 bg-border/40 mt-1" style={{ minHeight: 32 }} />}
-            </div>
-            {/* Card */}
-            <div className="flex-1 mb-2 rounded-2xl overflow-hidden border border-border/50 bg-card flex">
-              {/* Info */}
-              <div className="flex-1 p-3 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${statusColors[log.healthStatus] ?? ''}`}>
-                    {statusLabels[log.healthStatus] ?? log.healthStatus}
-                  </span>
-                  {isLast && (
-                    <span className="text-[10px] text-primary font-medium">Mais recente</span>
-                  )}
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </p>
-                {log.symptoms && (
-                  <p className="text-[11px] text-foreground/70 mt-1 line-clamp-2">{log.symptoms}</p>
-                )}
-                {log.notes && !log.symptoms && (
-                  <p className="text-[11px] text-foreground/50 mt-1 line-clamp-2 italic">{log.notes}</p>
-                )}
-              </div>
-              {/* Foto */}
-              <a href={log.photoUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 w-[90px]" style={{ aspectRatio: '3/4' }}>
-                <img
-                  src={log.photoUrl.startsWith('/uploads/') ? `/api/upload/thumbnail?url=${encodeURIComponent(log.photoUrl)}&w=192&h=256&q=72` : log.photoUrl}
-                  alt="Registro de saúde"
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </a>
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -613,17 +526,13 @@ export default function PlantDetail() {
         {/* 4 Tabs principais */}
         {(() => {
           const isPlant = plant.plantStage === "PLANT";
-          const tabCols = isPlant ? "grid-cols-5" : "grid-cols-4";
+          const tabCols = isPlant ? "grid-cols-4" : "grid-cols-3";
           return (
             <Tabs defaultValue="health" className="w-full">
               <TabsList className={`grid w-full ${tabCols} mb-3 h-auto p-1`}>
                 <TabsTrigger value="health" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
                   <Heart className="w-3.5 h-3.5" />
                   Saúde
-                </TabsTrigger>
-                <TabsTrigger value="timeline" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
-                  <Images className="w-3.5 h-3.5" />
-                  Fotos
                 </TabsTrigger>
                 <TabsTrigger value="environment" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
                   <Thermometer className="w-3.5 h-3.5" />
@@ -645,11 +554,6 @@ export default function PlantDetail() {
                 <Suspense fallback={<TabSkeleton />}>
                   <PlantHealthTab plantId={plantId} />
                 </Suspense>
-              </TabsContent>
-
-              {/* Aba Timeline de Fotos */}
-              <TabsContent value="timeline">
-                <PhotoTimeline plantId={plantId} plantName={plant.name} />
               </TabsContent>
 
               <TabsContent value="environment">
