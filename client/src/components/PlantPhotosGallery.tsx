@@ -1,5 +1,3 @@
-// @ts-ignore
-import piexif from 'piexifjs';
 import { useRef, useState, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
@@ -61,6 +59,13 @@ async function downloadPhotoWithExif(
   let finalBlob = blob;
   if (isJpeg) {
     try {
+      // Dynamic import to avoid CJS module breaking React singleton in Vite
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const piexifMod: any = await import('piexifjs');
+      const piexif = piexifMod.default ?? piexifMod;
+
       const arrayBuffer = await blob.arrayBuffer();
       const binary = Array.from(new Uint8Array(arrayBuffer)).map(b => String.fromCharCode(b)).join('');
 
