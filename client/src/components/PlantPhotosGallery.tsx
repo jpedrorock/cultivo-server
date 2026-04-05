@@ -230,7 +230,21 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
     setIsScrubbing(false);
   }, []);
 
-  // Non-passive touch listener for pinch prevention
+  // Lock body scroll while lightbox is open (prevents iOS from scrolling
+  // the underlying page through the fixed overlay, which makes BottomNav reappear)
+  useEffect(() => {
+    if (lightboxIdx !== null) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+      return () => {
+        document.body.style.overflow = prev;
+        document.body.style.touchAction = '';
+      };
+    }
+  }, [lightboxIdx]);
+
+  // Non-passive touch listener for pinch prevention on image area
   useEffect(() => {
     const el = imageRef.current;
     if (!el) return;
@@ -240,6 +254,15 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
     el.addEventListener("touchmove", onMove, { passive: false });
     return () => el.removeEventListener("touchmove", onMove);
   }, [scale]);
+
+  // Non-passive touch listener on thumbnail strip to prevent iOS scroll during scrub
+  useEffect(() => {
+    const el = thumbStripRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => { e.preventDefault(); };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
 
   const getPinchDist = (t: React.TouchList) => {
     const dx = t[0].clientX - t[1].clientX;
