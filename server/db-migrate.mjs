@@ -55,6 +55,10 @@ const INCREMENTAL_ALTERS = [
   "ALTER TABLE dailyLogs ADD COLUMN wateringVolume INT NULL DEFAULT NULL",
   "ALTER TABLE dailyLogs ADD COLUMN runoffCollected INT NULL DEFAULT NULL",
   "ALTER TABLE dailyLogs ADD COLUMN runoffPercentage DECIMAL(5,2) NULL DEFAULT NULL",
+
+  // 2026-04-04: Captura automática de ciclo e semana nas fotos
+  `ALTER TABLE plantPhotos ADD COLUMN IF NOT EXISTS cycleId INT NULL`,
+  `ALTER TABLE plantPhotos ADD COLUMN IF NOT EXISTS weekNumber INT NULL`,
 ];
 
 async function runMigrations() {

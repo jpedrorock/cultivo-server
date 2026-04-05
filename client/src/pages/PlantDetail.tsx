@@ -690,7 +690,7 @@ export default function PlantDetail() {
 
               <TabsContent value="archive">
                 <Suspense fallback={<TabSkeleton />}>
-                  <PlantArchiveTab plantId={plantId} />
+                  <PlantArchiveTab plantId={plantId} plantName={plant?.name ?? "Planta"} />
                 </Suspense>
               </TabsContent>
             </Tabs>

@@ -452,38 +452,37 @@ export default function PlantsList() {
                             }`}>
 
                               {/* Info à esquerda */}
-                              <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0 pl-3 pr-1 pt-3 pb-3 flex flex-col justify-start items-start gap-1.5">
-                                {/* Nome + badge na mesma linha, ambos à esquerda */}
-                                <div className="flex items-center gap-1.5 flex-wrap w-full">
-                                  <p className="text-sm font-semibold text-foreground leading-tight">{plant.name}</p>
-                                  <div className={`px-1.5 py-px rounded text-[10px] font-medium border ${getStatusColor(plant.status)}`}>
-                                    {getStatusLabel(plant.status)}
-                                  </div>
-                                </div>
-                                {/* Código + strain */}
-                                <p className="text-[11px] text-muted-foreground/60 truncate w-full">
+                              <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0 pl-3 pr-1 pt-3 pb-3 flex flex-col justify-start items-start gap-1">
+                                {/* Nome — hierarquia principal */}
+                                <p className="text-base font-bold text-foreground leading-tight w-full">{plant.name}</p>
+                                {/* Código + strain — secundário */}
+                                <p className="text-[11px] text-muted-foreground/50 truncate w-full">
                                   {plant.code && <span className="font-mono">{plant.code} · </span>}
                                   {getStrainName(plant.strainId) || '—'}
                                 </p>
                                 {/* Fase + saúde */}
-                                <div className="flex items-center gap-2 flex-wrap w-full">
+                                <div className="flex items-center gap-2 flex-wrap w-full mt-0.5">
                                   {(plant.cyclePhase && plant.cycleWeek) && (
-                                    <span className={`text-[11px] font-medium flex items-center gap-0.5 ${plant.cyclePhase === 'VEGA' ? 'text-green-400' : 'text-purple-400'}`}>
+                                    <span className={`text-xs font-semibold flex items-center gap-0.5 ${plant.cyclePhase === 'VEGA' ? 'text-green-400' : 'text-purple-400'}`}>
                                       {plant.cyclePhase === 'VEGA' ? <Leaf className="w-3 h-3"/> : <Flower2 className="w-3 h-3"/>}
                                       {plant.cyclePhase === 'VEGA' ? 'Vega' : 'Flora'} S{plant.cycleWeek}
                                     </span>
                                   )}
                                   {fitness && (
-                                    <span className="text-[11px] flex items-center gap-1" style={{ color: fitness.color }}>
+                                    <span className="text-xs flex items-center gap-1" style={{ color: fitness.color }}>
                                       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: fitness.color }}/>
                                       {plant.lastHealthStatus === "HEALTHY" ? "Saudável" : plant.lastHealthStatus === "STRESSED" ? "Estressada" : plant.lastHealthStatus === "SICK" ? "Doente" : "Recuperando"}
                                     </span>
                                   )}
                                 </div>
+                                {/* Badge de status — abaixo de tudo */}
+                                <div className={`mt-1 px-1.5 py-px rounded text-[10px] font-semibold border ${getStatusColor(plant.status)}`}>
+                                  {getStatusLabel(plant.status)}
+                                </div>
                               </Link>
 
                               {/* Foto + ações à direita */}
-                              <div className="w-[128px] shrink-0 border-l border-border/30 flex flex-col">
+                              <div className="w-[110px] shrink-0 border-l border-border/30 flex flex-col">
                                 {/* Foto em aspect-ratio 3:4 (iPhone portrait) */}
                                 <Link href={`/plants/${plant.id}`} className="block w-full" style={{ aspectRatio: '3/4' }}>
                                   <div className="w-full h-full bg-white/5">
@@ -493,8 +492,8 @@ export default function PlantsList() {
                                             ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=192&h=256&q=72`
                                             : plant.lastHealthPhotoUrl}
                                           alt={plant.name}
-                                          width={128}
-                                          height={171}
+                                          width={110}
+                                          height={147}
                                           className="w-full h-full object-cover"
                                           loading="lazy"
                                           decoding="async"

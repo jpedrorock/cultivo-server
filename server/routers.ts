@@ -4158,7 +4158,25 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
+
+        // Auto-capture active cycle and week for this plant
+        let capturedCycleId: number | undefined;
+        let capturedWeekNumber: number | undefined;
+        try {
+          const plant = await database.select({ currentTentId: plants.currentTentId }).from(plants).where(eq(plants.id, input.plantId)).limit(1);
+          if (plant[0]?.currentTentId) {
+            const cycle = await database.select({ id: cycles.id, startDate: cycles.startDate, floraStartDate: cycles.floraStartDate })
+              .from(cycles).where(and(eq(cycles.tentId, plant[0].currentTentId), eq(cycles.status, 'ACTIVE'))).limit(1);
+            if (cycle[0]) {
+              capturedCycleId = cycle[0].id;
+              const now = new Date();
+              const floraStart = cycle[0].floraStartDate ? new Date(cycle[0].floraStartDate) : null;
+              const refDate = floraStart && now >= floraStart ? floraStart : new Date(cycle[0].startDate);
+              capturedWeekNumber = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+            }
+          }
+        } catch {}
+
         let photoUrl: string | undefined;
         let photoKey: string | undefined;
 
@@ -4182,6 +4200,8 @@ export const appRouter = router({
           plantId: input.plantId,
           photoUrl,
           photoKey,
+          cycleId: capturedCycleId,
+          weekNumber: capturedWeekNumber,
           description: input.description,
           photoDate: new Date(),
         });

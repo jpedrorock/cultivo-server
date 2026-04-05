@@ -1144,8 +1144,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               })()}
               {/* Streak badge */}
               {streak && streak.current > 0 && (
-                <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'border-orange-500/40 text-orange-400 bg-orange-500/10' : 'border-amber-400/40 text-amber-400 bg-amber-500/10'}`}>
-                  🔥 {streak.current}d
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : 'border-emerald-400/30 text-emerald-400/60 bg-emerald-500/5'}`}>
+                  <Leaf className="w-2.5 h-2.5" />{streak.current}d
                 </span>
               )}
             </div>
