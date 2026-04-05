@@ -4141,11 +4141,39 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
 
-        return await database
+        // Fotos dedicadas (tabela plantPhotos)
+        const galleryPhotos = await database
           .select()
           .from(plantPhotos)
           .where(eq(plantPhotos.plantId, input.plantId))
           .orderBy(desc(plantPhotos.photoDate));
+
+        // Fotos dos registros de saúde (plantHealthLogs que têm photoUrl)
+        const healthPhotos = await database
+          .select({
+            id: plantHealthLogs.id,
+            plantId: plantHealthLogs.plantId,
+            photoUrl: plantHealthLogs.photoUrl,
+            photoKey: plantHealthLogs.photoKey,
+            description: plantHealthLogs.notes,
+            photoDate: plantHealthLogs.logDate,
+            createdAt: plantHealthLogs.createdAt,
+            healthStatus: plantHealthLogs.healthStatus,
+          })
+          .from(plantHealthLogs)
+          .where(and(
+            eq(plantHealthLogs.plantId, input.plantId),
+            isNotNull(plantHealthLogs.photoUrl)
+          ))
+          .orderBy(desc(plantHealthLogs.logDate));
+
+        // Unificar com source tag
+        const unified = [
+          ...galleryPhotos.map(p => ({ ...p, source: "gallery" as const, cycleId: p.cycleId ?? null, weekNumber: p.weekNumber ?? null, healthStatus: null })),
+          ...healthPhotos.map(p => ({ ...p, source: "health" as const, cycleId: null, weekNumber: null })),
+        ].sort((a, b) => new Date(b.photoDate).getTime() - new Date(a.photoDate).getTime());
+
+        return unified;
       }),
 
     upload: protectedProcedure

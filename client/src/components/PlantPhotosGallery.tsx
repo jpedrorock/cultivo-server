@@ -39,13 +39,9 @@ type Photo = {
   description?: string | null;
   photoDate: Date | string;
   createdAt: Date | string;
+  source?: "gallery" | "health" | null;
+  healthStatus?: string | null;
 };
-
-function getPhaseName(photo: Photo): string {
-  // We don't have phase info directly, so we use cycleId as proxy
-  // You can extend this later with actual phase lookups
-  return photo.cycleId ? "V" : "V";
-}
 
 async function downloadPhotoWithExif(
   photo: Photo,
@@ -433,6 +429,12 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
                       S{photo.weekNumber}
                     </div>
                   )}
+                  {/* Health log badge */}
+                  {photo.source === "health" && (
+                    <div className="absolute top-1 left-1 bg-emerald-500/80 text-white text-[8px] font-bold px-1 py-px rounded leading-tight">
+                      saúde
+                    </div>
+                  )}
                   {/* Selection checkbox overlay */}
                   {selectMode && (
                     <div className={`absolute top-1 right-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
@@ -486,12 +488,14 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
               >
                 <Download className="w-4.5 h-4.5" />
               </button>
-              <button
-                className="w-10 h-10 rounded-full flex items-center justify-center text-red-400 hover:bg-red-500/10 active:scale-90 transition-transform"
-                onClick={() => setDeleteConfirmOpen(true)}
-              >
-                <Trash2 className="w-4.5 h-4.5" />
-              </button>
+              {currentPhoto.source !== "health" && (
+                <button
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-red-400 hover:bg-red-500/10 active:scale-90 transition-transform"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="w-4.5 h-4.5" />
+                </button>
+              )}
               <button
                 className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:bg-white/10 active:scale-90 transition-transform"
                 onClick={closeLightbox}
@@ -570,13 +574,18 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
             className="px-5 py-3 pb-8 shrink-0 text-center"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
               <p className="text-xs text-white/40">
                 {format(new Date(currentPhoto.photoDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
               </p>
               {currentPhoto.weekNumber && (
                 <span className="bg-white/10 text-white/70 text-[10px] font-bold px-2 py-px rounded-full">
                   S{currentPhoto.weekNumber}
+                </span>
+              )}
+              {currentPhoto.source === "health" && (
+                <span className="bg-emerald-500/30 text-emerald-300 text-[10px] font-bold px-2 py-px rounded-full">
+                  registro de saúde
                 </span>
               )}
             </div>
