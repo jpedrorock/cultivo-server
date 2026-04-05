@@ -138,6 +138,39 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
   const lastTapRef = useRef(0);
   const imageRef = useRef<HTMLDivElement>(null);
 
+  // Timelapse scrub on thumbnail strip
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const scrubStartX = useRef(0);
+  const scrubStartIdx = useRef(0);
+  const thumbStripRef = useRef<HTMLDivElement>(null);
+
+  const handleScrubStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    scrubStartX.current = clientX;
+    scrubStartIdx.current = lightboxIdx ?? 0;
+    setIsScrubbing(true);
+  }, [lightboxIdx]);
+
+  const handleScrubMove = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    if (!isScrubbing) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const stripWidth = thumbStripRef.current?.offsetWidth ?? window.innerWidth;
+    // Map full strip width to all photos
+    const deltaX = clientX - scrubStartX.current;
+    const photosPerPx = typedPhotos.length / stripWidth;
+    const deltaIdx = Math.round(deltaX * photosPerPx * 2.5);
+    const newIdx = Math.max(0, Math.min(typedPhotos.length - 1, scrubStartIdx.current - deltaIdx));
+    if (newIdx !== lightboxIdx) {
+      resetZoom();
+      setSwipeOffset(0);
+      setLightboxIdx(newIdx);
+    }
+  }, [isScrubbing, lightboxIdx, typedPhotos.length, resetZoom]);
+
+  const handleScrubEnd = useCallback(() => {
+    setIsScrubbing(false);
+  }, []);
+
   // Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -472,7 +505,7 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
 
       {/* ── Lightbox ── */}
       {lightboxIdx !== null && currentPhoto && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col" onClick={closeLightbox}>
+        <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col" onClick={closeLightbox}>
           {/* Top bar */}
           <div
             className="flex items-center justify-between px-4 pt-12 pb-2 shrink-0"
@@ -531,7 +564,8 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
               draggable={false}
               style={{
                 transform: `translateX(${scale > 1 ? panX : swipeOffset}px) translateY(${panY}px) scale(${scale})`,
-                transition: pinchRef.current || panRef.current || isSwiping ? "none" : "transform 0.2s ease-out",
+                transition: pinchRef.current || panRef.current || isSwiping || isScrubbing ? "none" : "transform 0.2s ease-out",
+                opacity: isScrubbing ? 0.85 : 1,
                 cursor: scale > 1 ? "grab" : "default",
               }}
             />
@@ -552,26 +586,48 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
             )}
           </div>
 
-          {/* Thumbnail strip */}
+          {/* Thumbnail strip — tap to jump, drag to scrub (timelapse) */}
           <div
-            className="flex gap-1.5 overflow-x-auto px-4 py-3 shrink-0"
-            style={{ scrollbarWidth: 'none' }}
+            ref={thumbStripRef}
+            className={`flex gap-1.5 overflow-x-auto px-4 py-3 shrink-0 select-none ${isScrubbing ? 'cursor-grabbing' : 'cursor-grab'}`}
+            style={{ scrollbarWidth: 'none', touchAction: 'none' }}
             onClick={e => e.stopPropagation()}
+            onMouseDown={handleScrubStart}
+            onMouseMove={handleScrubMove}
+            onMouseUp={handleScrubEnd}
+            onMouseLeave={handleScrubEnd}
+            onTouchStart={handleScrubStart}
+            onTouchMove={handleScrubMove}
+            onTouchEnd={handleScrubEnd}
           >
+            {/* Scrub hint label */}
+            {!isScrubbing && typedPhotos.length > 2 && (
+              <div className="absolute bottom-[90px] left-1/2 -translate-x-1/2 pointer-events-none">
+                <span className="text-[9px] text-white/20 tracking-widest uppercase">← arrastar →</span>
+              </div>
+            )}
             {typedPhotos.map((p, i) => (
               <button
                 key={p.id}
-                onClick={() => { resetZoom(); setLightboxIdx(i); }}
-                className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all ${i === lightboxIdx ? 'border-white scale-110' : 'border-transparent opacity-50'}`}
+                onPointerDown={e => e.stopPropagation()}
+                onClick={() => { if (!isScrubbing) { resetZoom(); setLightboxIdx(i); } }}
+                className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all pointer-events-none ${
+                  i === lightboxIdx
+                    ? 'border-white scale-110'
+                    : Math.abs(i - (lightboxIdx ?? 0)) <= 1
+                      ? 'border-transparent opacity-70'
+                      : 'border-transparent opacity-40'
+                }`}
               >
-                <img src={p.photoUrl} alt="" className="w-full h-full object-cover" />
+                <img src={p.photoUrl} alt="" className="w-full h-full object-cover" draggable={false} />
               </button>
             ))}
           </div>
 
           {/* Bottom: date + description */}
           <div
-            className="px-5 py-3 pb-8 shrink-0 text-center"
+            className="px-5 py-3 shrink-0 text-center"
+            style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 1rem))' }}
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-center gap-2 flex-wrap">
