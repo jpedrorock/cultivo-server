@@ -138,38 +138,11 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
   const lastTapRef = useRef(0);
   const imageRef = useRef<HTMLDivElement>(null);
 
-  // Timelapse scrub on thumbnail strip
+  // Timelapse scrub — only state/refs here; callbacks defined after resetZoom
   const [isScrubbing, setIsScrubbing] = useState(false);
   const scrubStartX = useRef(0);
   const scrubStartIdx = useRef(0);
   const thumbStripRef = useRef<HTMLDivElement>(null);
-
-  const handleScrubStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    scrubStartX.current = clientX;
-    scrubStartIdx.current = lightboxIdx ?? 0;
-    setIsScrubbing(true);
-  }, [lightboxIdx]);
-
-  const handleScrubMove = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    if (!isScrubbing) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const stripWidth = thumbStripRef.current?.offsetWidth ?? window.innerWidth;
-    // Map full strip width to all photos
-    const deltaX = clientX - scrubStartX.current;
-    const photosPerPx = typedPhotos.length / stripWidth;
-    const deltaIdx = Math.round(deltaX * photosPerPx * 2.5);
-    const newIdx = Math.max(0, Math.min(typedPhotos.length - 1, scrubStartIdx.current - deltaIdx));
-    if (newIdx !== lightboxIdx) {
-      resetZoom();
-      setSwipeOffset(0);
-      setLightboxIdx(newIdx);
-    }
-  }, [isScrubbing, lightboxIdx, typedPhotos.length, resetZoom]);
-
-  const handleScrubEnd = useCallback(() => {
-    setIsScrubbing(false);
-  }, []);
 
   // Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -229,6 +202,33 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
     setSwipeOffset(0);
     setLightboxIdx(i => (i != null && i < typedPhotos.length - 1 ? i + 1 : i));
   }, [resetZoom, typedPhotos.length]);
+
+  // ── Timelapse scrub callbacks (must be after resetZoom) ───────────────────
+  const handleScrubStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    scrubStartX.current = clientX;
+    scrubStartIdx.current = lightboxIdx ?? 0;
+    setIsScrubbing(true);
+  }, [lightboxIdx]);
+
+  const handleScrubMove = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    if (!isScrubbing) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const stripWidth = thumbStripRef.current?.offsetWidth ?? window.innerWidth;
+    const deltaX = clientX - scrubStartX.current;
+    const photosPerPx = typedPhotos.length / stripWidth;
+    const deltaIdx = Math.round(deltaX * photosPerPx * 2.5);
+    const newIdx = Math.max(0, Math.min(typedPhotos.length - 1, scrubStartIdx.current - deltaIdx));
+    if (newIdx !== lightboxIdx) {
+      resetZoom();
+      setSwipeOffset(0);
+      setLightboxIdx(newIdx);
+    }
+  }, [isScrubbing, lightboxIdx, typedPhotos.length, resetZoom]);
+
+  const handleScrubEnd = useCallback(() => {
+    setIsScrubbing(false);
+  }, []);
 
   // Non-passive touch listener for pinch prevention
   useEffect(() => {
