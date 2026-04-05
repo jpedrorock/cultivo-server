@@ -1,20 +1,20 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Contrast, Moon, Sun, Trees, Zap } from "lucide-react";
+import { Check, Moon, Newspaper, Sparkles, Sun, Trees, Zap } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 // Theme preview component showing visual representation
 function ThemePreview({
   type,
 }: {
-  type: "light" | "dark" | "forest" | "hps" | "highcontrast" | "highcontrast-dark";
+  type: "light" | "dark" | "forest" | "hps" | "positivus" | "vision";
 }) {
   const previewStyles = {
-    light: { bg: "bg-[#faf9f6]", card: "bg-white", text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
-    dark: { bg: "bg-[#111a1a]", card: "bg-[#182020]", text: "bg-[#f0f7f0]", accent: "bg-[#4db84d]" },
-    forest: { bg: "bg-[#0d1a0d]", card: "bg-[#152015]", text: "bg-[#d4f0d4]", accent: "bg-[#5cd65c]" },
-    hps: { bg: "bg-[#080f08]", card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]" },
-    highcontrast: { bg: "bg-white", card: "bg-gray-200", text: "bg-black", accent: "bg-black" },
-    "highcontrast-dark": { bg: "bg-black", card: "bg-gray-900", text: "bg-white", accent: "bg-white" },
+    light:    { bg: "bg-[#faf9f6]", card: "bg-white",    text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
+    dark:     { bg: "bg-[#111a1a]", card: "bg-[#182020]", text: "bg-[#f0f7f0]", accent: "bg-[#4db84d]" },
+    forest:   { bg: "bg-[#0d1a0d]", card: "bg-[#152015]", text: "bg-[#d4f0d4]", accent: "bg-[#5cd65c]" },
+    hps:      { bg: "bg-[#080f08]", card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]" },
+    positivus:{ bg: "bg-[#f5f2e8]", card: "bg-white",    text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
+    vision:   { bg: "bg-[#0a1620]", card: "bg-[#162228]", text: "bg-[#e0f0e8]", accent: "bg-[#40c060]" },
   };
 
   const colors = previewStyles[type];
@@ -63,16 +63,16 @@ const THEMES = [
     icon: <Zap className="w-4 h-4 text-green-400 shrink-0" />,
   },
   {
-    value: "highcontrast" as const,
-    label: "Alto Contraste",
-    description: "Preto e branco puro (fundo branco, texto preto)",
-    icon: <Contrast className="w-4 h-4 shrink-0" />,
+    value: "positivus" as const,
+    label: "Positivus",
+    description: "Editorial e bold — fundo creme, borda verde forte, sidebar escura",
+    icon: <Newspaper className="w-4 h-4 text-emerald-700 shrink-0" />,
   },
   {
-    value: "highcontrast-dark" as const,
-    label: "Alto Contraste Escuro",
-    description: "Preto e branco invertido (fundo preto, texto branco)",
-    icon: <Contrast className="w-4 h-4 shrink-0" />,
+    value: "vision" as const,
+    label: "Vision UI",
+    description: "Glassmorphism dark — cards translúcidos com brilho verde esmeralda",
+    icon: <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />,
   },
 ] as const;
 

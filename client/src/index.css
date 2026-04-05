@@ -436,6 +436,164 @@
   --radius: 0.85rem;
 }
 
+/* ============================================================
+   POSITIVUS THEME — Editorial bold light, paleta Cultivo
+   Fundo creme, texto verde-preto, borda verde forte,
+   sidebar verde-escura, sombra geométrica offset nos cards.
+   ============================================================ */
+.positivus {
+  color-scheme: light;
+  --radius: 0.5rem;
+  --primary: oklch(0.52 0.165 145);
+  --primary-foreground: oklch(0.98 0 0);
+  --sidebar-primary: oklch(0.52 0.165 145);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --background: oklch(0.965 0.012 88);
+  --foreground: oklch(0.15 0.020 145);
+  --card: oklch(0.985 0.006 90);
+  --card-foreground: oklch(0.15 0.020 145);
+  --popover: oklch(0.990 0.004 90);
+  --popover-foreground: oklch(0.15 0.020 145);
+  --secondary: oklch(0.940 0.016 145);
+  --secondary-foreground: oklch(0.22 0.018 145);
+  --muted: oklch(0.930 0.010 88);
+  --muted-foreground: oklch(0.44 0.016 145);
+  --accent: oklch(0.910 0.040 145);
+  --accent-foreground: oklch(0.18 0.020 145);
+  --destructive: oklch(0.55 0.235 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.25 0.028 145);
+  --input: oklch(0.955 0.008 90);
+  --ring: oklch(0.52 0.165 145);
+  --chart-1: oklch(0.52 0.165 145);
+  --chart-2: oklch(0.58 0.145 195);
+  --chart-3: oklch(0.62 0.185 55);
+  --chart-4: oklch(0.55 0.175 275);
+  --chart-5: oklch(0.58 0.200 25);
+  --sidebar: oklch(0.15 0.035 145);
+  --sidebar-foreground: oklch(0.93 0.010 145);
+  --sidebar-accent: oklch(0.230 0.045 145);
+  --sidebar-accent-foreground: oklch(0.93 0.010 145);
+  --sidebar-border: oklch(0.265 0.032 145);
+  --sidebar-ring: oklch(0.64 0.185 145);
+}
+/* Cards: borda grossa + sombra offset geométrica (assinatura Positivus) */
+.positivus [data-slot="card"],
+.positivus .rounded-xl,
+.positivus .rounded-2xl {
+  border: 2px solid oklch(0.25 0.028 145) !important;
+  box-shadow: 3px 3px 0 0 oklch(0.25 0.028 145);
+}
+/* Inputs: borda escura bem visível */
+.positivus input,
+.positivus textarea,
+.positivus select,
+.positivus [role="combobox"] {
+  border: 1.5px solid oklch(0.30 0.025 145) !important;
+}
+.positivus input:focus,
+.positivus textarea:focus {
+  border-color: oklch(0.52 0.165 145) !important;
+  box-shadow: 0 0 0 3px oklch(0.52 0.165 145 / 0.20) !important;
+  outline: none !important;
+}
+/* Botão primário: sombra offset + micro-interação hover (press effect) */
+.positivus [data-slot="button"][class*="bg-primary"],
+.positivus button[class*="bg-primary"] {
+  border: 1.5px solid oklch(0.35 0.140 145) !important;
+  box-shadow: 2px 2px 0 0 oklch(0.22 0.030 145);
+}
+.positivus [data-slot="button"][class*="bg-primary"]:hover,
+.positivus button[class*="bg-primary"]:hover {
+  box-shadow: 1px 1px 0 0 oklch(0.22 0.030 145);
+  translate: 1px 1px;
+}
+
+/* ============================================================
+   VISION UI THEME — Dark glassmorphism, paleta verde/âmbar Cultivo
+   Inspirado no Vision UI Dashboard (Creative Tim), re-skinned
+   com verde esmeralda + âmbar no lugar do roxo/ciano original.
+   ============================================================ */
+.vision {
+  color-scheme: dark;
+  --radius: 1rem;
+  --primary: oklch(0.64 0.185 145);
+  --primary-foreground: oklch(0.98 0 0);
+  --sidebar-primary: oklch(0.64 0.185 145);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --background: oklch(0.10 0.028 210);
+  --foreground: oklch(0.95 0.010 145);
+  --card: oklch(0.175 0.025 205);
+  --card-foreground: oklch(0.95 0.010 145);
+  --popover: oklch(0.195 0.022 205);
+  --popover-foreground: oklch(0.95 0.010 145);
+  --secondary: oklch(0.210 0.024 205);
+  --secondary-foreground: oklch(0.90 0.008 145);
+  --muted: oklch(0.155 0.020 210);
+  --muted-foreground: oklch(0.56 0.018 180);
+  --accent: oklch(0.230 0.040 160);
+  --accent-foreground: oklch(0.95 0.010 145);
+  --destructive: oklch(0.65 0.18 18);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.295 0.030 185);
+  --input: oklch(0.170 0.022 205);
+  --ring: oklch(0.64 0.185 145);
+  --chart-1: oklch(0.67 0.185 145);
+  --chart-2: oklch(0.68 0.155 195);
+  --chart-3: oklch(0.72 0.195 55);
+  --chart-4: oklch(0.66 0.185 275);
+  --chart-5: oklch(0.68 0.210 25);
+  --sidebar: oklch(0.08 0.025 215);
+  --sidebar-foreground: oklch(0.95 0.010 145);
+  --sidebar-accent: oklch(0.195 0.040 160);
+  --sidebar-accent-foreground: oklch(0.95 0.010 145);
+  --sidebar-border: oklch(0.225 0.025 200);
+  --sidebar-ring: oklch(0.64 0.185 145);
+}
+/* Gradiente de fundo fixo — cria a atmosfera de profundidade */
+html.vision {
+  background:
+    radial-gradient(ellipse 80% 60% at 10% -10%,
+      oklch(0.35 0.12 155 / 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 110%,
+      oklch(0.30 0.10 195 / 0.25) 0%, transparent 55%),
+    oklch(0.10 0.028 210);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+/* Cards: glassmorphism com blur + borda verde + glow esmeralda */
+.vision [data-slot="card"],
+.vision .rounded-xl,
+.vision .rounded-2xl,
+.vision [class*="bg-card"] {
+  background: oklch(0.175 0.025 205 / 0.55) !important;
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid oklch(0.42 0.065 165 / 0.38) !important;
+  box-shadow:
+    0 0 0 1px oklch(0.62 0.17 145 / 0.08) inset,
+    0 1px 0 0 oklch(1 0 0 / 0.05) inset,
+    0 8px 32px oklch(0.10 0.028 210 / 0.60),
+    0 0 24px oklch(0.38 0.14 145 / 0.12);
+}
+/* Inputs com glass sutil */
+.vision input,
+.vision textarea,
+.vision select,
+.vision [role="combobox"] {
+  background: oklch(0.14 0.022 205 / 0.70) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-color: oklch(0.38 0.055 175 / 0.40) !important;
+}
+/* Botão primário com glow esmeralda */
+.vision [data-slot="button"][class*="bg-primary"],
+.vision button[class*="bg-primary"] {
+  box-shadow:
+    0 0 16px oklch(0.62 0.17 145 / 0.45),
+    0 4px 12px oklch(0.10 0.028 210 / 0.50);
+}
+
 @layer base {
   /* Apply Geist font globally */
   html {
