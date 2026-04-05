@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark" | "forest" | "hps" | "positivus" | "vision";
+type Theme = "light" | "dark" | "forest" | "hps" | "monstera" | "vision";
 
 interface ThemeContextType {
   theme: Theme;
@@ -37,7 +37,7 @@ export function ThemeProvider({
     root.classList.add('no-transitions');
 
     // Remove all theme classes (include legacy names to clean old localStorage)
-    root.classList.remove("light", "dark", "forest", "hps", "positivus", "vision", "highcontrast", "highcontrast-dark");
+    root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "positivus", "highcontrast", "highcontrast-dark");
     // Add current theme class
     root.classList.add(theme);
     // Remover a classe splash-loading do body para permitir que o CSS do tema assuma
@@ -66,8 +66,8 @@ export function ThemeProvider({
           if (prev === "light") return "dark";
           if (prev === "dark") return "forest";
           if (prev === "forest") return "hps";
-          if (prev === "hps") return "positivus";
-          if (prev === "positivus") return "vision";
+          if (prev === "hps") return "monstera";
+          if (prev === "monstera") return "vision";
           return "light";
         });
       }

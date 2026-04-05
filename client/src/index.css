@@ -437,75 +437,71 @@
 }
 
 /* ============================================================
-   POSITIVUS THEME — Editorial bold light, paleta Cultivo
-   Fundo creme, texto verde-preto, borda verde forte,
-   sidebar verde-escura, sombra geométrica offset nos cards.
+   MONSTERA THEME — Botânico minimalista, inspirado no Monstera UI Kit
+   Branco limpo + verde-floresta profundo + acentos menta/sage.
+   Referência: Monstera UI Kit (Harum Shidiqi, Figma Community)
    ============================================================ */
-.positivus {
+.monstera {
   color-scheme: light;
-  --radius: 0.5rem;
-  --primary: oklch(0.52 0.165 145);
+  --radius: 0.875rem;
+
+  /* Primary: verde-floresta profundo (#2b6e4a → oklch) */
+  --primary: oklch(0.44 0.115 145);
   --primary-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.52 0.165 145);
+  --sidebar-primary: oklch(0.44 0.115 145);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --background: oklch(0.965 0.012 88);
-  --foreground: oklch(0.15 0.020 145);
-  --card: oklch(0.985 0.006 90);
-  --card-foreground: oklch(0.15 0.020 145);
-  --popover: oklch(0.990 0.004 90);
-  --popover-foreground: oklch(0.15 0.020 145);
-  --secondary: oklch(0.940 0.016 145);
-  --secondary-foreground: oklch(0.22 0.018 145);
-  --muted: oklch(0.930 0.010 88);
-  --muted-foreground: oklch(0.44 0.016 145);
-  --accent: oklch(0.910 0.040 145);
-  --accent-foreground: oklch(0.18 0.020 145);
-  --destructive: oklch(0.55 0.235 27);
+
+  /* Background: branco com tint verde mínimo */
+  --background: oklch(0.988 0.004 150);
+  --foreground: oklch(0.16 0.022 145);
+
+  /* Card: branco puro — diferenciado pela sombra */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.022 145);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.022 145);
+
+  /* Secondary: sage suave (#b5c8bb → oklch) */
+  --secondary: oklch(0.935 0.018 150);
+  --secondary-foreground: oklch(0.25 0.025 145);
+
+  /* Muted: cinza-sage levíssimo */
+  --muted: oklch(0.950 0.010 150);
+  --muted-foreground: oklch(0.50 0.040 150);
+
+  /* Accent: menta suave (#9fd9ba → oklch) */
+  --accent: oklch(0.895 0.055 155);
+  --accent-foreground: oklch(0.22 0.030 145);
+
+  --destructive: oklch(0.55 0.230 27);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.25 0.028 145);
-  --input: oklch(0.955 0.008 90);
-  --ring: oklch(0.52 0.165 145);
-  --chart-1: oklch(0.52 0.165 145);
-  --chart-2: oklch(0.58 0.145 195);
-  --chart-3: oklch(0.62 0.185 55);
-  --chart-4: oklch(0.55 0.175 275);
-  --chart-5: oklch(0.58 0.200 25);
-  --sidebar: oklch(0.15 0.035 145);
-  --sidebar-foreground: oklch(0.93 0.010 145);
-  --sidebar-accent: oklch(0.230 0.045 145);
-  --sidebar-accent-foreground: oklch(0.93 0.010 145);
-  --sidebar-border: oklch(0.265 0.032 145);
-  --sidebar-ring: oklch(0.64 0.185 145);
+
+  /* Border: sutil — card vive pela sombra, não pela borda */
+  --border: oklch(0.900 0.014 150);
+  --input: oklch(0.960 0.008 150);
+  --ring: oklch(0.44 0.115 145);
+
+  /* Charts */
+  --chart-1: oklch(0.44 0.115 145);
+  --chart-2: oklch(0.72 0.095 155);
+  --chart-3: oklch(0.65 0.175 55);
+  --chart-4: oklch(0.55 0.140 200);
+  --chart-5: oklch(0.60 0.185 25);
+
+  /* Sidebar: verde-floresta escuro (casca de árvore) */
+  --sidebar: oklch(0.22 0.055 145);
+  --sidebar-foreground: oklch(0.94 0.010 145);
+  --sidebar-accent: oklch(0.30 0.065 145);
+  --sidebar-accent-foreground: oklch(0.94 0.010 145);
+  --sidebar-border: oklch(0.28 0.050 145);
+  --sidebar-ring: oklch(0.72 0.095 155);
 }
-/* Cards: borda grossa + sombra offset geométrica (assinatura Positivus)
-   Restrito ao Card do shadcn/ui para não afetar elementos internos */
-.positivus [data-slot="card"] {
-  border: 2px solid oklch(0.25 0.028 145) !important;
-  box-shadow: 3px 3px 0 0 oklch(0.25 0.028 145);
-}
-/* Inputs: borda escura bem visível */
-.positivus input,
-.positivus textarea,
-.positivus select,
-.positivus [role="combobox"] {
-  border: 1.5px solid oklch(0.30 0.025 145) !important;
-}
-.positivus input:focus,
-.positivus textarea:focus {
-  border-color: oklch(0.52 0.165 145) !important;
-  box-shadow: 0 0 0 3px oklch(0.52 0.165 145 / 0.20) !important;
-  outline: none !important;
-}
-/* Botão primário: sombra offset + micro-interação hover (press effect) */
-.positivus [data-slot="button"][class*="bg-primary"],
-.positivus button[class*="bg-primary"] {
-  border: 1.5px solid oklch(0.35 0.140 145) !important;
-  box-shadow: 2px 2px 0 0 oklch(0.22 0.030 145);
-}
-.positivus [data-slot="button"][class*="bg-primary"]:hover,
-.positivus button[class*="bg-primary"]:hover {
-  box-shadow: 1px 1px 0 0 oklch(0.22 0.030 145);
-  translate: 1px 1px;
+/* Cards: sombra verde-tintada suave — sem bordas agressivas */
+.monstera [data-slot="card"] {
+  border: 1px solid oklch(0.900 0.014 150);
+  box-shadow:
+    0 2px 8px oklch(0.44 0.115 145 / 0.06),
+    0 1px 3px oklch(0.44 0.115 145 / 0.04);
 }
 
 /* ============================================================

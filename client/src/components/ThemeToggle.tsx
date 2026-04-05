@@ -1,19 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Moon, Newspaper, Sparkles, Sun, Trees, Zap } from "lucide-react";
+import { Check, Leaf, Moon, Sparkles, Sun, Trees, Zap } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 // Theme preview component showing visual representation
 function ThemePreview({
   type,
 }: {
-  type: "light" | "dark" | "forest" | "hps" | "positivus" | "vision";
+  type: "light" | "dark" | "forest" | "hps" | "monstera" | "vision";
 }) {
   const previewStyles = {
     light:    { bg: "bg-[#faf9f6]", card: "bg-white",    text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
     dark:     { bg: "bg-[#111a1a]", card: "bg-[#182020]", text: "bg-[#f0f7f0]", accent: "bg-[#4db84d]" },
     forest:   { bg: "bg-[#0d1a0d]", card: "bg-[#152015]", text: "bg-[#d4f0d4]", accent: "bg-[#5cd65c]" },
     hps:      { bg: "bg-[#080f08]", card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]" },
-    positivus:{ bg: "bg-[#f5f2e8]", card: "bg-white",    text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
+    monstera:  { bg: "bg-[#fafffe]", card: "bg-white",    text: "bg-[#1a3322]", accent: "bg-[#9fd9ba]" },
     vision:   { bg: "bg-[#0a1620]", card: "bg-[#162228]", text: "bg-[#e0f0e8]", accent: "bg-[#40c060]" },
   };
 
@@ -63,10 +63,10 @@ const THEMES = [
     icon: <Zap className="w-4 h-4 text-green-400 shrink-0" />,
   },
   {
-    value: "positivus" as const,
-    label: "Positivus",
-    description: "Editorial e bold — fundo creme, borda verde forte, sidebar escura",
-    icon: <Newspaper className="w-4 h-4 text-emerald-700 shrink-0" />,
+    value: "monstera" as const,
+    label: "Monstera",
+    description: "Botânico minimalista — branco limpo, verde-floresta, acentos menta",
+    icon: <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />,
   },
   {
     value: "vision" as const,
