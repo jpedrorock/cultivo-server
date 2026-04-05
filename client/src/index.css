@@ -477,10 +477,9 @@
   --sidebar-border: oklch(0.265 0.032 145);
   --sidebar-ring: oklch(0.64 0.185 145);
 }
-/* Cards: borda grossa + sombra offset geométrica (assinatura Positivus) */
-.positivus [data-slot="card"],
-.positivus .rounded-xl,
-.positivus .rounded-2xl {
+/* Cards: borda grossa + sombra offset geométrica (assinatura Positivus)
+   Restrito ao Card do shadcn/ui para não afetar elementos internos */
+.positivus [data-slot="card"] {
   border: 2px solid oklch(0.25 0.028 145) !important;
   box-shadow: 3px 3px 0 0 oklch(0.25 0.028 145);
 }
@@ -561,11 +560,9 @@ html.vision {
   background-attachment: fixed;
   min-height: 100vh;
 }
-/* Cards: glassmorphism com blur + borda verde + glow esmeralda */
-.vision [data-slot="card"],
-.vision .rounded-xl,
-.vision .rounded-2xl,
-.vision [class*="bg-card"] {
+/* Cards: glassmorphism com blur + borda verde + glow esmeralda
+   Restrito ao Card do shadcn/ui para não afetar elementos internos */
+.vision [data-slot="card"] {
   background: oklch(0.175 0.025 205 / 0.55) !important;
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
