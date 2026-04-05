@@ -90,16 +90,25 @@ async function downloadPhotoWithExif(
   const safeName = plantName.replace(/[^a-zA-Z0-9]/g, '_');
   const filename = `${safeName}_${dateFormatted}${weekSuffix}.jpg`;
 
-  const url = URL.createObjectURL(finalBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  let url: string | null = null;
+  try {
+    url = URL.createObjectURL(finalBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+  }
 }
 
-async function downloadMultiple(photos: Photo[], plantName: string) {
+async function downloadMultiple(
+  photos: Photo[],
+  plantName: string,
+  onProgress?: (current: number, total: number) => void,
+) {
   for (let i = 0; i < photos.length; i++) {
+    onProgress?.(i + 1, photos.length);
     await downloadPhotoWithExif(photos[i], plantName);
     if (i < photos.length - 1) await new Promise(r => setTimeout(r, 350));
   }
@@ -124,6 +133,7 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
 
   // Download state
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Swipe / pinch-zoom
   const [scale, setScale] = useState(1);
@@ -351,12 +361,16 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
   const handleDownloadAll = async () => {
     if (typedPhotos.length === 0) return;
     setDownloading(true);
+    setDownloadProgress(null);
     try {
-      await downloadMultiple(typedPhotos, plantName);
+      await downloadMultiple(typedPhotos, plantName, (current, total) =>
+        setDownloadProgress({ current, total })
+      );
     } catch {
       toast.error("Erro ao baixar fotos");
     } finally {
       setDownloading(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -364,12 +378,16 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
     const selectedPhotos = typedPhotos.filter(p => selected.has(p.id));
     if (selectedPhotos.length === 0) return;
     setDownloading(true);
+    setDownloadProgress(null);
     try {
-      await downloadMultiple(selectedPhotos, plantName);
+      await downloadMultiple(selectedPhotos, plantName, (current, total) =>
+        setDownloadProgress({ current, total })
+      );
     } catch {
       toast.error("Erro ao baixar fotos");
     } finally {
       setDownloading(false);
+      setDownloadProgress(null);
       exitSelectMode();
     }
   };
@@ -430,7 +448,9 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
               className="flex items-center gap-1.5 px-3 py-3 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all disabled:opacity-50"
             >
               {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              Baixar tudo
+              {downloading && downloadProgress
+                ? `${downloadProgress.current}/${downloadProgress.total}`
+                : "Baixar tudo"}
             </button>
           </>
         )}
@@ -478,6 +498,7 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
                     alt={photo.description || format(new Date(photo.photoDate), "dd/MM/yyyy")}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    decoding="async"
                   />
                   {/* Week badge */}
                   {photo.weekNumber && (
@@ -521,7 +542,9 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
             className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground font-semibold text-sm shadow-lg active:scale-98 transition-transform disabled:opacity-70"
           >
             {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Baixar {selected.size} {selected.size === 1 ? "foto" : "fotos"} selecionada{selected.size === 1 ? "" : "s"}
+            {downloading && downloadProgress
+              ? `Baixando ${downloadProgress.current} de ${downloadProgress.total}…`
+              : `Baixar ${selected.size} ${selected.size === 1 ? "foto" : "fotos"} selecionada${selected.size === 1 ? "" : "s"}`}
           </button>
         </div>
       )}
@@ -642,7 +665,7 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
                       : 'border-transparent opacity-40'
                 }`}
               >
-                <img src={p.photoUrl} alt="" className="w-full h-full object-cover" draggable={false} />
+                <img src={p.photoUrl} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" draggable={false} />
               </button>
             ))}
           </div>

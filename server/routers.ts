@@ -31,6 +31,7 @@ import {
   plantHealthLogs,
   plantTrichomeLogs,
   plantLSTLogs,
+  plantStructures,
   fertilizationPresets,
   wateringPresets,
   pumpPresets,
@@ -4508,19 +4509,58 @@ export const appRouter = router({
         technique: z.string(),
         response: z.string().optional(),
         notes: z.string().optional(),
+        nodePosition: z.string().optional(),
+        techniqueConfig: z.object({
+          expectedTops: z.number(),
+          recoveryDays: z.number(),
+        }).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
+
         await database.insert(plantLSTLogs).values({
           plantId: input.plantId,
           technique: input.technique,
           response: input.response,
           notes: input.notes,
+          nodePosition: input.nodePosition,
+          techniqueConfig: input.techniqueConfig ? JSON.stringify(input.techniqueConfig) : null,
+          actualResult: null,
         });
-        
+
+        return { success: true };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        plantId: z.number(),
+        actualResult: z.object({
+          actualTops: z.number(),
+          vigor: z.enum(["low", "medium", "high"]),
+          confirmedAt: z.string(),
+        }).optional(),
+        notes: z.string().optional(),
+        response: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
+        await database
+          .update(plantLSTLogs)
+          .set({
+            ...(input.actualResult !== undefined && {
+              actualResult: JSON.stringify(input.actualResult),
+            }),
+            ...(input.notes !== undefined && { notes: input.notes }),
+            ...(input.response !== undefined && { response: input.response }),
+          })
+          .where(eq(plantLSTLogs.id, input.id));
+
         return { success: true };
       }),
 
@@ -4531,11 +4571,117 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
 
-        return await database
+        const rows = await database
           .select()
           .from(plantLSTLogs)
           .where(eq(plantLSTLogs.plantId, input.plantId))
           .orderBy(desc(plantLSTLogs.logDate));
+
+        // Parse JSON text columns
+        return rows.map((r) => ({
+          ...r,
+          techniqueConfig: r.techniqueConfig ? JSON.parse(r.techniqueConfig as string) : null,
+          actualResult:    r.actualResult    ? JSON.parse(r.actualResult    as string) : null,
+        }));
+      }),
+
+    stats: protectedProcedure
+      .input(z.object({ plantId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
+        const logs = await database
+          .select()
+          .from(plantLSTLogs)
+          .where(eq(plantLSTLogs.plantId, input.plantId));
+
+        const byTechnique: Record<string, number> = {};
+        for (const log of logs) {
+          const key = log.technique;
+          byTechnique[key] = (byTechnique[key] ?? 0) + 1;
+        }
+
+        return {
+          total: logs.length,
+          byTechnique,
+          lastTrainingDate: logs[0]?.logDate ?? null,
+        };
+      }),
+
+    deleteLog: protectedProcedure
+      .input(z.object({ id: z.number(), plantId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        await database.delete(plantLSTLogs).where(eq(plantLSTLogs.id, input.id));
+        return { success: true };
+      }),
+
+    clearLogs: protectedProcedure
+      .input(z.object({ plantId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        await database.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
+        return { success: true };
+      }),
+  }),
+
+  // CannaPrune — Plant Structure (nós interativos da planta)
+  plantStructure: router({
+    /** Retorna a estrutura salva da planta, ou null se ainda não foi criada */
+    get: protectedProcedure
+      .input(z.object({ plantId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        const [row] = await database
+          .select()
+          .from(plantStructures)
+          .where(eq(plantStructures.plantId, input.plantId))
+          .limit(1);
+        if (!row) return null;
+        return {
+          id: row.id,
+          plantId: row.plantId,
+          nodes: JSON.parse(row.nodesJson as string),
+          updatedAt: row.updatedAt,
+        };
+      }),
+
+    /** Salva (upsert) a estrutura da planta */
+    save: protectedProcedure
+      .input(z.object({
+        plantId: z.number(),
+        nodes: z.array(z.any()),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        const nodesJson = JSON.stringify(input.nodes);
+        const existing = await database
+          .select({ id: plantStructures.id })
+          .from(plantStructures)
+          .where(eq(plantStructures.plantId, input.plantId))
+          .limit(1);
+        if (existing.length > 0) {
+          await database
+            .update(plantStructures)
+            .set({ nodesJson })
+            .where(eq(plantStructures.plantId, input.plantId));
+        } else {
+          await database.insert(plantStructures).values({
+            plantId: input.plantId,
+            nodesJson,
+          });
+        }
+        return { success: true };
       }),
   }),
 

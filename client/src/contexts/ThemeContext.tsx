@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark" | "forest" | "hps" | "monstera" | "vision";
+type Theme = "forest" | "hps" | "monstera" | "vision";
 
 interface ThemeContextType {
   theme: Theme;
@@ -17,15 +17,24 @@ interface ThemeProviderProps {
   switchable?: boolean;
 }
 
+// Migrate old theme values to new names
+function migrateTheme(stored: string | null, defaultTheme: Theme): Theme {
+  if (!stored) return defaultTheme;
+  if (stored === "light") return "monstera";
+  if (stored === "dark") return "vision";
+  const valid: Theme[] = ["forest", "hps", "monstera", "vision"];
+  return valid.includes(stored as Theme) ? (stored as Theme) : defaultTheme;
+}
+
 export function ThemeProvider({
   children,
-  defaultTheme = "light",
+  defaultTheme = "monstera",
   switchable = false,
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (switchable) {
       const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
+      return migrateTheme(stored, defaultTheme);
     }
     return defaultTheme;
   });
@@ -63,12 +72,10 @@ export function ThemeProvider({
   const toggleTheme = switchable
     ? () => {
         setTheme(prev => {
-          if (prev === "light") return "dark";
-          if (prev === "dark") return "forest";
-          if (prev === "forest") return "hps";
-          if (prev === "hps") return "monstera";
           if (prev === "monstera") return "vision";
-          return "light";
+          if (prev === "vision") return "forest";
+          if (prev === "forest") return "hps";
+          return "monstera";
         });
       }
     : undefined;

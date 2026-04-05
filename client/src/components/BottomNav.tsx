@@ -80,7 +80,11 @@ export function BottomNav() {
   }, []);
 
   // Ocultar nav em telas de foco (ex: registro rápido) ou com teclado aberto — após todos os hooks
-  const isHidden = HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display") || keyboardOpen;
+  const isHidden =
+    HIDDEN_NAV_ROUTES.includes(location) ||
+    location.endsWith("/display") ||
+    location.endsWith("/training") ||
+    keyboardOpen;
 
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },

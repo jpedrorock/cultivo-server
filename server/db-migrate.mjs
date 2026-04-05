@@ -57,8 +57,17 @@ const INCREMENTAL_ALTERS = [
   "ALTER TABLE dailyLogs ADD COLUMN runoffPercentage DECIMAL(5,2) NULL DEFAULT NULL",
 
   // 2026-04-04: Captura automática de ciclo e semana nas fotos
-  `ALTER TABLE plantPhotos ADD COLUMN IF NOT EXISTS cycleId INT NULL`,
-  `ALTER TABLE plantPhotos ADD COLUMN IF NOT EXISTS weekNumber INT NULL`,
+  `ALTER TABLE plantPhotos ADD COLUMN cycleId INT NULL`,
+  `ALTER TABLE plantPhotos ADD COLUMN weekNumber INT NULL`,
+
+  // 2026-04-05: CannaPrune — estrutura visual da planta (nós e galhos)
+  `CREATE TABLE IF NOT EXISTS plantStructures (
+    id        INT AUTO_INCREMENT PRIMARY KEY,
+    plantId   INT NOT NULL UNIQUE,
+    nodesJson LONGTEXT NOT NULL,
+    updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT fk_plantStructures_plant FOREIGN KEY (plantId) REFERENCES plants(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 async function runMigrations() {

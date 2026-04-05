@@ -4,7 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme } = useTheme();
 
-  const sonnerTheme = theme === "dark" || theme === "highcontrast-dark" ? "dark" : "light";
+  const sonnerTheme = theme === "vision" || theme === "forest" || theme === "hps" ? "dark" : "light";
 
   return (
     <Sonner

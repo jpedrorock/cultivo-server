@@ -732,6 +732,12 @@ export const plantLSTLogs = mysqlTable(
     afterPhotoKey: varchar("afterPhotoKey", { length: 500 }),
     response: text("response"), // Como a planta respondeu
     notes: text("notes"),
+    // Onde na planta a técnica foi aplicada
+    nodePosition: varchar("nodePosition", { length: 100 }), // ex: "top", "left", "right", "all", "bottom_third"
+    // Resultado esperado em JSON (preenchido ao criar)
+    techniqueConfig: text("techniqueConfig"), // JSON: { expectedTops, recoveryDays }
+    // Resultado real em JSON (confirmado depois)
+    actualResult: text("actualResult"),       // JSON: { actualTops, vigor, confirmedAt }
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({
@@ -967,3 +973,20 @@ export const pushSubscriptions = mysqlTable("pushSubscriptions", {
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+/**
+ * CannaPrune — estado visual da planta (nós e galhos)
+ * Uma entrada por planta, salva como JSON
+ */
+export const plantStructures = mysqlTable("plantStructures", {
+  id: int("id").autoincrement().primaryKey(),
+  plantId: int("plantId")
+    .notNull()
+    .references(() => plants.id, { onDelete: "cascade" })
+    .unique(),
+  nodesJson: text("nodesJson").notNull(), // JSON serializado de PlantNode[]
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PlantStructure    = typeof plantStructures.$inferSelect;
+export type InsertPlantStructure = typeof plantStructures.$inferInsert;

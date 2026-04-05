@@ -44,6 +44,7 @@ const AlertHistory         = lazy(() => import("./pages/AlertHistory"));
 const AlertSettings        = lazy(() => import("./pages/AlertSettings"));
 const PlantsList           = lazy(() => import("./pages/PlantsList"));
 const PlantDetail          = lazy(() => import("./pages/PlantDetail"));
+const PlantTrainingPage    = lazy(() => import("./pages/PlantTrainingPage"));
 const NewPlant             = lazy(() => import("./pages/NewPlant"));
 const PlantArchivePage     = lazy(() => import("./pages/PlantArchivePage"));
 const HarvestQueue         = lazy(() => import("./pages/HarvestQueue"));
@@ -90,6 +91,7 @@ function Router() {
         <Route path={"/plants"} component={PlantsList} />
         <Route path="/plants/new" component={NewPlant} />
         <Route path="/plants/archive" component={PlantArchivePage} />
+        <Route path="/plants/:id/training" component={PlantTrainingPage} />
         <Route path="/harvest-queue" component={HarvestQueue} />
         <Route path={"/plants/:id"} component={PlantDetail} />
 
@@ -172,7 +174,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider
-        defaultTheme="light"
+        defaultTheme="monstera"
         switchable
       >
         <TooltipProvider>

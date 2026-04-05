@@ -65,6 +65,7 @@ const PlantObservationsTab = lazy(() => import("@/components/PlantObservationsTa
 const PlantArchiveTab      = lazy(() => import("@/components/PlantArchiveTab"));
 const PlantTrichomesTab    = lazy(() => import("@/components/PlantTrichomesTab"));
 const PlantLSTTab          = lazy(() => import("@/components/PlantLSTTab"));
+const PlantTrainingSummary = lazy(() => import("@/components/PlantTrainingSummary"));
 const PlantPhotosTab       = lazy(() => import("@/components/PlantPhotosTab"));
 
 // Skeleton mínimo exibido enquanto os componentes de tab carregam
@@ -661,8 +662,8 @@ export default function PlantDetail() {
                         Obs.
                       </TabsTrigger>
                       <TabsTrigger value="lst" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
-                        <Wind className="w-3.5 h-3.5" />
-                        LST
+                        <Scissors className="w-3.5 h-3.5" />
+                        Treino
                       </TabsTrigger>
                       <TabsTrigger value="trichomes" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
                         <Sparkles className="w-3.5 h-3.5" />
@@ -676,7 +677,7 @@ export default function PlantDetail() {
                     </TabsContent>
                     <TabsContent value="lst">
                       <Suspense fallback={<TabSkeleton />}>
-                        <PlantLSTTab plantId={plantId} />
+                        <PlantTrainingSummary plantId={plantId} />
                       </Suspense>
                     </TabsContent>
                     <TabsContent value="trichomes">

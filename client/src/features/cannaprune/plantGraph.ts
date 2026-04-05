@@ -1,0 +1,413 @@
+/**
+ * plantGraph.ts — Modelo de dados para o mapa de nós da planta
+ *
+ * A planta é representada como uma árvore de nós:
+ *   root → internodes → tops
+ *
+ * Operações são imutáveis: cada função retorna um novo array de nós.
+ */
+
+export type GraphNodeType  = 'root' | 'internode' | 'top';
+export type GraphNodeState = 'active' | 'topped' | 'fimmed' | 'lst' | 'super-cropped';
+export type GraphTechnique = 'topping' | 'fim' | 'lst' | 'super-crop';
+export type GraphAction    = 'topping' | 'fim' | 'lst' | 'super-crop' | 'grow' | 'add-branch' | 'remove';
+
+/** Estado visual da aresta (caule/galho) que conecta este nó ao pai */
+export type EdgeState = 'active' | 'defoliated' | 'recovering';
+
+export interface EdgeControl {
+  dx1: number; dy1: number;  // cp1 offset from parent node center
+  dx2: number; dy2: number;  // cp2 offset from child node center
+}
+
+export interface PlantGraphNode {
+  id:         string;
+  parentId:   string | null;
+  type:       GraphNodeType;
+  state:      GraphNodeState;
+  nodeNumber: number;           // N1, N2… exibido na UI
+  technique?:        GraphTechnique;   // técnica aplicada NESTE nó
+  edgeCtrl?:         EdgeControl;
+  edgeState?:        EdgeState;        // estado visual do caule/galho que chega neste nó
+  edgeModifiedAt?:   string;           // ISO date — início do período de recuperação (5 dias azul)
+  posX?:             number;           // posição livre no canvas
+  posY?:             number;
+  lstAppliedAt?:     string;           // ISO date — para fade roxo→verde após 7 dias
+}
+
+// ── ID helpers ────────────────────────────────────────────────────────────────
+
+let _c = 0;
+function uid(): string { return `g${++_c}-${Date.now().toString(36)}`; }
+
+function maxNum(nodes: PlantGraphNode[]): number {
+  return nodes.reduce((m, n) => Math.max(m, n.nodeNumber), 0);
+}
+
+// ── Estrutura inicial ─────────────────────────────────────────────────────────
+
+export function createInitialGraph(): PlantGraphNode[] {
+  // Raiz → N1 → N2 → N3(topo ★)
+  // Ao fazer topping em N3: N3 vira ✂, nascem N4 e N5 como novos topos
+  return [
+    { id: 'root', parentId: null,   type: 'root',      state: 'active', nodeNumber: 0 },
+    { id: 'n1',   parentId: 'root', type: 'internode', state: 'active', nodeNumber: 1 },
+    { id: 'n2',   parentId: 'n1',   type: 'internode', state: 'active', nodeNumber: 2 },
+    { id: 'n3',   parentId: 'n2',   type: 'top',       state: 'active', nodeNumber: 3 },
+  ];
+}
+
+/** Detecta se um array de nós usa o formato antigo (PlantNode sem nodeNumber) */
+export function isLegacyFormat(nodes: unknown[]): boolean {
+  if (!nodes.length) return false;
+  const first = nodes[0] as Record<string, unknown>;
+  return first.nodeNumber === undefined || typeof first.angle === 'number';
+}
+
+// ── Tipo de retorno padrão ────────────────────────────────────────────────────
+
+type OpResult = { nodes: PlantGraphNode[]; newIds: string[]; error?: string };
+
+// ── Operações ─────────────────────────────────────────────────────────────────
+
+export function applyTopping(nodes: PlantGraphNode[], id: string): OpResult {
+  const t = nodes.find(n => n.id === id);
+  if (!t)                   return { nodes, newIds: [], error: 'Nó não encontrado' };
+  if (t.type !== 'top')     return { nodes, newIds: [], error: 'Topping só pode ser aplicado num topo ativo' };
+  if (t.state !== 'active') return { nodes, newIds: [], error: 'Este topo já foi podado' };
+
+  const m = maxNum(nodes);
+  const [a, b] = [uid(), uid()];
+  return {
+    newIds: [a, b],
+    nodes: [
+      ...nodes.map(n => n.id === id
+        ? { ...n, state: 'topped' as GraphNodeState, technique: 'topping' as GraphTechnique }
+        : n),
+      { id: a, parentId: id, type: 'top', state: 'active', nodeNumber: m + 1 },
+      { id: b, parentId: id, type: 'top', state: 'active', nodeNumber: m + 2 },
+    ],
+  };
+}
+
+export function applyFIM(nodes: PlantGraphNode[], id: string): OpResult {
+  const t = nodes.find(n => n.id === id);
+  if (!t)                   return { nodes, newIds: [], error: 'Nó não encontrado' };
+  if (t.type !== 'top')     return { nodes, newIds: [], error: 'FIM só pode ser aplicado num topo ativo' };
+  if (t.state !== 'active') return { nodes, newIds: [], error: 'Este topo já foi podado' };
+
+  const m = maxNum(nodes);
+  const ids = [uid(), uid(), uid(), uid()];
+  return {
+    newIds: ids,
+    nodes: [
+      ...nodes.map(n => n.id === id
+        ? { ...n, state: 'fimmed' as GraphNodeState, technique: 'fim' as GraphTechnique }
+        : n),
+      ...ids.map((nid, i) => ({
+        id: nid, parentId: id,
+        type: 'top' as GraphNodeType, state: 'active' as GraphNodeState,
+        nodeNumber: m + i + 1,
+      })),
+    ],
+  };
+}
+
+export function applyLST(nodes: PlantGraphNode[], id: string): OpResult {
+  const t = nodes.find(n => n.id === id);
+  if (!t)                return { nodes, newIds: [], error: 'Nó não encontrado' };
+  if (t.type === 'root') return { nodes, newIds: [], error: 'Não é possível aplicar LST na raiz' };
+  return {
+    newIds: [],
+    nodes: nodes.map(n => n.id === id
+      ? { ...n, state: 'lst' as GraphNodeState, technique: 'lst' as GraphTechnique,
+          lstAppliedAt: new Date().toISOString() }
+      : n),
+  };
+}
+
+export function applySuperCrop(nodes: PlantGraphNode[], id: string): OpResult {
+  const t = nodes.find(n => n.id === id);
+  if (!t)                return { nodes, newIds: [], error: 'Nó não encontrado' };
+  if (t.type === 'root') return { nodes, newIds: [], error: 'Não é possível aplicar Super Crop na raiz' };
+  return {
+    newIds: [],
+    nodes: nodes.map(n => n.id === id
+      ? { ...n, state: 'super-cropped' as GraphNodeState, technique: 'super-crop' as GraphTechnique }
+      : n),
+  };
+}
+
+/** Converte o topo em internode e adiciona um novo topo acima */
+export function growPlant(nodes: PlantGraphNode[], id: string): OpResult {
+  const t = nodes.find(n => n.id === id);
+  if (!t)                   return { nodes, newIds: [], error: 'Nó não encontrado' };
+  if (t.type !== 'top')     return { nodes, newIds: [], error: 'Crescimento só é possível a partir de um topo' };
+  if (t.state !== 'active') return { nodes, newIds: [], error: 'Este topo não está ativo' };
+
+  const m = maxNum(nodes);
+  const newTopId = uid();
+  return {
+    newIds: [newTopId],
+    nodes: [
+      ...nodes.map(n => n.id === id ? { ...n, type: 'internode' as GraphNodeType } : n),
+      { id: newTopId, parentId: id, type: 'top', state: 'active', nodeNumber: m + 1 },
+    ],
+  };
+}
+
+/** Remove o nó e todos os seus descendentes */
+/** Adiciona um galho lateral (novo topo) a partir de qualquer nó não-topo */
+export function addLateralBranch(nodes: PlantGraphNode[], nodeId: string): OpResult {
+  const t = nodes.find(n => n.id === nodeId);
+  if (!t) return { nodes, newIds: [], error: 'Nó não encontrado' };
+  if (t.type === 'top' && t.state === 'active') {
+    return { nodes, newIds: [], error: 'Topo ativo: use Topping para dividir ou Crescer para estender' };
+  }
+  const m     = maxNum(nodes);
+  const newId = uid();
+  return {
+    newIds: [newId],
+    nodes: [...nodes, {
+      id: newId, parentId: nodeId,
+      type: 'top' as GraphNodeType, state: 'active' as GraphNodeState,
+      nodeNumber: m + 1,
+    }],
+  };
+}
+
+export function removeSubtree(
+  nodes: PlantGraphNode[], id: string,
+): { nodes: PlantGraphNode[]; error?: string } {
+  const t = nodes.find(n => n.id === id);
+  if (!t)                return { nodes, error: 'Nó não encontrado' };
+  if (t.type === 'root') return { nodes, error: 'Não é possível remover a raiz' };
+
+  const toRemove = new Set<string>();
+  function collect(nid: string) {
+    toRemove.add(nid);
+    nodes.filter(n => n.parentId === nid).forEach(c => collect(c.id));
+  }
+  collect(id);
+
+  return { nodes: nodes.filter(n => !toRemove.has(n.id)) };
+}
+
+// ── Ações disponíveis por nó ──────────────────────────────────────────────────
+
+export function getAvailableActions(node: PlantGraphNode): GraphAction[] {
+  // Raiz: só pode adicionar galho (novo caule)
+  if (node.type === 'root') return ['add-branch'];
+
+  const acts: GraphAction[] = [];
+
+  if (node.type === 'top' && node.state === 'active') {
+    // Topo ativo: técnicas de corte + crescer
+    acts.push('topping', 'fim', 'grow');
+  } else {
+    // Internode ou topo não-ativo: pode adicionar galho lateral
+    acts.push('add-branch');
+  }
+
+  // Treinamento físico para nós ativos
+  if (node.state === 'active') {
+    acts.push('lst', 'super-crop');
+  }
+
+  acts.push('remove');
+  return acts;
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+export interface PlantStats {
+  tops:        number;
+  internodes:  number;
+  lst:         number;
+  superCropped: number;
+}
+
+export function getPlantStats(nodes: PlantGraphNode[]): PlantStats {
+  return {
+    tops:        nodes.filter(n => n.type === 'top' && n.state === 'active').length,
+    internodes:  nodes.filter(n => n.type === 'internode').length,
+    lst:         nodes.filter(n => n.state === 'lst').length,
+    superCropped: nodes.filter(n => n.state === 'super-cropped').length,
+  };
+}
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+
+export const NODE_R: Record<GraphNodeType, number> = {
+  root:      18,
+  internode: 21,
+  top:       26,
+};
+
+const LEAF_W     = 72;   // largura mínima de um nó folha
+const PAD_BOTTOM = 60;
+const PAD_TOP    = 40;
+const PAD_SIDE   = 36;
+/** Pixels que um galho LST e todos os seus filhos deslocam horizontalmente */
+const LST_LEAN   = 36;
+
+export interface LayoutNode extends PlantGraphNode {
+  x: number;
+  y: number;
+}
+
+export function computeLayout(
+  nodes:      PlantGraphNode[],
+  svgWidth:   number,
+  minHeight:  number,
+  levelHeight = 88,   // px entre níveis — menor = mais compacto
+): { layoutNodes: LayoutNode[]; svgHeight: number; svgActualWidth: number } {
+  if (!nodes.length) return { layoutNodes: [], svgHeight: minHeight, svgActualWidth: svgWidth };
+
+  // Mapa de filhos
+  const childMap  = new Map<string, string[]>();
+  const nodeById  = new Map<string, PlantGraphNode>();
+  for (const n of nodes) {
+    nodeById.set(n.id, n);
+    if (!childMap.has(n.id)) childMap.set(n.id, []);
+    if (n.parentId) {
+      const arr = childMap.get(n.parentId) ?? [];
+      arr.push(n.id);
+      childMap.set(n.parentId, arr);
+    }
+  }
+
+  const root = nodes.find(n => n.parentId === null) ?? nodes[0];
+
+  // Profundidade de cada nó (root = 0)
+  const depthMap = new Map<string, number>();
+  function calcDepth(id: string, d: number) {
+    depthMap.set(id, d);
+    (childMap.get(id) ?? []).forEach(c => calcDepth(c, d + 1));
+  }
+  calcDepth(root.id, 0);
+  const maxDepth = Math.max(...[...depthMap.values()]);
+
+  // Largura da subárvore (folha = LEAF_W)
+  const wMap = new Map<string, number>();
+  function calcW(id: string): number {
+    const kids = childMap.get(id) ?? [];
+    const w = kids.length ? kids.reduce((s, k) => s + calcW(k), 0) : LEAF_W;
+    wMap.set(id, w);
+    return w;
+  }
+  calcW(root.id);
+
+  const treeW   = wMap.get(root.id) ?? svgWidth;
+  const startX  = Math.max(PAD_SIDE, (svgWidth - treeW) / 2);
+  const svgH0   = Math.max(minHeight, maxDepth * levelHeight + PAD_TOP + PAD_BOTTOM);
+
+  const posMap = new Map<string, { x: number; y: number }>();
+
+  // ── Passo 1: posições base (sem LST) ──────────────────────────────────────
+  function assignPos(id: string, left: number, right: number) {
+    const depth = depthMap.get(id) ?? 0;
+    posMap.set(id, {
+      x: (left + right) / 2,
+      y: svgH0 - PAD_BOTTOM - depth * levelHeight,
+    });
+    const kids   = childMap.get(id) ?? [];
+    const availW = right - left;
+    let cur = left;
+    for (const kid of kids) {
+      const kw   = wMap.get(kid) ?? LEAF_W;
+      const frac = kw / (wMap.get(id) ?? (availW || 1));
+      assignPos(kid, cur, cur + frac * availW);
+      cur += frac * availW;
+    }
+  }
+  assignPos(root.id, startX, startX + treeW);
+
+  // ── Passo 2: deslocamento LST em cascata ──────────────────────────────────
+  // Cada nó com estado 'lst' empurra a si mesmo e todos os seus descendentes
+  // LST_LEAN px para a direita (acumulativo se houver vários LST encadeados).
+  function applyLSTLean(id: string, cumOffset: number) {
+    const node      = nodeById.get(id)!;
+    const ownOffset = node.state === 'lst' ? LST_LEAN : 0;
+    const total     = cumOffset + ownOffset;
+    if (total !== 0) {
+      const p = posMap.get(id)!;
+      posMap.set(id, { x: p.x + total, y: p.y });
+    }
+    (childMap.get(id) ?? []).forEach(kid => applyLSTLean(kid, total));
+  }
+  // Aplica a partir dos filhos da raiz (raiz não se move)
+  (childMap.get(root.id) ?? []).forEach(kid => applyLSTLean(kid, 0));
+
+  // ── Passo 3: recalcula bounds para não cortar nada ────────────────────────
+  let minX = Infinity, maxX = -Infinity;
+  for (const p of posMap.values()) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+  }
+  // Se algum nó saiu pela esquerda, empurra tudo para a direita
+  const shiftLeft = Math.max(0, PAD_SIDE - minX);
+  if (shiftLeft > 0) {
+    for (const [id, p] of posMap) posMap.set(id, { x: p.x + shiftLeft, y: p.y });
+    maxX += shiftLeft;
+  }
+  const svgActualWidth = Math.max(svgWidth, maxX + PAD_SIDE);
+
+  // ── Passo 4: posições livres (drag do usuário) sobrepõem o layout ───────────
+  for (const n of nodes) {
+    if (n.posX !== undefined && n.posY !== undefined) {
+      posMap.set(n.id, { x: n.posX, y: n.posY });
+    }
+  }
+
+  const layoutNodes: LayoutNode[] = nodes.map(n => {
+    const pos = posMap.get(n.id) ?? { x: svgActualWidth / 2, y: svgH0 / 2 };
+    return { ...n, x: pos.x, y: pos.y };
+  });
+
+  return { layoutNodes, svgHeight: svgH0, svgActualWidth };
+}
+
+// ── Helpers de estado de aresta ────────────────────────────────────────────────
+
+export const EDGE_RECOVERY_MS  = 5 * 24 * 60 * 60 * 1000; // 5 dias azul
+
+/** Resolve a cor visual atual de uma aresta dado seu estado e timestamp */
+export function resolveEdgeState(n: PlantGraphNode): EdgeState {
+  if (n.edgeState === 'defoliated') return 'defoliated';
+  if (n.edgeState === 'recovering' && n.edgeModifiedAt) {
+    const elapsed = Date.now() - new Date(n.edgeModifiedAt).getTime();
+    if (elapsed < EDGE_RECOVERY_MS) return 'recovering';
+    // Passou dos 5 dias — volta para active automaticamente
+  }
+  return 'active';
+}
+
+/** Marca aresta como em recuperação (após mover nó) */
+export function setEdgeRecovering(
+  nodes: PlantGraphNode[], id: string,
+): PlantGraphNode[] {
+  return nodes.map(n =>
+    n.id === id
+      ? { ...n, edgeState: 'recovering' as EdgeState, edgeModifiedAt: new Date().toISOString() }
+      : n,
+  );
+}
+
+/** Aplica desfolha na aresta */
+export function setEdgeDefoliated(
+  nodes: PlantGraphNode[], id: string,
+): PlantGraphNode[] {
+  return nodes.map(n =>
+    n.id === id ? { ...n, edgeState: 'defoliated' as EdgeState, edgeModifiedAt: new Date().toISOString() } : n,
+  );
+}
+
+/** Restaura aresta para active */
+export function setEdgeActive(
+  nodes: PlantGraphNode[], id: string,
+): PlantGraphNode[] {
+  return nodes.map(n =>
+    n.id === id ? { ...n, edgeState: 'active' as EdgeState, edgeModifiedAt: undefined } : n,
+  );
+}

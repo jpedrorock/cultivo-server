@@ -1,16 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Leaf, Moon, Sparkles, Sun, Trees, Zap } from "lucide-react";
+import { Check, Leaf, Sparkles, Trees, Zap } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 // Theme preview component showing visual representation
 function ThemePreview({
   type,
 }: {
-  type: "light" | "dark" | "forest" | "hps" | "monstera" | "vision";
+  type: "forest" | "hps" | "monstera" | "vision";
 }) {
   const previewStyles = {
-    light:    { bg: "bg-[#faf9f6]", card: "bg-white",    text: "bg-[#1a2e1a]", accent: "bg-[#3d7a3d]" },
-    dark:     { bg: "bg-[#111a1a]", card: "bg-[#182020]", text: "bg-[#f0f7f0]", accent: "bg-[#4db84d]" },
     forest:   { bg: "bg-[#0d1a0d]", card: "bg-[#152015]", text: "bg-[#d4f0d4]", accent: "bg-[#5cd65c]" },
     hps:      { bg: "bg-[#080f08]", card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]" },
     monstera:  { bg: "bg-[#fafffe]", card: "bg-white",    text: "bg-[#1a3322]", accent: "bg-[#9fd9ba]" },
@@ -39,16 +37,16 @@ function ThemePreview({
 
 const THEMES = [
   {
-    value: "light" as const,
+    value: "monstera" as const,
     label: "Claro",
-    description: "Fundo off-white quente, ideal para ambientes iluminados",
-    icon: <Sun className="w-4 h-4 text-yellow-600 shrink-0" />,
+    description: "Botânico minimalista — branco limpo, verde-floresta, acentos menta",
+    icon: <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />,
   },
   {
-    value: "dark" as const,
+    value: "vision" as const,
     label: "Escuro",
-    description: "Fundo slate-verde profundo, ideal para uso noturno",
-    icon: <Moon className="w-4 h-4 text-blue-400 shrink-0" />,
+    description: "Glassmorphism dark — cards translúcidos com brilho verde esmeralda",
+    icon: <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />,
   },
   {
     value: "forest" as const,
@@ -61,18 +59,6 @@ const THEMES = [
     label: "HPS Agrícola",
     description: "Preto absoluto + verde neon — máximo contraste sob luz HPS/LED",
     icon: <Zap className="w-4 h-4 text-green-400 shrink-0" />,
-  },
-  {
-    value: "monstera" as const,
-    label: "Monstera",
-    description: "Botânico minimalista — branco limpo, verde-floresta, acentos menta",
-    icon: <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />,
-  },
-  {
-    value: "vision" as const,
-    label: "Vision UI",
-    description: "Glassmorphism dark — cards translúcidos com brilho verde esmeralda",
-    icon: <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />,
   },
 ] as const;
 

@@ -1,8 +1,8 @@
+import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Camera, Heart, ArrowRight, Loader2, CalendarDays, ImageOff } from "lucide-react";
-import { useState } from "react";
+import { Camera, Heart, ArrowRight, Loader2, CalendarDays, ImageOff, LayoutList } from "lucide-react";
 
 interface Props {
   plantId: number;
@@ -20,12 +20,15 @@ const HEALTH_LABELS: Record<string, { label: string; color: string }> = {
   RECOVERING: { label: "Recuperando",color: "text-blue-400" },
 };
 
+type FilterKind = "all" | "photo" | "health" | "move";
+
 export default function PlantTimeline({ plantId }: Props) {
   const { data: photos = [],  isLoading: lPhotos  } = trpc.plantPhotos.list.useQuery({ plantId });
   const { data: healthLogs = [], isLoading: lHealth } = trpc.plantHealth.list.useQuery({ plantId });
   const { data: tentHistory = [], isLoading: lHistory } = trpc.plants.getTentHistory.useQuery({ plantId });
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKind>("all");
 
   const isLoading = lPhotos || lHealth || lHistory;
 
@@ -56,6 +59,15 @@ export default function PlantTimeline({ plantId }: Props) {
     })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
+  const filteredEvents = filter === "all" ? events : events.filter(e => e.kind === filter);
+
+  // Counts per type for badge
+  const counts = {
+    photo:  events.filter(e => e.kind === "photo").length,
+    health: events.filter(e => e.kind === "health").length,
+    move:   events.filter(e => e.kind === "move").length,
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-10">
@@ -76,9 +88,49 @@ export default function PlantTimeline({ plantId }: Props) {
 
   return (
     <>
+      {/* Filter tabs */}
+      {events.length > 0 && (
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+          {([
+            { key: "all",    label: "Todas",          icon: <LayoutList className="w-3 h-3" />, count: events.length },
+            { key: "photo",  label: "Fotos",           icon: <Camera     className="w-3 h-3" />, count: counts.photo },
+            { key: "health", label: "Saúde",           icon: <Heart      className="w-3 h-3" />, count: counts.health },
+            { key: "move",   label: "Transferências",  icon: <ArrowRight className="w-3 h-3" />, count: counts.move },
+          ] as { key: FilterKind; label: string; icon: React.ReactNode; count: number }[]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shrink-0 transition-all ${
+                filter === tab.key
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+              {tab.count > 0 && (
+                <span className={`text-[10px] px-1 rounded-full ${
+                  filter === tab.key ? "bg-white/20" : "bg-muted-foreground/20"
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Empty filtered state */}
+      {filteredEvents.length === 0 && events.length > 0 && (
+        <div className="flex flex-col items-center py-8 gap-2 text-muted-foreground">
+          <CalendarDays className="w-8 h-8 opacity-30" />
+          <p className="text-sm">Nenhum evento deste tipo</p>
+        </div>
+      )}
+
       {/* Timeline */}
       <div className="relative ml-2 pl-5 border-l border-border/40 space-y-3">
-        {events.map((evt, idx) => (
+        {filteredEvents.map((evt) => (
           <div key={`${evt.kind}-${evt.id}`} className="relative">
             {/* Dot */}
             <span className={`absolute -left-[21px] top-3.5 flex items-center justify-center w-4 h-4 rounded-full bg-card border border-border/60 z-10`}>
