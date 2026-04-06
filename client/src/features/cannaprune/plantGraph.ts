@@ -136,13 +136,29 @@ export function applyLST(nodes: PlantGraphNode[], id: string): OpResult {
 
 export function applySuperCrop(nodes: PlantGraphNode[], id: string): OpResult {
   const t = nodes.find(n => n.id === id);
-  if (!t)                return { nodes, newIds: [], error: 'Nó não encontrado' };
-  if (t.type === 'root') return { nodes, newIds: [], error: 'Não é possível aplicar Super Crop na raiz' };
+  if (!t)                   return { nodes, newIds: [], error: 'Nó não encontrado' };
+  if (t.type === 'root')    return { nodes, newIds: [], error: 'Não é possível aplicar Super Crop na raiz' };
+  if (t.state !== 'active') return { nodes, newIds: [], error: 'Super Crop requer nó ativo' };
+
+  // Remove toda a estrutura acima do ponto e cria 2 novos top buds (igual ao topping mas em roxo)
+  const toRemove = new Set<string>();
+  const collectSubtree = (nid: string) => {
+    nodes.filter(n => n.parentId === nid).forEach(c => { toRemove.add(c.id); collectSubtree(c.id); });
+  };
+  collectSubtree(id);
+  const baseNodes = nodes.filter(n => !toRemove.has(n.id));
+
+  const m = maxNum(baseNodes);
+  const [a, b] = [uid(), uid()];
   return {
-    newIds: [],
-    nodes: nodes.map(n => n.id === id
-      ? { ...n, state: 'super-cropped' as GraphNodeState, technique: 'super-crop' as GraphTechnique }
-      : n),
+    newIds: [a, b],
+    nodes: [
+      ...baseNodes.map(n => n.id === id
+        ? { ...n, type: 'top' as GraphNodeType, state: 'super-cropped' as GraphNodeState, technique: 'super-crop' as GraphTechnique }
+        : n),
+      { id: a, parentId: id, type: 'top' as GraphNodeType, state: 'active' as GraphNodeState, nodeNumber: m + 1 },
+      { id: b, parentId: id, type: 'top' as GraphNodeType, state: 'active' as GraphNodeState, nodeNumber: m + 2 },
+    ],
   };
 }
 
@@ -211,14 +227,13 @@ export function getAvailableActions(node: PlantGraphNode): GraphAction[] {
 
   if (node.state === 'active') {
     if (node.type === 'top') {
-      // Topo ativo: corte (Topping/FIM) + crescer
+      // Top bud ativo: Topping / FIM / Crescer (nada acima para remover)
       acts.push('topping', 'fim', 'grow');
     } else {
-      // Internode ativo: Topping (corta tudo acima, nascem 2 galhos) + galho lateral
-      acts.push('topping', 'add-branch');
+      // Internode ativo com estrutura acima: Super Crop remove tudo e cria 2 topos
+      acts.push('super-crop', 'add-branch');
     }
-    // Treinamento físico (não-destrutivo) disponível para qualquer nó ativo
-    acts.push('lst', 'super-crop');
+    acts.push('lst');
   } else {
     // Nó já podado / treinado: só adicionar galho lateral
     acts.push('add-branch');

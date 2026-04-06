@@ -110,7 +110,7 @@ const ACTION_META: Record<GraphAction, {
   grow:         { label: 'Crescer',    shortDesc: '+ nó acima',      color: '#4ade80', Icon: ArrowUp  },
   'add-branch': { label: '+ Galho',   shortDesc: 'ramo lateral',    color: '#34d399', Icon: GitBranch },
   lst:          { label: 'LST',        shortDesc: 'inclina + filhos',color: '#818cf8', Icon: Anchor   },
-  'super-crop': { label: 'Super Crop',shortDesc: 'dobra o caule',   color: '#c084fc', Icon: Zap      },
+  'super-crop': { label: 'Super Crop',shortDesc: '→ 2 topos',       color: '#c084fc', Icon: Zap      },
   remove:       { label: 'Remover',    shortDesc: 'nó + filhos',     color: '#f87171', Icon: Trash2,
                   destructive: true, separator: true },
 };
@@ -163,8 +163,8 @@ interface NodeActionMenuProps {
   onAction:  (a: GraphAction) => void;
 }
 
-const PODA_ACTIONS: GraphAction[] = ['topping', 'fim'];
-const VEGA_ACTIONS: GraphAction[] = ['grow', 'lst', 'super-crop', 'add-branch'];
+const PODA_ACTIONS: GraphAction[] = ['topping', 'fim', 'super-crop'];
+const VEGA_ACTIONS: GraphAction[] = ['grow', 'lst', 'add-branch'];
 
 function NodeActionMenu({
   selectedNode, availableActions, onClose, onAction,
@@ -866,7 +866,7 @@ export default function PlantNodeMap({
       topping:      'Topping ✂ — estrutura acima cortada, 2 novos topos',
       fim:          'FIM ~ — até 4 brotos',
       lst:          '〰 LST — galho e filhos deslocados',
-      'super-crop': '⚡ Super Cropping — caule dobrado (sem corte)',
+      'super-crop': '⚡ Super Cropping — estrutura acima removida, 2 novos topos',
       grow:         '🌱 Novo nó adicionado',
       'add-branch': '🌿 Galho lateral adicionado',
     };
