@@ -149,6 +149,176 @@ function Chip({ value, label, color }: { value: number; label: string; color: st
   );
 }
 
+// ── NodeActionMenu — componente de módulo (nunca recriado durante render) ─────
+// Motivo: componentes definidos dentro de outro componente/IIFE recebem um
+// tipo novo a cada render → React os desmonta imediatamente → conteúdo vazio.
+
+interface NodeActionMenuProps {
+  selectedNode:     LayoutNode;
+  menuPage:         'main' | 'poda' | 'vega';
+  availableActions: GraphAction[];
+  onClose:   () => void;
+  onPage:    (p: 'main' | 'poda' | 'vega') => void;
+  onAction:  (a: GraphAction) => void;
+}
+
+const PODA_ACTIONS: GraphAction[] = ['topping', 'fim', 'super-crop'];
+const VEGA_ACTIONS: GraphAction[] = ['grow', 'lst', 'add-branch'];
+
+function NodeActionMenu({
+  selectedNode, menuPage, availableActions,
+  onClose, onPage, onAction,
+}: NodeActionMenuProps) {
+  const poda      = availableActions.filter(a => PODA_ACTIONS.includes(a));
+  const vega      = availableActions.filter(a => VEGA_ACTIONS.includes(a));
+  const hasRemove = availableActions.includes('remove');
+
+  const nodeColor = selectedNode.type === 'top' && selectedNode.state === 'active'
+    ? NODE_COLOR.top.ring : getCircleColor(selectedNode).ring;
+  const nodeLabel = selectedNode.type === 'root' ? 'Raiz' : `N${selectedNode.nodeNumber}`;
+  const nodeDesc  = selectedNode.type === 'root' ? '↑ caule'
+    : selectedNode.type === 'top' && selectedNode.state === 'active' ? 'topo ▲'
+    : selectedNode.type === 'internode' ? 'nó' : selectedNode.state;
+
+  const slideX = menuPage === 'main' ? '0%' : '-100%';
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-[199]" onClick={onClose} />
+
+      {/* Card */}
+      <div
+        className="fixed z-[200] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] pointer-events-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden">
+
+          {/* Cabeçalho */}
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/20">
+            {menuPage !== 'main' ? (
+              <button
+                onClick={() => onPage('main')}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+              >
+                <span className="text-base leading-none">←</span>
+              </button>
+            ) : (
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nodeColor }} />
+            )}
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-bold">
+                {menuPage === 'main' ? nodeLabel : menuPage === 'poda' ? '✂ Poda' : '🌿 Vega'}
+              </span>
+              {menuPage === 'main' && (
+                <span className="text-xs text-muted-foreground ml-1.5">{nodeDesc}</span>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Slider de páginas */}
+          <div className="overflow-hidden">
+            <div
+              className="flex transition-transform duration-200 ease-in-out"
+              style={{ transform: `translateX(${slideX})`, width: '200%' }}
+            >
+              {/* Página principal */}
+              <div style={{ width: '50%', flexShrink: 0 }}>
+                <div className="py-1.5">
+                  {poda.length > 0 && (
+                    <button
+                      onClick={() => onPage('poda')}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
+                    >
+                      <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/15">
+                        <Scissors className="w-4 h-4 text-amber-400" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-semibold block leading-tight">Poda</span>
+                        <span className="text-xs text-muted-foreground truncate block">
+                          {poda.map(a => ACTION_META[a].label).join(' · ')}
+                        </span>
+                      </div>
+                      <span className="text-muted-foreground/40 text-base leading-none">›</span>
+                    </button>
+                  )}
+                  {vega.length > 0 && (
+                    <button
+                      onClick={() => onPage('vega')}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
+                    >
+                      <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/15">
+                        <Leaf className="w-4 h-4 text-emerald-400" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-semibold block leading-tight">Vega</span>
+                        <span className="text-xs text-muted-foreground truncate block">
+                          {vega.map(a => ACTION_META[a].label).join(' · ')}
+                        </span>
+                      </div>
+                      <span className="text-muted-foreground/40 text-base leading-none">›</span>
+                    </button>
+                  )}
+                  {hasRemove && (
+                    <>
+                      <div className="h-px bg-border/30 mx-4 my-1" />
+                      <button
+                        onClick={() => onAction('remove')}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
+                      >
+                        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-red-500/10">
+                          <Trash2 className="w-4 h-4 text-red-400" />
+                        </span>
+                        <div>
+                          <span className="text-sm font-semibold text-red-400 block leading-tight">Remover</span>
+                          <span className="text-xs text-muted-foreground">nó + filhos</span>
+                        </div>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Subpágina (poda ou vega) */}
+              <div style={{ width: '50%', flexShrink: 0 }}>
+                <div className="py-1.5">
+                  {(menuPage === 'poda' ? poda : vega).map(action => {
+                    const meta = ACTION_META[action];
+                    const Icon = meta.Icon;
+                    return (
+                      <button
+                        key={action}
+                        onClick={() => onAction(action)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
+                      >
+                        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                          style={{ background: meta.color + '22' }}>
+                          <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                        </span>
+                        <div>
+                          <span className="text-sm font-semibold block leading-tight">{meta.label}</span>
+                          <span className="text-xs text-muted-foreground">{meta.shortDesc}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PlantNodeMap({
@@ -1095,190 +1265,17 @@ export default function PlantNodeMap({
         )}
       </div>
 
-      {/* ── Menu centralizado na tela com slide ── */}
-      {selectedNode && menuOpen && !compact && (() => {
-        const PODA: GraphAction[] = ['topping', 'fim', 'super-crop'];
-        const VEGA: GraphAction[] = ['grow', 'lst', 'add-branch'];
-        const poda       = availableActions.filter(a => PODA.includes(a));
-        const vega       = availableActions.filter(a => VEGA.includes(a));
-        const hasRemove  = availableActions.includes('remove');
-        const nodeColor  = selectedNode.type === 'top' && selectedNode.state === 'active'
-          ? NODE_COLOR.top.ring : getCircleColor(selectedNode).ring;
-        const nodeLabel  = selectedNode.type === 'root' ? 'Raiz' : `N${selectedNode.nodeNumber}`;
-        const nodeDesc   = selectedNode.type === 'root' ? '↑ caule'
-          : selectedNode.type === 'top' && selectedNode.state === 'active' ? 'topo ▲'
-          : selectedNode.type === 'internode' ? 'nó' : selectedNode.state;
-
-        // slide offset: main=0, poda/vega=-100% (slide left)
-        const slideX = menuPage === 'main' ? '0%' : '-100%';
-
-        function SubActions({ actions }: { actions: GraphAction[] }) {
-          return (
-            <>
-              {actions.map(action => {
-                const meta = ACTION_META[action];
-                const Icon = meta.Icon;
-                return (
-                  <button
-                    key={action}
-                    onClick={() => applyAction(action)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                  >
-                    <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: meta.color + '22' }}>
-                      <Icon className="w-4 h-4" style={{ color: meta.color }} />
-                    </span>
-                    <div>
-                      <span className="text-sm font-semibold block leading-tight">{meta.label}</span>
-                      <span className="text-xs text-muted-foreground">{meta.shortDesc}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </>
-          );
-        }
-
-        return (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 z-[199]"
-              onClick={() => { setSelectedId(null); setMenuOpen(false); }}
-            />
-            {/* Card centralizado */}
-            <div
-              className="fixed z-[200] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] pointer-events-auto"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden">
-
-                {/* ── Cabeçalho ── */}
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/20">
-                  {menuPage !== 'main' ? (
-                    <button
-                      onClick={() => setMenuPage('main')}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-                    >
-                      <span className="text-base leading-none">←</span>
-                    </button>
-                  ) : (
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nodeColor }} />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-bold">
-                      {menuPage === 'main' ? nodeLabel
-                        : menuPage === 'poda' ? '✂ Poda'
-                        : '🌿 Vega'}
-                    </span>
-                    {menuPage === 'main' && (
-                      <span className="text-xs text-muted-foreground ml-1.5">{nodeDesc}</span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => { setSelectedId(null); setMenuOpen(false); }}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* ── Slider ── */}
-                <div className="overflow-hidden">
-                  <div
-                    className="flex transition-transform duration-200 ease-in-out"
-                    style={{ transform: `translateX(${slideX})`, width: '200%' }}
-                  >
-                    {/* Página main (largura = 50% do container = 260px) */}
-                    <div style={{ width: '50%', flexShrink: 0 }}>
-                      <div className="py-1.5">
-                        {poda.length > 0 && (
-                          <button
-                            onClick={() => setMenuPage('poda')}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                          >
-                            <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/15">
-                              <Scissors className="w-4 h-4 text-amber-400" />
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-semibold block leading-tight">Poda</span>
-                              <span className="text-xs text-muted-foreground truncate block">
-                                {poda.map(a => ACTION_META[a].label).join(' · ')}
-                              </span>
-                            </div>
-                            <span className="text-muted-foreground/40 text-base leading-none">›</span>
-                          </button>
-                        )}
-                        {vega.length > 0 && (
-                          <button
-                            onClick={() => setMenuPage('vega')}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                          >
-                            <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/15">
-                              <Leaf className="w-4 h-4 text-emerald-400" />
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm font-semibold block leading-tight">Vega</span>
-                              <span className="text-xs text-muted-foreground truncate block">
-                                {vega.map(a => ACTION_META[a].label).join(' · ')}
-                              </span>
-                            </div>
-                            <span className="text-muted-foreground/40 text-base leading-none">›</span>
-                          </button>
-                        )}
-                        {hasRemove && (
-                          <>
-                            <div className="h-px bg-border/30 mx-4 my-1" />
-                            <button
-                              onClick={() => applyAction('remove')}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
-                            >
-                              <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-red-500/10">
-                                <Trash2 className="w-4 h-4 text-red-400" />
-                              </span>
-                              <div>
-                                <span className="text-sm font-semibold text-red-400 block leading-tight">Remover</span>
-                                <span className="text-xs text-muted-foreground">nó + filhos</span>
-                              </div>
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Página sub (poda ou vega) — renderizado inline, sem sub-componente */}
-                    <div style={{ width: '50%', flexShrink: 0 }}>
-                      <div className="py-1.5">
-                        {(menuPage === 'poda' ? poda : vega).map(action => {
-                          const meta = ACTION_META[action];
-                          const Icon = meta.Icon;
-                          return (
-                            <button
-                              key={action}
-                              onClick={() => applyAction(action)}
-                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                            >
-                              <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                                style={{ background: meta.color + '22' }}>
-                                <Icon className="w-4 h-4" style={{ color: meta.color }} />
-                              </span>
-                              <div>
-                                <span className="text-sm font-semibold block leading-tight">{meta.label}</span>
-                                <span className="text-xs text-muted-foreground">{meta.shortDesc}</span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </>
-        );
-      })()}
+      {/* ── Menu de ações (componente de módulo — sem IIFE) ── */}
+      {selectedNode && menuOpen && !compact && (
+        <NodeActionMenu
+          selectedNode={selectedNode}
+          menuPage={menuPage}
+          availableActions={availableActions}
+          onClose={() => { setSelectedId(null); setMenuOpen(false); }}
+          onPage={setMenuPage}
+          onAction={applyAction}
+        />
+      )}
 
       {/* ── Menu de aresta (caule/galho) centralizado ── */}
       {selectedEdgeId && edgeMenuOpen && !compact && (() => {
