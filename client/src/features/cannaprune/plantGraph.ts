@@ -219,25 +219,23 @@ export function removeSubtree(
 
 // ── Ações disponíveis por nó ──────────────────────────────────────────────────
 
-export function getAvailableActions(node: PlantGraphNode): GraphAction[] {
-  // Raiz: só pode adicionar galho (novo caule)
-  if (node.type === 'root') return ['add-branch'];
+export function getAvailableActions(node: PlantGraphNode, hasChildren: boolean): GraphAction[] {
+  // Raiz: sem ações no menu
+  if (node.type === 'root') return [];
 
   const acts: GraphAction[] = [];
 
   if (node.state === 'active') {
-    if (node.type === 'top') {
-      // Top bud ativo: Topping + Crescer
+    if (!hasChildren) {
+      // Top bud (último da cadeia, ★): Topping + Crescer
       acts.push('topping', 'grow');
     } else {
-      // Internode ativo: Super Crop remove tudo acima e cria 2 topos
-      acts.push('super-crop');
+      // Nó com filhos à frente: Super Crop + Topping + Crescer
+      acts.push('super-crop', 'topping', 'grow');
     }
-  } else {
-    // Nó já podado / treinado: só adicionar galho lateral
-    acts.push('add-branch');
   }
 
+  // Todos os nós (exceto raiz) têm Remover
   acts.push('remove');
   return acts;
 }

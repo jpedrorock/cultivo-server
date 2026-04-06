@@ -114,7 +114,7 @@ const ACTION_META: Record<GraphAction, {
                   destructive: true, separator: true },
 };
 
-const ACTION_ORDER: GraphAction[] = ['topping','grow','super-crop','remove'];
+const ACTION_ORDER: GraphAction[] = ['super-crop','topping','grow','remove'];
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -831,9 +831,12 @@ export default function PlantNodeMap({
 
   // ── Selected node ─────────────────────────────────────────────────────────────
 
-  const selectedNode     = selectedId ? nodeMap.get(selectedId) ?? null : null;
-  const availableActions = selectedNode
-    ? ACTION_ORDER.filter(a => getAvailableActions(selectedNode).includes(a))
+  const selectedNode      = selectedId ? nodeMap.get(selectedId) ?? null : null;
+  const selectedHasChildren = selectedNode
+    ? layoutNodes.some(n => n.parentId === selectedNode.id)
+    : false;
+  const availableActions  = selectedNode
+    ? ACTION_ORDER.filter(a => getAvailableActions(selectedNode, selectedHasChildren).includes(a))
     : [];
 
 
