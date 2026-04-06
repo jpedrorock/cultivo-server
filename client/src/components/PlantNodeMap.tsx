@@ -155,10 +155,8 @@ function Chip({ value, label, color }: { value: number; label: string; color: st
 
 interface NodeActionMenuProps {
   selectedNode:     LayoutNode;
-  menuPage:         'main' | 'poda' | 'vega';
   availableActions: GraphAction[];
   onClose:   () => void;
-  onPage:    (p: 'main' | 'poda' | 'vega') => void;
   onAction:  (a: GraphAction) => void;
 }
 
@@ -166,9 +164,11 @@ const PODA_ACTIONS: GraphAction[] = ['topping', 'fim', 'super-crop'];
 const VEGA_ACTIONS: GraphAction[] = ['grow', 'lst', 'add-branch'];
 
 function NodeActionMenu({
-  selectedNode, menuPage, availableActions,
-  onClose, onPage, onAction,
+  selectedNode, availableActions, onClose, onAction,
 }: NodeActionMenuProps) {
+  // menuPage vive DENTRO do componente — sem re-render do pai ao navegar
+  const [page, setPage] = useState<'main' | 'poda' | 'vega'>('main');
+
   const poda      = availableActions.filter(a => PODA_ACTIONS.includes(a));
   const vega      = availableActions.filter(a => VEGA_ACTIONS.includes(a));
   const hasRemove = availableActions.includes('remove');
@@ -180,7 +180,7 @@ function NodeActionMenu({
     : selectedNode.type === 'top' && selectedNode.state === 'active' ? 'topo ▲'
     : selectedNode.type === 'internode' ? 'nó' : selectedNode.state;
 
-  const slideX = menuPage === 'main' ? '0%' : '-100%';
+  const slideX = page === 'main' ? '0%' : '-100%';
 
   return (
     <>
@@ -196,9 +196,9 @@ function NodeActionMenu({
 
           {/* Cabeçalho */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/20">
-            {menuPage !== 'main' ? (
+            {page !== 'main' ? (
               <button
-                onClick={() => onPage('main')}
+                onClick={() => setPage('main')}
                 className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
               >
                 <span className="text-base leading-none">←</span>
@@ -208,9 +208,9 @@ function NodeActionMenu({
             )}
             <div className="flex-1 min-w-0">
               <span className="text-sm font-bold">
-                {menuPage === 'main' ? nodeLabel : menuPage === 'poda' ? '✂ Poda' : '🌿 Vega'}
+                {page === 'main' ? nodeLabel : page === 'poda' ? '✂ Poda' : '🌿 Vega'}
               </span>
-              {menuPage === 'main' && (
+              {page === 'main' && (
                 <span className="text-xs text-muted-foreground ml-1.5">{nodeDesc}</span>
               )}
             </div>
@@ -233,7 +233,7 @@ function NodeActionMenu({
                 <div className="py-1.5">
                   {poda.length > 0 && (
                     <button
-                      onClick={() => onPage('poda')}
+                      onClick={() => setPage('poda')}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
                     >
                       <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/15">
@@ -250,7 +250,7 @@ function NodeActionMenu({
                   )}
                   {vega.length > 0 && (
                     <button
-                      onClick={() => onPage('vega')}
+                      onClick={() => setPage('vega')}
                       className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
                     >
                       <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/15">
@@ -288,7 +288,7 @@ function NodeActionMenu({
               {/* Subpágina (poda ou vega) */}
               <div style={{ width: '50%', flexShrink: 0 }}>
                 <div className="py-1.5">
-                  {(menuPage === 'poda' ? poda : vega).map(action => {
+                  {(page === 'poda' ? poda : vega).map(action => {
                     const meta = ACTION_META[action];
                     const Icon = meta.Icon;
                     return (
@@ -372,7 +372,6 @@ export default function PlantNodeMap({
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [selectedEdgeId,  setSelectedEdgeId]  = useState<string | null>(null);
   const [edgeMenuOpen,    setEdgeMenuOpen]    = useState(false);
-  const [menuPage,        setMenuPage]        = useState<'main' | 'poda' | 'vega'>('main');
   const [resetOpen,  setResetOpen]  = useState(false);
   const [canUndo,    setCanUndo]    = useState(false);
   const [canRedo,    setCanRedo]    = useState(false);
@@ -471,9 +470,8 @@ export default function PlantNodeMap({
 
   const stats = useMemo(() => getPlantStats(nodes), [nodes]);
 
-  // Reset menu page + abre/fecha quando muda o nó selecionado
+  // Abre/fecha menu quando muda o nó selecionado
   useEffect(() => {
-    setMenuPage('main');
     setMenuOpen(!!selectedId);
   }, [selectedId]);
 
@@ -1269,10 +1267,8 @@ export default function PlantNodeMap({
       {selectedNode && menuOpen && !compact && (
         <NodeActionMenu
           selectedNode={selectedNode}
-          menuPage={menuPage}
           availableActions={availableActions}
           onClose={() => { setSelectedId(null); setMenuOpen(false); }}
-          onPage={setMenuPage}
           onAction={applyAction}
         />
       )}
