@@ -21,7 +21,7 @@ import {
 } from "@/features/cannaprune/plantGraph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
-  Scissors, Zap, Anchor, Leaf, ArrowUp, GitBranch,
+  Scissors, Zap, Leaf, ArrowUp, GitBranch,
   Trash2, Undo2, Redo2, RotateCcw, Save, Loader2, X,
   ZoomIn, ZoomOut, Maximize2,
 } from "lucide-react";
@@ -109,7 +109,6 @@ const ACTION_META: Record<GraphAction, {
   fim:          { label: 'FIM',        shortDesc: '→ 3–4 brotos',    color: '#fb923c', Icon: Scissors },
   grow:         { label: 'Crescer',    shortDesc: '+ nó acima',      color: '#4ade80', Icon: ArrowUp  },
   'add-branch': { label: '+ Galho',   shortDesc: 'ramo lateral',    color: '#34d399', Icon: GitBranch },
-  lst:          { label: 'LST',        shortDesc: 'inclina + filhos',color: '#818cf8', Icon: Anchor   },
   'super-crop': { label: 'Super Crop',shortDesc: '→ 2 topos',       color: '#c084fc', Icon: Zap      },
   remove:       { label: 'Remover',    shortDesc: 'nó + filhos',     color: '#f87171', Icon: Trash2,
                   destructive: true, separator: true },
@@ -163,27 +162,19 @@ interface NodeActionMenuProps {
   onAction:  (a: GraphAction) => void;
 }
 
-const PODA_ACTIONS: GraphAction[] = ['topping', 'fim', 'super-crop'];
-const VEGA_ACTIONS: GraphAction[] = ['grow', 'add-branch'];
-
 function NodeActionMenu({
   selectedNode, availableActions, onClose, onAction,
 }: NodeActionMenuProps) {
-  const [page, setPage] = useState<'main' | 'poda' | 'vega'>('main');
-
-  const poda      = availableActions.filter(a => PODA_ACTIONS.includes(a));
-  const vega      = availableActions.filter(a => VEGA_ACTIONS.includes(a));
-  const hasRemove = availableActions.includes('remove');
-
   const nodeColor = selectedNode.type === 'top' && selectedNode.state === 'active'
     ? NODE_COLOR.top.ring : getCircleColor(selectedNode).ring;
   const nodeLabel = selectedNode.type === 'root' ? 'Raiz' : `N${selectedNode.nodeNumber}`;
-  const nodeDesc  = selectedNode.type === 'root' ? '↑ caule'
-    : selectedNode.type === 'top' && selectedNode.state === 'active' ? 'topo ▲'
-    : selectedNode.type === 'internode' ? 'nó' : selectedNode.state;
+  const nodeDesc  = selectedNode.type === 'root'    ? '↑ caule'
+    : selectedNode.type === 'top' && selectedNode.state === 'active' ? '★ top bud'
+    : selectedNode.type === 'internode' ? 'nó'
+    : selectedNode.state;
 
-  // Ações da subpágina atual
-  const subActions = page === 'poda' ? poda : page === 'vega' ? vega : [];
+  const mainActions = availableActions.filter(a => a !== 'remove');
+  const hasRemove   = availableActions.includes('remove');
 
   return (
     <>
@@ -192,30 +183,17 @@ function NodeActionMenu({
 
       {/* Card */}
       <div
-        className="fixed z-[200] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] pointer-events-auto"
+        className="fixed z-[200] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] pointer-events-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden">
 
           {/* Cabeçalho */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/20">
-            {page !== 'main' ? (
-              <button
-                onClick={() => setPage('main')}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-              >
-                <span className="text-base leading-none">←</span>
-              </button>
-            ) : (
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nodeColor }} />
-            )}
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nodeColor }} />
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-bold">
-                {page === 'main' ? nodeLabel : page === 'poda' ? '✂ Poda' : '🌿 Vega'}
-              </span>
-              {page === 'main' && (
-                <span className="text-xs text-muted-foreground ml-1.5">{nodeDesc}</span>
-              )}
+              <span className="text-sm font-bold">{nodeLabel}</span>
+              <span className="text-xs text-muted-foreground ml-1.5">{nodeDesc}</span>
             </div>
             <button
               onClick={onClose}
@@ -225,84 +203,44 @@ function NodeActionMenu({
             </button>
           </div>
 
-          {/* Conteúdo — renderização direta sem slide/overflow */}
+          {/* Ações flat */}
           <div className="py-1.5">
-            {page === 'main' ? (
+            {mainActions.map(action => {
+              const meta = ACTION_META[action];
+              const Icon = meta.Icon;
+              return (
+                <button
+                  key={action}
+                  onClick={() => onAction(action)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
+                >
+                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: meta.color + '22' }}>
+                    <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                  </span>
+                  <div>
+                    <span className="text-sm font-semibold block leading-tight">{meta.label}</span>
+                    <span className="text-xs text-muted-foreground">{meta.shortDesc}</span>
+                  </div>
+                </button>
+              );
+            })}
+            {hasRemove && (
               <>
-                {poda.length > 0 && (
-                  <button
-                    onClick={() => setPage('poda')}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                  >
-                    <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-amber-500/15">
-                      <Scissors className="w-4 h-4 text-amber-400" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-semibold block leading-tight">Poda</span>
-                      <span className="text-xs text-muted-foreground truncate block">
-                        {poda.map(a => ACTION_META[a].label).join(' · ')}
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground/40 text-base leading-none">›</span>
-                  </button>
-                )}
-                {vega.length > 0 && (
-                  <button
-                    onClick={() => setPage('vega')}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                  >
-                    <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/15">
-                      <Leaf className="w-4 h-4 text-emerald-400" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-semibold block leading-tight">Vega</span>
-                      <span className="text-xs text-muted-foreground truncate block">
-                        {vega.map(a => ACTION_META[a].label).join(' · ')}
-                      </span>
-                    </div>
-                    <span className="text-muted-foreground/40 text-base leading-none">›</span>
-                  </button>
-                )}
-                {hasRemove && (
-                  <>
-                    <div className="h-px bg-border/30 mx-4 my-1" />
-                    <button
-                      onClick={() => onAction('remove')}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
-                    >
-                      <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-red-500/10">
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </span>
-                      <div>
-                        <span className="text-sm font-semibold text-red-400 block leading-tight">Remover</span>
-                        <span className="text-xs text-muted-foreground">nó + filhos</span>
-                      </div>
-                    </button>
-                  </>
-                )}
+                <div className="h-px bg-border/30 mx-4 my-1" />
+                <button
+                  onClick={() => onAction('remove')}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
+                >
+                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-red-500/10">
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                  </span>
+                  <div>
+                    <span className="text-sm font-semibold text-red-400 block leading-tight">Remover</span>
+                    <span className="text-xs text-muted-foreground">nó + filhos</span>
+                  </div>
+                </button>
               </>
-            ) : (
-              /* Subpágina: lista as ações direto */
-              subActions.map(action => {
-                const meta = ACTION_META[action];
-                const Icon = meta.Icon;
-                return (
-                  <button
-                    key={action}
-                    onClick={() => onAction(action)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                  >
-                    <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: meta.color + '22' }}>
-                      <Icon className="w-4 h-4" style={{ color: meta.color }} />
-                    </span>
-                    <div>
-                      <span className="text-sm font-semibold block leading-tight">{meta.label}</span>
-                      <span className="text-xs text-muted-foreground">{meta.shortDesc}</span>
-                    </div>
-                  </button>
-                );
-              })
             )}
           </div>
 
