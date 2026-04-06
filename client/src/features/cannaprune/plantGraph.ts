@@ -227,11 +227,11 @@ export function getAvailableActions(node: PlantGraphNode): GraphAction[] {
 
   if (node.state === 'active') {
     if (node.type === 'top') {
-      // Top bud ativo: Topping / FIM / Crescer (nada acima para remover)
-      acts.push('topping', 'fim', 'grow');
+      // Top bud ativo: Topping + Crescer
+      acts.push('topping', 'grow');
     } else {
-      // Internode ativo com estrutura acima: Super Crop remove tudo e cria 2 topos
-      acts.push('super-crop', 'add-branch');
+      // Internode ativo: Super Crop remove tudo acima e cria 2 topos
+      acts.push('super-crop');
     }
   } else {
     // Nó já podado / treinado: só adicionar galho lateral

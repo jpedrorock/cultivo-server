@@ -114,7 +114,7 @@ const ACTION_META: Record<GraphAction, {
                   destructive: true, separator: true },
 };
 
-const ACTION_ORDER: GraphAction[] = ['topping','fim','grow','add-branch','super-crop','remove'];
+const ACTION_ORDER: GraphAction[] = ['topping','grow','super-crop','remove'];
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -931,7 +931,9 @@ export default function PlantNodeMap({
           const r          = getRadius(node, compact);
           const isSelected = node.id === selectedId;
           const parentNode = node.parentId ? nodeMap.get(node.parentId) : undefined;
-          const visual     = getNodeVisual(node, parentNode?.state);
+          const hasChildren = layoutNodes.some(n => n.parentId === node.id);
+          // Top bud (★) só aparece se for a ponta da linha — sem filhos conectados
+          const visual     = hasChildren ? 'circle' : getNodeVisual(node, parentNode?.state);
           const isTopBud = visual === 'top' || visual === 'top-new' || visual === 'top-fim';
           const sw       = isSelected ? 2.5 : strokeWidth;
 
