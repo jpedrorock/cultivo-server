@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
@@ -12,7 +12,9 @@ import {
   Trash2,
   Maximize2,
   X,
+  Save,
 } from "lucide-react";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Accordion,
   AccordionContent,
@@ -116,18 +118,56 @@ export default function PlantTrainingPage() {
   }
 
   // ── Chamado pelo PlantNodeMap quando uma técnica é aplicada ──────────────
-  function handleTechniqueApplied(technique: string, nodeType: string) {
+  // Acumula localmente — os logs são criados em lote ao salvar a sessão
+  function handleTechniqueApplied(technique: string, nodeLabel: string) {
+    setSessionTechniques(prev => [...prev, { technique, nodeLabel }]);
+  }
+
+  // ── Abre o sandbox ────────────────────────────────────────────────────────
+  function openSandbox() {
+    sandboxCancelRef.current = false;
+    setSessionTechniques([]);
+    setMapFullscreen(true);
+  }
+
+  // ── Clique no X: mostra aviso se houve técnicas, senão fecha direto ───────
+  function handleSandboxClose() {
+    if (sessionTechniques.length > 0) {
+      setExitConfirmOpen(true);
+    } else {
+      // Sem alterações — fecha e salva estrutura (posições, curvas, etc.)
+      setMapFullscreen(false);
+    }
+  }
+
+  // ── Salvar sessão: cria os logs e fecha ───────────────────────────────────
+  function handleSaveSession() {
     if (!plantId) return;
-    const techId = normalizeTechniqueName(technique) as TechniqueId | null;
-    const cfg = techId ? TECHNIQUE_CONFIGS[techId] : null;
-    createMutation.mutate({
-      plantId,
-      technique,
-      nodePosition: nodeType,
-      techniqueConfig: cfg
-        ? { expectedTops: cfg.expectedTops, recoveryDays: cfg.recoveryDays }
-        : undefined,
+    setExitConfirmOpen(false);
+    // Cria um log por técnica aplicada durante a sessão
+    sessionTechniques.forEach(({ technique, nodeLabel }) => {
+      const techId = normalizeTechniqueName(technique) as TechniqueId | null;
+      const cfg    = techId ? TECHNIQUE_CONFIGS[techId] : null;
+      createMutation.mutate({
+        plantId,
+        technique,
+        nodePosition: nodeLabel,
+        techniqueConfig: cfg
+          ? { expectedTops: cfg.expectedTops, recoveryDays: cfg.recoveryDays }
+          : undefined,
+      });
     });
+    setMapFullscreen(false); // PlantNodeMap salva estrutura no unmount
+  }
+
+  // ── Descartar: fecha sem salvar estrutura nem criar logs ──────────────────
+  function handleDiscardSession() {
+    sandboxCancelRef.current = true; // sinaliza ao PlantNodeMap para não salvar
+    setExitConfirmOpen(false);
+    setSessionTechniques([]);
+    setMapFullscreen(false);
+    // Reseta a flag após o unmount (pequeno delay)
+    setTimeout(() => { sandboxCancelRef.current = false; }, 500);
   }
 
   function handleConfirmResult(logId: number) {
@@ -143,7 +183,12 @@ export default function PlantTrainingPage() {
     });
   }
 
-  const [mapFullscreen, setMapFullscreen] = useState(false);
+  const [mapFullscreen,    setMapFullscreen]    = useState(false);
+  const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
+  // Técnicas aplicadas nesta sessão do sandbox
+  const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
+  // Sinaliza ao PlantNodeMap para NÃO salvar no unmount (sessão descartada)
+  const sandboxCancelRef = useRef(false);
 
   // Stats chips
   const topTechniques = Object.entries(stats?.byTechnique ?? {})
@@ -181,7 +226,7 @@ export default function PlantTrainingPage() {
               Mapa da planta
             </p>
             <button
-              onClick={() => setMapFullscreen(true)}
+              onClick={openSandbox}
               className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               title="Abrir em tela cheia"
             >
@@ -198,7 +243,7 @@ export default function PlantTrainingPage() {
                 onResetStructure={handleResetStructure}
               />
               <button
-                onClick={() => setMapFullscreen(true)}
+                onClick={openSandbox}
                 className="w-full py-2 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors flex items-center justify-center gap-1.5 border-t border-border/20"
               >
                 <Maximize2 className="w-3 h-3" />
@@ -221,10 +266,13 @@ export default function PlantTrainingPage() {
         {/* ── Fullscreen overlay ────────────────────────────────────────── */}
         {mapFullscreen && (
           <div className="fixed inset-0 z-50 bg-background flex flex-col">
-            {/* Header fullscreen */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-background/95 backdrop-blur shrink-0">
+            {/* Header fullscreen — respeita notch do iOS via safe-area-inset-top */}
+            <div
+              className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-background/95 backdrop-blur shrink-0"
+              style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
+            >
               <button
-                onClick={() => setMapFullscreen(false)}
+                onClick={handleSandboxClose}
                 className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -235,17 +283,76 @@ export default function PlantTrainingPage() {
                   <p className="text-xs text-muted-foreground truncate">{plant.name}</p>
                 )}
               </div>
+              {/* Badge de técnicas aplicadas na sessão */}
+              {sessionTechniques.length > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                  {sessionTechniques.length} ação{sessionTechniques.length > 1 ? 'ões' : ''}
+                </span>
+              )}
             </div>
             {/* Canvas com pan/zoom — overflow:hidden é intencional */}
             <div className="flex-1 min-h-0 overflow-hidden">
               <PlantNodeMap
                 plantId={plantId}
+                cancelSaveRef={sandboxCancelRef}
                 onTechniqueApplied={handleTechniqueApplied}
                 onResetStructure={handleResetStructure}
               />
             </div>
           </div>
         )}
+
+        {/* ── Confirmação de saída do sandbox ────────────────────────────── */}
+        <Sheet open={exitConfirmOpen} onOpenChange={open => { if (!open) setExitConfirmOpen(false); }}>
+          <SheetContent side="bottom" className="rounded-t-2xl pb-8" style={{ paddingBottom: 'max(32px, env(safe-area-inset-bottom))' }}>
+            {/* Resumo da sessão */}
+            <div className="mb-4">
+              <p className="text-sm font-semibold mb-1">Sessão de edição</p>
+              <p className="text-xs text-muted-foreground">
+                {sessionTechniques.length} técnica{sessionTechniques.length !== 1 ? 's' : ''} aplicada{sessionTechniques.length !== 1 ? 's' : ''} nesta sessão
+              </p>
+            </div>
+            {/* Lista de técnicas */}
+            <div className="space-y-1 mb-5 max-h-48 overflow-y-auto">
+              {/* Agrupa por técnica */}
+              {Object.entries(
+                sessionTechniques.reduce<Record<string, string[]>>((acc, { technique, nodeLabel }) => {
+                  if (!acc[technique]) acc[technique] = [];
+                  if (nodeLabel) acc[technique].push(nodeLabel);
+                  return acc;
+                }, {}),
+              ).map(([tech, labels]) => {
+                const techId = normalizeTechniqueName(tech) as TechniqueId | null;
+                const cfg    = techId ? TECHNIQUE_CONFIGS[techId] : null;
+                return (
+                  <div key={tech} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/40">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cfg?.color ?? '#6b7280' }} />
+                    <span className="text-sm font-medium flex-1">{tech}</span>
+                    <span className="text-xs text-muted-foreground">
+                      ×{labels.length}{labels.length > 0 ? ` · ${labels.join(', ')}` : ''}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Ações */}
+            <div className="space-y-2">
+              <button
+                onClick={handleSaveSession}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm justify-center active:scale-[0.98] transition-all"
+              >
+                <Save className="w-4 h-4" />
+                Salvar sessão e sair
+              </button>
+              <button
+                onClick={handleDiscardSession}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 text-sm text-muted-foreground justify-center hover:border-border active:scale-[0.98] transition-all"
+              >
+                Descartar alterações
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* ── Stats ─────────────────────────────────────────────────────── */}
         {(stats?.total ?? 0) > 0 && (

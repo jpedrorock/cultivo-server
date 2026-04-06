@@ -134,6 +134,8 @@ const DEFAULT_VP: VP = { x: 0, y: 0, scale: 1 };
 interface Props {
   plantId:             number;
   compact?:            boolean;
+  /** Se `current === true` ao desmontar, o save automático é cancelado (ex: usuário descartou a sessão) */
+  cancelSaveRef?:      React.MutableRefObject<boolean>;
   onTechniqueApplied?: (technique: string, nodeLabel: string) => void;
   onResetStructure?:   (clearHistory: boolean) => void;
 }
@@ -150,7 +152,7 @@ function Chip({ value, label, color }: { value: number; label: string; color: st
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PlantNodeMap({
-  plantId, compact = false, onTechniqueApplied, onResetStructure,
+  plantId, compact = false, cancelSaveRef, onTechniqueApplied, onResetStructure,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -248,6 +250,7 @@ export default function PlantNodeMap({
   const saveFnRef = useRef<() => void>(() => {});
   saveFnRef.current = () => {
     if (compact || nodesRef.current.length === 0) return;
+    if (cancelSaveRef?.current) return; // sessão descartada pelo pai
     saveMutation.mutate({ plantId, nodes: nodesRef.current });
   };
   useEffect(() => {
