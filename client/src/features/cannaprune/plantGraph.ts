@@ -162,22 +162,36 @@ export function applySuperCrop(nodes: PlantGraphNode[], id: string): OpResult {
   };
 }
 
-/** Converte o topo em internode e adiciona um novo topo acima */
+/** Cresce o nó: sem filhos → estende a haste; com filhos → ramifica lateralmente */
 export function growPlant(nodes: PlantGraphNode[], id: string): OpResult {
   const t = nodes.find(n => n.id === id);
   if (!t)                   return { nodes, newIds: [], error: 'Nó não encontrado' };
-  if (t.type !== 'top')     return { nodes, newIds: [], error: 'Crescimento só é possível a partir de um topo' };
-  if (t.state !== 'active') return { nodes, newIds: [], error: 'Este topo não está ativo' };
+  if (t.state !== 'active') return { nodes, newIds: [], error: 'Este nó não está ativo' };
 
-  const m = maxNum(nodes);
+  const hasChildren = nodes.some(n => n.parentId === id);
+  const m        = maxNum(nodes);
   const newTopId = uid();
-  return {
-    newIds: [newTopId],
-    nodes: [
-      ...nodes.map(n => n.id === id ? { ...n, type: 'internode' as GraphNodeType } : n),
-      { id: newTopId, parentId: id, type: 'top', state: 'active', nodeNumber: m + 1 },
-    ],
-  };
+
+  if (!hasChildren) {
+    // Top bud (sem filhos): converte em internode e adiciona novo topo acima
+    return {
+      newIds: [newTopId],
+      nodes: [
+        ...nodes.map(n => n.id === id ? { ...n, type: 'internode' as GraphNodeType } : n),
+        { id: newTopId, parentId: id, type: 'top' as GraphNodeType, state: 'active' as GraphNodeState, nodeNumber: m + 1 },
+      ],
+    };
+  } else {
+    // Nó com filhos: ramifica — adiciona novo top bud lateral
+    return {
+      newIds: [newTopId],
+      nodes: [...nodes, {
+        id: newTopId, parentId: id,
+        type: 'top' as GraphNodeType, state: 'active' as GraphNodeState,
+        nodeNumber: m + 1,
+      }],
+    };
+  }
 }
 
 /** Remove o nó e todos os seus descendentes */

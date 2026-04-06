@@ -805,7 +805,7 @@ export default function PlantNodeMap({
       fim:          'FIM ~ — até 4 brotos',
       lst:          '〰 LST — galho e filhos deslocados',
       'super-crop': '⚡ Super Cropping — estrutura acima removida, 2 novos topos',
-      grow:         '🌱 Novo nó adicionado',
+      grow:         '🌱 Crescimento aplicado',
       'add-branch': '🌿 Galho lateral adicionado',
     };
     if (msgs[action]) toast.success(msgs[action]!);
