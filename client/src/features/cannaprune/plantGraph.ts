@@ -73,19 +73,27 @@ type OpResult = { nodes: PlantGraphNode[]; newIds: string[]; error?: string };
 export function applyTopping(nodes: PlantGraphNode[], id: string): OpResult {
   const t = nodes.find(n => n.id === id);
   if (!t)                   return { nodes, newIds: [], error: 'Nó não encontrado' };
-  if (t.type !== 'top')     return { nodes, newIds: [], error: 'Topping só pode ser aplicado num topo ativo' };
-  if (t.state !== 'active') return { nodes, newIds: [], error: 'Este topo já foi podado' };
+  if (t.type === 'root')    return { nodes, newIds: [], error: 'Não é possível fazer Topping na raiz' };
+  if (t.state !== 'active') return { nodes, newIds: [], error: 'Topping requer nó ativo' };
 
-  const m = maxNum(nodes);
+  // Corta a estrutura acima do ponto de topping (simula o corte físico da planta)
+  const toRemove = new Set<string>();
+  const collectSubtree = (nid: string) => {
+    nodes.filter(n => n.parentId === nid).forEach(c => { toRemove.add(c.id); collectSubtree(c.id); });
+  };
+  collectSubtree(id);
+  const baseNodes = nodes.filter(n => !toRemove.has(n.id));
+
+  const m = maxNum(baseNodes);
   const [a, b] = [uid(), uid()];
   return {
     newIds: [a, b],
     nodes: [
-      ...nodes.map(n => n.id === id
-        ? { ...n, state: 'topped' as GraphNodeState, technique: 'topping' as GraphTechnique }
+      ...baseNodes.map(n => n.id === id
+        ? { ...n, type: 'top' as GraphNodeType, state: 'topped' as GraphNodeState, technique: 'topping' as GraphTechnique }
         : n),
-      { id: a, parentId: id, type: 'top', state: 'active', nodeNumber: m + 1 },
-      { id: b, parentId: id, type: 'top', state: 'active', nodeNumber: m + 2 },
+      { id: a, parentId: id, type: 'top' as GraphNodeType, state: 'active' as GraphNodeState, nodeNumber: m + 1 },
+      { id: b, parentId: id, type: 'top' as GraphNodeType, state: 'active' as GraphNodeState, nodeNumber: m + 2 },
     ],
   };
 }
@@ -201,17 +209,19 @@ export function getAvailableActions(node: PlantGraphNode): GraphAction[] {
 
   const acts: GraphAction[] = [];
 
-  if (node.type === 'top' && node.state === 'active') {
-    // Topo ativo: técnicas de corte + crescer
-    acts.push('topping', 'fim', 'grow');
-  } else {
-    // Internode ou topo não-ativo: pode adicionar galho lateral
-    acts.push('add-branch');
-  }
-
-  // Treinamento físico para nós ativos
   if (node.state === 'active') {
+    if (node.type === 'top') {
+      // Topo ativo: corte (Topping/FIM) + crescer
+      acts.push('topping', 'fim', 'grow');
+    } else {
+      // Internode ativo: Topping (corta tudo acima, nascem 2 galhos) + galho lateral
+      acts.push('topping', 'add-branch');
+    }
+    // Treinamento físico (não-destrutivo) disponível para qualquer nó ativo
     acts.push('lst', 'super-crop');
+  } else {
+    // Nó já podado / treinado: só adicionar galho lateral
+    acts.push('add-branch');
   }
 
   acts.push('remove');

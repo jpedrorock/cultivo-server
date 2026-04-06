@@ -1,57 +1,27 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ArrowLeft,
-  Scissors,
-  Check,
-  Loader2,
-  Sprout,
-  Trash2,
   Maximize2,
   X,
   Save,
+  Play,
+  Pause,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import PlantNodeMap from "@/components/PlantNodeMap";
+import type { PlantGraphNode } from "@/features/cannaprune/plantGraph";
 import {
   TECHNIQUE_CONFIGS,
   normalizeTechniqueName,
   type TechniqueId,
 } from "@/features/training/techniqueConfigs";
-
-// ── Vigor indicator ──────────────────────────────────────────────────────────
-function VigorDots({ vigor }: { vigor: "low" | "medium" | "high" | null }) {
-  const map = {
-    low:    { dots: 1, color: "bg-red-500",     label: "Baixo" },
-    medium: { dots: 2, color: "bg-yellow-500",  label: "Médio" },
-    high:   { dots: 3, color: "bg-emerald-500", label: "Alto" },
-  };
-  if (!vigor) return <span className="text-xs text-muted-foreground">—</span>;
-  const cfg = map[vigor];
-  return (
-    <span className="flex items-center gap-1">
-      {[1, 2, 3].map((n) => (
-        <span
-          key={n}
-          className={`w-2 h-2 rounded-full ${n <= cfg.dots ? cfg.color : "bg-muted"}`}
-        />
-      ))}
-      <span className="text-xs text-muted-foreground ml-0.5">{cfg.label}</span>
-    </span>
-  );
-}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PlantTrainingPage() {
@@ -59,17 +29,12 @@ export default function PlantTrainingPage() {
   const [, navigate] = useLocation();
   const plantId = params?.id ? parseInt(params.id, 10) : null;
 
-  // Confirm result state (inline on history item)
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
-  const [actualTops,   setActualTops]   = useState(0);
-  const [vigor, setVigor] = useState<"low" | "medium" | "high">("medium");
-
   // Data
   const { data: plant } = trpc.plants.getById.useQuery(
     { id: plantId! },
     { enabled: !!plantId },
   );
-  const { data: logs = [], isLoading, refetch } = trpc.plantLST.list.useQuery(
+  const { data: logs = [], refetch } = trpc.plantLST.list.useQuery(
     { plantId: plantId! },
     { enabled: !!plantId },
   );
@@ -84,15 +49,9 @@ export default function PlantTrainingPage() {
     onSuccess: () => {
       refetch();
       utils.plantLST.stats.invalidate({ plantId: plantId! });
+      utils.plantLST.list.invalidate({ plantId: plantId! });
     },
-  });
-  const updateMutation = trpc.plantLST.update.useMutation({
-    onSuccess: () => {
-      toast.success("Resultado confirmado!");
-      setConfirmingId(null);
-      refetch();
-    },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onError: (e) => toast.error(`Erro ao salvar sessão: ${e.message}`),
   });
   const clearLogsMutation = trpc.plantLST.clearLogs.useMutation({
     onSuccess: () => {
@@ -101,14 +60,21 @@ export default function PlantTrainingPage() {
     },
     onError: (e) => toast.error(`Erro ao apagar histórico: ${e.message}`),
   });
-  const deleteLogMutation = trpc.plantLST.deleteLog.useMutation({
-    onSuccess: () => {
-      refetch();
-      utils.plantLST.stats.invalidate({ plantId: plantId! });
-      toast.success("Registro apagado");
-    },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
-  });
+  // Auto-abre o sandbox se navegou com ?sandbox=1 (ex: via quick log)
+  const autoSandbox = new URLSearchParams(window.location.search).get('sandbox') === '1';
+  const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
+  const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
+  // Técnicas aplicadas nesta sessão do sandbox
+  const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
+  // Sinaliza ao PlantNodeMap para NÃO salvar no unmount (sessão descartada)
+  const sandboxCancelRef = useRef(false);
+  // Ref para capturar snapshot dos nós ao salvar sessão
+  const nodeSnapshotRef  = useRef<PlantGraphNode[]>([]);
+  // Timeline / play
+  const [timelineOpen,  setTimelineOpen]  = useState(false);
+  const [timelineIndex, setTimelineIndex] = useState(0);
+  const [isPlaying,     setIsPlaying]     = useState(false);
+  const playTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Chamado pelo PlantNodeMap quando a estrutura é reiniciada ────────────
   function handleResetStructure(clearHistory: boolean) {
@@ -140,11 +106,15 @@ export default function PlantTrainingPage() {
     }
   }
 
-  // ── Salvar sessão: cria os logs e fecha ───────────────────────────────────
+  // ── Salvar sessão: cria os logs (com snapshot) e fecha ───────────────────
   function handleSaveSession() {
     if (!plantId) return;
     setExitConfirmOpen(false);
-    // Cria um log por técnica aplicada durante a sessão
+    // Captura snapshot atual (nodeSnapshotRef é preenchido pelo PlantNodeMap a cada render)
+    const snapshot = nodeSnapshotRef.current.length > 0
+      ? JSON.stringify(nodeSnapshotRef.current)
+      : undefined;
+    // Cria um log por técnica aplicada, todos com o mesmo snapshot da sessão
     sessionTechniques.forEach(({ technique, nodeLabel }) => {
       const techId = normalizeTechniqueName(technique) as TechniqueId | null;
       const cfg    = techId ? TECHNIQUE_CONFIGS[techId] : null;
@@ -155,6 +125,7 @@ export default function PlantTrainingPage() {
         techniqueConfig: cfg
           ? { expectedTops: cfg.expectedTops, recoveryDays: cfg.recoveryDays }
           : undefined,
+        snapshotJson: snapshot,
       });
     });
     setMapFullscreen(false); // PlantNodeMap salva estrutura no unmount
@@ -170,27 +141,39 @@ export default function PlantTrainingPage() {
     setTimeout(() => { sandboxCancelRef.current = false; }, 500);
   }
 
-  function handleConfirmResult(logId: number) {
-    if (!plantId) return;
-    updateMutation.mutate({
-      id: logId,
-      plantId,
-      actualResult: {
-        actualTops,
-        vigor,
-        confirmedAt: new Date().toISOString(),
-      },
-    });
-  }
+  // ── Timeline: snpshots únicos ordenados do mais antigo ao mais novo ──────
+  const snapshots = (logs as any[])
+    .filter(l => l.snapshotJson)
+    .reduce<{ date: string; nodes: PlantGraphNode[]; technique: string }[]>((acc, l) => {
+      // Deduplica: só adiciona se o snapshot for diferente do anterior
+      const last = acc[acc.length - 1];
+      if (!last || JSON.stringify(last.nodes) !== JSON.stringify(l.snapshotJson)) {
+        acc.push({ date: l.logDate, nodes: l.snapshotJson, technique: l.technique });
+      }
+      return acc;
+    }, [])
+    .reverse(); // cronológico (antigo → novo)
 
-  // Auto-abre o sandbox se navegou com ?sandbox=1 (ex: via quick log)
-  const autoSandbox = new URLSearchParams(window.location.search).get('sandbox') === '1';
-  const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
-  const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
-  // Técnicas aplicadas nesta sessão do sandbox
-  const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
-  // Sinaliza ao PlantNodeMap para NÃO salvar no unmount (sessão descartada)
-  const sandboxCancelRef = useRef(false);
+  // Clamp timelineIndex so it never goes out-of-range when snapshots changes
+  const safeTimelineIndex = Math.min(timelineIndex, Math.max(0, snapshots.length - 1));
+
+  // Play automático
+  useEffect(() => {
+    if (!isPlaying) {
+      if (playTimerRef.current) clearInterval(playTimerRef.current);
+      return;
+    }
+    playTimerRef.current = setInterval(() => {
+      setTimelineIndex(i => {
+        if (i >= snapshots.length - 1) {
+          setIsPlaying(false);
+          return i;
+        }
+        return i + 1;
+      });
+    }, 1800);
+    return () => { if (playTimerRef.current) clearInterval(playTimerRef.current); };
+  }, [isPlaying, snapshots.length]);
 
   // Stats chips
   const topTechniques = Object.entries(stats?.byTechnique ?? {})
@@ -297,9 +280,114 @@ export default function PlantTrainingPage() {
               <PlantNodeMap
                 plantId={plantId}
                 cancelSaveRef={sandboxCancelRef}
+                nodeSnapshotRef={nodeSnapshotRef}
                 onTechniqueApplied={handleTechniqueApplied}
                 onResetStructure={handleResetStructure}
               />
+            </div>
+          </div>
+        )}
+
+        {/* ── Timeline de evolução ─────────────────────────────────────── */}
+        {timelineOpen && snapshots.length > 0 && (
+          <div
+            className="fixed inset-0 z-50 bg-background flex flex-col"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-background/95 backdrop-blur shrink-0"
+              style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
+            >
+              <button
+                onClick={() => { setIsPlaying(false); setTimelineOpen(false); }}
+                className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <h2 className="font-semibold text-base leading-tight">Evolução da planta</h2>
+                <p className="text-xs text-muted-foreground truncate">
+                  {format(new Date(snapshots[safeTimelineIndex].date), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
+                  {' · '}
+                  <span style={{ color: TECHNIQUE_CONFIGS[normalizeTechniqueName(snapshots[safeTimelineIndex].technique) as TechniqueId]?.color ?? '#6b7280' }}>
+                    {snapshots[safeTimelineIndex].technique}
+                  </span>
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {safeTimelineIndex + 1} / {snapshots.length}
+              </span>
+            </div>
+
+            {/* Mapa da planta — snapshot estático */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <PlantNodeMap
+                key={safeTimelineIndex}
+                staticNodes={snapshots[safeTimelineIndex].nodes}
+                compact={false}
+              />
+            </div>
+
+            {/* Controles inferiores */}
+            <div
+              className="shrink-0 border-t border-border/40 bg-background/95 backdrop-blur px-4 pt-3"
+              style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}
+            >
+              {/* Indicadores de passo */}
+              <div className="flex items-center justify-center gap-1.5 mb-3">
+                {snapshots.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setIsPlaying(false); setTimelineIndex(i); }}
+                    className="transition-all duration-200"
+                    style={{
+                      width:  i === safeTimelineIndex ? 20 : 6,
+                      height: 6,
+                      borderRadius: 3,
+                      background: i === safeTimelineIndex
+                        ? (TECHNIQUE_CONFIGS[normalizeTechniqueName(snapshots[i].technique) as TechniqueId]?.color ?? 'hsl(var(--primary))')
+                        : 'hsl(var(--muted))',
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Botões ◀ Play/Pause ▶ */}
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => { setIsPlaying(false); setTimelineIndex(i => Math.max(0, i - 1)); }}
+                  disabled={safeTimelineIndex === 0}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-muted disabled:opacity-30 hover:bg-muted/80 active:scale-95 transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (safeTimelineIndex >= snapshots.length - 1) {
+                      setTimelineIndex(0);
+                      setIsPlaying(true);
+                    } else {
+                      setIsPlaying(p => !p);
+                    }
+                  }}
+                  className="w-14 h-14 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg active:scale-95 transition-all"
+                >
+                  {isPlaying
+                    ? <Pause className="w-6 h-6" />
+                    : <Play  className="w-6 h-6 fill-primary-foreground" />
+                  }
+                </button>
+
+                <button
+                  onClick={() => { setIsPlaying(false); setTimelineIndex(i => Math.min(snapshots.length - 1, i + 1)); }}
+                  disabled={safeTimelineIndex === snapshots.length - 1}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-muted disabled:opacity-30 hover:bg-muted/80 active:scale-95 transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -383,219 +471,17 @@ export default function PlantTrainingPage() {
           </div>
         )}
 
-        {/* ── Histórico ─────────────────────────────────────────────────── */}
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">
-            Histórico
-          </p>
+        {/* ── Ver evolução (quando há 2+ snapshots) ──────────────────────── */}
+        {snapshots.length >= 2 && (
+          <button
+            onClick={() => { setTimelineIndex(0); setIsPlaying(false); setTimelineOpen(true); }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 text-emerald-500 font-semibold text-sm active:scale-[0.98] transition-transform hover:bg-emerald-500/10"
+          >
+            <Play className="w-4 h-4 fill-emerald-500" />
+            Ver evolução da planta
+          </button>
+        )}
 
-          {isLoading && (
-            <div className="flex justify-center py-10">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {!isLoading && logs.length === 0 && (
-            <div className="flex flex-col items-center py-12 gap-3 text-muted-foreground">
-              <Sprout className="w-10 h-10 opacity-30" />
-              <p className="text-sm">Nenhum treinamento registrado</p>
-              <p className="text-xs opacity-60">Aplique uma técnica na planta acima</p>
-            </div>
-          )}
-
-          <Accordion type="single" collapsible className="space-y-2">
-            {(logs as any[]).map((log) => {
-              const techId  = normalizeTechniqueName(log.technique);
-              const cfg     = techId ? TECHNIQUE_CONFIGS[techId] : null;
-              const isConf  = confirmingId === log.id;
-              const actual  = log.actualResult as {
-                actualTops: number;
-                vigor: "low" | "medium" | "high";
-                confirmedAt: string;
-              } | null;
-
-              return (
-                <AccordionItem
-                  key={log.id}
-                  id={`log-${log.id}`}
-                  value={`log-${log.id}`}
-                  className="border border-border/40 rounded-2xl px-4 overflow-hidden bg-card"
-                >
-                  <AccordionTrigger className="hover:no-underline py-3">
-                    <div className="flex items-center gap-3 text-left w-full">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ background: cfg?.color ?? "#6b7280" }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm">{log.technique}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(new Date(log.logDate), "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
-                        </div>
-                      </div>
-                      {log.response && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">
-                          {log.response}
-                        </span>
-                      )}
-                    </div>
-                  </AccordionTrigger>
-
-                  <AccordionContent className="pb-4 pt-0 space-y-3">
-                    {/* Apagar registro */}
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => {
-                          if (plantId) deleteLogMutation.mutate({ id: log.id, plantId });
-                        }}
-                        disabled={deleteLogMutation.isPending}
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                        Apagar registro
-                      </button>
-                    </div>
-                    {/* Fotos */}
-                    {(log.beforePhotoUrl || log.afterPhotoUrl) && (
-                      <div className="flex gap-2">
-                        {log.beforePhotoUrl && (
-                          <div className="flex-1 rounded-xl overflow-hidden aspect-square bg-muted/30">
-                            <img src={log.beforePhotoUrl} alt="Antes" className="w-full h-full object-cover" loading="lazy" />
-                            <p className="text-[9px] text-center text-muted-foreground py-0.5 bg-muted/40">Antes</p>
-                          </div>
-                        )}
-                        {log.afterPhotoUrl && (
-                          <div className="flex-1 rounded-xl overflow-hidden aspect-square bg-muted/30">
-                            <img src={log.afterPhotoUrl} alt="Depois" className="w-full h-full object-cover" loading="lazy" />
-                            <p className="text-[9px] text-center text-muted-foreground py-0.5 bg-muted/40">Depois</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Esperado */}
-                    {log.techniqueConfig && (
-                      <div className="flex gap-3 text-xs text-muted-foreground">
-                        {(log.techniqueConfig as any).expectedTops > 0 && (
-                          <span>
-                            Esperado:{" "}
-                            <strong className="text-foreground">
-                              {(log.techniqueConfig as any).expectedTops} tops
-                            </strong>
-                          </span>
-                        )}
-                        {(log.techniqueConfig as any).recoveryDays > 0 && (
-                          <span>
-                            Recuperação:{" "}
-                            <strong className="text-foreground">
-                              {(log.techniqueConfig as any).recoveryDays}d
-                            </strong>
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Resultado confirmado */}
-                    {actual && !isConf && (
-                      <div className="flex items-center gap-3 p-2.5 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
-                        <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <div className="flex-1 text-xs space-y-0.5">
-                          {actual.actualTops > 0 && (
-                            <p>Real: <strong>{actual.actualTops} tops</strong></p>
-                          )}
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-muted-foreground">Vigor:</span>
-                            <VigorDots vigor={actual.vigor} />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Notas */}
-                    {log.notes && (
-                      <p className="text-xs text-muted-foreground leading-relaxed">{log.notes}</p>
-                    )}
-
-                    {/* Confirmar resultado */}
-                    {!actual && !isConf && (
-                      <button
-                        onClick={() => {
-                          setConfirmingId(log.id);
-                          setActualTops((log.techniqueConfig as any)?.expectedTops ?? 0);
-                          setVigor("medium");
-                        }}
-                        className="text-xs text-primary font-medium flex items-center gap-1 hover:underline"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        Confirmar resultado real
-                      </button>
-                    )}
-
-                    {isConf && (
-                      <div className="space-y-3 p-3 rounded-xl bg-muted/40 border border-border/40">
-                        <p className="text-xs font-semibold">Confirmar resultado</p>
-                        {cfg && cfg.expectedTops > 0 && (
-                          <div className="space-y-1">
-                            <Label className="text-xs">Tops reais nascidos</Label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={20}
-                              value={actualTops}
-                              onChange={(e) => setActualTops(Number(e.target.value))}
-                              className="w-full px-3 py-1.5 border rounded-lg bg-background text-sm"
-                            />
-                          </div>
-                        )}
-                        <div className="space-y-1">
-                          <Label className="text-xs">Vigor da recuperação</Label>
-                          <div className="flex gap-2">
-                            {(["low", "medium", "high"] as const).map((v) => (
-                              <button
-                                key={v}
-                                onClick={() => setVigor(v)}
-                                className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                                  vigor === v
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "border-border hover:border-foreground/30"
-                                }`}
-                              >
-                                {v === "low" ? "Baixo" : v === "medium" ? "Médio" : "Alto"}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="flex-1 text-xs"
-                            disabled={updateMutation.isPending}
-                            onClick={() => handleConfirmResult(log.id)}
-                          >
-                            {updateMutation.isPending ? (
-                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                            ) : (
-                              <Check className="w-3 h-3 mr-1" />
-                            )}
-                            Confirmar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                            onClick={() => setConfirmingId(null)}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        </div>
       </div>
     </div>
   );

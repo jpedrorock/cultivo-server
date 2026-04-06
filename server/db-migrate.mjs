@@ -60,6 +60,9 @@ const INCREMENTAL_ALTERS = [
   `ALTER TABLE plantPhotos ADD COLUMN cycleId INT NULL`,
   `ALTER TABLE plantPhotos ADD COLUMN weekNumber INT NULL`,
 
+  // 2026-04-06: Snapshot da estrutura no momento de cada sessão de treinamento
+  `ALTER TABLE plantLSTLogs ADD COLUMN snapshotJson LONGTEXT NULL`,
+
   // 2026-04-05: CannaPrune — estrutura visual da planta (nós e galhos)
   `CREATE TABLE IF NOT EXISTS plantStructures (
     id        INT AUTO_INCREMENT PRIMARY KEY,

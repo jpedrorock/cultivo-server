@@ -50,16 +50,16 @@ function isLSTRecovered(n: PlantGraphNode): boolean {
 
 // Tipo de renderização visual do nó
 type NodeVisual =
-  | 'triangle'     // top ativo nativo → triângulo verde ▲
-  | 'triangle-new' // top ativo pós-topping → triângulo amarelo (novo broto)
-  | 'triangle-fim' // top ativo pós-fim → triângulo laranja
-  | 'circle';      // tudo o mais → círculo
+  | 'top'      // top ativo nativo → bola verde com ★
+  | 'top-new'  // top ativo pós-topping → bola amarela com ★
+  | 'top-fim'  // top ativo pós-fim → bola laranja com ★
+  | 'circle';  // tudo o mais → círculo
 
 function getNodeVisual(n: PlantGraphNode, parentState?: PlantGraphNode['state']): NodeVisual {
   if (n.type === 'top' && n.state === 'active') {
-    if (parentState === 'topped') return 'triangle-new';
-    if (parentState === 'fimmed') return 'triangle-fim';
-    return 'triangle';
+    if (parentState === 'topped') return 'top-new';
+    if (parentState === 'fimmed') return 'top-fim';
+    return 'top';
   }
   return 'circle';
 }
@@ -119,7 +119,6 @@ const ACTION_ORDER: GraphAction[] = ['topping','fim','grow','add-branch','lst','
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const SAVE_DEBOUNCE     = 3500;   // salva 3.5s após última mudança
 const MAX_UNDO          = 12;
 const SVG_MIN_H         = 380;
 const SVG_MIN_H_COMPACT = 220;
@@ -132,8 +131,12 @@ const DEFAULT_VP: VP = { x: 0, y: 0, scale: 1 };
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  plantId:             number;
+  plantId?:            number;
   compact?:            boolean;
+  /** Nós estáticos para visualização de snapshot (sem DB, sem interação) */
+  staticNodes?:        PlantGraphNode[];
+  /** Ref populado pelo PlantNodeMap com os nós atuais (para capturar snapshot ao salvar) */
+  nodeSnapshotRef?:    React.MutableRefObject<PlantGraphNode[]>;
   /** Se `current === true` ao desmontar, o save automático é cancelado (ex: usuário descartou a sessão) */
   cancelSaveRef?:      React.MutableRefObject<boolean>;
   onTechniqueApplied?: (technique: string, nodeLabel: string) => void;
@@ -160,8 +163,8 @@ interface NodeActionMenuProps {
   onAction:  (a: GraphAction) => void;
 }
 
-const PODA_ACTIONS: GraphAction[] = ['topping', 'fim', 'super-crop'];
-const VEGA_ACTIONS: GraphAction[] = ['grow', 'lst', 'add-branch'];
+const PODA_ACTIONS: GraphAction[] = ['topping', 'fim'];
+const VEGA_ACTIONS: GraphAction[] = ['grow', 'lst', 'super-crop', 'add-branch'];
 
 function NodeActionMenu({
   selectedNode, availableActions, onClose, onAction,
@@ -312,8 +315,11 @@ function NodeActionMenu({
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PlantNodeMap({
-  plantId, compact = false, cancelSaveRef, onTechniqueApplied, onResetStructure,
+  plantId, compact = false, staticNodes, nodeSnapshotRef,
+  cancelSaveRef, onTechniqueApplied, onResetStructure,
 }: Props) {
+  // Modo estático: só renderiza o snapshot, sem DB, sem interação
+  const isStatic = !!staticNodes;
   const containerRef = useRef<HTMLDivElement>(null);
   const saveTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Histórico bidirecional (undo/redo) — usado dentro do sandbox
@@ -391,10 +397,11 @@ export default function PlantNodeMap({
   const scheduleAutoSave = useCallback((_ns: PlantGraphNode[]) => {}, []);
 
   const saveNow = useCallback((ns: PlantGraphNode[]) => {
+    if (!plantId || isStatic) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setIsSaving(true);
     saveMutation.mutate({ plantId, nodes: ns });
-  }, [plantId, saveMutation]);
+  }, [plantId, isStatic, saveMutation]);
 
   useEffect(() => () => {
     if (saveTimer.current)  clearTimeout(saveTimer.current);
@@ -408,7 +415,7 @@ export default function PlantNodeMap({
   // Ref que aponta para a função de save mais recente (sem stale closure)
   const saveFnRef = useRef<() => void>(() => {});
   saveFnRef.current = () => {
-    if (compact || nodesRef.current.length === 0) return;
+    if (isStatic || compact || nodesRef.current.length === 0 || !plantId) return;
     if (cancelSaveRef?.current) return; // sessão descartada pelo pai
     saveMutation.mutate({ plantId, nodes: nodesRef.current });
   };
@@ -422,13 +429,22 @@ export default function PlantNodeMap({
   // ── Load ────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    // Modo estático: usa o snapshot passado diretamente, sem DB
+    if (isStatic) {
+      setNodes(staticNodes!);
+      setIsLoading(false);
+      return;
+    }
     if (saved === undefined) return;
     if (skipRemote.current) { skipRemote.current = false; return; }
     const raw = saved?.nodes as PlantGraphNode[] | undefined;
     const ns  = (raw?.length && !isLegacyFormat(raw)) ? raw : createInitialGraph();
     setNodes(ns);
     setIsLoading(false);
-  }, [saved]);
+  }, [saved, isStatic, staticNodes]);
+
+  // Sincroniza nodeSnapshotRef para que o pai possa capturar o estado atual
+  if (nodeSnapshotRef) nodeSnapshotRef.current = nodes;
 
   // ── Resize (usado no modo compact) ──────────────────────────────────────────
 
@@ -469,8 +485,6 @@ export default function PlantNodeMap({
   layoutNodesRef.current = layoutNodes;
   const vpRef              = useRef<VP>(DEFAULT_VP);
   vpRef.current            = vp;
-  const scheduleAutoSaveRef = useRef(scheduleAutoSave);
-  scheduleAutoSaveRef.current = scheduleAutoSave;
 
   // ── Fit to view ──────────────────────────────────────────────────────────────
 
@@ -849,10 +863,10 @@ export default function PlantNodeMap({
     if (techLabels[action]) onTechniqueApplied?.(techLabels[action]!, selNode ? `N${selNode.nodeNumber}` : '');
 
     const msgs: Partial<Record<GraphAction, string>> = {
-      topping:      'Topping ✂ — 2 novos topos criados',
+      topping:      'Topping ✂ — estrutura acima cortada, 2 novos topos',
       fim:          'FIM ~ — até 4 brotos',
       lst:          '〰 LST — galho e filhos deslocados',
-      'super-crop': '⚡ Super Cropping',
+      'super-crop': '⚡ Super Cropping — caule dobrado (sem corte)',
       grow:         '🌱 Novo nó adicionado',
       'add-branch': '🌿 Galho lateral adicionado',
     };
@@ -980,22 +994,15 @@ export default function PlantNodeMap({
           const isSelected = node.id === selectedId;
           const parentNode = node.parentId ? nodeMap.get(node.parentId) : undefined;
           const visual     = getNodeVisual(node, parentNode?.state);
-          const isTriangle = visual === 'triangle' || visual === 'triangle-new' || visual === 'triangle-fim';
-          const sw         = isSelected ? 2.5 : strokeWidth;
+          const isTopBud = visual === 'top' || visual === 'top-new' || visual === 'top-fim';
+          const sw       = isSelected ? 2.5 : strokeWidth;
 
-          // Cores do triângulo
-          const triColor = visual === 'triangle-new' ? NODE_COLOR.topNew
-                         : visual === 'triangle-fim' ? NODE_COLOR.topFimmed
+          // Cores do top bud (bola com estrela)
+          const topColor = visual === 'top-new' ? NODE_COLOR.topNew
+                         : visual === 'top-fim' ? NODE_COLOR.topFimmed
                          : NODE_COLOR.top;
 
-          // Triângulo SVG: vértice topo, base embaixo
-          const triPts = isTriangle ? [
-            `${node.x},${node.y - r}`,
-            `${node.x - r * 0.9},${node.y + r * 0.6}`,
-            `${node.x + r * 0.9},${node.y + r * 0.6}`,
-          ].join(' ') : '';
-
-          // Círculo
+          // Círculo normal
           const cc  = getCircleColor(node);
           const lbl = getCircleLabel(node);
           const fs  = compact
@@ -1016,31 +1023,36 @@ export default function PlantNodeMap({
               }}
               style={{ cursor: compact ? 'default' : 'move' }}
             >
-              {isTriangle ? (
+              {isTopBud ? (
                 <>
-                  {/* Anel de seleção para triângulo */}
+                  {/* Anel de seleção */}
                   {isSelected && (
-                    <polygon points={[
-                      `${node.x},${node.y - r - 5}`,
-                      `${node.x - (r+5) * 0.9},${node.y + (r+5) * 0.6}`,
-                      `${node.x + (r+5) * 0.9},${node.y + (r+5) * 0.6}`,
-                    ].join(' ')}
+                    <circle cx={node.x} cy={node.y} r={r + 5}
                       fill="none" stroke="#fff" strokeWidth={1.5} strokeOpacity={0.5} />
                   )}
-                  {/* Triângulo */}
-                  <polygon
-                    points={triPts}
-                    fill={triColor.fill}
-                    stroke={triColor.ring}
+                  {/* Bola do top bud */}
+                  <circle
+                    cx={node.x} cy={node.y} r={r}
+                    fill={topColor.fill}
+                    stroke={topColor.ring}
                     strokeWidth={sw}
-                    strokeLinejoin="round"
                   />
+                  {/* Estrela ★ */}
+                  <text
+                    x={node.x} y={node.y + 0.5}
+                    textAnchor="middle" dominantBaseline="central"
+                    fill={topColor.ring}
+                    fontSize={Math.round(r * (compact ? 0.95 : 1.05))}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    ★
+                  </text>
                   {/* Número lateral (modo full) */}
                   {!compact && (
                     <text
                       x={node.x + r + 3} y={node.y}
                       dominantBaseline="central"
-                      fill={triColor.ring} fillOpacity={0.6} fontSize={8} fontWeight="600"
+                      fill={topColor.ring} fillOpacity={0.6} fontSize={8} fontWeight="600"
                       fontFamily="ui-monospace,'SF Mono',Menlo,monospace"
                       style={{ pointerEvents: 'none', userSelect: 'none' }}
                     >

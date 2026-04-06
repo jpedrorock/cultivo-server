@@ -738,6 +738,8 @@ export const plantLSTLogs = mysqlTable(
     techniqueConfig: text("techniqueConfig"), // JSON: { expectedTops, recoveryDays }
     // Resultado real em JSON (confirmado depois)
     actualResult: text("actualResult"),       // JSON: { actualTops, vigor, confirmedAt }
+    // Snapshot da estrutura da planta (nós) no momento em que a sessão foi salva
+    snapshotJson: text("snapshotJson"),       // JSON: PlantGraphNode[]
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({

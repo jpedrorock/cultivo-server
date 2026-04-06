@@ -4514,21 +4514,37 @@ export const appRouter = router({
           expectedTops: z.number(),
           recoveryDays: z.number(),
         }).optional(),
+        snapshotJson: z.string().optional(), // PlantGraphNode[] serializado
       }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
 
-        await database.insert(plantLSTLogs).values({
+        const baseValues = {
           plantId: input.plantId,
           technique: input.technique,
           response: input.response,
           notes: input.notes,
           nodePosition: input.nodePosition,
           techniqueConfig: input.techniqueConfig ? JSON.stringify(input.techniqueConfig) : null,
-          actualResult: null,
-        });
+          actualResult: null as null,
+        };
+
+        try {
+          // Tenta inserir com snapshotJson (requer migration: ALTER TABLE ADD COLUMN snapshotJson)
+          await database.insert(plantLSTLogs).values({
+            ...baseValues,
+            ...(input.snapshotJson != null ? { snapshotJson: input.snapshotJson } : {}),
+          });
+        } catch (e: any) {
+          // Fallback: coluna snapshotJson ainda não existe na DB (migration pendente)
+          if (e?.message?.includes('snapshotJson') || e?.errno === 1054) {
+            await database.insert(plantLSTLogs).values(baseValues);
+          } else {
+            throw e;
+          }
+        }
 
         return { success: true };
       }),
@@ -4582,6 +4598,10 @@ export const appRouter = router({
           ...r,
           techniqueConfig: r.techniqueConfig ? JSON.parse(r.techniqueConfig as string) : null,
           actualResult:    r.actualResult    ? JSON.parse(r.actualResult    as string) : null,
+          snapshotJson:    (() => {
+            try { return r.snapshotJson ? JSON.parse(r.snapshotJson as string) : null; }
+            catch { return null; }
+          })(),
         }));
       }),
 
