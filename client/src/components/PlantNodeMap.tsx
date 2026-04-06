@@ -115,7 +115,7 @@ const ACTION_META: Record<GraphAction, {
                   destructive: true, separator: true },
 };
 
-const ACTION_ORDER: GraphAction[] = ['topping','fim','grow','add-branch','lst','super-crop','remove'];
+const ACTION_ORDER: GraphAction[] = ['topping','fim','grow','add-branch','super-crop','remove'];
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -164,7 +164,7 @@ interface NodeActionMenuProps {
 }
 
 const PODA_ACTIONS: GraphAction[] = ['topping', 'fim', 'super-crop'];
-const VEGA_ACTIONS: GraphAction[] = ['grow', 'lst', 'add-branch'];
+const VEGA_ACTIONS: GraphAction[] = ['grow', 'add-branch'];
 
 function NodeActionMenu({
   selectedNode, availableActions, onClose, onAction,

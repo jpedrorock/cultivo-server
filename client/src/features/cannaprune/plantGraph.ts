@@ -233,7 +233,6 @@ export function getAvailableActions(node: PlantGraphNode): GraphAction[] {
       // Internode ativo com estrutura acima: Super Crop remove tudo e cria 2 topos
       acts.push('super-crop', 'add-branch');
     }
-    acts.push('lst');
   } else {
     // Nó já podado / treinado: só adicionar galho lateral
     acts.push('add-branch');
