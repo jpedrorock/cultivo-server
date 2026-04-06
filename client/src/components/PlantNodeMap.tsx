@@ -975,12 +975,12 @@ export default function PlantNodeMap({
               <line x1={child.x}  y1={child.y}  x2={cp2.x} y2={cp2.y}
                 stroke="#60a5fa" strokeWidth={0.8} strokeDasharray="3 2" opacity={0.45} style={{pointerEvents:'none'}} />
               {/* Handle 1 */}
-              <circle cx={cp1.x} cy={cp1.y} r={5}
+              <circle cx={cp1.x} cy={cp1.y} r={8}
                 fill="#1e40af" stroke="#93c5fd" strokeWidth={1.5}
                 data-handle="1" data-edge-id={selectedEdgeId}
                 style={{ cursor: 'move', pointerEvents: 'all' }} />
               {/* Handle 2 */}
-              <circle cx={cp2.x} cy={cp2.y} r={5}
+              <circle cx={cp2.x} cy={cp2.y} r={8}
                 fill="#1e40af" stroke="#93c5fd" strokeWidth={1.5}
                 data-handle="2" data-edge-id={selectedEdgeId}
                 style={{ cursor: 'move', pointerEvents: 'all' }} />
@@ -1258,7 +1258,7 @@ export default function PlantNodeMap({
             {/* ── Dica ── */}
             <div className="absolute bottom-4 left-4 pointer-events-none select-none">
               <span className="text-[9px] text-muted-foreground/30">
-                {selectedEdgeId && !edgeMenuOpen ? 'Arraste os handles · Clique na linha p/ menu' : 'Mova nós · Arraste o fundo · Pinch / Scroll'}
+                {selectedEdgeId && !edgeMenuOpen ? 'Arraste os handles azuis · Clique fora p/ desselecionar' : 'Toque numa linha p/ curvar · Toque num nó p/ treinar'}
               </span>
             </div>
           </>
@@ -1283,7 +1283,7 @@ export default function PlantNodeMap({
         return (
           <>
             <div className="fixed inset-0 z-[199]"
-              onClick={() => { setSelectedEdgeId(null); setEdgeMenuOpen(false); }} />
+              onClick={() => setEdgeMenuOpen(false)} />
             <div
               className="fixed z-[200] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] pointer-events-auto"
               onClick={e => e.stopPropagation()}
@@ -1302,7 +1302,7 @@ export default function PlantNodeMap({
                     </span>
                   </div>
                   <button
-                    onClick={() => { setSelectedEdgeId(null); setEdgeMenuOpen(false); }}
+                    onClick={() => setEdgeMenuOpen(false)}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
