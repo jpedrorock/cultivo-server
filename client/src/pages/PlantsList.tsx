@@ -407,7 +407,7 @@ export default function PlantsList() {
                 <div key={tent.id} className={`rounded-2xl border ${tentColor.border} bg-card overflow-hidden`}>
                   {/* Header — gradiente de fase igual às seções da calculadora */}
                   <div
-                    className="flex items-center justify-between px-4 py-3 border-b border-border/40 cursor-pointer"
+                    className="flex items-center justify-between px-4 py-4 border-b border-border/40 cursor-pointer"
                     style={{ background: `linear-gradient(135deg, ${tentColor.glow} 0%, rgba(0,0,0,0) 100%)` }}
                     onClick={() => toggleTent(tent.id)}
                   >
@@ -438,7 +438,7 @@ export default function PlantsList() {
                   </div>
 
                   {isExpanded && (
-                    <div className="px-3 pb-3">
+                    <div className="px-3 pt-3 pb-3">
                       <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                         {tentPlants.map((plant: any) => {
                           const isSelected = selectedPlants.has(plant.id);

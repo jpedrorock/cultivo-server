@@ -630,7 +630,7 @@ export default function PlantDetail() {
                   </TabsTrigger>
                   {isPlant && (
                     <TabsTrigger value="cultivation" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
-                      <Scissors className="w-3.5 h-3.5" />
+                      <Sprout className="w-3.5 h-3.5" />
                       Cultivo
                     </TabsTrigger>
                   )}
