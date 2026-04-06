@@ -1,9 +1,10 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { useNavBadges } from "@/hooks/useNavBadges";
+import { trpc } from "@/lib/trpc";
 import {
   Sheet,
   SheetContent,
@@ -31,10 +32,17 @@ const HIDDEN_NAV_ROUTES = ["/quick-log"];
 const HIDDEN_NAV_PREFIXES = ["/tent/", "/display"];
 
 export function BottomNav() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const [trainingPickerOpen, setTrainingPickerOpen] = useState(false);
   const fabRef = useRef<HTMLDivElement>(null);
+
+  // Carrega plantas ativas só quando o picker de treinamento está aberto
+  const { data: activePlants = [] } = trpc.plants.list.useQuery(
+    { status: 'ACTIVE' },
+    { enabled: trainingPickerOpen },
+  );
 
   // TODOS os hooks devem ser chamados antes de qualquer return condicional (regra do React)
   const { alertCount, harvestQueueCount } = useNavBadges();
@@ -169,7 +177,7 @@ export function BottomNav() {
                 <Link
                   href="/quick-log?mode=trichome"
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors w-full"
+                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors border-b border-border/30 w-full"
                 >
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
                     <Sparkles className="w-4 h-4 text-white" />
@@ -179,8 +187,63 @@ export function BottomNav() {
                     <p className="text-[11px] text-muted-foreground/60">Maturação · Flora</p>
                   </div>
                 </Link>
+
+                {/* Treinamento — abre picker de planta */}
+                <button
+                  onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setTrainingPickerOpen(true); }}
+                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-green-500/8 active:bg-green-500/15 transition-colors w-full text-left"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <Scissors className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight">Treinamento</p>
+                    <p className="text-[11px] text-muted-foreground/60">LST, topping, super crop</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                </button>
               </div>
             )}
+
+            {/* ── Sheet: picker de planta para treinamento ── */}
+            <Sheet open={trainingPickerOpen} onOpenChange={setTrainingPickerOpen}>
+              <SheetContent side="bottom" className="rounded-t-2xl" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+                <SheetHeader className="mb-4">
+                  <SheetTitle className="text-sm flex items-center gap-2">
+                    <Scissors className="w-4 h-4 text-emerald-500" />
+                    Selecionar planta para treinar
+                  </SheetTitle>
+                </SheetHeader>
+                {activePlants.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma planta ativa encontrada</p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pb-2">
+                    {activePlants.map((plant: any) => (
+                      <button
+                        key={plant.id}
+                        onClick={() => {
+                          triggerHapticFeedback();
+                          setTrainingPickerOpen(false);
+                          navigate(`/plants/${plant.id}/training?sandbox=1`);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 active:scale-[0.98] transition-all text-left"
+                      >
+                        <span className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-emerald-500">
+                          {(plant.name ?? '?')[0].toUpperCase()}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold leading-tight truncate">{plant.name ?? `Planta ${plant.id}`}</p>
+                          {plant.strain && (
+                            <p className="text-xs text-muted-foreground truncate">{plant.strain}</p>
+                          )}
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </SheetContent>
+            </Sheet>
 
             <button
               onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}

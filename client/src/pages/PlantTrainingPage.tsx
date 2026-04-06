@@ -183,7 +183,9 @@ export default function PlantTrainingPage() {
     });
   }
 
-  const [mapFullscreen,    setMapFullscreen]    = useState(false);
+  // Auto-abre o sandbox se navegou com ?sandbox=1 (ex: via quick log)
+  const autoSandbox = new URLSearchParams(window.location.search).get('sandbox') === '1';
+  const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
   const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
   // Técnicas aplicadas nesta sessão do sandbox
   const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
