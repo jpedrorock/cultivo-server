@@ -136,11 +136,13 @@ async function startServer() {
   const { startDailyReminderCron } = await import("../cron/dailyReminder");
   startDailyReminderCron();
 
-  // Security headers
-  app.use(helmet({
-    contentSecurityPolicy: false, // SPA gerencia CSP via meta tags
-    crossOriginEmbedderPolicy: false,
-  }));
+  // Security headers — apenas em produção (Helmet interfere com Vite HMR em dev)
+  if (process.env.NODE_ENV === 'production') {
+    app.use(helmet({
+      contentSecurityPolicy: false, // SPA gerencia CSP via meta tags
+      crossOriginEmbedderPolicy: false,
+    }));
+  }
 
   // CORS — apenas origens conhecidas em produção
   const allowedOrigins = process.env.ALLOWED_ORIGINS
