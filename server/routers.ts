@@ -49,9 +49,10 @@ import { nanoid } from "nanoid";
 async function validateTentOwnership(tentId: number, groupId: number | null | undefined): Promise<void> {
   const database = await getDb();
   if (!database) throw new Error("Banco de dados não inicializado");
+  if (groupId == null) throw new Error("Acesso negado: usuário sem grupo atribuído");
   const [tent] = await database.select({ id: tents.id, groupId: tents.groupId }).from(tents).where(eq(tents.id, tentId)).limit(1);
   if (!tent) throw new Error("Estufa não encontrada");
-  if (groupId != null && tent.groupId != null && tent.groupId !== groupId) {
+  if (tent.groupId !== groupId) {
     throw new Error("Acesso negado: estufa não pertence ao seu grupo");
   }
 }
@@ -73,9 +74,10 @@ async function validateCycleOwnership(cycleId: number, groupId: number | null | 
 async function validatePlantOwnership(plantId: number, groupId: number | null | undefined): Promise<void> {
   const database = await getDb();
   if (!database) throw new Error("Banco de dados não inicializado");
+  if (groupId == null) throw new Error("Acesso negado: usuário sem grupo atribuído");
   const [plant] = await database.select({ id: plants.id, groupId: plants.groupId }).from(plants).where(eq(plants.id, plantId)).limit(1);
   if (!plant) throw new Error("Planta não encontrada");
-  if (groupId != null && plant.groupId != null && plant.groupId !== groupId) {
+  if (plant.groupId !== groupId) {
     throw new Error("Acesso negado: planta não pertence ao seu grupo");
   }
 }
@@ -2988,7 +2990,7 @@ export const appRouter = router({
       const sqlDump = await generateSQLDump();
       return { sql: sqlDump };
     }),
-    import: protectedProcedure
+    import: adminProcedure
       .input(z.object({ sqlContent: z.string() }))
       .mutation(async ({ input }) => {
         const { importSQLDump } = await import("./databaseImport");
@@ -3403,8 +3405,11 @@ export const appRouter = router({
             .select()
             .from(plants)
             .where(eq(plants.id, plantId));
-          
+
           if (!plant) continue; // Skip if plant not found
+
+          // Verificar que a planta pertence ao grupo do usuário
+          await validatePlantOwnership(plantId, ctx.user.groupId);
           
           // Registrar histórico
           await database.insert(plantTentHistory).values({
@@ -3856,21 +3861,24 @@ export const appRouter = router({
     uploadPhoto: protectedProcedure
       .input(z.object({
         plantId: z.number(),
-        imageData: z.string(), // base64
-        mimeType: z.string(),
+        imageData: z.string().max(20 * 1024 * 1024), // max ~15MB base64
+        mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
       }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
+
         // Converter base64 para Buffer
-        const base64Data = input.imageData.split(',')[1] || input.imageData;
+        const base64Data = input.imageData.replace(/^data:[^;]+;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
-        
+
+        // Extensão segura a partir do enum validado
+        const ext = input.mimeType.split('/')[1]; // seguro pois é enum
+
         // Upload para S3
         const { storagePut } = await import("./storage");
-        const fileKey = `plants/${input.plantId}/${Date.now()}.${input.mimeType.split('/')[1]}`;
+        const fileKey = `plants/${input.plantId}/${Date.now()}.${ext}`;
         const { url } = await storagePut(fileKey, buffer, input.mimeType);
         
         // Salvar no banco
@@ -3889,14 +3897,23 @@ export const appRouter = router({
     // Excluir foto da planta
     deletePhoto: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
+        // Verificar ownership: buscar a foto e validar a planta associada
+        const [photo] = await database
+          .select({ plantId: plantPhotos.plantId })
+          .from(plantPhotos)
+          .where(eq(plantPhotos.id, input.id))
+          .limit(1);
+        if (!photo) throw new Error("Foto não encontrada");
+        await validatePlantOwnership(photo.plantId, ctx.user.groupId);
+
         await database
           .delete(plantPhotos)
           .where(eq(plantPhotos.id, input.id));
-        
+
         return { success: true };
       }),
 
@@ -3993,22 +4010,23 @@ export const appRouter = router({
       .input(z.object({
         status: z.enum(["HARVESTED", "DISCARDED", "DEAD"]).optional(),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+        if (ctx.user.groupId == null) throw new Error("Acesso negado: usuário sem grupo atribuído");
+
+        const statusCondition = input.status
+          ? eq(plants.status, input.status)
+          : or(
+              eq(plants.status, "HARVESTED"),
+              eq(plants.status, "DISCARDED"),
+              eq(plants.status, "DEAD")
+            );
+
         let query = database
           .select()
           .from(plants)
-          .where(
-            input.status 
-              ? eq(plants.status, input.status)
-              : or(
-                  eq(plants.status, "HARVESTED"),
-                  eq(plants.status, "DISCARDED"),
-                  eq(plants.status, "DEAD")
-                )
-          )
+          .where(and(statusCondition, eq(plants.groupId, ctx.user.groupId)))
           .orderBy(desc(plants.finishedAt));
         
         const archivedPlants = await query;
@@ -4240,14 +4258,23 @@ export const appRouter = router({
     
     delete: protectedProcedure
       .input(z.object({ photoId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
-        
+
+        // Verificar ownership: buscar a foto e validar a planta associada
+        const [photo] = await database
+          .select({ plantId: plantPhotos.plantId })
+          .from(plantPhotos)
+          .where(eq(plantPhotos.id, input.photoId))
+          .limit(1);
+        if (!photo) throw new Error("Foto não encontrada");
+        await validatePlantOwnership(photo.plantId, ctx.user.groupId);
+
         await database
           .delete(plantPhotos)
           .where(eq(plantPhotos.id, input.photoId));
-        
+
         return { success: true };
       }),
   }),
