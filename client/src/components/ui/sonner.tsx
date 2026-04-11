@@ -9,12 +9,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={sonnerTheme}
-      position="bottom-center"
+      position="top-center"
       expand={false}
       richColors={false}
       closeButton={false}
       duration={3000}
-      offset={80}
+
       className="toaster group"
       toastOptions={{
         // Sem estilos inline — o CSS em index.css via [data-sonner-toast] controla tudo
