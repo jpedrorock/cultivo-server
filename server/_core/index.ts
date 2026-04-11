@@ -4,6 +4,8 @@ import path from "path";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import helmet from "helmet";
+import cors from "cors";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
 import { appRouter } from "../routers";
@@ -133,6 +135,26 @@ async function startServer() {
   // Inicializar cron job de lembretes diários (verifica a cada minuto)
   const { startDailyReminderCron } = await import("../cron/dailyReminder");
   startDailyReminderCron();
+
+  // Security headers
+  app.use(helmet({
+    contentSecurityPolicy: false, // SPA gerencia CSP via meta tags
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // CORS — apenas origens conhecidas em produção
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : [];
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Desenvolvimento: permitir sem origin (apps mobile/Vite local)
+      if (!origin || process.env.NODE_ENV !== 'production') return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origem não permitida — ${origin}`));
+    },
+    credentials: true,
+  }));
 
   // Body parser com limite maior para uploads
   app.use(express.json({ limit: "50mb" }));

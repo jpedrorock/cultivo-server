@@ -95,9 +95,9 @@ function Router() {
         <Route path="/harvest-queue" component={HarvestQueue} />
         <Route path={"/plants/:id"} component={PlantDetail} />
 
-        <Route path={"/tent/:id"} component={TentDetails} />
         <Route path={"/tent/:id/log"} component={TentLog} />
         <Route path={"/tent/:id/display"} component={DisplayMode} />
+        <Route path={"/tent/:id"} component={TentDetails} />
         <Route path={"/quick-log"} component={QuickLog} />
         <Route path={"/morning-check"} component={MorningCheck} />
         <Route path={"/admin/users"} component={AdminUsers} />

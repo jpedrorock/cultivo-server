@@ -452,24 +452,25 @@ export const appRouter = router({
       .input(
         z.object({
           name: z.string().min(1).max(100),
-          description: z.string().optional(),
+          description: z.string().max(2000).optional(),
           vegaWeeks: z.number().min(1).max(12),
           floraWeeks: z.number().min(1).max(16),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+
         // Check if strain name already exists
         const existing = await database.select().from(strains).where(eq(strains.name, input.name));
         if (existing.length > 0) {
           throw new Error(`Já existe uma strain com o nome "${input.name}". Por favor, escolha outro nome.`);
         }
-        
-        await database.insert(strains).values(input);
+
+        // groupId sempre vem do contexto — nunca do input do cliente
+        await database.insert(strains).values({ ...input, groupId: ctx.user.groupId ?? null });
         return { success: true };
       }),
     update: protectedProcedure
@@ -477,7 +478,7 @@ export const appRouter = router({
         z.object({
           id: z.number(),
           name: z.string().min(1).max(100).optional(),
-          description: z.string().optional(),
+          description: z.string().max(2000).optional(),
           vegaWeeks: z.number().min(1).max(12).optional(),
           floraWeeks: z.number().min(1).max(16).optional(),
           isActive: z.boolean().optional(),
@@ -494,24 +495,31 @@ export const appRouter = router({
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
-        
+
+        // Verificar que a strain pertence ao grupo do usuário (strains globais não podem ser deletadas)
+        const [strain] = await database.select({ groupId: strains.groupId }).from(strains).where(eq(strains.id, input.id)).limit(1);
+        if (!strain) throw new Error("Strain não encontrada");
+        if (strain.groupId == null || strain.groupId !== ctx.user.groupId) {
+          throw new Error("Acesso negado: apenas strains do seu grupo podem ser excluídas");
+        }
+
         // Check if strain is used in any cycles
         const cyclesWithStrain = await database.select().from(cycles).where(eq(cycles.strainId, input.id));
         if (cyclesWithStrain.length > 0) {
           throw new Error("Não é possível excluir esta strain pois ela está vinculada a ciclos existentes. Finalize ou exclua os ciclos primeiro.");
         }
-        
+
         // Check if strain is used in any plants
         const plantsWithStrain = await database.select().from(plants).where(eq(plants.strainId, input.id));
         if (plantsWithStrain.length > 0) {
           throw new Error("Não é possível excluir esta strain pois ela está vinculada a plantas existentes. Remova as plantas primeiro.");
         }
-        
+
         await database.delete(strains).where(eq(strains.id, input.id));
         return { success: true };
       }),
@@ -520,7 +528,7 @@ export const appRouter = router({
         z.object({
           sourceStrainId: z.number(),
           name: z.string().min(1).max(100),
-          description: z.string().optional(),
+          description: z.string().max(2000).optional(),
           vegaWeeks: z.number().min(1).max(12),
           floraWeeks: z.number().min(1).max(16),
         })
@@ -1585,7 +1593,7 @@ export const appRouter = router({
             { message: "Runoff coletado deve ser maior ou igual a 0" }
           ),
           // runoffPh e runoffEc removidos: ph/ec da rega já medem o runoff
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -1770,7 +1778,7 @@ export const appRouter = router({
           ppfd: z.number().optional(),
           ph: z.string().optional(),
           ec: z.string().optional(),
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -2513,7 +2521,7 @@ export const appRouter = router({
           phMax: z.string().optional(),
           ecMin: z.string().optional(),
           ecMax: z.string().optional(),
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -2876,7 +2884,7 @@ export const appRouter = router({
       .input(
         z.object({
           taskId: z.number(),
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -3248,7 +3256,7 @@ export const appRouter = router({
           id: z.number(),
           name: z.string().min(1).optional(),
           code: z.string().optional(),
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -3922,7 +3930,7 @@ export const appRouter = router({
       .input(z.object({
         plantId: z.number(),
         status: z.enum(["HARVESTED", "DISCARDED"]),
-        finishReason: z.string().optional(),
+        finishReason: z.string().max(1000).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
@@ -5014,7 +5022,7 @@ export const appRouter = router({
       .input(
         z.object({
           title: z.string().min(1),
-          description: z.string().optional(),
+          description: z.string().max(2000).optional(),
           phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
@@ -5041,7 +5049,7 @@ export const appRouter = router({
         z.object({
           id: z.number(),
           title: z.string().min(1),
-          description: z.string().optional(),
+          description: z.string().max(2000).optional(),
           phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
@@ -5138,7 +5146,7 @@ export const appRouter = router({
               fe: z.number().optional(),
             })
           ),
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -5185,7 +5193,7 @@ export const appRouter = router({
               fe: z.number().optional(),
             })
           ),
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -5260,7 +5268,7 @@ export const appRouter = router({
           expectedRunoffL: z.number().nullable(),
           actualRunoffL: z.number().nullable(),
           actualRunoffPercent: z.number().nullable(),
-          notes: z.string().optional(),
+          notes: z.string().max(2000).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -5681,7 +5689,7 @@ export const appRouter = router({
       .input(
         z.object({
           plantIds: z.array(z.number()),
-          reason: z.string().optional(),
+          reason: z.string().max(1000).optional(),
         })
       )
       .mutation(async ({ input }) => {
