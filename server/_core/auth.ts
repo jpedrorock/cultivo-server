@@ -97,7 +97,7 @@ export function setAuthCookie(
   res.cookie('auth_token', token, {
     httpOnly: true,
     secure: ENV.isProduction,
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge,
     path: '/',
   });
@@ -110,7 +110,7 @@ export function clearAuthCookie(res: Response) {
   res.clearCookie('auth_token', {
     httpOnly: true,
     secure: ENV.isProduction,
-    sameSite: 'strict',
+    sameSite: 'lax',
     path: '/',
   });
 }
