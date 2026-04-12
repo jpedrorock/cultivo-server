@@ -262,30 +262,33 @@ export default function PlantChat() {
               <h1 className="text-sm font-bold text-foreground leading-tight">IA Especialista</h1>
               <p className="text-xs text-muted-foreground">Cannabis Indoor</p>
             </div>
+
+            {/* Plant selector button */}
             <button
               onClick={() => setPickerOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-xs font-medium text-foreground max-w-[140px]"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all text-xs font-medium shrink-0 max-w-[150px] ${
+                plant
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20'
+                  : 'bg-muted border border-dashed border-border text-muted-foreground hover:border-emerald-500/50 hover:text-emerald-600'
+              }`}
             >
-              <Leaf className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className="truncate">{plant?.name ?? 'Selecionar planta'}</span>
-              <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
+              {plant ? (
+                <>
+                  <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-white font-bold" style={{ fontSize: 9 }}>
+                    {plant.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="truncate">{plant.name}</span>
+                  <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
+                </>
+              ) : (
+                <>
+                  <Leaf className="w-3.5 h-3.5 shrink-0" />
+                  <span>Planta</span>
+                  <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
+                </>
+              )}
             </button>
           </div>
-
-          {/* Context banner */}
-          {plant && (
-            <div className="container mx-auto px-4 pb-2">
-              <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-400 overflow-x-auto whitespace-nowrap">
-                <span className="font-medium">{plant.name}</span>
-                {plant.plantStage && (
-                  <span className="text-emerald-600 dark:text-emerald-500">
-                    {plant.plantStage === 'CLONE' ? 'Clone' : plant.plantStage === 'SEEDLING' ? 'Seedling' : 'Planta'}
-                  </span>
-                )}
-                <span className="text-emerald-500/70">Contexto automático ativo</span>
-              </div>
-            </div>
-          )}
         </header>
 
         {/* No API key warning */}
@@ -312,6 +315,42 @@ export default function PlantChat() {
                 <p className="font-semibold text-foreground">IA Especialista em Cannabis</p>
                 <p className="text-sm text-muted-foreground mt-1">Pergunte sobre sua planta, diagnóstico, tricomas, LST…</p>
               </div>
+
+              {/* Plant context card */}
+              {plant ? (
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  className="w-full max-w-xs flex items-center gap-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/15 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 text-white font-bold text-base shadow-sm">
+                    {plant.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{plant.name}</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                      {plant.plantStage === 'CLONE' ? 'Clone' : plant.plantStage === 'SEEDLING' ? 'Seedling' : 'Planta'} · Contexto ativo
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex flex-col items-end gap-1">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-medium">ativo</span>
+                    <span className="text-[10px] text-muted-foreground">trocar</span>
+                  </div>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  className="w-full max-w-xs flex items-center gap-3 p-3 rounded-2xl border border-dashed border-border hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                    <Leaf className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Selecionar planta</p>
+                    <p className="text-xs text-muted-foreground">A IA receberá o contexto automático</p>
+                  </div>
+                </button>
+              )}
+
               {/* Quick chips */}
               <div className="flex flex-wrap gap-2 justify-center max-w-sm">
                 {QUICK_CHIPS.map(chip => (
@@ -325,6 +364,29 @@ export default function PlantChat() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Plant indicator when chat has messages */}
+          {messages.length > 0 && plant && (
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="flex items-center gap-2 mx-auto mb-4 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+            >
+              <span className="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shrink-0" style={{ fontSize: 9 }}>
+                {plant.name.charAt(0).toUpperCase()}
+              </span>
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 truncate max-w-[120px]">{plant.name}</span>
+              <span className="text-[10px] text-emerald-500/70">trocar</span>
+            </button>
+          )}
+          {messages.length > 0 && !plant && (
+            <button
+              onClick={() => setPickerOpen(true)}
+              className="flex items-center gap-2 mx-auto mb-4 px-3 py-1.5 rounded-full bg-muted border border-dashed border-border hover:border-emerald-500/40 transition-colors"
+            >
+              <Leaf className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Sem planta selecionada · tocar para escolher</span>
+            </button>
           )}
 
           {messages.map(msg => <ChatBubble key={msg.id} msg={msg} />)}
