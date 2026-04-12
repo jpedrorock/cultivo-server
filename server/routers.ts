@@ -464,8 +464,8 @@ export const appRouter = router({
         }
 
         // Check if strain name already exists
-        const existing = await database.select().from(strains).where(eq(strains.name, input.name));
-        if (existing.length > 0) {
+        const [existing] = await database.select({ id: strains.id }).from(strains).where(eq(strains.name, input.name)).limit(1);
+        if (existing) {
           throw new Error(`Já existe uma strain com o nome "${input.name}". Por favor, escolha outro nome.`);
         }
 
@@ -509,14 +509,14 @@ export const appRouter = router({
         }
 
         // Check if strain is used in any cycles
-        const cyclesWithStrain = await database.select().from(cycles).where(eq(cycles.strainId, input.id));
-        if (cyclesWithStrain.length > 0) {
+        const [cycleWithStrain] = await database.select({ id: cycles.id }).from(cycles).where(eq(cycles.strainId, input.id)).limit(1);
+        if (cycleWithStrain) {
           throw new Error("Não é possível excluir esta strain pois ela está vinculada a ciclos existentes. Finalize ou exclua os ciclos primeiro.");
         }
 
         // Check if strain is used in any plants
-        const plantsWithStrain = await database.select().from(plants).where(eq(plants.strainId, input.id));
-        if (plantsWithStrain.length > 0) {
+        const [plantWithStrain] = await database.select({ id: plants.id }).from(plants).where(eq(plants.strainId, input.id)).limit(1);
+        if (plantWithStrain) {
           throw new Error("Não é possível excluir esta strain pois ela está vinculada a plantas existentes. Remova as plantas primeiro.");
         }
 
@@ -4038,65 +4038,63 @@ export const appRouter = router({
           .orderBy(desc(plants.finishedAt));
         
         const archivedPlants = await query;
-        
-        // Para cada planta, buscar strain, última foto, estufa e ciclo
-        const plantsWithDetails = await Promise.all(
-          archivedPlants.map(async (plant: any) => {
-            // Buscar strain
-            const [strain] = await database
-              .select()
-              .from(strains)
-              .where(eq(strains.id, plant.strainId));
-            
-            // Última foto de saúde
-            const [lastHealthPhoto] = await database
-              .select()
-              .from(plantHealthLogs)
-              .where(eq(plantHealthLogs.plantId, plant.id))
-              .orderBy(desc(plantHealthLogs.logDate))
-              .limit(1);
-            
-            // Buscar nome da estufa
-            let tentName: string | null = null;
-            if (plant.currentTentId) {
-              const [tent] = await database
-                .select({ name: tents.name })
-                .from(tents)
-                .where(eq(tents.id, plant.currentTentId));
-              tentName = tent?.name || null;
-            }
-            
-            // Buscar dados de colheita do ciclo mais recente da estufa
-            let harvestWeight: string | null = null;
-            let harvestNotes: string | null = null;
-            if (plant.currentTentId) {
-              const [lastCycle] = await database
-                .select({ 
-                  harvestWeight: cycles.harvestWeight, 
-                  harvestNotes: cycles.harvestNotes 
-                })
+        if (archivedPlants.length === 0) return [];
+
+        // Batch queries — sem N+1
+        const plantIds    = archivedPlants.map((p: any) => p.id);
+        const strainIds   = [...new Set(archivedPlants.map((p: any) => p.strainId).filter(Boolean))];
+        const tentIds     = [...new Set(archivedPlants.map((p: any) => p.currentTentId).filter(Boolean))];
+
+        const [strainsMap, lastPhotosRows, tentsRows, cyclesRows] = await Promise.all([
+          // 1. Todas as strains de uma vez
+          strainIds.length
+            ? database.select({ id: strains.id, name: strains.name }).from(strains)
+                .where(inArray(strains.id, strainIds as number[]))
+            : Promise.resolve([]),
+
+          // 2. Última foto de saúde por planta (subquery via ORDER + GROUP não suportado pelo Drizzle,
+          //    então buscamos todas ordenadas e pegamos a primeira por plantId)
+          database.select({ plantId: plantHealthLogs.plantId, photoUrl: plantHealthLogs.photoUrl })
+            .from(plantHealthLogs)
+            .where(inArray(plantHealthLogs.plantId, plantIds))
+            .orderBy(desc(plantHealthLogs.logDate)),
+
+          // 3. Todas as estufas relevantes
+          tentIds.length
+            ? database.select({ id: tents.id, name: tents.name }).from(tents)
+                .where(inArray(tents.id, tentIds as number[]))
+            : Promise.resolve([]),
+
+          // 4. Ciclos finalizados mais recentes por estufa
+          tentIds.length
+            ? database.select({ tentId: cycles.tentId, harvestWeight: cycles.harvestWeight, harvestNotes: cycles.harvestNotes })
                 .from(cycles)
-                .where(and(
-                  eq(cycles.tentId, plant.currentTentId),
-                  eq(cycles.status, "FINISHED")
-                ))
+                .where(and(inArray(cycles.tentId, tentIds as number[]), eq(cycles.status, "FINISHED")))
                 .orderBy(desc(cycles.createdAt))
-                .limit(1);
-              harvestWeight = lastCycle?.harvestWeight || null;
-              harvestNotes = lastCycle?.harvestNotes || null;
-            }
-            
-            return {
-              ...plant,
-              strainName: strain?.name || "Desconhecida",
-              lastHealthPhotoUrl: lastHealthPhoto?.photoUrl || null,
-              tentName,
-              harvestWeight,
-              harvestNotes,
-            };
-          })
-        );
-        
+            : Promise.resolve([]),
+        ]);
+
+        // Montar mapas para lookup O(1)
+        const strainById  = new Map((strainsMap as any[]).map(s => [s.id, s.name]));
+        const tentNameById = new Map((tentsRows as any[]).map(t => [t.id, t.name]));
+        const lastPhotoByPlant = new Map<number, string | null>();
+        for (const row of lastPhotosRows as any[]) {
+          if (!lastPhotoByPlant.has(row.plantId)) lastPhotoByPlant.set(row.plantId, row.photoUrl);
+        }
+        const cycleByTent = new Map<number, { harvestWeight: string | null; harvestNotes: string | null }>();
+        for (const row of cyclesRows as any[]) {
+          if (!cycleByTent.has(row.tentId)) cycleByTent.set(row.tentId, { harvestWeight: row.harvestWeight, harvestNotes: row.harvestNotes });
+        }
+
+        const plantsWithDetails = archivedPlants.map((plant: any) => ({
+          ...plant,
+          strainName: strainById.get(plant.strainId) || "Desconhecida",
+          lastHealthPhotoUrl: lastPhotoByPlant.get(plant.id) || null,
+          tentName: plant.currentTentId ? tentNameById.get(plant.currentTentId) || null : null,
+          harvestWeight: plant.currentTentId ? cycleByTent.get(plant.currentTentId)?.harvestWeight || null : null,
+          harvestNotes: plant.currentTentId ? cycleByTent.get(plant.currentTentId)?.harvestNotes || null : null,
+        }));
+
         return plantsWithDetails;
       }),
 
