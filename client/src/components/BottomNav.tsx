@@ -93,7 +93,6 @@ export function BottomNav() {
     HIDDEN_NAV_ROUTES.includes(location) ||
     location.endsWith("/display") ||
     location.endsWith("/training") ||
-    location.startsWith("/chat") ||
     keyboardOpen;
 
   const navItems: NavItem[] = [

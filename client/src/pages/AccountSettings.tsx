@@ -279,36 +279,59 @@ function GroupCard() {
 }
 
 const PROVIDER_MODELS = {
-  openai:    { label: 'OpenAI',    models: ['gpt-4o', 'gpt-4o-mini'] },
-  anthropic: { label: 'Anthropic', models: ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'] },
-  gemini:    { label: 'Gemini',    models: ['gemini-2.0-flash', 'gemini-1.5-pro'] },
+  gemini:    { label: 'Gemini',    models: ['gemini-2.0-flash-lite', 'gemini-2.5-flash-preview-04-17', 'gemini-2.5-pro-preview-03-25'],  hint: 'Tier gratuito · aistudio.google.com' },
+  deepseek:  { label: 'DeepSeek', models: ['deepseek-chat', 'deepseek-reasoner'],               hint: 'Mais barato pago · platform.deepseek.com' },
+  openai:    { label: 'OpenAI',   models: ['gpt-4o-mini', 'gpt-4o'],                            hint: 'platform.openai.com' },
+  anthropic: { label: 'Anthropic', models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-6'],  hint: 'console.anthropic.com' },
+  kimi:      { label: 'Kimi',     models: ['moonshot-v1-8k', 'moonshot-v1-32k'],                hint: 'platform.moonshot.cn' },
 } as const;
 
 type Provider = keyof typeof PROVIDER_MODELS;
 
 function AiSettingsCard() {
   const { data: settings } = trpc.aiChat.getSettings.useQuery();
+  const { data: liveModels, isLoading: modelsLoading } = trpc.aiChat.listModels.useQuery(
+    undefined,
+    { enabled: !!settings?.hasKey },
+  );
   const save = trpc.aiChat.saveSettings.useMutation({
-    onSuccess: () => toast.success('API configurada!'),
+    onSuccess: () => { toast.success('API configurada!'); setTestResult(null); },
     onError: (e) => toast.error(`Erro: ${e.message}`),
   });
+  const test = trpc.aiChat.testConnection.useMutation({
+    onSuccess: (d) => setTestResult({ ok: true, msg: `✓ Conectado · ${d.modelUsed}` }),
+    onError: (e) => setTestResult({ ok: false, msg: e.message }),
+  });
 
-  const [provider, setProvider] = useState<Provider>('openai');
+  const [provider, setProvider] = useState<Provider>('gemini');
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState(PROVIDER_MODELS.openai.models[0]);
+  const [model, setModel] = useState(PROVIDER_MODELS.gemini.models[0]);
   const [showKey, setShowKey] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  // Sync form with loaded settings (once, in effect)
+  // Modelos disponíveis: live da API (Gemini) ou lista estática
+  const availableModels: string[] = (liveModels?.models?.length)
+    ? liveModels.models
+    : [...PROVIDER_MODELS[provider].models];
+
   useEffect(() => {
     if (!settings) return;
-    const p = (settings.provider as Provider | null) ?? 'openai';
+    const p = (settings.provider as Provider | null) ?? 'gemini';
     setProvider(p);
-    setModel(settings.model ?? PROVIDER_MODELS[p]?.models[0] ?? PROVIDER_MODELS.openai.models[0]);
+    setModel(settings.model ?? PROVIDER_MODELS[p]?.models[0] ?? PROVIDER_MODELS.gemini.models[0]);
   }, [settings?.provider, settings?.model]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quando modelos live carregam e o modelo atual não está na lista, seleciona o primeiro
+  useEffect(() => {
+    if (liveModels?.models?.length && !liveModels.models.includes(model)) {
+      setModel(liveModels.models[0]);
+    }
+  }, [liveModels]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleProviderChange = (p: Provider) => {
     setProvider(p);
     setModel(PROVIDER_MODELS[p].models[0]);
+    setTestResult(null);
   };
 
   const handleSave = () => {
@@ -341,36 +364,48 @@ function AiSettingsCard() {
           </div>
         )}
 
-        <div className="space-y-2 p-3 border border-border rounded-lg">
+        <div className="space-y-3 p-3 border border-border rounded-lg">
           {/* Provedor */}
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Provedor</p>
-            <div className="flex gap-1.5">
-              {(Object.keys(PROVIDER_MODELS) as Provider[]).map(p => (
-                <button
-                  key={p}
-                  onClick={() => handleProviderChange(p)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                    provider === p
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  {PROVIDER_MODELS[p].label}
-                </button>
-              ))}
+            <p className="text-xs text-muted-foreground mb-2">Provedor</p>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {(Object.keys(PROVIDER_MODELS) as Provider[]).map(p => {
+                const isSelected = provider === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => handleProviderChange(p)}
+                    className={`flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg border text-left transition-all active:scale-[0.98] ${
+                      isSelected
+                        ? 'bg-emerald-600/10 border-emerald-500/50 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-muted/40 border-border text-muted-foreground hover:border-emerald-500/30 hover:text-foreground'
+                    }`}
+                  >
+                    <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : 'text-foreground'}`}>
+                      {PROVIDER_MODELS[p].label}
+                    </span>
+                    <span className="text-[10px] leading-tight opacity-70 truncate w-full">
+                      {PROVIDER_MODELS[p].hint}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Modelo */}
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Modelo</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-muted-foreground">Modelo</p>
+              {modelsLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando modelos…</span>}
+              {!modelsLoading && liveModels?.models?.length ? <span className="text-[10px] text-emerald-600">{liveModels.models.length} disponíveis</span> : null}
+            </div>
             <select
               value={model}
               onChange={e => setModel(e.target.value)}
               className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-emerald-500"
             >
-              {PROVIDER_MODELS[provider].models.map(m => (
+              {availableModels.map(m => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
@@ -396,14 +431,37 @@ function AiSettingsCard() {
             </div>
           </div>
 
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={save.isPending || (!apiKey.trim() && !settings?.hasKey)}
-            className="w-full"
-          >
-            {save.isPending ? 'Salvando...' : 'Salvar configuração'}
-          </Button>
+          {/* Resultado do teste */}
+          {testResult && (
+            <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
+              testResult.ok
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                : 'bg-destructive/10 text-destructive border border-destructive/20'
+            }`}>
+              {testResult.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+              <span>{testResult.msg}</span>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => test.mutate()}
+              disabled={test.isPending || !settings?.hasKey}
+              className="flex-1"
+            >
+              {test.isPending ? 'Testando…' : 'Testar conexão'}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={save.isPending || (!apiKey.trim() && !settings?.hasKey)}
+              className="flex-1"
+            >
+              {save.isPending ? 'Salvando…' : 'Salvar'}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

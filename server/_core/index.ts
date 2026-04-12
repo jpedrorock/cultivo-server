@@ -135,6 +135,30 @@ async function ensureUserAiSettingsTable() {
   }
 }
 
+async function ensureAiChatMessagesTable() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`aiChatMessages\` (
+        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\`    INT NOT NULL,
+        \`plantId\`   INT,
+        \`role\`      ENUM('user','assistant') NOT NULL,
+        \`content\`   TEXT NOT NULL,
+        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        INDEX \`userPlantIdx\` (\`userId\`, \`plantId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.end();
+    console.log("[DB] Tabela aiChatMessages OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao criar aiChatMessages:", err?.message);
+  }
+}
+
 async function ensurePlantLSTLogsColumns() {
   try {
     const connectionString = process.env.DATABASE_URL;
@@ -190,6 +214,9 @@ async function startServer() {
 
   // Garantir que a tabela de configurações de IA do usuário existe
   await ensureUserAiSettingsTable();
+
+  // Garantir que a tabela de histórico do chat de IA existe
+  await ensureAiChatMessagesTable();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();

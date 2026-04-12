@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRoute, useLocation, Link } from 'wouter';
-import { ArrowLeft, Bot, Send, ImagePlus, X, ChevronDown, Leaf, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Bot, Send, ImagePlus, X, Leaf, AlertCircle, Trash2, Sparkles, ChevronRight, Images } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { PageTransition } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -33,9 +33,7 @@ function SimpleMarkdown({ text }: { text: string }) {
   return (
     <div className="space-y-1">
       {lines.map((line, i) => {
-        // Bold **text**
         const parsed = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        // Bullet list
         if (/^[-•*]\s/.test(line)) {
           return (
             <div key={i} className="flex gap-1.5">
@@ -44,7 +42,6 @@ function SimpleMarkdown({ text }: { text: string }) {
             </div>
           );
         }
-        // Heading ## or ###
         if (/^#{1,3}\s/.test(line)) {
           return <p key={i} className="font-semibold mt-1" dangerouslySetInnerHTML={{ __html: parsed.replace(/^#{1,3}\s/, '') }} />;
         }
@@ -86,7 +83,7 @@ function ChatBubble({ msg }: { msg: Message }) {
   );
 }
 
-// ─── Skeleton loading bubble ──────────────────────────────────────────────────
+// ─── Loading bubble ───────────────────────────────────────────────────────────
 
 function LoadingBubble() {
   return (
@@ -107,40 +104,285 @@ function LoadingBubble() {
   );
 }
 
+// ─── History skeleton ─────────────────────────────────────────────────────────
+
+function HistorySkeleton() {
+  return (
+    <>
+      {[{ w: '60%', user: false }, { w: '45%', user: true }, { w: '70%', user: false }].map((s, i) => (
+        <div key={i} className={`flex ${s.user ? 'justify-end' : 'justify-start'} mb-3`}>
+          {!s.user && <div className="w-7 h-7 rounded-full bg-muted shrink-0 mr-2 animate-pulse" />}
+          <div className="rounded-2xl bg-muted animate-pulse" style={{ width: s.w, height: 36 }} />
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ─── Plant context bar ────────────────────────────────────────────────────────
+
+function PlantContextBar({
+  plant,
+  onPress,
+}: {
+  plant: any;
+  onPress: () => void;
+}) {
+  if (plant) {
+    const stage =
+      plant.plantStage === 'CLONE' ? 'Clone' :
+      plant.plantStage === 'SEEDLING' ? 'Seedling' :
+      plant.plantStage === 'VEGETATION' ? 'Vegetativa' :
+      plant.plantStage === 'FLOWERING' ? 'Flora' : 'Planta';
+
+    return (
+      <button
+        onClick={onPress}
+        className="w-full flex items-center gap-3 px-4 py-2.5 bg-emerald-500/8 border-b border-emerald-500/15 hover:bg-emerald-500/12 active:bg-emerald-500/15 transition-colors"
+      >
+        {/* Avatar */}
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 text-white font-bold text-sm shadow-sm shadow-emerald-500/20">
+          {plant.name.charAt(0).toUpperCase()}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-foreground truncate">{plant.name}</p>
+            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/20">
+              {stage}
+            </span>
+          </div>
+          <p className="text-[11px] text-emerald-600/70 dark:text-emerald-400/60 mt-0.5">
+            Contexto enviado automaticamente para a IA
+          </p>
+        </div>
+
+        {/* Trocar */}
+        <div className="shrink-0 flex items-center gap-1 text-emerald-600/60 dark:text-emerald-400/60">
+          <span className="text-[11px] font-medium">Trocar</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </div>
+      </button>
+    );
+  }
+
+  // No plant selected
+  return (
+    <button
+      onClick={onPress}
+      className="w-full flex items-center gap-3 px-4 py-2.5 bg-muted/40 border-b border-dashed border-border hover:bg-muted/60 hover:border-emerald-500/30 transition-colors"
+    >
+      <div className="w-9 h-9 rounded-xl bg-muted border border-dashed border-border flex items-center justify-center shrink-0">
+        <Leaf className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <div className="flex-1 text-left">
+        <p className="text-sm font-medium text-foreground">Selecionar planta</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">A IA receberá dados de ambiente, saúde e fase</p>
+      </div>
+      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+    </button>
+  );
+}
+
+// ─── Plant gallery sheet ──────────────────────────────────────────────────────
+
+function PlantGallerySheet({
+  open,
+  onClose,
+  plantId,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  plantId: number;
+  onSelect: (base64: string, mime: 'image/jpeg' | 'image/png' | 'image/webp', preview: string) => void;
+}) {
+  const { data: photos = [], isLoading } = trpc.plantPhotos.list.useQuery(
+    { plantId },
+    { enabled: open },
+  );
+  const [loadingUrl, setLoadingUrl] = useState<string | null>(null);
+
+  const handlePickPhoto = async (photoUrl: string) => {
+    try {
+      setLoadingUrl(photoUrl);
+      const fullUrl = photoUrl.startsWith('http') ? photoUrl : `${window.location.origin}${photoUrl}`;
+      const res = await fetch(fullUrl);
+      const blob = await res.blob();
+      const mime = (blob.type as 'image/jpeg' | 'image/png' | 'image/webp') || 'image/jpeg';
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const base64 = dataUrl.split(',')[1];
+        onSelect(base64, mime, dataUrl);
+        onClose();
+      };
+      reader.readAsDataURL(blob);
+    } catch {
+      toast.error('Não foi possível carregar a foto');
+    } finally {
+      setLoadingUrl(null);
+    }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={v => !v && onClose()}>
+      <SheetContent side="bottom" className="rounded-t-2xl h-[70vh] flex flex-col" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+        <p className="font-semibold text-sm mb-1 shrink-0">Fotos salvas da planta</p>
+        <p className="text-xs text-muted-foreground mb-3 shrink-0">Toque numa foto para enviar para análise da IA</p>
+
+        <div className="flex-1 overflow-y-auto">
+          {isLoading && (
+            <div className="grid grid-cols-3 gap-1.5">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
+              ))}
+            </div>
+          )}
+
+          {!isLoading && photos.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
+              <Images className="w-8 h-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">Nenhuma foto salva para esta planta</p>
+            </div>
+          )}
+
+          {!isLoading && photos.length > 0 && (
+            <div className="grid grid-cols-3 gap-1.5">
+              {photos.map((photo: any) => (
+                <button
+                  key={photo.id}
+                  onClick={() => handlePickPhoto(photo.photoUrl)}
+                  disabled={loadingUrl === photo.photoUrl}
+                  className="relative aspect-square rounded-xl overflow-hidden border border-border/40 active:scale-95 transition-transform disabled:opacity-50"
+                >
+                  <img
+                    src={`/api/upload/thumbnail?url=${encodeURIComponent(photo.photoUrl)}&w=200&h=200&q=70`}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                  {loadingUrl === photo.photoUrl && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                  {photo.source === 'health' && (
+                    <span className="absolute bottom-1 left-1 text-[9px] px-1 py-0.5 rounded bg-amber-500/80 text-white font-medium">saúde</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 // ─── Plant picker sheet ───────────────────────────────────────────────────────
+
+// Gradients por letra para dar personalidade aos avatares
+const AVATAR_GRADIENTS = [
+  'from-emerald-500 to-teal-600',
+  'from-blue-500 to-indigo-600',
+  'from-violet-500 to-purple-600',
+  'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+  'from-cyan-500 to-sky-600',
+];
+function avatarGradient(name: string) {
+  return AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length];
+}
 
 function PlantPickerSheet({
   open,
   onClose,
   onSelect,
+  currentPlantId,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (plant: { id: number; name: string }) => void;
+  currentPlantId: number | null;
 }) {
   const { data: plants = [] } = trpc.plants.list.useQuery({});
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent side="bottom" className="max-h-[60vh] overflow-y-auto">
-        <p className="font-semibold text-sm mb-3">Selecionar planta</p>
+      <SheetContent
+        side="bottom"
+        className="rounded-t-2xl flex flex-col"
+        style={{ maxHeight: '75vh', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
+      >
+        {/* Header */}
+        <div className="shrink-0 mb-4">
+          <p className="font-bold text-base">Conversar sobre qual planta?</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            A IA recebe fase, ambiente e histórico de saúde automaticamente
+          </p>
+        </div>
+
         {plants.length === 0 && (
-          <p className="text-sm text-muted-foreground">Nenhuma planta ativa.</p>
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">Nenhuma planta ativa.</p>
+          </div>
         )}
-        <div className="space-y-1">
-          {plants.map((p: any) => (
-            <button
-              key={p.id}
-              onClick={() => { onSelect(p); onClose(); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-left"
-            >
-              <Leaf className="w-4 h-4 text-emerald-500 shrink-0" />
-              <div>
-                <p className="text-sm font-medium">{p.name}</p>
-                {p.strain?.name && <p className="text-xs text-muted-foreground">{p.strain.name}</p>}
-              </div>
-            </button>
-          ))}
+
+        {/* Grid 2 colunas */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-2">
+            {plants.map((p: any) => {
+              const isCurrent = p.id === currentPlantId;
+              const stage =
+                p.plantStage === 'CLONE' ? 'Clone' :
+                p.plantStage === 'SEEDLING' ? 'Seedling' :
+                p.plantStage === 'VEGETATION' ? 'Vegetativa' :
+                p.plantStage === 'FLOWERING' ? 'Flora' : 'Planta';
+              const grad = avatarGradient(p.name);
+
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { onSelect(p); onClose(); }}
+                  className={`relative flex flex-col items-center gap-2.5 p-4 rounded-2xl border transition-all active:scale-[0.96] text-center ${
+                    isCurrent
+                      ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm shadow-emerald-500/10'
+                      : 'bg-card border-border/60 hover:border-emerald-500/30 hover:bg-muted/40'
+                  }`}
+                >
+                  {/* Badge ativa */}
+                  {isCurrent && (
+                    <span className="absolute top-2.5 right-2.5 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold tracking-wide">
+                      ATIVA
+                    </span>
+                  )}
+
+                  {/* Avatar grande */}
+                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-2xl shadow-md`}>
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* Nome */}
+                  <div className="min-w-0 w-full">
+                    <p className="text-sm font-semibold text-foreground truncate leading-tight">{p.name}</p>
+                    <div className="flex items-center justify-center gap-1 mt-1">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        isCurrent
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {stage}
+                      </span>
+                    </div>
+                    {p.strain?.name && (
+                      <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">{p.strain.name}</p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
@@ -163,12 +405,46 @@ export default function PlantChat() {
   const [imageMime, setImageMime] = useState<'image/jpeg' | 'image/png' | 'image/webp' | undefined>();
   const [imagePreview, setImagePreview] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: aiSettings } = trpc.aiChat.getSettings.useQuery();
   const { data: plant } = trpc.plants.getById.useQuery({ id: plantId! }, { enabled: !!plantId });
+
+  const { data: serverHistory = [], isLoading: historyLoading } = trpc.aiChat.getHistory.useQuery(
+    { plantId: plantId ?? undefined },
+  );
+
+  useEffect(() => {
+    setMessages([]);
+  }, [plantId]);
+
+  useEffect(() => {
+    if (!historyLoading) {
+      setMessages(
+        serverHistory.map((m: any) => ({
+          id: m.createdAt instanceof Date ? m.createdAt.getTime().toString() : String(m.createdAt),
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }))
+      );
+    }
+  }, [historyLoading, serverHistory]);
+
+  const utils = trpc.useUtils();
+
+  const clearHistory = trpc.aiChat.clearHistory.useMutation({
+    onSuccess: () => {
+      setMessages([]);
+      setConfirmClear(false);
+      utils.aiChat.getHistory.invalidate({ plantId: plantId ?? undefined });
+      toast.success('Conversa apagada');
+    },
+    onError: (e) => toast.error(`Erro: ${e.message}`),
+  });
 
   const sendMessage = trpc.aiChat.sendMessage.useMutation({
     onSuccess: (data) => {
@@ -224,14 +500,11 @@ export default function PlantChat() {
     setImagePreview(undefined);
     setLoading(true);
 
-    const history = messages.slice(-16).map(m => ({ role: m.role, content: m.content }));
-
     sendMessage.mutate({
       message: text || 'Analise essa foto.',
       plantId: plantId ?? undefined,
       imageBase64,
       imageMime,
-      history,
     });
   };
 
@@ -243,10 +516,12 @@ export default function PlantChat() {
   };
 
   const noKey = aiSettings && !aiSettings.hasKey;
+  const hasMessages = messages.length > 0;
 
   return (
     <PageTransition>
       <div className="flex flex-col h-screen bg-background">
+
         {/* Header */}
         <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
           <div className="container mx-auto px-4 py-3 flex items-center gap-3">
@@ -255,50 +530,57 @@ export default function PlantChat() {
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </Button>
+
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
               <Bot className="w-4 h-4 text-white" />
             </div>
+
             <div className="flex-1 min-w-0">
               <h1 className="text-sm font-bold text-foreground leading-tight">IA Especialista</h1>
               <p className="text-xs text-muted-foreground">Cannabis Indoor</p>
             </div>
 
-            {/* Plant selector button */}
-            <button
-              onClick={() => setPickerOpen(true)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl transition-all text-xs font-medium shrink-0 max-w-[150px] ${
-                plant
-                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20'
-                  : 'bg-muted border border-dashed border-border text-muted-foreground hover:border-emerald-500/50 hover:text-emerald-600'
-              }`}
-            >
-              {plant ? (
-                <>
-                  <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-white font-bold" style={{ fontSize: 9 }}>
-                    {plant.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="truncate">{plant.name}</span>
-                  <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
-                </>
+            {/* Clear history */}
+            {hasMessages && (
+              confirmClear ? (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs text-muted-foreground">Apagar?</span>
+                  <button
+                    onClick={() => clearHistory.mutate({ plantId: plantId ?? undefined })}
+                    className="text-xs px-2 py-1 rounded-lg bg-destructive text-destructive-foreground font-medium"
+                  >
+                    Sim
+                  </button>
+                  <button
+                    onClick={() => setConfirmClear(false)}
+                    className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground font-medium"
+                  >
+                    Não
+                  </button>
+                </div>
               ) : (
-                <>
-                  <Leaf className="w-3.5 h-3.5 shrink-0" />
-                  <span>Planta</span>
-                  <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
-                </>
-              )}
-            </button>
+                <button
+                  onClick={() => setConfirmClear(true)}
+                  className="shrink-0 w-8 h-8 rounded-lg bg-muted hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )
+            )}
           </div>
+
+          {/* Plant context bar */}
+          <PlantContextBar plant={plant} onPress={() => setPickerOpen(true)} />
         </header>
 
         {/* No API key warning */}
         {noKey && (
-          <div className="container mx-auto px-4 pt-4">
+          <div className="container mx-auto px-4 pt-3">
             <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
               <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="text-xs text-amber-700 dark:text-amber-400">
                 <p className="font-medium mb-0.5">Nenhuma chave de API configurada</p>
-                <p>Configure sua chave em <Link href="/settings/account" className="underline">Configurações → Conta</Link> para usar o chat de IA.</p>
+                <p>Configure em <Link href="/settings/account" className="underline">Configurações → Conta</Link></p>
               </div>
             </div>
           </div>
@@ -306,50 +588,29 @@ export default function PlantChat() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto container mx-auto px-4 py-4 max-w-2xl">
-          {messages.length === 0 && !loading && (
-            <div className="flex flex-col items-center justify-center h-full gap-4 pb-8">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                <Bot className="w-8 h-8 text-white" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-foreground">IA Especialista em Cannabis</p>
-                <p className="text-sm text-muted-foreground mt-1">Pergunte sobre sua planta, diagnóstico, tricomas, LST…</p>
+          {historyLoading && <HistorySkeleton />}
+
+          {/* Empty state */}
+          {!historyLoading && messages.length === 0 && !loading && (
+            <div className="flex flex-col items-center justify-center h-full gap-5 pb-10">
+              {/* Icon */}
+              <div className="relative">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  <Bot className="w-10 h-10 text-white" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">
+                  <Sparkles className="w-3 h-3 text-white" />
+                </div>
               </div>
 
-              {/* Plant context card */}
-              {plant ? (
-                <button
-                  onClick={() => setPickerOpen(true)}
-                  className="w-full max-w-xs flex items-center gap-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 hover:bg-emerald-500/15 transition-colors text-left"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 text-white font-bold text-base shadow-sm">
-                    {plant.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{plant.name}</p>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                      {plant.plantStage === 'CLONE' ? 'Clone' : plant.plantStage === 'SEEDLING' ? 'Seedling' : 'Planta'} · Contexto ativo
-                    </p>
-                  </div>
-                  <div className="shrink-0 flex flex-col items-end gap-1">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-medium">ativo</span>
-                    <span className="text-[10px] text-muted-foreground">trocar</span>
-                  </div>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setPickerOpen(true)}
-                  className="w-full max-w-xs flex items-center gap-3 p-3 rounded-2xl border border-dashed border-border hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                    <Leaf className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Selecionar planta</p>
-                    <p className="text-xs text-muted-foreground">A IA receberá o contexto automático</p>
-                  </div>
-                </button>
-              )}
+              <div className="text-center">
+                <p className="font-bold text-foreground text-base">IA Especialista em Cannabis</p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-xs leading-relaxed">
+                  {plant
+                    ? `Pronto para ajudar com ${plant.name}. Envie uma foto ou pergunta.`
+                    : 'Selecione uma planta acima para que a IA tenha todo o contexto.'}
+                </p>
+              </div>
 
               {/* Quick chips */}
               <div className="flex flex-wrap gap-2 justify-center max-w-sm">
@@ -357,7 +618,7 @@ export default function PlantChat() {
                   <button
                     key={chip}
                     onClick={() => { setInput(chip); textareaRef.current?.focus(); }}
-                    className="px-3 py-1.5 rounded-full bg-muted hover:bg-muted/80 text-xs font-medium text-foreground transition-colors text-left"
+                    className="px-3 py-2 rounded-full bg-muted hover:bg-muted/80 text-xs font-medium text-foreground transition-colors border border-border/50 hover:border-emerald-500/30 active:scale-95"
                   >
                     {chip}
                   </button>
@@ -366,30 +627,7 @@ export default function PlantChat() {
             </div>
           )}
 
-          {/* Plant indicator when chat has messages */}
-          {messages.length > 0 && plant && (
-            <button
-              onClick={() => setPickerOpen(true)}
-              className="flex items-center gap-2 mx-auto mb-4 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
-            >
-              <span className="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold shrink-0" style={{ fontSize: 9 }}>
-                {plant.name.charAt(0).toUpperCase()}
-              </span>
-              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 truncate max-w-[120px]">{plant.name}</span>
-              <span className="text-[10px] text-emerald-500/70">trocar</span>
-            </button>
-          )}
-          {messages.length > 0 && !plant && (
-            <button
-              onClick={() => setPickerOpen(true)}
-              className="flex items-center gap-2 mx-auto mb-4 px-3 py-1.5 rounded-full bg-muted border border-dashed border-border hover:border-emerald-500/40 transition-colors"
-            >
-              <Leaf className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Sem planta selecionada · tocar para escolher</span>
-            </button>
-          )}
-
-          {messages.map(msg => <ChatBubble key={msg.id} msg={msg} />)}
+          {!historyLoading && messages.map(msg => <ChatBubble key={msg.id} msg={msg} />)}
           {loading && <LoadingBubble />}
           <div ref={bottomRef} />
         </div>
@@ -397,7 +635,6 @@ export default function PlantChat() {
         {/* Input bar */}
         <div className="bg-card border-t border-border pb-safe">
           <div className="container mx-auto px-3 py-2.5 max-w-2xl">
-            {/* Image preview */}
             {imagePreview && (
               <div className="relative inline-block mb-2 ml-1">
                 <img src={imagePreview} alt="preview" className="h-16 w-16 rounded-lg object-cover border border-border" />
@@ -414,9 +651,19 @@ export default function PlantChat() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="shrink-0 w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground transition-colors"
+                title="Tirar ou escolher foto do celular"
               >
                 <ImagePlus className="w-4.5 h-4.5" />
               </button>
+              {plantId && (
+                <button
+                  onClick={() => setGalleryOpen(true)}
+                  className="shrink-0 w-9 h-9 rounded-xl bg-muted hover:bg-emerald-500/15 flex items-center justify-center text-muted-foreground hover:text-emerald-500 transition-colors"
+                  title="Fotos salvas da planta"
+                >
+                  <Images className="w-4.5 h-4.5" />
+                </button>
+              )}
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -447,10 +694,24 @@ export default function PlantChat() {
         onChange={e => { const f = e.target.files?.[0]; if (f) handleImage(f); e.target.value = ''; }}
       />
 
+      {plantId && (
+        <PlantGallerySheet
+          open={galleryOpen}
+          onClose={() => setGalleryOpen(false)}
+          plantId={plantId}
+          onSelect={(base64, mime, preview) => {
+            setImageBase64(base64);
+            setImageMime(mime);
+            setImagePreview(preview);
+          }}
+        />
+      )}
+
       <PlantPickerSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={handleSelectPlant}
+        currentPlantId={plantId}
       />
     </PageTransition>
   );

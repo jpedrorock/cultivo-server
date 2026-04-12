@@ -1000,7 +1000,7 @@ export type InsertPlantStructure = typeof plantStructures.$inferInsert;
 export const userAiSettings = mysqlTable("userAiSettings", {
   id:        int("id").autoincrement().primaryKey(),
   userId:    int("userId").notNull().unique(),
-  provider:  varchar("provider", { length: 32 }).notNull(), // "openai" | "anthropic" | "gemini"
+  provider:  varchar("provider", { length: 32 }).notNull(), // "openai" | "anthropic" | "gemini" | "deepseek" | "kimi"
   apiKey:    text("apiKey").notNull(),                       // AES-256 encrypted
   model:     varchar("model", { length: 64 }),               // ex: "gpt-4o", "claude-sonnet-4-5"
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1009,3 +1009,20 @@ export const userAiSettings = mysqlTable("userAiSettings", {
 
 export type UserAiSettings = typeof userAiSettings.$inferSelect;
 export type InsertUserAiSettings = typeof userAiSettings.$inferInsert;
+
+/**
+ * Histórico de mensagens do chat de IA — uma conversa por planta por usuário.
+ * Fotos não são armazenadas (apenas o texto da análise da IA é salvo).
+ */
+export const aiChatMessages = mysqlTable("aiChatMessages", {
+  id:        int("id").autoincrement().primaryKey(),
+  userId:    int("userId").notNull(),
+  plantId:   int("plantId"),  // NULL = chat geral sem planta selecionada
+  role:      mysqlEnum("role", ["user", "assistant"]).notNull(),
+  content:   text("content").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userPlantIdx: index("userPlantIdx").on(table.userId, table.plantId),
+}));
+
+export type AiChatMessage = typeof aiChatMessages.$inferSelect;
