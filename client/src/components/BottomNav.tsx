@@ -263,39 +263,67 @@ export function BottomNav() {
 
             {/* ── Sheet: picker de planta para IA chat ── */}
             <Sheet open={chatPickerOpen} onOpenChange={setChatPickerOpen}>
-              <SheetContent side="bottom" className="rounded-t-2xl" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-                <SheetHeader className="mb-4">
-                  <SheetTitle className="text-sm flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-blue-500" />
-                    Selecionar planta para o chat de IA
-                  </SheetTitle>
-                </SheetHeader>
+              <SheetContent side="bottom" className="rounded-t-2xl flex flex-col" style={{ maxHeight: '75vh', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+                {/* Header */}
+                <div className="shrink-0 mb-4">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                      <Bot className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <p className="font-bold text-base">Conversar sobre qual planta?</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-9">A IA recebe fase, ambiente e saúde automaticamente</p>
+                </div>
+
                 {activePlants.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma planta ativa encontrada</p>
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">Nenhuma planta ativa encontrada</p>
+                  </div>
                 ) : (
-                  <div className="space-y-2 max-h-72 overflow-y-auto pb-2">
-                    {activePlants.map((plant: any) => (
-                      <button
-                        key={plant.id}
-                        onClick={() => {
-                          triggerHapticFeedback();
-                          setChatPickerOpen(false);
-                          navigate(`/chat/${plant.id}`);
-                        }}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-blue-500/40 hover:bg-blue-500/5 active:scale-[0.98] transition-all text-left"
-                      >
-                        <span className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-blue-500">
-                          {(plant.name ?? '?')[0].toUpperCase()}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold leading-tight truncate">{plant.name ?? `Planta ${plant.id}`}</p>
-                          {plant.strain && (
-                            <p className="text-xs text-muted-foreground truncate">{plant.strain}</p>
-                          )}
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-                      </button>
-                    ))}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-2">
+                      {activePlants.map((plant: any) => {
+                        const letter = (plant.name ?? '?')[0].toUpperCase();
+                        const gradients = [
+                          'from-emerald-500 to-teal-600',
+                          'from-blue-500 to-indigo-600',
+                          'from-violet-500 to-purple-600',
+                          'from-rose-500 to-pink-600',
+                          'from-amber-500 to-orange-600',
+                          'from-cyan-500 to-sky-600',
+                        ];
+                        const grad = gradients[letter.charCodeAt(0) % gradients.length];
+                        const stage =
+                          plant.plantStage === 'CLONE' ? 'Clone' :
+                          plant.plantStage === 'SEEDLING' ? 'Seedling' :
+                          plant.plantStage === 'VEGETATION' ? 'Vegetativa' :
+                          plant.plantStage === 'FLOWERING' ? 'Flora' : 'Planta';
+                        return (
+                          <button
+                            key={plant.id}
+                            onClick={() => {
+                              triggerHapticFeedback();
+                              setChatPickerOpen(false);
+                              navigate(`/chat/${plant.id}`);
+                            }}
+                            className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border border-border/60 bg-card hover:border-blue-500/40 hover:bg-blue-500/5 active:scale-[0.96] transition-all text-center"
+                          >
+                            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-2xl shadow-md`}>
+                              {letter}
+                            </div>
+                            <div className="min-w-0 w-full">
+                              <p className="text-sm font-semibold text-foreground truncate leading-tight">{plant.name ?? `Planta ${plant.id}`}</p>
+                              <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                                {stage}
+                              </span>
+                              {plant.strain?.name && (
+                                <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">{plant.strain.name}</p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </SheetContent>
