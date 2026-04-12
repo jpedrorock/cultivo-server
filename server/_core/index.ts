@@ -207,21 +207,30 @@ async function startServer() {
   // Security headers — apenas em produção (Helmet interfere com Vite HMR em dev)
   if (process.env.NODE_ENV === 'production') {
     app.use(helmet({
-      contentSecurityPolicy: false, // SPA gerencia CSP via meta tags
+      contentSecurityPolicy: false,       // SPA gerencia CSP via meta tags
       crossOriginEmbedderPolicy: false,
+      hsts: false,                        // Cloudflare/Coolify já gerencia HTTPS — HSTS duplo causa loop
     }));
   }
 
-  // CORS — apenas origens conhecidas em produção
+  // CORS — se ALLOWED_ORIGINS estiver definida, restringir; caso contrário, permitir tudo
+  // (proteção CSRF principal vem do cookie sameSite:lax + httpOnly)
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
     : [];
   app.use(cors({
     origin: (origin, callback) => {
-      // Desenvolvimento: permitir sem origin (apps mobile/Vite local)
-      if (!origin || process.env.NODE_ENV !== 'production') return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origem não permitida — ${origin}`));
+      // Sem origin (curl, mobile nativo, SSR) → sempre permitir
+      if (!origin) return callback(null, true);
+      // Desenvolvimento → sempre permitir
+      if (process.env.NODE_ENV !== 'production') return callback(null, true);
+      // Produção com lista configurada → verificar
+      if (allowedOrigins.length > 0) {
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`CORS: origem não permitida — ${origin}`));
+      }
+      // Produção sem lista → permitir tudo (modo permissivo)
+      return callback(null, true);
     },
     credentials: true,
   }));
