@@ -1691,7 +1691,7 @@ export const appRouter = router({
           tentId: z.number().optional(),
           startDate: z.date().optional(),
           endDate: z.date().optional(),
-          limit: z.number().default(100),
+          limit: z.number().default(50),
           offset: z.number().default(0),
         })
       )

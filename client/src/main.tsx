@@ -26,6 +26,7 @@ queryClient.setQueryDefaults([["weeklyTargets"]], { staleTime: 60 * 60_000, gcTi
 queryClient.setQueryDefaults([["tents"]], { staleTime: 5 * 60_000, gcTime: 15 * 60_000 });           // estufas: fresco 5min
 queryClient.setQueryDefaults([["cycles"]], { staleTime: 5 * 60_000, gcTime: 15 * 60_000 });          // ciclos: fresco 5min
 queryClient.setQueryDefaults([["alerts"]], { staleTime: 2 * 60_000 });                               // alertas: fresco 2min
+queryClient.setQueryDefaults([["plants"]], { staleTime: 2 * 60_000, gcTime: 10 * 60_000 });          // plantas: fresco 2min, cache 10min
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;

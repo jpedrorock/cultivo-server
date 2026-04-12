@@ -112,6 +112,43 @@ async function ensureNotificationSettingsColumns() {
   }
 }
 
+async function ensurePlantLSTLogsColumns() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+
+    const [rows]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plantLSTLogs'`
+    );
+    const existingCols = rows.map((r: any) => r.COLUMN_NAME);
+
+    if (!existingCols.includes('techniqueConfig')) {
+      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`techniqueConfig\` TEXT`);
+      console.log("[DB] Coluna techniqueConfig adicionada em plantLSTLogs");
+    }
+    if (!existingCols.includes('actualResult')) {
+      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`actualResult\` TEXT`);
+      console.log("[DB] Coluna actualResult adicionada em plantLSTLogs");
+    }
+    if (!existingCols.includes('nodePosition')) {
+      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`nodePosition\` VARCHAR(200)`);
+      console.log("[DB] Coluna nodePosition adicionada em plantLSTLogs");
+    }
+    if (!existingCols.includes('snapshotJson')) {
+      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`snapshotJson\` LONGTEXT`);
+      console.log("[DB] Coluna snapshotJson adicionada em plantLSTLogs");
+    }
+
+    await conn.end();
+    console.log("[DB] Colunas plantLSTLogs OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao migrar plantLSTLogs:", err?.message);
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -124,6 +161,9 @@ async function startServer() {
 
   // Garantir que as colunas de lembrete diário existem na tabela notificationSettings
   await ensureNotificationSettingsColumns();
+
+  // Garantir que as colunas extras de plantLSTLogs existem (snapshotJson, techniqueConfig, etc.)
+  await ensurePlantLSTLogsColumns();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();
