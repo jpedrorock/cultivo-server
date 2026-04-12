@@ -4,8 +4,6 @@ import path from "path";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
-import helmet from "helmet";
-import cors from "cors";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
 import { appRouter } from "../routers";
@@ -204,36 +202,52 @@ async function startServer() {
   const { startDailyReminderCron } = await import("../cron/dailyReminder");
   startDailyReminderCron();
 
-  // Security headers — apenas em produção (Helmet interfere com Vite HMR em dev)
+  // Security headers inline (sem dependência de pacote externo)
   if (process.env.NODE_ENV === 'production') {
-    app.use(helmet({
-      contentSecurityPolicy: false,       // SPA gerencia CSP via meta tags
-      crossOriginEmbedderPolicy: false,
-      hsts: false,                        // Cloudflare/Coolify já gerencia HTTPS — HSTS duplo causa loop
-    }));
+    app.use((_req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+      res.setHeader('X-XSS-Protection', '0');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+      next();
+    });
   }
 
-  // CORS — se ALLOWED_ORIGINS estiver definida, restringir; caso contrário, permitir tudo
+  // CORS inline — se ALLOWED_ORIGINS estiver definida, restringir; caso contrário, permitir tudo
   // (proteção CSRF principal vem do cookie sameSite:lax + httpOnly)
   const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
     : [];
-  app.use(cors({
-    origin: (origin, callback) => {
-      // Sem origin (curl, mobile nativo, SSR) → sempre permitir
-      if (!origin) return callback(null, true);
-      // Desenvolvimento → sempre permitir
-      if (process.env.NODE_ENV !== 'production') return callback(null, true);
-      // Produção com lista configurada → verificar
-      if (allowedOrigins.length > 0) {
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error(`CORS: origem não permitida — ${origin}`));
-      }
-      // Produção sem lista → permitir tudo (modo permissivo)
-      return callback(null, true);
-    },
-    credentials: true,
-  }));
+  app.use((req, res, next) => {
+    const origin = req.headers.origin as string | undefined;
+    const isProd = process.env.NODE_ENV === 'production';
+
+    // Determinar se origin é permitida
+    let allowed = true;
+    if (origin && isProd && allowedOrigins.length > 0) {
+      allowed = allowedOrigins.includes(origin);
+    }
+
+    if (allowed && origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,trpc-batch-mode');
+    }
+
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+      return;
+    }
+
+    if (!allowed) {
+      res.status(403).json({ error: `CORS: origem não permitida — ${origin}` });
+      return;
+    }
+
+    next();
+  });
 
   // Body parser com limite maior para uploads
   app.use(express.json({ limit: "50mb" }));
