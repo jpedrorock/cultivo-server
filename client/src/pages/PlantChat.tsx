@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRoute, useLocation, Link } from 'wouter';
-import { ArrowLeft, Bot, Send, ImagePlus, X, Leaf, AlertCircle, Trash2, Sparkles, ChevronRight, Images } from 'lucide-react';
+import { ArrowLeft, Bot, Send, ImagePlus, X, Leaf, AlertCircle, Trash2, Sparkles, ChevronRight, ChevronDown, Images } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { PageTransition } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
@@ -309,6 +309,22 @@ function PlantPickerSheet({
   const { data: plants = [] } = trpc.plants.list.useQuery({});
   const { data: tents = [] } = trpc.tents.list.useQuery(undefined, { enabled: open });
   const tentMap = Object.fromEntries((tents as any[]).map((t: any) => [t.id, t.name]));
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggle = (key: string) => setCollapsed(c => ({ ...c, [key]: !c[key] }));
+
+  // Build groups
+  const groups: { key: string; tentName: string; plants: any[] }[] = [];
+  const seen = new Map<string, number>();
+  for (const p of plants as any[]) {
+    const key = p.currentTentId ? String(p.currentTentId) : '__sem__';
+    const tentName = p.currentTentId ? (tentMap[p.currentTentId] ?? `Estufa ${p.currentTentId}`) : 'Sem estufa';
+    if (!seen.has(key)) { seen.set(key, groups.length); groups.push({ key, tentName, plants: [] }); }
+    groups[seen.get(key)!].plants.push(p);
+  }
+
+  const stageLabel = (s: string) =>
+    s === 'CLONE' ? 'Clone' : s === 'SEEDLING' ? 'Seedling' :
+    s === 'VEGETATION' ? 'Vegetativa' : s === 'FLOWERING' ? 'Flora' : 'Planta';
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
@@ -331,75 +347,60 @@ function PlantPickerSheet({
           </div>
         )}
 
-        {/* Grid agrupado por estufa */}
-        <div className="flex-1 overflow-y-auto space-y-4">
-          {(() => {
-            const stageLabel = (s: string) =>
-              s === 'CLONE' ? 'Clone' : s === 'SEEDLING' ? 'Seedling' :
-              s === 'VEGETATION' ? 'Vegetativa' : s === 'FLOWERING' ? 'Flora' : 'Planta';
+        {/* Accordion list grouped by tent */}
+        <div className="flex-1 overflow-y-auto space-y-1">
+          {groups.map(group => {
+            const isCollapsed = !!collapsed[group.key];
+            return (
+              <div key={group.key}>
+                {/* Tent accordion header */}
+                <button
+                  onClick={() => toggle(group.key)}
+                  className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted/60 transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0 text-base">🏕️</div>
+                  <span className="flex-1 text-left text-sm font-semibold text-foreground">{group.tentName}</span>
+                  <span className="text-[11px] text-muted-foreground">{group.plants.length}p</span>
+                  {isCollapsed
+                    ? <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                    : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+                </button>
 
-            // Agrupar por estufa
-            const groups = new Map<string, { tentName: string; plants: any[] }>();
-            for (const p of plants as any[]) {
-              const key = p.currentTentId ? String(p.currentTentId) : '__sem__';
-              const tentName = p.currentTentId ? (tentMap[p.currentTentId] ?? `Estufa ${p.currentTentId}`) : 'Sem estufa';
-              if (!groups.has(key)) groups.set(key, { tentName, plants: [] });
-              groups.get(key)!.plants.push(p);
-            }
-
-            return Array.from(groups.entries()).map(([key, group]) => (
-              <div key={key}>
-                {/* Tent header */}
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-5 h-5 rounded-md bg-muted flex items-center justify-center shrink-0">
-                    <span className="text-[10px]">🏕️</span>
+                {/* Plant rows */}
+                {!isCollapsed && (
+                  <div className="ml-3 border-l border-border/50 pl-3 mb-1 space-y-0.5">
+                    {group.plants.map((p: any) => {
+                      const isCurrent = p.id === currentPlantId;
+                      const letter = (p.name ?? '?')[0].toUpperCase();
+                      const grad = avatarGradient(p.name);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => { onSelect(p); onClose(); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl active:scale-[0.98] transition-all text-left ${
+                            isCurrent
+                              ? 'bg-emerald-500/10 hover:bg-emerald-500/15'
+                              : 'hover:bg-muted/60'
+                          }`}
+                        >
+                          <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
+                            {letter}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
+                            <p className="text-[11px] text-muted-foreground">{stageLabel(p.plantStage ?? '')}{p.strain?.name ? ` · ${p.strain.name}` : ''}</p>
+                          </div>
+                          {isCurrent
+                            ? <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold">ATUAL</span>
+                            : <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.tentName}</p>
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-[10px] text-muted-foreground">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {group.plants.map((p: any) => {
-                    const isCurrent = p.id === currentPlantId;
-                    const stage = stageLabel(p.plantStage ?? '');
-                    const grad = avatarGradient(p.name);
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => { onSelect(p); onClose(); }}
-                        className={`relative flex flex-col items-center gap-2.5 p-4 rounded-2xl border transition-all active:scale-[0.96] text-center ${
-                          isCurrent
-                            ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm shadow-emerald-500/10'
-                            : 'bg-card border-border/60 hover:border-emerald-500/30 hover:bg-muted/40'
-                        }`}
-                      >
-                        {isCurrent && (
-                          <span className="absolute top-2.5 right-2.5 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold tracking-wide">
-                            ATIVA
-                          </span>
-                        )}
-                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-2xl shadow-md`}>
-                          {p.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 w-full">
-                          <p className="text-sm font-semibold text-foreground truncate leading-tight">{p.name}</p>
-                          <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                            isCurrent ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {stage}
-                          </span>
-                          {p.strain?.name && (
-                            <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">{p.strain.name}</p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                )}
               </div>
-            ));
-          })()}
+            );
+          })}
         </div>
       </SheetContent>
     </Sheet>

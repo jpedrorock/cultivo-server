@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, ChevronDown, Bot } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,86 @@ type NavItem = {
 // Rotas onde o BottomNav deve ficar oculto (telas de foco total)
 const HIDDEN_NAV_ROUTES = ["/quick-log"];
 const HIDDEN_NAV_PREFIXES = ["/tent/", "/display"];
+
+const AVATAR_GRADIENTS = [
+  'from-emerald-500 to-teal-600', 'from-blue-500 to-indigo-600',
+  'from-violet-500 to-purple-600', 'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600', 'from-cyan-500 to-sky-600',
+];
+const stageLabel = (s: string) =>
+  s === 'CLONE' ? 'Clone' : s === 'SEEDLING' ? 'Seedling' :
+  s === 'VEGETATION' ? 'Veg' : s === 'FLOWERING' ? 'Flora' : 'Planta';
+
+function ChatPlantPicker({
+  plants, tentMap, onSelect,
+}: {
+  plants: any[];
+  tentMap: Record<string | number, string>;
+  onSelect: (plant: any) => void;
+}) {
+  // Agrupar por estufa
+  const groups: { key: string; tentName: string; plants: any[] }[] = [];
+  const seen = new Map<string, number>();
+  for (const p of plants) {
+    const key = p.currentTentId ? String(p.currentTentId) : '__sem__';
+    const tentName = p.currentTentId ? (tentMap[p.currentTentId] ?? `Estufa ${p.currentTentId}`) : 'Sem estufa';
+    if (!seen.has(key)) { seen.set(key, groups.length); groups.push({ key, tentName, plants: [] }); }
+    groups[seen.get(key)!].plants.push(p);
+  }
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggle = (key: string) => setCollapsed(c => ({ ...c, [key]: !c[key] }));
+
+  return (
+    <div className="space-y-1">
+      {groups.map(group => {
+        const isCollapsed = !!collapsed[group.key];
+        return (
+          <div key={group.key}>
+            {/* Tent accordion header */}
+            <button
+              onClick={() => toggle(group.key)}
+              className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted/60 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0 text-base">🏕️</div>
+              <span className="flex-1 text-left text-sm font-semibold text-foreground">{group.tentName}</span>
+              <span className="text-[11px] text-muted-foreground">{group.plants.length}p</span>
+              {isCollapsed
+                ? <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+            </button>
+
+            {/* Plant list */}
+            {!isCollapsed && (
+              <div className="ml-3 border-l border-border/50 pl-3 mb-1 space-y-0.5">
+                {group.plants.map((p: any) => {
+                  const letter = (p.name ?? '?')[0].toUpperCase();
+                  const grad = AVATAR_GRADIENTS[letter.charCodeAt(0) % AVATAR_GRADIENTS.length];
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => onSelect(p)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
+                    >
+                      <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
+                        {letter}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{stageLabel(p.plantStage ?? '')}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function BottomNav() {
   const [location, navigate] = useLocation();
@@ -284,71 +364,19 @@ export function BottomNav() {
                   <div className="flex-1 flex items-center justify-center">
                     <p className="text-sm text-muted-foreground">Nenhuma planta ativa encontrada</p>
                   </div>
-                ) : (() => {
-                  const gradients = [
-                    'from-emerald-500 to-teal-600', 'from-blue-500 to-indigo-600',
-                    'from-violet-500 to-purple-600', 'from-rose-500 to-pink-600',
-                    'from-amber-500 to-orange-600', 'from-cyan-500 to-sky-600',
-                  ];
-                  const stageLabel = (s: string) =>
-                    s === 'CLONE' ? 'Clone' : s === 'SEEDLING' ? 'Seedling' :
-                    s === 'VEGETATION' ? 'Vegetativa' : s === 'FLOWERING' ? 'Flora' : 'Planta';
-
-                  // Agrupar por estufa
-                  const groups = new Map<string, { tentName: string; plants: any[] }>();
-                  for (const p of activePlants as any[]) {
-                    const key = p.currentTentId ? String(p.currentTentId) : '__sem_estufa__';
-                    const tentName = p.currentTentId ? (tentMap[p.currentTentId] ?? `Estufa ${p.currentTentId}`) : 'Sem estufa';
-                    if (!groups.has(key)) groups.set(key, { tentName, plants: [] });
-                    groups.get(key)!.plants.push(p);
-                  }
-
-                  return (
-                    <div className="flex-1 overflow-y-auto space-y-4">
-                      {Array.from(groups.entries()).map(([key, group]) => (
-                        <div key={key}>
-                          {/* Tent header */}
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-5 h-5 rounded-md bg-muted flex items-center justify-center shrink-0">
-                              <span className="text-[10px]">🏕️</span>
-                            </div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.tentName}</p>
-                            <div className="flex-1 h-px bg-border" />
-                            <span className="text-[10px] text-muted-foreground">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            {group.plants.map((plant: any) => {
-                              const letter = (plant.name ?? '?')[0].toUpperCase();
-                              const grad = gradients[letter.charCodeAt(0) % gradients.length];
-                              return (
-                                <button
-                                  key={plant.id}
-                                  onClick={() => {
-                                    triggerHapticFeedback();
-                                    setChatPickerOpen(false);
-                                    navigate(`/chat/${plant.id}`);
-                                  }}
-                                  className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border border-border/60 bg-card hover:border-blue-500/40 hover:bg-blue-500/5 active:scale-[0.96] transition-all text-center"
-                                >
-                                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-2xl shadow-md`}>
-                                    {letter}
-                                  </div>
-                                  <div className="min-w-0 w-full">
-                                    <p className="text-sm font-semibold text-foreground truncate leading-tight">{plant.name ?? `Planta ${plant.id}`}</p>
-                                    <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
-                                      {stageLabel(plant.plantStage ?? '')}
-                                    </span>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                ) : (
+                  <div className="flex-1 overflow-y-auto">
+                    <ChatPlantPicker
+                      plants={activePlants}
+                      tentMap={tentMap}
+                      onSelect={(plant) => {
+                        triggerHapticFeedback();
+                        setChatPickerOpen(false);
+                        navigate(`/chat/${plant.id}`);
+                      }}
+                    />
+                  </div>
+                )}
               </SheetContent>
             </Sheet>
 
