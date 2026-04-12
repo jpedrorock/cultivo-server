@@ -112,6 +112,31 @@ async function ensureNotificationSettingsColumns() {
   }
 }
 
+async function ensureUserAiSettingsTable() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`userAiSettings\` (
+        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\`    INT NOT NULL,
+        \`provider\`  VARCHAR(32) NOT NULL,
+        \`apiKey\`    TEXT NOT NULL,
+        \`model\`     VARCHAR(64),
+        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE KEY \`userAiSettings_userId_unique\` (\`userId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.end();
+    console.log("[DB] Tabela userAiSettings OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao criar userAiSettings:", err?.message);
+  }
+}
+
 async function ensurePlantLSTLogsColumns() {
   try {
     const connectionString = process.env.DATABASE_URL;
@@ -164,6 +189,9 @@ async function startServer() {
 
   // Garantir que as colunas extras de plantLSTLogs existem (snapshotJson, techniqueConfig, etc.)
   await ensurePlantLSTLogsColumns();
+
+  // Garantir que a tabela de configurações de IA do usuário existe
+  await ensureUserAiSettingsTable();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();

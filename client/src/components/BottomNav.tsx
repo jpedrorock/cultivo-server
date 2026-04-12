@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -36,12 +36,13 @@ export function BottomNav() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [trainingPickerOpen, setTrainingPickerOpen] = useState(false);
+  const [chatPickerOpen, setChatPickerOpen] = useState(false);
   const fabRef = useRef<HTMLDivElement>(null);
 
-  // Carrega plantas ativas só quando o picker de treinamento está aberto
+  // Carrega plantas ativas quando o picker de treinamento ou chat está aberto
   const { data: activePlants = [] } = trpc.plants.list.useQuery(
     { status: 'ACTIVE' },
-    { enabled: trainingPickerOpen },
+    { enabled: trainingPickerOpen || chatPickerOpen },
   );
 
   // TODOS os hooks devem ser chamados antes de qualquer return condicional (regra do React)
@@ -92,6 +93,7 @@ export function BottomNav() {
     HIDDEN_NAV_ROUTES.includes(location) ||
     location.endsWith("/display") ||
     location.endsWith("/training") ||
+    location.startsWith("/chat") ||
     keyboardOpen;
 
   const navItems: NavItem[] = [
@@ -191,7 +193,7 @@ export function BottomNav() {
                 {/* Treinamento — abre picker de planta */}
                 <button
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setTrainingPickerOpen(true); }}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-green-500/8 active:bg-green-500/15 transition-colors w-full text-left"
+                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-green-500/8 active:bg-green-500/15 transition-colors border-b border-border/30 w-full text-left"
                 >
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm">
                     <Scissors className="w-4 h-4 text-white" />
@@ -199,6 +201,21 @@ export function BottomNav() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground leading-tight">Treinamento</p>
                     <p className="text-[11px] text-muted-foreground/60">LST, topping, super crop</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                </button>
+
+                {/* IA Especialista — abre picker de planta */}
+                <button
+                  onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setChatPickerOpen(true); }}
+                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-blue-500/8 active:bg-blue-500/15 transition-colors w-full text-left"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <Bot className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight">IA Especialista</p>
+                    <p className="text-[11px] text-muted-foreground/60">Diagnóstico · LST · Tricomas</p>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
                 </button>
@@ -229,6 +246,46 @@ export function BottomNav() {
                         className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 active:scale-[0.98] transition-all text-left"
                       >
                         <span className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-emerald-500">
+                          {(plant.name ?? '?')[0].toUpperCase()}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold leading-tight truncate">{plant.name ?? `Planta ${plant.id}`}</p>
+                          {plant.strain && (
+                            <p className="text-xs text-muted-foreground truncate">{plant.strain}</p>
+                          )}
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </SheetContent>
+            </Sheet>
+
+            {/* ── Sheet: picker de planta para IA chat ── */}
+            <Sheet open={chatPickerOpen} onOpenChange={setChatPickerOpen}>
+              <SheetContent side="bottom" className="rounded-t-2xl" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+                <SheetHeader className="mb-4">
+                  <SheetTitle className="text-sm flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-blue-500" />
+                    Selecionar planta para o chat de IA
+                  </SheetTitle>
+                </SheetHeader>
+                {activePlants.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma planta ativa encontrada</p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pb-2">
+                    {activePlants.map((plant: any) => (
+                      <button
+                        key={plant.id}
+                        onClick={() => {
+                          triggerHapticFeedback();
+                          setChatPickerOpen(false);
+                          navigate(`/chat/${plant.id}`);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-blue-500/40 hover:bg-blue-500/5 active:scale-[0.98] transition-all text-left"
+                      >
+                        <span className="w-8 h-8 rounded-full bg-blue-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-blue-500">
                           {(plant.name ?? '?')[0].toUpperCase()}
                         </span>
                         <div className="flex-1 min-w-0">

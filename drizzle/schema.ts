@@ -992,3 +992,20 @@ export const plantStructures = mysqlTable("plantStructures", {
 
 export type PlantStructure    = typeof plantStructures.$inferSelect;
 export type InsertPlantStructure = typeof plantStructures.$inferInsert;
+
+/**
+ * Configurações de IA por usuário — cada usuário guarda sua própria chave de API.
+ * A chave é armazenada criptografada (AES-256-GCM) no banco.
+ */
+export const userAiSettings = mysqlTable("userAiSettings", {
+  id:        int("id").autoincrement().primaryKey(),
+  userId:    int("userId").notNull().unique(),
+  provider:  varchar("provider", { length: 32 }).notNull(), // "openai" | "anthropic" | "gemini"
+  apiKey:    text("apiKey").notNull(),                       // AES-256 encrypted
+  model:     varchar("model", { length: 64 }),               // ex: "gpt-4o", "claude-sonnet-4-5"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserAiSettings = typeof userAiSettings.$inferSelect;
+export type InsertUserAiSettings = typeof userAiSettings.$inferInsert;

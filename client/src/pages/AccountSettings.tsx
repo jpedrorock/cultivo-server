@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ArrowLeft, User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus } from 'lucide-react';
+import { ArrowLeft, User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle } from 'lucide-react';
 
 function UserAvatar({ user, size = 'md' }: { user: { name?: string | null; email?: string; avatarUrl?: string | null } | null; size?: 'md' | 'lg' }) {
   const dim = size === 'lg' ? 'w-12 h-12' : 'w-8 h-8';
@@ -46,6 +46,7 @@ export default function AccountSettings() {
         <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl space-y-5">
           <ProfileCard />
           <GroupCard />
+          <AiSettingsCard />
         </main>
       </div>
     </PageTransition>
@@ -271,6 +272,138 @@ function GroupCard() {
               </div>
             ))}
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const PROVIDER_MODELS = {
+  openai:    { label: 'OpenAI',    models: ['gpt-4o', 'gpt-4o-mini'] },
+  anthropic: { label: 'Anthropic', models: ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001'] },
+  gemini:    { label: 'Gemini',    models: ['gemini-2.0-flash', 'gemini-1.5-pro'] },
+} as const;
+
+type Provider = keyof typeof PROVIDER_MODELS;
+
+function AiSettingsCard() {
+  const { data: settings } = trpc.aiChat.getSettings.useQuery();
+  const save = trpc.aiChat.saveSettings.useMutation({
+    onSuccess: () => toast.success('API configurada!'),
+    onError: (e) => toast.error(`Erro: ${e.message}`),
+  });
+
+  const [provider, setProvider] = useState<Provider>('openai');
+  const [apiKey, setApiKey] = useState('');
+  const [model, setModel] = useState(PROVIDER_MODELS.openai.models[0]);
+  const [showKey, setShowKey] = useState(false);
+
+  // Sync form with loaded settings (once, in effect)
+  useEffect(() => {
+    if (!settings) return;
+    const p = (settings.provider as Provider | null) ?? 'openai';
+    setProvider(p);
+    setModel(settings.model ?? PROVIDER_MODELS[p]?.models[0] ?? PROVIDER_MODELS.openai.models[0]);
+  }, [settings?.provider, settings?.model]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleProviderChange = (p: Provider) => {
+    setProvider(p);
+    setModel(PROVIDER_MODELS[p].models[0]);
+  };
+
+  const handleSave = () => {
+    const key = apiKey.trim();
+    if (!key && !settings?.hasKey) return;
+    save.mutate({ provider, ...(key ? { apiKey: key } : {}), model });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+          IA Especialista
+        </CardTitle>
+        <CardDescription className="text-xs sm:text-sm">
+          Configure sua chave de API para usar o chat de diagnóstico de plantas
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {settings?.hasKey ? (
+          <div className="flex items-center gap-2 text-sm text-emerald-600">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>API configurada — provedor: <strong>{PROVIDER_MODELS[settings.provider as Provider]?.label ?? settings.provider}</strong></span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>Nenhuma chave configurada. O chat de IA não estará disponível.</span>
+          </div>
+        )}
+
+        <div className="space-y-2 p-3 border border-border rounded-lg">
+          {/* Provedor */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Provedor</p>
+            <div className="flex gap-1.5">
+              {(Object.keys(PROVIDER_MODELS) as Provider[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => handleProviderChange(p)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    provider === p
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {PROVIDER_MODELS[p].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Modelo */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Modelo</p>
+            <select
+              value={model}
+              onChange={e => setModel(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-emerald-500"
+            >
+              {PROVIDER_MODELS[provider].models.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* API Key */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">
+              <Key className="w-3 h-3 inline mr-1" />
+              Chave de API {settings?.hasKey && '(deixe em branco para manter a atual)'}
+            </p>
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder={settings?.hasKey ? '••••••••••••••••' : 'sk-...'}
+                className="w-full px-3 py-2 pr-9 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-emerald-500"
+              />
+              <button onClick={() => setShowKey(!showKey)} className="absolute right-2.5 top-2.5 text-muted-foreground">
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={save.isPending || (!apiKey.trim() && !settings?.hasKey)}
+            className="w-full"
+          >
+            {save.isPending ? 'Salvando...' : 'Salvar configuração'}
+          </Button>
         </div>
       </CardContent>
     </Card>

@@ -2,7 +2,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { getUserById, updateUserProfile, updateUserPassword, getUserByEmail, approveUser, revokeUser, getPendingUsers } from "./db-auth";
 import { hashPassword, comparePassword } from "./_core/auth";
-import { users } from "../drizzle/schema";
+import { users, userAiSettings } from "../drizzle/schema";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
 import { z } from "zod";
 import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
@@ -140,6 +140,155 @@ async function seedWeekTasks(
       });
     }
   }
+}
+
+// ── AI helpers ────────────────────────────────────────────────────────────────
+
+function buildBaseSystemPrompt(): string {
+  return `Você é um especialista em cultivo de cannabis indoor com 20 anos de experiência prática.
+Responda SEMPRE em português brasileiro. Seja direto, prático e objetivo.
+Use linguagem técnica mas acessível. Quando houver foto, analise-a cuidadosamente.
+
+Seus domínios de especialidade:
+- Diagnóstico visual de deficiências nutricionais, pragas e doenças
+- Técnicas de treinamento: LST, topping, FIM, super crop, ScrOG, mainlining, lollipopping
+- Leitura de tricomas e determinação do ponto ideal de colheita
+- Nutrição, ajuste de pH e EC em cada fase do cultivo
+- Ambiência: VPD, DLI, temperatura, umidade relativa, espectro de luz
+- Gestão de espaço, fotoperiodo e transição vega→flora
+
+Ao diagnosticar problemas, siga esta estrutura:
+1. O que está acontecendo
+2. Possível causa (deficiência/excesso/praga/ambiente)
+3. Como corrigir (ação imediata + prevenção)
+`;
+}
+
+function buildPlantContext(ctx: {
+  plantName: string; strainName: string; daysOld: number; weekNumber: number;
+  phase: string; tentName: string; avgTemp: string; avgRh: string;
+  avgPpfd: string; avgPh: string; avgEc: string;
+  healthLogs: { logDate: any; healthStatus: string | null; symptoms: string | null; notes: string | null }[];
+}): string {
+  const healthStr = ctx.healthLogs.length
+    ? ctx.healthLogs.map(h =>
+        `  - ${new Date(h.logDate).toLocaleDateString('pt-BR')}: ${h.healthStatus ?? ''} ${h.symptoms ? `| Sintomas: ${h.symptoms}` : ''} ${h.notes ? `| Nota: ${h.notes}` : ''}`
+      ).join('\n')
+    : "  Sem registros de saúde";
+
+  return `
+━━━ CONTEXTO DA PLANTA ━━━
+Nome: ${ctx.plantName}
+Strain: ${ctx.strainName}
+Dias de vida: ${ctx.daysOld} | Semana ${ctx.weekNumber} | Fase: ${ctx.phase}
+Estufa: ${ctx.tentName}
+
+CONDIÇÕES AMBIENTAIS (últimos 7 dias):
+  Temperatura média: ${ctx.avgTemp}°C
+  Umidade relativa: ${ctx.avgRh}%
+  PPFD: ${ctx.avgPpfd} μmol/m²/s
+  pH: ${ctx.avgPh}
+  EC: ${ctx.avgEc} mS/cm
+
+HISTÓRICO DE SAÚDE (últimos 5 registros):
+${healthStr}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+}
+
+async function callAiProvider(opts: {
+  provider: string; model: string; apiKey: string; systemPrompt: string;
+  history: { role: "user" | "assistant"; content: string }[];
+  message: string; imageBase64?: string; imageMime?: string;
+}): Promise<string> {
+  const { provider, model, apiKey, systemPrompt, history, message, imageBase64, imageMime } = opts;
+
+  if (provider === "openai") {
+    const messages = [
+      { role: "system" as const, content: systemPrompt },
+      ...history.map(h => ({ role: h.role, content: h.content })),
+      {
+        role: "user" as const,
+        content: imageBase64
+          ? [
+              { type: "text", text: message },
+              { type: "image_url", image_url: { url: `data:${imageMime ?? "image/jpeg"};base64,${imageBase64}`, detail: "high" } },
+            ]
+          : message,
+      },
+    ];
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, max_tokens: 1500 }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenAI error ${res.status}: ${err.slice(0, 200)}`);
+    }
+    const data: any = await res.json();
+    return data.choices?.[0]?.message?.content ?? "Sem resposta";
+  }
+
+  if (provider === "anthropic") {
+    const userContent: any[] = imageBase64
+      ? [
+          { type: "image", source: { type: "base64", media_type: imageMime ?? "image/jpeg", data: imageBase64 } },
+          { type: "text", text: message },
+        ]
+      : [{ type: "text", text: message }];
+
+    const messages = [
+      ...history.map(h => ({ role: h.role, content: h.content })),
+      { role: "user" as const, content: userContent },
+    ];
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({ model, max_tokens: 1500, system: systemPrompt, messages }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Anthropic error ${res.status}: ${err.slice(0, 200)}`);
+    }
+    const data: any = await res.json();
+    return data.content?.[0]?.text ?? "Sem resposta";
+  }
+
+  if (provider === "gemini") {
+    const parts: any[] = [];
+    if (imageBase64) parts.push({ inlineData: { mimeType: imageMime ?? "image/jpeg", data: imageBase64 } });
+    parts.push({ text: message });
+
+    const contents = [
+      ...history.map(h => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.content }] })),
+      { role: "user", parts },
+    ];
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { maxOutputTokens: 1500 },
+        }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Gemini error ${res.status}: ${err.slice(0, 200)}`);
+    }
+    const data: any = await res.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Sem resposta";
+  }
+
+  throw new Error(`Provedor desconhecido: ${provider}`);
 }
 
 export const appRouter = router({
@@ -5967,6 +6116,186 @@ export const appRouter = router({
         if (!database) throw new Error('Banco indisponível');
         await database.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
         return { success: true };
+      }),
+  }),
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // AI Chat — Assistente especialista em cannabis indoor
+  // Cada usuário configura sua própria chave de API (OpenAI / Anthropic / Gemini)
+  // ──────────────────────────────────────────────────────────────────────────
+  aiChat: router({
+
+    // Salvar configurações de API do usuário
+    saveSettings: protectedProcedure
+      .input(z.object({
+        provider: z.enum(["openai", "anthropic", "gemini"]),
+        apiKey:   z.string().min(1).max(500).optional(), // omitir = manter chave existente
+        model:    z.string().max(64).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const existing = await database
+          .select({ id: userAiSettings.id, apiKey: userAiSettings.apiKey })
+          .from(userAiSettings)
+          .where(eq(userAiSettings.userId, ctx.user.id))
+          .limit(1);
+
+        let encryptedKey: string;
+        if (input.apiKey) {
+          const { encryptApiKey } = await import("./aiCrypto");
+          encryptedKey = encryptApiKey(input.apiKey);
+        } else if (existing.length > 0) {
+          encryptedKey = existing[0].apiKey; // manter chave existente
+        } else {
+          throw new Error("API key é obrigatória no primeiro cadastro");
+        }
+
+        if (existing.length > 0) {
+          await database
+            .update(userAiSettings)
+            .set({ provider: input.provider, apiKey: encryptedKey, model: input.model ?? null })
+            .where(eq(userAiSettings.userId, ctx.user.id));
+        } else {
+          await database.insert(userAiSettings).values({
+            userId: ctx.user.id,
+            provider: input.provider,
+            apiKey: encryptedKey,
+            model: input.model ?? null,
+          });
+        }
+        return { success: true };
+      }),
+
+    // Buscar configurações — nunca expõe a chave
+    getSettings: protectedProcedure
+      .query(async ({ ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        const [settings] = await database
+          .select({ provider: userAiSettings.provider, model: userAiSettings.model })
+          .from(userAiSettings)
+          .where(eq(userAiSettings.userId, ctx.user.id))
+          .limit(1);
+        if (!settings) return { hasKey: false, provider: null, model: null };
+        return { hasKey: true, provider: settings.provider, model: settings.model };
+      }),
+
+    // Enviar mensagem para a IA
+    sendMessage: protectedProcedure
+      .input(z.object({
+        message:     z.string().min(1).max(4000),
+        plantId:     z.number().optional(),
+        imageBase64: z.string().max(10 * 1024 * 1024).optional(),
+        imageMime:   z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
+        history:     z.array(z.object({
+          role:    z.enum(["user", "assistant"]),
+          content: z.string().max(8000),
+        })).max(20).default([]),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        // 1. Buscar settings e descriptografar chave
+        const [settings] = await database
+          .select()
+          .from(userAiSettings)
+          .where(eq(userAiSettings.userId, ctx.user.id))
+          .limit(1);
+        if (!settings) throw new Error("Configure sua chave de API em Configurações → Conta → IA Especialista");
+
+        const { decryptApiKey } = await import("./aiCrypto");
+        const apiKey = decryptApiKey(settings.apiKey);
+        const provider = settings.provider;
+        const model = (settings.model && settings.model.length > 0) ? settings.model : (
+          provider === "openai" ? "gpt-4o-mini" :
+          provider === "anthropic" ? "claude-haiku-4-5-20251001" :
+          "gemini-2.0-flash"
+        );
+
+        // 2. Buscar contexto da planta (se fornecido)
+        let systemPrompt = buildBaseSystemPrompt();
+
+        if (input.plantId) {
+          await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
+          const [plant] = await database
+            .select()
+            .from(plants)
+            .where(eq(plants.id, input.plantId))
+            .limit(1);
+
+          if (plant) {
+            // Strain
+            const [strain] = plant.strainId
+              ? await database.select({ name: strains.name }).from(strains).where(eq(strains.id, plant.strainId)).limit(1)
+              : [null];
+
+            // Estufa e ciclo ativo
+            const [tent] = plant.currentTentId
+              ? await database.select({ id: tents.id, name: tents.name }).from(tents).where(eq(tents.id, plant.currentTentId)).limit(1)
+              : [null];
+
+            const [cycle] = tent
+              ? await database.select().from(cycles)
+                  .where(and(eq(cycles.tentId, tent.id), eq(cycles.status, "ACTIVE")))
+                  .orderBy(desc(cycles.createdAt)).limit(1)
+              : [null];
+
+            // Calcular semana
+            const daysOld = plant.createdAt
+              ? Math.floor((Date.now() - new Date(plant.createdAt).getTime()) / 86400000)
+              : 0;
+            const weekNumber = Math.floor(daysOld / 7) + 1;
+            const isFlora = cycle?.floraStartDate != null;
+            const phase = isFlora ? "Flora" : "Vegetativa";
+
+            // Últimos 7 dias de ambiente
+            const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
+            const envLogs = tent
+              ? await database.select({
+                  tempC: dailyLogs.tempC, rhPct: dailyLogs.rhPct,
+                  ppfd: dailyLogs.ppfd, ph: dailyLogs.ph, ec: dailyLogs.ec,
+                }).from(dailyLogs)
+                  .where(and(eq(dailyLogs.tentId, tent.id), sql`${dailyLogs.logDate} >= ${sevenDaysAgo}`))
+                  .limit(50)
+              : [];
+
+            const avg = (arr: (string | number | null | undefined)[]) => {
+              const nums = arr.map(v => v != null ? parseFloat(String(v)) : null).filter((v): v is number => v !== null);
+              return nums.length ? (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1) : "—";
+            };
+
+            // Últimos 5 registros de saúde
+            const healthLogs = await database
+              .select({ logDate: plantHealthLogs.logDate, healthStatus: plantHealthLogs.healthStatus, symptoms: plantHealthLogs.symptoms, notes: plantHealthLogs.notes })
+              .from(plantHealthLogs)
+              .where(eq(plantHealthLogs.plantId, input.plantId))
+              .orderBy(desc(plantHealthLogs.logDate))
+              .limit(5);
+
+            systemPrompt += buildPlantContext({
+              plantName: plant.name ?? `Planta ${plant.id}`,
+              strainName: strain?.name ?? "Desconhecida",
+              daysOld,
+              weekNumber,
+              phase,
+              tentName: tent?.name ?? "—",
+              avgTemp: avg(envLogs.map(l => l.tempC)),
+              avgRh: avg(envLogs.map(l => l.rhPct)),
+              avgPpfd: avg(envLogs.map(l => l.ppfd)),
+              avgPh: avg(envLogs.map(l => l.ph)),
+              avgEc: avg(envLogs.map(l => l.ec)),
+              healthLogs,
+            });
+          }
+        }
+
+        // 3. Chamar a API do provedor
+        const reply = await callAiProvider({ provider, model, apiKey, systemPrompt, history: input.history, message: input.message, imageBase64: input.imageBase64, imageMime: input.imageMime });
+        return { reply };
       }),
   }),
 });
