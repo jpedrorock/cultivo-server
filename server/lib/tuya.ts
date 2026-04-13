@@ -187,63 +187,53 @@ export async function listTuyaDevices(
     }));
   }
 
-  // Tenta /v1.0/iot-03/devices (paginado, page_size=100)
-  try {
-    const data = await tuyaGet(
-      `/v1.0/iot-03/devices?page_no=1&page_size=100`,
-      accessId,
-      accessSecret,
-      accessToken,
-      region
-    );
-    if (data.success && Array.isArray(data.result?.devices) && data.result.devices.length > 0) {
-      console.log(`[Tuya] listDevices via /v1.0/iot-03/devices: ${data.result.devices.length} dispositivos`);
-      const devices = parseDevices(data.result.devices);
-      devices.sort((a, b) =>
-        (SENSOR_CATS.includes(a.category) ? 0 : 1) - (SENSOR_CATS.includes(b.category) ? 0 : 1)
-      );
-      return devices;
+  // Endpoints tentados em ordem — loga tudo para diagnóstico
+  const attempts: Array<{ label: string; path: string; extract: (r: any) => any[] }> = [
+    // Smart Home Basic Service: busca todos dispositivos do projeto (página de 100)
+    {
+      label: "Smart Home /v1.0/devices",
+      path: `/v1.0/devices?page_no=1&page_size=100`,
+      extract: (r) => (Array.isArray(r) ? r : r?.devices ?? r?.list ?? []),
+    },
+    // Homes: busca casas do uid e depois dispositivos de cada casa
+    // — tentativa indireta via iot-03
+    {
+      label: "IoT-03 /v1.0/iot-03/devices",
+      path: `/v1.0/iot-03/devices?page_no=1&page_size=100`,
+      extract: (r) => r?.devices ?? [],
+    },
+    {
+      label: "IoT-03 /v1.2/iot-03/devices",
+      path: `/v1.2/iot-03/devices?page_no=1&page_size=100`,
+      extract: (r) => r?.devices ?? [],
+    },
+    // Legado: usuário do projeto (geralmente developer uid, pode não ter dispositivos SmartLife)
+    {
+      label: `Legacy /v1.0/users/${uid}/devices`,
+      path: `/v1.0/users/${uid}/devices`,
+      extract: (r) => (Array.isArray(r) ? r : r?.devices ?? r?.list ?? []),
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const data = await tuyaGet(attempt.path, accessId, accessSecret, accessToken, region);
+      const list = attempt.extract(data.result);
+      console.log(`[Tuya] ${attempt.label}: success=${data.success} code=${data.code ?? "-"} msg="${data.msg ?? "-"}" count=${list?.length ?? 0}`);
+      if (data.success && Array.isArray(list) && list.length > 0) {
+        const devices = parseDevices(list);
+        devices.sort((a, b) =>
+          (SENSOR_CATS.includes(a.category) ? 0 : 1) - (SENSOR_CATS.includes(b.category) ? 0 : 1)
+        );
+        return devices;
+      }
+    } catch (e: any) {
+      console.warn(`[Tuya] ${attempt.label} exception: ${e?.message}`);
     }
-  } catch (_) {}
-
-  // Tenta /v1.2/iot-03/devices
-  try {
-    const data = await tuyaGet(
-      `/v1.2/iot-03/devices?page_no=1&page_size=100`,
-      accessId,
-      accessSecret,
-      accessToken,
-      region
-    );
-    if (data.success && Array.isArray(data.result?.devices) && data.result.devices.length > 0) {
-      console.log(`[Tuya] listDevices via /v1.2/iot-03/devices: ${data.result.devices.length} dispositivos`);
-      const devices = parseDevices(data.result.devices);
-      devices.sort((a, b) =>
-        (SENSOR_CATS.includes(a.category) ? 0 : 1) - (SENSOR_CATS.includes(b.category) ? 0 : 1)
-      );
-      return devices;
-    }
-  } catch (_) {}
-
-  // Fallback: /v1.0/users/{uid}/devices (legado)
-  const data = await tuyaGet(
-    `/v1.0/users/${uid}/devices`,
-    accessId,
-    accessSecret,
-    accessToken,
-    region
-  );
-
-  if (!data.success) {
-    throw new Error(`Tuya listDevices: ${data.msg ?? data.code}`);
   }
 
-  console.log(`[Tuya] listDevices via /v1.0/users/${uid}/devices: ${(data.result ?? []).length} dispositivos`);
-  const devices = parseDevices(data.result ?? []);
-  devices.sort((a, b) =>
-    (SENSOR_CATS.includes(a.category) ? 0 : 1) - (SENSOR_CATS.includes(b.category) ? 0 : 1)
-  );
-  return devices;
+  // Nenhum endpoint retornou dispositivos
+  throw new Error("Nenhum dispositivo encontrado. Verifique se os sensores estão linkados ao projeto no iot.tuya.com → Devices.");
 }
 
 /**
