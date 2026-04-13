@@ -580,14 +580,14 @@ export default function QuickLog() {
   return (
     <PageTransition>
         <div
-          className="fixed inset-0 overflow-hidden bg-background flex flex-col"
+          className="fixed inset-0 overflow-hidden bg-background flex flex-col isolate"
           style={{
             paddingTop: 'env(safe-area-inset-top, 0px)',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
-      {/* Radial glow background */}
-      <div className="pointer-events-none absolute inset-0 z-0 will-change-transform">
+      {/* Radial glow background — sem will-change-transform (causa flash preto no iOS ao usar slider/scroll) */}
+      <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full bg-primary/5 blur-[120px]" />
       </div>
       {/* Content */}
