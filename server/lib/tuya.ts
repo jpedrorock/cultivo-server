@@ -163,6 +163,12 @@ export async function testTuyaConnection(
   }
 }
 
+/**
+ * Tenta múltiplos endpoints para garantir que dispositivos SmartLife vinculados apareçam.
+ * 1. /v1.0/iot-03/devices  → dispositivos do projeto (inclui SmartLife linkados)
+ * 2. /v1.2/iot-03/devices  → versão mais nova
+ * 3. /v1.0/users/{uid}/devices → fallback legado
+ */
 export async function listTuyaDevices(
   accessId: string,
   accessSecret: string,
@@ -170,6 +176,56 @@ export async function listTuyaDevices(
 ): Promise<TuyaDevice[]> {
   const { accessToken, uid } = await getToken(accessId, accessSecret, region);
 
+  const SENSOR_CATS = ["wsdcg", "mcs", "zdkj", "wnykq", "hjjcy"];
+
+  function parseDevices(result: any[]): TuyaDevice[] {
+    return (result ?? []).map((d: any) => ({
+      id: d.id ?? d.device_id ?? "",
+      name: d.name ?? d.device_name ?? d.custom_name ?? "Sem nome",
+      online: d.online ?? false,
+      category: d.category ?? d.product_category ?? "",
+    }));
+  }
+
+  // Tenta /v1.0/iot-03/devices (paginado, page_size=100)
+  try {
+    const data = await tuyaGet(
+      `/v1.0/iot-03/devices?page_no=1&page_size=100`,
+      accessId,
+      accessSecret,
+      accessToken,
+      region
+    );
+    if (data.success && Array.isArray(data.result?.devices) && data.result.devices.length > 0) {
+      console.log(`[Tuya] listDevices via /v1.0/iot-03/devices: ${data.result.devices.length} dispositivos`);
+      const devices = parseDevices(data.result.devices);
+      devices.sort((a, b) =>
+        (SENSOR_CATS.includes(a.category) ? 0 : 1) - (SENSOR_CATS.includes(b.category) ? 0 : 1)
+      );
+      return devices;
+    }
+  } catch (_) {}
+
+  // Tenta /v1.2/iot-03/devices
+  try {
+    const data = await tuyaGet(
+      `/v1.2/iot-03/devices?page_no=1&page_size=100`,
+      accessId,
+      accessSecret,
+      accessToken,
+      region
+    );
+    if (data.success && Array.isArray(data.result?.devices) && data.result.devices.length > 0) {
+      console.log(`[Tuya] listDevices via /v1.2/iot-03/devices: ${data.result.devices.length} dispositivos`);
+      const devices = parseDevices(data.result.devices);
+      devices.sort((a, b) =>
+        (SENSOR_CATS.includes(a.category) ? 0 : 1) - (SENSOR_CATS.includes(b.category) ? 0 : 1)
+      );
+      return devices;
+    }
+  } catch (_) {}
+
+  // Fallback: /v1.0/users/{uid}/devices (legado)
   const data = await tuyaGet(
     `/v1.0/users/${uid}/devices`,
     accessId,
@@ -182,19 +238,11 @@ export async function listTuyaDevices(
     throw new Error(`Tuya listDevices: ${data.msg ?? data.code}`);
   }
 
-  const SENSOR_CATS = ["wsdcg", "mcs", "zdkj", "wnykq", "hjjcy"];
-  const devices: TuyaDevice[] = (data.result ?? []).map((d: any) => ({
-    id: d.id,
-    name: d.name,
-    online: d.online ?? false,
-    category: d.category ?? "",
-  }));
-
-  // Sensores de temp/umidade primeiro
+  console.log(`[Tuya] listDevices via /v1.0/users/${uid}/devices: ${(data.result ?? []).length} dispositivos`);
+  const devices = parseDevices(data.result ?? []);
   devices.sort((a, b) =>
     (SENSOR_CATS.includes(a.category) ? 0 : 1) - (SENSOR_CATS.includes(b.category) ? 0 : 1)
   );
-
   return devices;
 }
 
