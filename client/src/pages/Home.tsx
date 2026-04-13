@@ -986,7 +986,15 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { tentId: tent.id },
     { staleTime: 5 * 60 * 1000 }
   );
-  
+
+  // Leitura do sensor SmartLife para badge automático
+  const { data: sensorReading } = trpc.tuya.getLatestReadingForTent.useQuery(
+    { tentId: tent.id },
+    { staleTime: 5 * 60 * 1000, retry: false }
+  );
+  // Badge "A" aparece quando o sensor está ativo e a leitura é fresca (< 2h)
+  const isSensorAuto = !!(sensorReading?.isFresh);
+
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
     if (!value || !min || !max) return "text-foreground";
@@ -1345,22 +1353,28 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           {/* KPI Metrics — 3 colunas: Temp · RH · PPFD */}
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/40">
             {/* Temperature */}
-            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08]">
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08] relative">
               <ThermometerSun className="w-3.5 h-3.5 text-orange-400" />
               <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">Temp</p>
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
                 {latestLog?.tempC ? <AnimatedCounter value={parseFloat(latestLog.tempC)} decimals={1} suffix="°" /> : <span className="text-muted-foreground/40">--</span>}
               </p>
               <MiniSparkline values={sparkTemps} color="#f97316" />
+              {isSensorAuto && (
+                <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
+              )}
             </div>
             {/* Humidity */}
-            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08]">
+            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08] relative">
               <Droplets className="w-3.5 h-3.5 text-teal-400" />
               <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">RH</p>
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
                 {latestLog?.rhPct ? <AnimatedCounter value={parseFloat(latestLog.rhPct)} decimals={0} suffix="%" /> : <span className="text-muted-foreground/40">--</span>}
               </p>
               <MiniSparkline values={sparkRh} color="#2dd4bf" />
+              {isSensorAuto && (
+                <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
+              )}
             </div>
             {/* PPFD */}
             <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.08]">
