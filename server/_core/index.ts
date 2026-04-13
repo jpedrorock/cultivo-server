@@ -159,6 +159,65 @@ async function ensureAiChatMessagesTable() {
   }
 }
 
+async function ensureTuyaTables() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+
+    // Credenciais Tuya por usuário
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`tuyaConfig\` (
+        \`id\`              INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\`          INT NOT NULL,
+        \`accessId\`        VARCHAR(100) NOT NULL,
+        \`accessSecret\`    VARCHAR(100) NOT NULL,
+        \`region\`          VARCHAR(10) NOT NULL DEFAULT 'eu',
+        \`pollIntervalMin\` INT NOT NULL DEFAULT 60,
+        \`enabled\`         TINYINT(1) NOT NULL DEFAULT 1,
+        \`createdAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        \`updatedAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE KEY \`tuyaConfig_userId\` (\`userId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Mapeamento dispositivo ↔ estufa por usuário
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`tuyaSensorMappings\` (
+        \`id\`          INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\`      INT NOT NULL,
+        \`tentId\`      INT NOT NULL,
+        \`deviceId\`    VARCHAR(100) NOT NULL,
+        \`deviceName\`  VARCHAR(200),
+        \`enabled\`     TINYINT(1) NOT NULL DEFAULT 1,
+        \`createdAt\`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE KEY \`tuyaSensorMappings_userId_tentId\` (\`userId\`, \`tentId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // Cache da última leitura por dispositivo
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`sensorLatestReadings\` (
+        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\`    INT NOT NULL,
+        \`deviceId\`  VARCHAR(100) NOT NULL,
+        \`tempC\`     DECIMAL(4,1),
+        \`rhPct\`     DECIMAL(4,1),
+        \`readAt\`    TIMESTAMP NOT NULL,
+        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE KEY \`sensorLatestReadings_deviceId\` (\`deviceId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await conn.end();
+    console.log("[DB] Tabelas Tuya OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao criar tabelas Tuya:", err?.message);
+  }
+}
+
 async function ensurePlantLSTLogsColumns() {
   try {
     const connectionString = process.env.DATABASE_URL;
@@ -218,6 +277,9 @@ async function startServer() {
   // Garantir que a tabela de histórico do chat de IA existe
   await ensureAiChatMessagesTable();
 
+  // Garantir que as tabelas de integração Tuya/SmartLife existem
+  await ensureTuyaTables();
+
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();
 
@@ -228,6 +290,10 @@ async function startServer() {
   // Inicializar cron job de lembretes diários (verifica a cada minuto)
   const { startDailyReminderCron } = await import("../cron/dailyReminder");
   startDailyReminderCron();
+
+  // Inicializar cron job de leitura de sensores Tuya/SmartLife
+  const { startTuyaPollerCron } = await import("../cron/tuyaPoller");
+  startTuyaPollerCron();
 
   // Security headers inline (sem dependência de pacote externo)
   if (process.env.NODE_ENV === 'production') {

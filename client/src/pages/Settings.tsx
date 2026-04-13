@@ -1,5 +1,5 @@
 import { Link } from 'wouter';
-import { ArrowLeft, Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette } from 'lucide-react';
+import { ArrowLeft, Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette, Wifi } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageTransition } from '@/components/PageTransition';
 import { useAuth } from '@/_core/hooks/useAuth';
@@ -60,6 +60,11 @@ export default function Settings() {
             <SettingsRow href="/settings/appearance" icon={<Palette className="w-4 h-4" />} label="Tema" description="Claro, escuro, floresta e outros" />
             <SettingsRow href="/settings/alerts" icon={<Sliders className="w-4 h-4" />} label="Alertas de ambiente" description="Margens de tolerância por fase" />
             <SettingsRow href="/settings/notifications" icon={<Bell className="w-4 h-4" />} label="Notificações" description="Push e lembretes diários" />
+          </SettingsSection>
+
+          {/* Seção: Integrações */}
+          <SettingsSection title="Integrações">
+            <SettingsRow href="/settings/sensors" icon={<Wifi className="w-4 h-4" />} label="Sensores SmartLife / Tuya" description="Temperatura e umidade automáticos" />
           </SettingsSection>
 
           {/* Seção: Dados */}

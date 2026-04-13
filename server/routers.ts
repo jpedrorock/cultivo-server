@@ -416,9 +416,207 @@ async function callAiProviderWithFallback(opts: Parameters<typeof callAiProvider
   throw new Error(lastError || `Nenhum modelo disponível para ${provider}`);
 }
 
+// ─── Tuya / SmartLife integration router ─────────────────────────────────────
+
+const POLL_INTERVAL_OPTIONS = [30, 60, 180, 480, 720] as const;
+
+const tuyaRouter = router({
+  /** Salva credenciais Tuya do usuário */
+  saveConfig: protectedProcedure
+    .input(z.object({
+      accessId: z.string().min(1).max(100),
+      accessSecret: z.string().min(1).max(100),
+      region: z.enum(["eu", "us", "cn", "in"]),
+      pollIntervalMin: z.number().refine(v => POLL_INTERVAL_OPTIONS.includes(v as any)),
+      enabled: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.userId;
+      const mysql = await import("mysql2/promise");
+      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
+      try {
+        await conn.execute(
+          `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             accessId = VALUES(accessId),
+             accessSecret = VALUES(accessSecret),
+             region = VALUES(region),
+             pollIntervalMin = VALUES(pollIntervalMin),
+             enabled = VALUES(enabled)`,
+          [userId, input.accessId, input.accessSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0]
+        );
+        return { ok: true };
+      } finally {
+        await conn.end();
+      }
+    }),
+
+  /** Busca credenciais salvas */
+  getConfig: protectedProcedure.query(async ({ ctx }) => {
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
+    try {
+      const [rows]: any = await conn.execute(
+        `SELECT accessId, accessSecret, region, pollIntervalMin, enabled FROM tuyaConfig WHERE userId = ?`,
+        [ctx.userId]
+      );
+      if (rows.length === 0) return null;
+      const r = rows[0];
+      return {
+        accessId: r.accessId as string,
+        accessSecret: r.accessSecret as string,
+        region: r.region as string,
+        pollIntervalMin: r.pollIntervalMin as number,
+        enabled: Boolean(r.enabled),
+      };
+    } finally {
+      await conn.end();
+    }
+  }),
+
+  /** Testa a conexão com a API Tuya */
+  testConnection: protectedProcedure
+    .input(z.object({
+      accessId: z.string().min(1),
+      accessSecret: z.string().min(1),
+      region: z.enum(["eu", "us", "cn", "in"]),
+    }))
+    .mutation(async ({ input }) => {
+      const { testTuyaConnection } = await import("./lib/tuya");
+      return testTuyaConnection(input.accessId, input.accessSecret, input.region);
+    }),
+
+  /** Lista dispositivos da conta Tuya */
+  listDevices: protectedProcedure.query(async ({ ctx }) => {
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
+    try {
+      const [rows]: any = await conn.execute(
+        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+        [ctx.userId]
+      );
+      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+      const cfg = rows[0];
+      const { listTuyaDevices } = await import("./lib/tuya");
+      return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region);
+    } finally {
+      await conn.end();
+    }
+  }),
+
+  /** Salva mapeamento dispositivo ↔ estufa */
+  saveMappings: protectedProcedure
+    .input(z.array(z.object({
+      tentId: z.number(),
+      deviceId: z.string(),
+      deviceName: z.string(),
+      enabled: z.boolean(),
+    })))
+    .mutation(async ({ ctx, input }) => {
+      const mysql = await import("mysql2/promise");
+      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
+      try {
+        // Apaga mapeamentos antigos do usuário e reinserir
+        await conn.execute(`DELETE FROM tuyaSensorMappings WHERE userId = ?`, [ctx.userId]);
+        for (const m of input) {
+          await conn.execute(
+            `INSERT INTO tuyaSensorMappings (userId, tentId, deviceId, deviceName, enabled)
+             VALUES (?, ?, ?, ?, ?)`,
+            [ctx.userId, m.tentId, m.deviceId, m.deviceName, m.enabled ? 1 : 0]
+          );
+        }
+        return { ok: true };
+      } finally {
+        await conn.end();
+      }
+    }),
+
+  /** Busca mapeamentos salvos */
+  getMappings: protectedProcedure.query(async ({ ctx }) => {
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
+    try {
+      const [rows]: any = await conn.execute(
+        `SELECT tentId, deviceId, deviceName, enabled FROM tuyaSensorMappings WHERE userId = ?`,
+        [ctx.userId]
+      );
+      return (rows as any[]).map(r => ({
+        tentId: r.tentId as number,
+        deviceId: r.deviceId as string,
+        deviceName: r.deviceName as string,
+        enabled: Boolean(r.enabled),
+      }));
+    } finally {
+      await conn.end();
+    }
+  }),
+
+  /** Retorna a leitura mais recente do sensor de uma estufa específica */
+  getLatestReadingForTent: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const mysql = await import("mysql2/promise");
+      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
+      try {
+        const [rows]: any = await conn.execute(
+          `SELECT slr.tempC, slr.rhPct, slr.readAt, tsm.enabled
+           FROM tuyaSensorMappings tsm
+           INNER JOIN sensorLatestReadings slr ON slr.deviceId = tsm.deviceId
+           WHERE tsm.userId = ? AND tsm.tentId = ?
+           LIMIT 1`,
+          [ctx.userId, input.tentId]
+        );
+        if (rows.length === 0) return null;
+        const r = rows[0];
+        if (!r.enabled) return null; // sensor desativado para esta estufa
+        return {
+          tempC: r.tempC != null ? parseFloat(r.tempC) : null,
+          rhPct: r.rhPct != null ? parseFloat(r.rhPct) : null,
+          readAt: r.readAt as Date,
+          // Fresco = menos de 2h (para que o usuário veja dados relevantes no QuickLog)
+          isFresh: (Date.now() - new Date(r.readAt).getTime()) < 2 * 60 * 60 * 1000,
+        };
+      } finally {
+        await conn.end();
+      }
+    }),
+
+  /** Força leitura imediata de todos os sensores desta estufa */
+  readNow: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const mysql = await import("mysql2/promise");
+      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
+      try {
+        const [cfgRows]: any = await conn.execute(
+          `SELECT tc.accessId, tc.accessSecret, tc.region, tsm.deviceId
+           FROM tuyaConfig tc
+           INNER JOIN tuyaSensorMappings tsm ON tsm.userId = tc.userId AND tsm.tentId = ? AND tsm.enabled = 1
+           WHERE tc.userId = ? AND tc.enabled = 1`,
+          [input.tentId, ctx.userId]
+        );
+        if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum sensor ativo para esta estufa" });
+        const cfg = cfgRows[0];
+        const { readTuyaDeviceStatus } = await import("./lib/tuya");
+        const reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+        await conn.execute(
+          `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
+           VALUES (?, ?, ?, ?, NOW())
+           ON DUPLICATE KEY UPDATE tempC = VALUES(tempC), rhPct = VALUES(rhPct), readAt = NOW()`,
+          [ctx.userId, cfg.deviceId, reading.tempC, reading.rhPct]
+        );
+        return { ...reading, readAt: new Date() };
+      } finally {
+        await conn.end();
+      }
+    }),
+});
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  tuya: tuyaRouter,
   auth: router({
     // Simplified auth for standalone deployment
     me: protectedProcedure.query(() => ({ id: 1, name: "Local User", email: "user@local" })),

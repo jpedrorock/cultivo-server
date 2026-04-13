@@ -53,6 +53,7 @@ const PendingApproval      = lazy(() => import("./pages/PendingApproval"));
 const DisplayMode          = lazy(() => import("./pages/DisplayMode"));
 const MorningCheck         = lazy(() => import("./pages/MorningCheck"));
 const PlantChat            = lazy(() => import("./pages/PlantChat"));
+const TuyaSettings         = lazy(() => import("./pages/TuyaSettings"));
 // QuickLog removido daqui — agora é eager (import estático acima)
 
 // Spinner minimalista usado durante carregamento lazy
@@ -86,6 +87,7 @@ function Router() {
         <Route path={"/settings/backup"} component={Backup} />
         <Route path={"/settings/notifications"} component={NotificationSettings} />
         <Route path={"/settings/alerts"} component={AlertSettings} />
+        <Route path={"/settings/sensors"} component={TuyaSettings} />
         <Route path={"/alerts/history"} component={AlertHistory} />
         <Route path={"/strains/:id/targets"} component={StrainTargets} />
 

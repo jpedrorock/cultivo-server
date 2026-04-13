@@ -157,14 +157,37 @@ export default function QuickLog() {
   useEffect(() => {
     const last = lastLogs?.[0];
     if (!last) return;
-    if (last.tempC)           setTempC(String(parseFloat(String(last.tempC))));
-    if (last.rhPct)           setRhPct(String(parseFloat(String(last.rhPct))));
     if (last.ph)              setPh(String(parseFloat(String(last.ph))));
     if (last.ec)              setEc(String(parseFloat(String(last.ec))));
     if (last.wateringVolume)  setWateringVolume(String(last.wateringVolume));
     if (last.runoffCollected) setRunoffCollected(String(last.runoffCollected));
     if (last.ppfd)            setPpfd(last.ppfd);
+    // Temp e umidade só são preenchidos do lastLog se não houver sensor ativo (tratado abaixo)
   }, [lastLogs]);
+
+  // Leitura do sensor Tuya para esta estufa
+  const { data: sensorReading, refetch: refetchSensor } = trpc.tuya.getLatestReadingForTent.useQuery(
+    { tentId: tentId ?? 0 },
+    { enabled: !!tentId, staleTime: 60_000 }
+  );
+  const readNow = trpc.tuya.readNow.useMutation({
+    onSuccess: () => { refetchSensor(); toast.success('Leitura atualizada!'); },
+    onError: (e) => toast.error(`Erro no sensor: ${e.message}`),
+  });
+
+  // Aplica leitura do sensor quando disponível (sobrescreve lastLog para temp/rh)
+  useEffect(() => {
+    if (sensorReading?.isFresh) {
+      if (sensorReading.tempC != null) setTempC(String(sensorReading.tempC));
+      if (sensorReading.rhPct  != null) setRhPct(String(sensorReading.rhPct));
+    } else if (!sensorReading) {
+      // Sem sensor → usa lastLog para temp/rh também
+      const last = lastLogs?.[0];
+      if (!last) return;
+      if (last.tempC) setTempC(String(parseFloat(String(last.tempC))));
+      if (last.rhPct) setRhPct(String(parseFloat(String(last.rhPct))));
+    }
+  }, [sensorReading, lastLogs]);
 
   // Fetch weekly targets for color validation
   const { data: targets } = trpc.weeklyTargets.getTargetsByTent.useQuery(
@@ -801,6 +824,21 @@ export default function QuickLog() {
             {/* Step 1: Temperature */}
             {currentStep === 1 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
+                {sensorReading?.isFresh && (
+                  <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Leitura do sensor SmartLife</span>
+                    </div>
+                    <button
+                      onClick={() => readNow.mutate({ tentId: tentId! })}
+                      disabled={readNow.isPending}
+                      className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40"
+                    >
+                      {readNow.isPending ? '...' : 'Atualizar'}
+                    </button>
+                  </div>
+                )}
                 <BigStepper value={tempC} onChange={setTempC} step={0.1} min={-10} max={50} decimals={1} unit="°C" fieldType="temperature" colorClass={getValidationColor(tempC, targets?.tempMin ? parseFloat(String(targets.tempMin)) : null, targets?.tempMax ? parseFloat(String(targets.tempMax)) : null)} />
                 {targets?.tempMin && targets?.tempMax && (
                   <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
@@ -813,6 +851,12 @@ export default function QuickLog() {
             {/* Step 2: Humidity */}
             {currentStep === 2 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
+                {sensorReading?.isFresh && (
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400">
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Leitura do sensor SmartLife</span>
+                  </div>
+                )}
                 <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" fieldType="humidity" colorClass={getValidationColor(rhPct, targets?.rhMin ? parseFloat(String(targets.rhMin)) : null, targets?.rhMax ? parseFloat(String(targets.rhMax)) : null)} />
                 {targets?.rhMin && targets?.rhMax && (
                   <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
