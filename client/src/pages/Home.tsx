@@ -1053,11 +1053,15 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const utils = trpc.useUtils();
 
   const readNow = trpc.tuya.readNow.useMutation({
-    onSuccess: () => {
-      refetchSensor();
+    onSuccess: (data) => {
+      // Atualiza o cache do sensor com os valores retornados direto (sem esperar refetch)
+      utils.tuya.getLatestReadingForTent.setData(
+        { tentId: tent.id },
+        { hasSensor: true, isFresh: true, tempC: data.tempC, rhPct: data.rhPct, readAt: data.readAt }
+      );
       utils.dailyLogs.getLatestByTent.invalidate({ tentId: tent.id });
       utils.dailyLogs.list.invalidate({ tentId: tent.id });
-      toast.success("Leitura atualizada!");
+      toast.success(`Leitura: ${data.tempC?.toFixed(1)}°C · ${data.rhPct?.toFixed(0)}%`);
     },
     onError: (e) => toast.error(`Sensor: ${e.message}`),
   });
@@ -1375,7 +1379,15 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
                 {readNow.isPending
                   ? <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-                  : latestLog?.tempC ? <AnimatedCounter value={parseFloat(latestLog.tempC)} decimals={1} suffix="°" /> : <span className="text-muted-foreground/40">--</span>}
+                  : (() => {
+                      const val = sensorReading?.isFresh && sensorReading.tempC != null
+                        ? sensorReading.tempC
+                        : latestLog?.tempC ? parseFloat(latestLog.tempC) : null;
+                      return val != null
+                        ? <AnimatedCounter value={val} decimals={1} suffix="°" />
+                        : <span className="text-muted-foreground/40">--</span>;
+                    })()
+                }
               </p>
               <MiniSparkline values={sparkTemps} color="#f97316" />
               {isSensorAuto && (
@@ -1394,7 +1406,15 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
                 {readNow.isPending
                   ? <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-                  : latestLog?.rhPct ? <AnimatedCounter value={parseFloat(latestLog.rhPct)} decimals={0} suffix="%" /> : <span className="text-muted-foreground/40">--</span>}
+                  : (() => {
+                      const val = sensorReading?.isFresh && sensorReading.rhPct != null
+                        ? sensorReading.rhPct
+                        : latestLog?.rhPct ? parseFloat(latestLog.rhPct) : null;
+                      return val != null
+                        ? <AnimatedCounter value={val} decimals={0} suffix="%" />
+                        : <span className="text-muted-foreground/40">--</span>;
+                    })()
+                }
               </p>
               <MiniSparkline values={sparkRh} color="#2dd4bf" />
               {isSensorAuto && (
