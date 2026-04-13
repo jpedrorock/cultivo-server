@@ -90,29 +90,14 @@ export default function TuyaSettings() {
   });
 
   const saveMappings = trpc.tuya.saveMappings.useMutation({
-    onSuccess: () => toast.success('Sensores salvos!'),
-    onError: (e) => toast.error(`Erro: ${e.message}`),
+    onSuccess: () => toast.success('Sensor salvo!', { duration: 2000 }),
+    onError: (e) => toast.error(`Erro ao salvar: ${e.message}`),
   });
 
-  const handlePickDevice = (tentId: number, deviceId: string, deviceName: string) => {
-    setMappings(prev => ({ ...prev, [tentId]: { deviceId, deviceName, enabled: prev[tentId]?.enabled ?? true } }));
-    setOpenPicker(null);
-  };
-
-  const handleToggle = (tentId: number) => {
-    setMappings(prev => ({
-      ...prev,
-      [tentId]: { ...prev[tentId], enabled: !prev[tentId]?.enabled },
-    }));
-  };
-
-  const handleRemove = (tentId: number) => {
-    setMappings(prev => { const n = { ...prev }; delete n[tentId]; return n; });
-  };
-
-  const handleSaveMappings = () => {
+  // Persiste imediatamente qualquer mudança de mapeamento
+  const persistMappings = (newMappings: typeof mappings) => {
     saveMappings.mutate(
-      Object.entries(mappings).map(([tentId, m]) => ({
+      Object.entries(newMappings).map(([tentId, m]) => ({
         tentId: Number(tentId),
         deviceId: m.deviceId,
         deviceName: m.deviceName,
@@ -120,6 +105,31 @@ export default function TuyaSettings() {
       }))
     );
   };
+
+  const handlePickDevice = (tentId: number, deviceId: string, deviceName: string) => {
+    const updated = { ...mappings, [tentId]: { deviceId, deviceName, enabled: mappings[tentId]?.enabled ?? true } };
+    setMappings(updated);
+    setOpenPicker(null);
+    persistMappings(updated);
+  };
+
+  const handleToggle = (tentId: number) => {
+    const updated = {
+      ...mappings,
+      [tentId]: { ...mappings[tentId], enabled: !mappings[tentId]?.enabled },
+    };
+    setMappings(updated);
+    persistMappings(updated);
+  };
+
+  const handleRemove = (tentId: number) => {
+    const updated = { ...mappings };
+    delete updated[tentId];
+    setMappings(updated);
+    persistMappings(updated);
+  };
+
+  const handleSaveMappings = () => persistMappings(mappings);
 
   if (isLoading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -443,16 +453,12 @@ export default function TuyaSettings() {
                     })}
                   </div>
 
-                  {Object.keys(mappings).length > 0 && (
-                    <Button
-                      className="w-full bg-emerald-600 hover:bg-emerald-700"
-                      disabled={saveMappings.isPending}
-                      onClick={handleSaveMappings}
-                    >
-                      {saveMappings.isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-                      Salvar todos os sensores
-                    </Button>
-                  )}
+                  {/* Indicador de salvamento automático */}
+                  <p className="text-center text-xs text-muted-foreground">
+                    {saveMappings.isPending
+                      ? <span className="flex items-center justify-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> Salvando...</span>
+                      : '✓ Configurações salvas automaticamente'}
+                  </p>
                 </>
               )}
             </>
