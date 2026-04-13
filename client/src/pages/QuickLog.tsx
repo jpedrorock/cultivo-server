@@ -184,8 +184,8 @@ export default function QuickLog() {
       // Sem sensor → usa lastLog para temp/rh também
       const last = lastLogs?.[0];
       if (!last) return;
-      if (last.tempC) setTempC(String(parseFloat(String(last.tempC))));
-      if (last.rhPct) setRhPct(String(parseFloat(String(last.rhPct))));
+      if (last.tempC != null) setTempC(String(parseFloat(String(last.tempC))));
+      if (last.rhPct != null) setRhPct(String(parseFloat(String(last.rhPct))));
     }
   }, [sensorReading, lastLogs]);
 
@@ -199,7 +199,7 @@ export default function QuickLog() {
   const runoffPercentage = useMemo(() => {
     const watering = parseFloat(wateringVolume);
     const runoff = parseFloat(runoffCollected);
-    if (!watering || !runoff || watering === 0) return null;
+    if (isNaN(watering) || isNaN(runoff) || watering === 0) return null;
     return ((runoff / watering) * 100).toFixed(1);
   }, [wateringVolume, runoffCollected]);
 

@@ -575,7 +575,7 @@ const tuyaRouter = router({
           rhPct: r.rhPct != null ? parseFloat(r.rhPct) : null,
           readAt: r.readAt as Date,
           // Fresco = menos de 2h (para que o usuário veja dados relevantes no QuickLog)
-          isFresh: (Date.now() - new Date(r.readAt).getTime()) < 2 * 60 * 60 * 1000,
+          isFresh: (Date.now() - (r.readAt instanceof Date ? r.readAt : new Date(r.readAt)).getTime()) < 2 * 60 * 60 * 1000,
         };
       } finally {
         await conn.end();

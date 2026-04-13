@@ -431,11 +431,12 @@ export default function TentDetails() {
           max: Math.max(...vals).toFixed(1),
         };
 
-    const temps  = exportLogs.map(l => l.tempC  ? parseFloat(l.tempC)  : null).filter(Boolean) as number[];
-    const rhs    = exportLogs.map(l => l.rhPct   ? parseFloat(l.rhPct)  : null).filter(Boolean) as number[];
-    const ppfds  = exportLogs.map(l => l.ppfd    ?? null).filter(Boolean) as number[];
-    const phs    = exportLogs.map(l => l.ph      ? parseFloat(l.ph)     : null).filter(Boolean) as number[];
-    const ecs    = exportLogs.map(l => l.ec      ? parseFloat(l.ec)     : null).filter(Boolean) as number[];
+    const notNull = (v: number | null): v is number => v !== null;
+    const temps  = exportLogs.map(l => l.tempC != null ? parseFloat(l.tempC)  : null).filter(notNull);
+    const rhs    = exportLogs.map(l => l.rhPct  != null ? parseFloat(l.rhPct)  : null).filter(notNull);
+    const ppfds  = exportLogs.map(l => l.ppfd   != null ? l.ppfd               : null).filter(notNull);
+    const phs    = exportLogs.map(l => l.ph     != null ? parseFloat(l.ph)     : null).filter(notNull);
+    const ecs    = exportLogs.map(l => l.ec     != null ? parseFloat(l.ec)     : null).filter(notNull);
 
     const sTemp  = stat(temps);
     const sRh    = stat(rhs);

@@ -114,10 +114,9 @@ export default function TuyaSettings() {
   };
 
   const handleToggle = (tentId: number) => {
-    const updated = {
-      ...mappings,
-      [tentId]: { ...mappings[tentId], enabled: !mappings[tentId]?.enabled },
-    };
+    const current = mappings[tentId];
+    if (!current) return;
+    const updated = { ...mappings, [tentId]: { ...current, enabled: !current.enabled } };
     setMappings(updated);
     persistMappings(updated);
   };

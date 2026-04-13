@@ -30,6 +30,7 @@ import {
   Search,
   Timer,
   Heart,
+  Wifi,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -544,6 +545,54 @@ const sections: Section[] = [
     ),
   },
   {
+    id: "sensores",
+    icon: Wifi,
+    title: "Sensores SmartLife / Tuya",
+    gradient: "from-cyan-500 to-teal-600",
+    glow: "rgba(6,182,212,0.09)",
+    border: "border-cyan-500/25",
+    badge: "Novo",
+    content: (
+      <div className="space-y-4">
+        <p>Conecte sensores físicos de temperatura e umidade do SmartLife/Tuya para que o app preencha esses campos automaticamente no Registro Rápido.</p>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">Como configurar</p>
+          <div className="space-y-2">
+            <Step number={1} text='Acesse iot.tuya.com e crie uma conta de desenvolvedor.' />
+            <Step number={2} text='Crie um Cloud Project (tipo Smart Home) com Data Center correspondente à sua região (ex: Western America para EUA).' />
+            <Step number={3} text='Em Devices → Link App Account, escaneie o QR code com o app SmartLife no celular.' />
+            <Step number={4} text='Copie o Access ID e o Access Secret da página inicial do projeto.' />
+            <Step number={5} text='No app: Configurações → Integrações → SmartLife → aba API. Cole as credenciais, selecione a região e salve.' />
+            <Step number={6} text='Vá para a aba Sensores. Se os dispositivos não carregarem automaticamente, clique no ícone de lápis ✏️ de cada estufa e cole o Device ID manualmente (visível na aba Devices do portal Tuya).' />
+            <Step number={7} text='Configure a frequência de leitura (recomendado: 1 hora).' />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">Como funciona no app</p>
+          <div className="space-y-1.5">
+            {[
+              ["Registro Rápido", "Temperatura e umidade são preenchidos automaticamente com a leitura mais recente do sensor (até 2h de validade). Um badge verde indica a origem do dado. Os outros campos (pH, EC, rega, PPFD) continuam manuais."],
+              ["Card na estufa", "Cada estufa mostra um card SmartLife com a última leitura, horário, badge AO VIVO e botão de atualizar. O toggle liga/desliga a leitura automática por estufa."],
+              ["Leitura forçada", "Use o botão de atualizar no card da estufa para buscar uma leitura imediata sem esperar o intervalo configurado."],
+              ["Cron automático", "O servidor verifica a cada 15 min se algum sensor precisa ser lido com base no intervalo configurado. As leituras ficam salvas no banco."],
+              ["Dados manuais preservados", "Se o sensor estiver desativado ou offline, o Registro Rápido usa o último valor registrado manualmente — nenhum dado é perdido."],
+            ].map(([title, desc]) => (
+              <div key={title as string} className="rounded-xl border border-border/20 bg-card/50 px-3 py-2.5">
+                <p className="font-semibold text-xs text-foreground/80 mb-1">{title}</p>
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Tip text="O Device ID fica visível no portal iot.tuya.com → seu projeto → aba Devices, na coluna 'Device ID'. Ele tem o formato: eb8168f5771604de9ccjsi" />
+        <Tip text="Cada sensor SmartLife de temperatura/umidade pode ser vinculado a apenas uma estufa. Para múltiplas estufas, você precisa de um sensor físico em cada." />
+      </div>
+    ),
+  },
+  {
     id: "iphone",
     icon: Smartphone,
     title: "Dicas para iPhone / Mobile",
@@ -648,6 +697,7 @@ export default function Help() {
                 { label: "Tricomas", id: "tricomas" },
                 { label: "Calculadoras", id: "calculadoras" },
                 { label: "Alertas", id: "alertas" },
+                { label: "Sensores", id: "sensores" },
                 { label: "iPhone", id: "iphone" },
               ].map((chip) => (
                 <button
