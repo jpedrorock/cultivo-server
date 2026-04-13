@@ -3,6 +3,7 @@ import { useRoute, useLocation, Link } from 'wouter';
 import { ArrowLeft, Bot, Send, ImagePlus, X, Leaf, AlertCircle, Trash2, Sparkles, ChevronRight, Images } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { PageTransition } from '@/components/PageTransition';
+import { TentIcon } from '@/components/TentIcon';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { toast } from 'sonner';
@@ -351,8 +352,9 @@ function PlantPickerSheet({
               Estufas
             </button>
           ) : null}
-          <p className="font-bold text-base">
-            {activeGroup ? `🏕️ ${activeGroup.tentName}` : 'Conversar sobre qual planta?'}
+          <p className="font-bold text-base flex items-center gap-2">
+            {activeGroup && <TentIcon className="w-4 h-4 text-muted-foreground shrink-0" />}
+            {activeGroup ? activeGroup.tentName : 'Conversar sobre qual planta?'}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {activeGroup
@@ -377,7 +379,9 @@ function PlantPickerSheet({
                   onClick={() => setSelectedGroupKey(group.key)}
                   className="w-full flex items-center gap-3 px-3 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0 text-2xl">🏕️</div>
+                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                    <TentIcon className="w-6 h-6 text-muted-foreground" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>

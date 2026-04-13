@@ -77,8 +77,9 @@ function ChatPlantPicker({
             Estufas
           </button>
         )}
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
-          🏕️ {activeGroup.tentName}
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1 flex items-center gap-1.5">
+          <TentIcon className="w-3.5 h-3.5 shrink-0" />
+          {activeGroup.tentName}
         </p>
         <div className="space-y-0.5">
           {activeGroup.plants.map((p: any) => {
@@ -115,7 +116,9 @@ function ChatPlantPicker({
           onClick={() => setSelectedGroup(group.key)}
           className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
         >
-          <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 text-xl">🏕️</div>
+          <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+            <TentIcon className="w-5 h-5 text-muted-foreground" />
+          </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
             <p className="text-[11px] text-muted-foreground">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
