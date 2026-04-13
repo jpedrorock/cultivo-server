@@ -380,10 +380,8 @@ export default function TentDetails() {
   const historyLogs = useMemo(() => {
     if (!logs) return [];
     if (showAutoLogs) return logs;
-    return logs.filter((log: any) => {
-      const isAuto = log.source === 'AUTO' || (!log.ph && !log.ec && !log.ppfd && !log.wateringVolume);
-      return !isAuto;
-    });
+    // Usa apenas o campo source — evitar ocultar logs manuais sem pH/EC/PPFD
+    return logs.filter((log: any) => log.source !== 'AUTO');
   }, [logs, showAutoLogs]);
 
   if (tentLoading) {
@@ -700,15 +698,18 @@ export default function TentDetails() {
   // L4 — apenas logs com watering registrado (para o gráfico de correlação)
   const wateringChartData = chartData.filter(d => d.watering !== null);
 
-  // Calculate averages (filtered by period)
-  const avgTemp = filteredLogs.length
-    ? (filteredLogs.reduce((sum, log) => sum + (log.tempC ? parseFloat(log.tempC) : 0), 0) / filteredLogs.filter(l => l.tempC).length).toFixed(1)
+  // Calculate averages (filtered by period) — usando só logs com valor para evitar NaN
+  const logsWithTemp  = filteredLogs.filter(l => l.tempC);
+  const logsWithRh    = filteredLogs.filter(l => l.rhPct);
+  const logsWithPpfd  = filteredLogs.filter(l => l.ppfd);
+  const avgTemp = logsWithTemp.length
+    ? (logsWithTemp.reduce((sum, log) => sum + parseFloat(log.tempC!), 0) / logsWithTemp.length).toFixed(1)
     : "--";
-  const avgRh = filteredLogs.length
-    ? (filteredLogs.reduce((sum, log) => sum + (log.rhPct ? parseFloat(log.rhPct) : 0), 0) / filteredLogs.filter(l => l.rhPct).length).toFixed(1)
+  const avgRh = logsWithRh.length
+    ? (logsWithRh.reduce((sum, log) => sum + parseFloat(log.rhPct!), 0) / logsWithRh.length).toFixed(1)
     : "--";
-  const avgPpfd = filteredLogs.length
-    ? Math.round(filteredLogs.reduce((sum, log) => sum + (log.ppfd || 0), 0) / filteredLogs.filter(l => l.ppfd).length)
+  const avgPpfd = logsWithPpfd.length
+    ? Math.round(logsWithPpfd.reduce((sum, log) => sum + (log.ppfd ?? 0), 0) / logsWithPpfd.length)
     : "--";
 
   return (

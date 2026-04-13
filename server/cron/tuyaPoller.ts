@@ -79,14 +79,20 @@ async function pollAllUsers() {
         );
         const prev = (lastManual as any[])[0] ?? {};
 
-        // Inserir registro automático no dailyLogs
+        // Upsert registro automático no dailyLogs — 1 registro por estufa por turno por dia
+        // Usa logDate truncado na hora (sem minutos/segundos) para o ON DUPLICATE KEY funcionar
+        // e atualiza tempC/rhPct a cada poll sem criar linhas extras
         const nowHour = new Date().getHours();
         const turn = nowHour < 18 ? 'AM' : 'PM';
         await conn.execute(
-          `INSERT IGNORE INTO dailyLogs
+          `INSERT INTO dailyLogs
              (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd,
               wateringVolume, runoffCollected, runoffPercentage, source)
-           VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO')`,
+           VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO')
+           ON DUPLICATE KEY UPDATE
+             tempC  = VALUES(tempC),
+             rhPct  = VALUES(rhPct),
+             source = 'AUTO'`,
           [row.tentId, turn,
            reading.tempC ?? null, reading.rhPct ?? null,
            prev.ph ?? null, prev.ec ?? null, prev.ppfd ?? null,

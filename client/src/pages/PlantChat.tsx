@@ -468,11 +468,10 @@ export default function PlantChat() {
   );
 
   useEffect(() => {
-    setMessages([]);
-  }, [plantId]);
-
-  useEffect(() => {
-    if (!historyLoading) {
+    // Ao trocar de planta: limpa enquanto carrega para não mostrar histórico errado
+    if (historyLoading) {
+      setMessages([]);
+    } else {
       setMessages(
         serverHistory.map((m: any) => ({
           id: m.createdAt instanceof Date ? m.createdAt.getTime().toString() : String(m.createdAt),

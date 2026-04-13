@@ -215,11 +215,15 @@ export default function QuickLog() {
     return ((runoff / watering) * 100).toFixed(1);
   }, [wateringVolume, runoffCollected]);
 
+  const utils = trpc.useUtils();
+
   // Save daily log mutation
   const saveDailyLogMutation = trpc.dailyLogs.create.useMutation({
     onSuccess: () => {
+      // Invalida cache para que Home e TentDetails mostrem o novo log imediatamente
+      utils.dailyLogs.list.invalidate();
+      utils.dailyLogs.getLatestByTent.invalidate();
       // Log saved — advance to plant health question (step 9)
-      // Step 9 shows confirmation + option to record plant health
       setCurrentStep(9);
     },
     onError: (error) => {

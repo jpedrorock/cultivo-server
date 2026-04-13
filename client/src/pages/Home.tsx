@@ -170,6 +170,7 @@ export default function Home() {
   const deleteTent = trpc.tents.delete.useMutation({
     onSuccess: () => {
       utils.tents.list.invalidate();
+      utils.cycles.listActive.invalidate();
       toast.success("Estufa excluída com sucesso!");
     },
     onError: (error) => {

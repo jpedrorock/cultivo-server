@@ -1,6 +1,6 @@
 // Service Worker para App Cultivo PWA
 // Versão do cache - incrementar para forçar atualização
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `app-cultivo-${CACHE_VERSION}`;
 
 // Assets essenciais garantidos no install (sem hash — sempre os mesmos)
@@ -114,6 +114,11 @@ self.addEventListener('fetch', (event) => {
           });
         })
     );
+    return;
+  }
+
+  // Não interceptar requisições que não sejam GET (POST, PUT, DELETE, etc.)
+  if (request.method !== 'GET') {
     return;
   }
 
