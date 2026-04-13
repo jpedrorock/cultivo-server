@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { ArrowLeft, Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageTransition } from '@/components/PageTransition';
 import { TentIcon } from '@/components/TentIcon';
@@ -42,15 +42,19 @@ export default function TuyaSettings() {
   const [mappings, setMappings] = useState<Record<number, { deviceId: string; deviceName: string; enabled: boolean }>>({});
   // which tent's picker is open
   const [openPicker, setOpenPicker] = useState<number | null>(null);
+  // manual input drafts tentId → { deviceId, deviceName }
+  const [manualDraft, setManualDraft] = useState<Record<number, { deviceId: string; deviceName: string }>>({});
 
   // ── Remote data ──────────────────────────────────────────────────────────
   const { data: config, isLoading } = trpc.tuya.getConfig.useQuery();
   const { data: tents = [] } = trpc.tents.list.useQuery();
   const { data: savedMappings = [] } = trpc.tuya.getMappings.useQuery();
-  const { data: devices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
+  const { data: devices = [], isLoading: devicesLoading, isError: devicesError } = trpc.tuya.listDevices.useQuery(
     undefined,
     { enabled: tab === 'sensors' && !!config, retry: false }
   );
+  // manual mode when API can't list devices
+  const useManualEntry = !devicesLoading && (devicesError || devices.length === 0);
 
   // Hydrate from saved data
   useEffect(() => {
@@ -270,23 +274,35 @@ export default function TuyaSettings() {
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span className="text-sm">Buscando dispositivos SmartLife...</span>
                 </div>
-              ) : devices.length === 0 ? (
-                <div className="text-center py-16 space-y-2">
-                  <WifiOff className="w-8 h-8 mx-auto text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">Nenhum dispositivo encontrado</p>
-                  <p className="text-xs text-muted-foreground">Verifique se vinculou o SmartLife ao projeto Tuya</p>
-                </div>
               ) : (
                 <>
-                  <p className="text-xs text-muted-foreground px-1">
-                    Para cada estufa escolha o sensor correspondente. Você pode ativar/desativar individualmente.
-                  </p>
+                  {/* Banner de modo manual quando API não retorna dispositivos */}
+                  {useManualEntry && (
+                    <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 p-4 space-y-2">
+                      <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Inserção manual de Device ID</p>
+                      <p className="text-xs text-muted-foreground">
+                        A listagem automática não está disponível para este projeto. Cole o <strong>Device ID</strong> de cada sensor diretamente do portal Tuya:
+                      </p>
+                      <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
+                        <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto → aba <strong>Devices</strong></li>
+                        <li>Copie o <strong>Device ID</strong> do sensor (coluna "Device ID")</li>
+                        <li>Cole abaixo em cada estufa correspondente</li>
+                      </ol>
+                    </div>
+                  )}
+
+                  {!useManualEntry && (
+                    <p className="text-xs text-muted-foreground px-1">
+                      Para cada estufa escolha o sensor correspondente. Você pode ativar/desativar individualmente.
+                    </p>
+                  )}
 
                   {/* Uma linha por estufa */}
                   <div className="space-y-3">
                     {(tents as any[]).map((tent: any) => {
                       const m = mappings[tent.id];
                       const isOpen = openPicker === tent.id;
+                      const draft = manualDraft[tent.id] ?? { deviceId: '', deviceName: tent.name };
 
                       return (
                         <div key={tent.id} className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -315,6 +331,12 @@ export default function TuyaSettings() {
                                   : <ToggleLeft className="w-7 h-7 text-muted-foreground" />}
                               </button>
                             )}
+                            {/* Remover */}
+                            {m && !isOpen && (
+                              <button onClick={() => handleRemove(tent.id)} className="shrink-0 w-8 h-8 rounded-lg bg-muted hover:bg-red-500/10 flex items-center justify-center transition-colors">
+                                <X className="w-3.5 h-3.5 text-muted-foreground" />
+                              </button>
+                            )}
                             {/* Abrir/fechar picker */}
                             <button
                               onClick={() => setOpenPicker(isOpen ? null : tent.id)}
@@ -322,51 +344,98 @@ export default function TuyaSettings() {
                             >
                               {isOpen
                                 ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                                : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                : <Pencil className="w-3.5 h-3.5 text-muted-foreground" />}
                             </button>
                           </div>
 
-                          {/* Device picker expandível */}
+                          {/* Picker expandível */}
                           {isOpen && (
-                            <div className="border-t border-border/50 divide-y divide-border/50 max-h-56 overflow-y-auto">
-                              {/* Opção "sem sensor" */}
-                              <button
-                                onClick={() => { handleRemove(tent.id); setOpenPicker(null); }}
-                                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 ${!m ? 'bg-muted/30' : ''}`}
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                                  <WifiOff className="w-4 h-4 text-muted-foreground" />
-                                </div>
-                                <p className="text-sm text-muted-foreground italic flex-1">Sem sensor</p>
-                                {!m && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
-                              </button>
-
-                              {/* Dispositivos disponíveis */}
-                              {(devices as any[]).map((dev: any) => {
-                                const selected = m?.deviceId === dev.id;
-                                return (
+                            <div className="border-t border-border/50">
+                              {/* Modo automático: lista de dispositivos da API */}
+                              {!useManualEntry && devices.length > 0 && (
+                                <div className="divide-y divide-border/50 max-h-56 overflow-y-auto">
                                   <button
-                                    key={dev.id}
-                                    onClick={() => handlePickDevice(tent.id, dev.id, dev.name)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                                      selected ? 'bg-emerald-500/8' : 'hover:bg-muted/40'
-                                    }`}
+                                    onClick={() => { handleRemove(tent.id); setOpenPicker(null); }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 ${!m ? 'bg-muted/30' : ''}`}
                                   >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                      dev.online ? 'bg-emerald-500/15' : 'bg-muted'
-                                    }`}>
-                                      {dev.online
-                                        ? <Wifi className="w-4 h-4 text-emerald-500" />
-                                        : <WifiOff className="w-4 h-4 text-muted-foreground" />}
+                                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                                      <WifiOff className="w-4 h-4 text-muted-foreground" />
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-foreground truncate">{dev.name}</p>
-                                      <p className="text-[10px] text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
-                                    </div>
-                                    {selected && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
+                                    <p className="text-sm text-muted-foreground italic flex-1">Sem sensor</p>
+                                    {!m && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
                                   </button>
-                                );
-                              })}
+                                  {(devices as any[]).map((dev: any) => {
+                                    const selected = m?.deviceId === dev.id;
+                                    return (
+                                      <button
+                                        key={dev.id}
+                                        onClick={() => handlePickDevice(tent.id, dev.id, dev.name)}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                          selected ? 'bg-emerald-500/8' : 'hover:bg-muted/40'
+                                        }`}
+                                      >
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                          dev.online ? 'bg-emerald-500/15' : 'bg-muted'
+                                        }`}>
+                                          {dev.online
+                                            ? <Wifi className="w-4 h-4 text-emerald-500" />
+                                            : <WifiOff className="w-4 h-4 text-muted-foreground" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-medium text-foreground truncate">{dev.name}</p>
+                                          <p className="text-[10px] text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
+                                        </div>
+                                        {selected && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Modo manual */}
+                              {useManualEntry && (
+                                <div className="px-4 py-4 space-y-3">
+                                  <div>
+                                    <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Device ID <span className="text-muted-foreground/60">(do portal iot.tuya.com)</span></p>
+                                    <input
+                                      type="text"
+                                      value={draft.deviceId}
+                                      onChange={e => setManualDraft(prev => ({ ...prev, [tent.id]: { ...draft, deviceId: e.target.value.trim() } }))}
+                                      placeholder="ex: eb8168f5771604de9ccjsi"
+                                      className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Nome do sensor</p>
+                                    <input
+                                      type="text"
+                                      value={draft.deviceName}
+                                      onChange={e => setManualDraft(prev => ({ ...prev, [tent.id]: { ...draft, deviceName: e.target.value } }))}
+                                      placeholder={`Sensor ${tent.name}`}
+                                      className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
+                                    />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline" size="sm" className="flex-1"
+                                      onClick={() => { handleRemove(tent.id); setOpenPicker(null); }}
+                                    >
+                                      <X className="w-3.5 h-3.5 mr-1" /> Sem sensor
+                                    </Button>
+                                    <Button
+                                      size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                                      disabled={!draft.deviceId}
+                                      onClick={() => {
+                                        if (!draft.deviceId) return;
+                                        handlePickDevice(tent.id, draft.deviceId, draft.deviceName || tent.name);
+                                        setManualDraft(prev => ({ ...prev, [tent.id]: { deviceId: '', deviceName: tent.name } }));
+                                      }}
+                                    >
+                                      <Check className="w-3.5 h-3.5 mr-1" /> Confirmar
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -374,14 +443,16 @@ export default function TuyaSettings() {
                     })}
                   </div>
 
-                  <Button
-                    className="w-full bg-emerald-600 hover:bg-emerald-700"
-                    disabled={saveMappings.isPending}
-                    onClick={handleSaveMappings}
-                  >
-                    {saveMappings.isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
-                    Salvar todos os sensores
-                  </Button>
+                  {Object.keys(mappings).length > 0 && (
+                    <Button
+                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      disabled={saveMappings.isPending}
+                      onClick={handleSaveMappings}
+                    >
+                      {saveMappings.isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
+                      Salvar todos os sensores
+                    </Button>
+                  )}
                 </>
               )}
             </>
