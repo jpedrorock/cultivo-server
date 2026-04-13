@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -29,6 +29,223 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+
+// ─── Sensor SmartLife por estufa ─────────────────────────────────────────────
+
+function timeAgo(date: Date): string {
+  const diff = Date.now() - new Date(date).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1)  return 'agora';
+  if (min < 60) return `há ${min}min`;
+  const h = Math.floor(min / 60);
+  if (h < 24)   return `há ${h}h`;
+  return `há ${Math.floor(h / 24)}d`;
+}
+
+function TentSensorCard({ tentId }: { tentId: number }) {
+  const utils = trpc.useUtils();
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const { data: tuyaConfig } = trpc.tuya.getConfig.useQuery();
+  const { data: mapping, refetch: refetchMapping } = trpc.tuya.getMappings.useQuery();
+  const { data: reading, refetch: refetchReading } = trpc.tuya.getLatestReadingForTent.useQuery(
+    { tentId },
+    { refetchInterval: 60_000 }
+  );
+  const { data: devices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
+    undefined,
+    { enabled: pickerOpen }
+  );
+
+  const tentMapping = mapping?.find(m => m.tentId === tentId);
+
+  const saveMappings = trpc.tuya.saveMappings.useMutation({
+    onSuccess: () => { refetchMapping(); refetchReading(); setPickerOpen(false); toast.success('Sensor vinculado!'); },
+    onError: (e) => toast.error(`Erro: ${e.message}`),
+  });
+
+  const readNow = trpc.tuya.readNow.useMutation({
+    onSuccess: () => { refetchReading(); toast.success('Leitura atualizada!'); },
+    onError: (e) => toast.error(`Sensor: ${e.message}`),
+  });
+
+  const handleSelectDevice = (deviceId: string, deviceName: string) => {
+    const others = (mapping ?? []).filter(m => m.tentId !== tentId);
+    saveMappings.mutate([
+      ...others,
+      { tentId, deviceId, deviceName, enabled: true },
+    ]);
+  };
+
+  const handleToggle = () => {
+    if (!tentMapping) return;
+    const others = (mapping ?? []).filter(m => m.tentId !== tentId);
+    saveMappings.mutate([
+      ...others,
+      { ...tentMapping, enabled: !tentMapping.enabled },
+    ]);
+  };
+
+  const handleRemove = () => {
+    const others = (mapping ?? []).filter(m => m.tentId !== tentId);
+    saveMappings.mutate(others);
+  };
+
+  // Sem credenciais Tuya configuradas
+  if (!tuyaConfig) {
+    return (
+      <div className="mb-4 rounded-2xl border border-dashed border-border px-4 py-3 flex items-center gap-3 bg-card/50">
+        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <Wifi className="w-4 h-4 text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground">Sensor de ambiente</p>
+          <p className="text-[11px] text-muted-foreground">Configure as credenciais SmartLife para ativar</p>
+        </div>
+        <Link href="/settings/sensors">
+          <button className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground font-medium transition-colors flex items-center gap-1">
+            <Settings className="w-3 h-3" /> Configurar
+          </button>
+        </Link>
+      </div>
+    );
+  }
+
+  // Com credenciais mas sem sensor mapeado
+  if (!tentMapping) {
+    return (
+      <div className="mb-4">
+        {!pickerOpen ? (
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="w-full rounded-2xl border border-dashed border-border px-4 py-3 flex items-center gap-3 bg-card/50 hover:bg-muted/40 transition-colors text-left"
+          >
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Wifi className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">Vincular sensor SmartLife</p>
+              <p className="text-[11px] text-muted-foreground">Temperatura e umidade automáticos</p>
+            </div>
+            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
+              <p className="text-sm font-semibold">Escolher sensor</p>
+              <button onClick={() => setPickerOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">Cancelar</button>
+            </div>
+            {devicesLoading ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Buscando dispositivos...
+              </div>
+            ) : devices.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhum dispositivo encontrado</p>
+            ) : (
+              <div className="divide-y divide-border/50 max-h-56 overflow-y-auto">
+                {(devices as any[]).map((dev: any) => (
+                  <button
+                    key={dev.id}
+                    onClick={() => handleSelectDevice(dev.id, dev.name)}
+                    disabled={saveMappings.isPending}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${dev.online ? 'bg-emerald-500/15' : 'bg-muted'}`}>
+                      {dev.online ? <Wifi className="w-4 h-4 text-emerald-500" /> : <WifiOff className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{dev.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Com sensor mapeado — mostra status
+  const isEnabled = tentMapping.enabled;
+  const hasReading = reading && reading.tempC != null;
+
+  return (
+    <div className={`mb-4 rounded-2xl border px-4 py-3 flex items-center gap-3 transition-colors ${
+      isEnabled && hasReading
+        ? 'bg-emerald-500/5 border-emerald-500/20'
+        : 'bg-card/50 border-border'
+    }`}>
+      {/* Ícone */}
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+        isEnabled && hasReading ? 'bg-emerald-500/15' : 'bg-muted'
+      }`}>
+        {isEnabled && hasReading
+          ? <Wifi className="w-5 h-5 text-emerald-500" />
+          : <WifiOff className="w-5 h-5 text-muted-foreground" />}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-foreground truncate">{tentMapping.deviceName}</p>
+          {isEnabled && hasReading && reading.isFresh && (
+            <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold">AO VIVO</span>
+          )}
+        </div>
+        {isEnabled && hasReading ? (
+          <div className="flex items-center gap-3 mt-0.5">
+            <span className="text-xs text-foreground font-medium flex items-center gap-1">
+              <ThermometerSun className="w-3 h-3 text-orange-400" />
+              {reading.tempC}°C
+            </span>
+            <span className="text-xs text-foreground font-medium flex items-center gap-1">
+              <Droplets className="w-3 h-3 text-blue-400" />
+              {reading.rhPct}%
+            </span>
+            <span className="text-[10px] text-muted-foreground">{timeAgo(reading.readAt)}</span>
+          </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {!isEnabled ? 'Leitura automática desativada' : 'Aguardando primeira leitura...'}
+          </p>
+        )}
+      </div>
+
+      {/* Ações */}
+      <div className="flex items-center gap-2 shrink-0">
+        {isEnabled && (
+          <button
+            onClick={() => readNow.mutate({ tentId })}
+            disabled={readNow.isPending}
+            className="w-8 h-8 rounded-lg bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors disabled:opacity-40"
+            title="Atualizar agora"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground ${readNow.isPending ? 'animate-spin' : ''}`} />
+          </button>
+        )}
+        <button
+          onClick={handleToggle}
+          disabled={saveMappings.isPending}
+          title={isEnabled ? 'Desativar sensor' : 'Ativar sensor'}
+        >
+          {isEnabled
+            ? <ToggleRight className="w-8 h-8 text-emerald-500" />
+            : <ToggleLeft className="w-8 h-8 text-muted-foreground" />}
+        </button>
+        <button
+          onClick={handleRemove}
+          disabled={saveMappings.isPending}
+          className="w-8 h-8 rounded-lg hover:bg-red-500/10 flex items-center justify-center transition-colors"
+          title="Remover sensor"
+        >
+          <WifiOff className="w-3.5 h-3.5 text-muted-foreground hover:text-red-500" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function TentDetails() {
   const { id } = useParams<{ id: string }>();
@@ -979,6 +1196,9 @@ export default function TentDetails() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Sensor SmartLife */}
+        <TentSensorCard tentId={tentId} />
 
         {/* Date Range Selector */}
         <div className="flex items-center gap-3 mb-6">
