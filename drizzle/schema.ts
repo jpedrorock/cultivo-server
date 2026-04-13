@@ -242,6 +242,7 @@ export const dailyLogs = mysqlTable(
     runoffPercentage: decimal("runoffPercentage", { precision: 5, scale: 2 }), // Calculado: (runoffCollected / wateringVolume) * 100
     // runoffPh e runoffEc removidos: ph/ec já medem o runoff diretamente
     notes: text("notes"),
+    source: varchar("source", { length: 10 }).default("MANUAL").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({

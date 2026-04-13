@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { BigStepper } from "@/components/BigStepper";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle, Target, Smartphone, Sparkles } from "lucide-react";
+import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle, Target, Smartphone, Sparkles, Wifi } from "lucide-react";
 import { RangeSlider } from "@/components/ui/range-slider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -70,6 +70,18 @@ export default function QuickLog() {
     }
   };
   
+  const goNext = () => {
+    triggerHaptic('medium');
+    if (currentStep === 0 && sensorReading?.isFresh && logMode === 'status') return setCurrentStep(3);
+    setCurrentStep(currentStep + 1);
+  };
+
+  const goBack = () => {
+    triggerHaptic('light');
+    if (currentStep === 3 && sensorReading?.isFresh && logMode === 'status') return setCurrentStep(0);
+    setCurrentStep(currentStep - 1);
+  };
+
   // Auto-detect shift based on current time (AM before 6 PM, PM after 6 PM)
   const getDefaultShift = (): "AM" | "PM" => {
     const currentHour = new Date().getHours();
@@ -825,6 +837,12 @@ export default function QuickLog() {
             {currentStep === 1 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 {sensorReading?.isFresh && (
+                  <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/30 px-4 py-3 text-sm text-cyan-600 dark:text-cyan-400 flex items-center gap-2">
+                    <Wifi className="w-4 h-4 shrink-0" />
+                    Sendo registrado automaticamente pelo sensor SmartLife
+                  </div>
+                )}
+                {sensorReading?.isFresh && (
                   <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
                     <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
                       <Smartphone className="w-3.5 h-3.5" />
@@ -851,6 +869,12 @@ export default function QuickLog() {
             {/* Step 2: Humidity */}
             {currentStep === 2 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
+                {sensorReading?.isFresh && (
+                  <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/30 px-4 py-3 text-sm text-cyan-600 dark:text-cyan-400 flex items-center gap-2">
+                    <Wifi className="w-4 h-4 shrink-0" />
+                    Sendo registrado automaticamente pelo sensor SmartLife
+                  </div>
+                )}
                 {sensorReading?.isFresh && (
                   <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/8 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400">
                     <Smartphone className="w-3.5 h-3.5" />
@@ -1025,13 +1049,19 @@ export default function QuickLog() {
                 {tempC && (
                   <div className="p-4 bg-orange-500/10 rounded-xl border-l-4 border-orange-500">
                     <div className="text-sm text-muted-foreground">Temperatura</div>
-                    <div className="text-2xl font-bold text-foreground">{tempC}°C</div>
+                    <div className="text-2xl font-bold text-foreground flex items-center gap-1.5">
+                      {tempC}°C
+                      {sensorReading?.isFresh && <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
+                    </div>
                   </div>
                 )}
                 {rhPct && (
                   <div className="p-4 bg-blue-500/10 rounded-xl border-l-4 border-blue-500">
                     <div className="text-sm text-muted-foreground">Umidade</div>
-                    <div className="text-2xl font-bold text-foreground">{rhPct}%</div>
+                    <div className="text-2xl font-bold text-foreground flex items-center gap-1.5">
+                      {rhPct}%
+                      {sensorReading?.isFresh && <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
+                    </div>
                   </div>
                 )}
                 {/* VPD calculado (L2) */}
@@ -1367,10 +1397,7 @@ export default function QuickLog() {
         {currentStep > 0 && currentStep < 9 && (
           <Button
             variant="outline"
-            onClick={() => {
-              triggerHaptic('light');
-              setCurrentStep(currentStep - 1);
-            }}
+            onClick={goBack}
             className="flex-1 h-14 text-lg font-medium rounded-xl"
           >
             <ArrowLeft className="mr-2 h-5 w-5" />
@@ -1381,10 +1408,7 @@ export default function QuickLog() {
         {/* Next/Save button for daily log */}
         {currentStep < 8 && (
           <Button
-            onClick={() => {
-              triggerHaptic('medium');
-              setCurrentStep(currentStep + 1);
-            }}
+            onClick={goNext}
             disabled={!canGoNext()}
             className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
           >

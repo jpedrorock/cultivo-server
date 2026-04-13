@@ -269,6 +269,7 @@ export default function TentDetails() {
   const [editLogOpen, setEditLogOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<any>(null);
   const [deletingLogId, setDeletingLogId] = useState<number | null>(null);
+  const [showAutoLogs, setShowAutoLogs] = useState(false);
 
   const openPhaseConfirm = (type: PhaseConfirmType) => {
     setPhaseConfirmType(type);
@@ -374,6 +375,16 @@ export default function TentDetails() {
     if (!logs) return [];
     return logs.filter((log) => new Date(log.logDate) >= dateFilter.startDate);
   }, [logs, dateFilter.startDate]);
+
+  // History tab logs — additionally filter out AUTO entries when showAutoLogs is false
+  const historyLogs = useMemo(() => {
+    if (!logs) return [];
+    if (showAutoLogs) return logs;
+    return logs.filter((log: any) => {
+      const isAuto = log.source === 'AUTO' || (!log.ph && !log.ec && !log.ppfd && !log.wateringVolume);
+      return !isAuto;
+    });
+  }, [logs, showAutoLogs]);
 
   if (tentLoading) {
     return (
@@ -1563,7 +1574,51 @@ export default function TentDetails() {
               </Card>
             ) : logs && logs.length > 0 ? (
               <div className="space-y-2">
-                {logs.map((log) => (
+                {/* Toggle button for auto logs */}
+                <div className="flex justify-end pb-1">
+                  <button
+                    onClick={() => setShowAutoLogs(v => !v)}
+                    className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${showAutoLogs ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-500' : 'border-border text-muted-foreground'}`}
+                  >
+                    {showAutoLogs ? '● Automáticos visíveis' : '○ Ocultar automáticos'}
+                  </button>
+                </div>
+
+                {historyLogs.map((log: any) => {
+                  const isAuto = log.source === 'AUTO' || (!log.ph && !log.ec && !log.ppfd && !log.wateringVolume);
+
+                  if (isAuto) {
+                    // Compact row for AUTO entries
+                    return (
+                      <div
+                        key={log.id}
+                        className={`rounded-xl border border-border/20 bg-card/60 px-4 py-2.5 flex items-center gap-3 transition-opacity ${deletingLogId === log.id ? "opacity-40" : ""}`}
+                      >
+                        <span className="text-xs text-muted-foreground/50 tabular-nums shrink-0">
+                          {format(new Date(log.logDate), "HH:mm", { locale: ptBR })}
+                        </span>
+                        <span className="text-xs text-muted-foreground/50 capitalize shrink-0">
+                          {format(new Date(log.logDate), "EEE, dd MMM", { locale: ptBR })}
+                        </span>
+                        {log.tempC && (
+                          <span className="flex items-center gap-1 text-xs text-foreground/60">
+                            <ThermometerSun className="w-3 h-3 text-orange-400 shrink-0" />
+                            {log.tempC}°C
+                          </span>
+                        )}
+                        {log.rhPct && (
+                          <span className="flex items-center gap-1 text-xs text-foreground/60">
+                            <Droplets className="w-3 h-3 text-blue-400 shrink-0" />
+                            {log.rhPct}%
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-auto">A</span>
+                      </div>
+                    );
+                  }
+
+                  // Full card for MANUAL entries
+                  return (
                   <div
                     key={log.id}
                     className={`rounded-2xl border border-border/40 bg-card overflow-hidden transition-opacity ${deletingLogId === log.id ? "opacity-40" : ""}`}
@@ -1667,7 +1722,8 @@ export default function TentDetails() {
                       </p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <Card className="bg-card/90 backdrop-blur-sm">

@@ -159,6 +159,31 @@ async function ensureAiChatMessagesTable() {
   }
 }
 
+async function ensureSourceColumn() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    try {
+      await conn.execute(
+        `ALTER TABLE \`dailyLogs\` ADD COLUMN \`source\` VARCHAR(10) NOT NULL DEFAULT 'MANUAL'`
+      );
+      console.log("[DB] Coluna source adicionada à tabela dailyLogs");
+    } catch (alterErr: any) {
+      if (alterErr?.code === 'ER_DUP_FIELDNAME') {
+        // Coluna já existe — OK
+      } else {
+        throw alterErr;
+      }
+    }
+    await conn.end();
+    console.log("[DB] Coluna dailyLogs.source OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao migrar dailyLogs.source:", err?.message);
+  }
+}
+
 async function ensureTuyaTables() {
   try {
     const connectionString = process.env.DATABASE_URL;
@@ -279,6 +304,9 @@ async function startServer() {
 
   // Garantir que as tabelas de integração Tuya/SmartLife existem
   await ensureTuyaTables();
+
+  // Garantir que a coluna source existe na tabela dailyLogs
+  await ensureSourceColumn();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();

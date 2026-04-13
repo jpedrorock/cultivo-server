@@ -69,6 +69,15 @@ async function pollAllUsers() {
           [row.userId, row.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
         );
 
+        // Inserir registro automático no dailyLogs
+        const nowHour = new Date().getHours();
+        const turn = nowHour < 18 ? 'AM' : 'PM';
+        await conn.execute(
+          `INSERT IGNORE INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, source)
+           VALUES (?, NOW(), ?, ?, ?, 'AUTO')`,
+          [row.tentId, turn, reading.tempC ?? null, reading.rhPct ?? null]
+        );
+
         console.log(
           `[TuyaPoller] device=${row.deviceId} tent=${row.tentId}`,
           `temp=${reading.tempC}°C rh=${reading.rhPct}%`
