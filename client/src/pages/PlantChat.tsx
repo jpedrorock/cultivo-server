@@ -338,29 +338,39 @@ function PlantPickerSheet({
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl flex flex-col"
+        className="rounded-t-2xl flex flex-col px-5 pt-6"
         style={{ maxHeight: '75vh', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
       >
         {/* Header */}
-        <div className="shrink-0 mb-4">
+        <div className="shrink-0 mb-5">
           {activeGroup && groups.length > 1 ? (
             <button
               onClick={() => setSelectedGroupKey(null)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2 hover:text-foreground transition-colors"
+              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-4 hover:text-foreground transition-colors"
             >
               <ChevronRight className="w-3.5 h-3.5 rotate-180" />
-              Estufas
+              Todas as estufas
             </button>
           ) : null}
-          <p className="font-bold text-base flex items-center gap-2">
-            {activeGroup && <TentIcon className="w-4 h-4 text-muted-foreground shrink-0" />}
-            {activeGroup ? activeGroup.tentName : 'Conversar sobre qual planta?'}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {activeGroup
-              ? `${activeGroup.plants.length} planta${activeGroup.plants.length !== 1 ? 's' : ''} — toque para selecionar`
-              : 'Escolha a estufa'}
-          </p>
+
+          {activeGroup ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                <TentIcon className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-bold text-base leading-tight">{activeGroup.tentName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {activeGroup.plants.length} planta{activeGroup.plants.length !== 1 ? 's' : ''} — toque para selecionar
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="font-bold text-base">Conversar sobre qual planta?</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Escolha a estufa</p>
+            </div>
+          )}
         </div>
 
         {plants.length === 0 && (
@@ -369,7 +379,7 @@ function PlantPickerSheet({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto -mx-1 px-1">
           {/* ── Step 1: tent list ── */}
           {!activeGroup && (
             <div className="space-y-2">
@@ -377,7 +387,7 @@ function PlantPickerSheet({
                 <button
                   key={group.key}
                   onClick={() => setSelectedGroupKey(group.key)}
-                  className="w-full flex items-center gap-3 px-3 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
                 >
                   <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
                     <TentIcon className="w-6 h-6 text-muted-foreground" />
@@ -386,7 +396,7 @@ function PlantPickerSheet({
                     <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground/50 shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-muted-foreground/40 shrink-0" />
                 </button>
               ))}
             </div>
@@ -403,7 +413,7 @@ function PlantPickerSheet({
                   <button
                     key={p.id}
                     onClick={() => { onSelect(p); onClose(); }}
-                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl active:scale-[0.98] transition-all text-left ${
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl active:scale-[0.98] transition-all text-left ${
                       isCurrent ? 'bg-emerald-500/10 hover:bg-emerald-500/15' : 'hover:bg-muted/60'
                     }`}
                   >
@@ -412,7 +422,7 @@ function PlantPickerSheet({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                      <p className="text-[11px] text-muted-foreground">{stageLabel(p.plantStage ?? '')}{p.strain?.name ? ` · ${p.strain.name}` : ''}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}{p.strain?.name ? ` · ${p.strain.name}` : ''}</p>
                     </div>
                     {isCurrent
                       ? <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold">ATUAL</span>

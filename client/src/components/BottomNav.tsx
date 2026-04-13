@@ -71,17 +71,23 @@ function ChatPlantPicker({
         {groups.length > 1 && (
           <button
             onClick={() => setSelectedGroup(null)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3 hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-5 hover:text-foreground transition-colors"
           >
             <ChevronRight className="w-3.5 h-3.5 rotate-180" />
-            Estufas
+            Todas as estufas
           </button>
         )}
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1 flex items-center gap-1.5">
-          <TentIcon className="w-3.5 h-3.5 shrink-0" />
-          {activeGroup.tentName}
-        </p>
-        <div className="space-y-0.5">
+        {/* Tent title */}
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+            <TentIcon className="w-4.5 h-4.5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">{activeGroup.tentName}</p>
+            <p className="text-[11px] text-muted-foreground">{activeGroup.plants.length} planta{activeGroup.plants.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <div className="space-y-1">
           {activeGroup.plants.map((p: any) => {
             const letter = (p.name ?? '?')[0].toUpperCase();
             const grad = AVATAR_GRADIENTS[letter.charCodeAt(0) % AVATAR_GRADIENTS.length];
@@ -89,14 +95,14 @@ function ChatPlantPicker({
               <button
                 key={p.id}
                 onClick={() => onSelect(p)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
               >
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
+                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
                   {letter}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{stageLabel(p.plantStage ?? '')}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
               </button>
@@ -109,21 +115,21 @@ function ChatPlantPicker({
 
   // ── Step 1: tent list ────────────────────────────────────────────────────
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {groups.map(group => (
         <button
           key={group.key}
           onClick={() => setSelectedGroup(group.key)}
-          className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
+          className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
         >
-          <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
-            <TentIcon className="w-5 h-5 text-muted-foreground" />
+          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
+            <TentIcon className="w-6 h-6 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
-            <p className="text-[11px] text-muted-foreground">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
           </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+          <ChevronRight className="w-5 h-5 text-muted-foreground/40 shrink-0" />
         </button>
       ))}
     </div>
@@ -367,16 +373,16 @@ export function BottomNav() {
 
             {/* ── Sheet: picker de planta para IA chat ── */}
             <Sheet open={chatPickerOpen} onOpenChange={setChatPickerOpen}>
-              <SheetContent side="bottom" className="rounded-t-2xl flex flex-col" style={{ maxHeight: '75vh', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+              <SheetContent side="bottom" className="rounded-t-2xl flex flex-col px-5 pt-6" style={{ maxHeight: '75vh', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
                 {/* Header */}
-                <div className="shrink-0 mb-4">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                      <Bot className="w-3.5 h-3.5 text-white" />
+                <div className="shrink-0 mb-5">
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
+                      <Bot className="w-4 h-4 text-white" />
                     </div>
                     <p className="font-bold text-base">Conversar sobre qual planta?</p>
                   </div>
-                  <p className="text-xs text-muted-foreground ml-9">A IA recebe fase, ambiente e saúde automaticamente</p>
+                  <p className="text-xs text-muted-foreground ml-[42px]">A IA recebe fase, ambiente e saúde automaticamente</p>
                 </div>
 
                 {activePlants.length === 0 ? (
@@ -384,7 +390,7 @@ export function BottomNav() {
                     <p className="text-sm text-muted-foreground">Nenhuma planta ativa encontrada</p>
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto -mx-1 px-1">
                     <ChatPlantPicker
                       plants={activePlants}
                       tentMap={tentMap}
