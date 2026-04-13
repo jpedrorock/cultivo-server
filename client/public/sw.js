@@ -1,6 +1,6 @@
 // Service Worker para App Cultivo PWA
 // Versão do cache - incrementar para forçar atualização
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE_NAME = `app-cultivo-${CACHE_VERSION}`;
 
 // Assets essenciais garantidos no install (sem hash — sempre os mesmos)
@@ -83,10 +83,14 @@ self.addEventListener('fetch', (event) => {
 
   // Estratégia Network First para API (sempre tentar buscar dados frescos)
   if (url.pathname.startsWith('/api/')) {
+    // Cache API não suporta POST — deixar passar direto sem cache
+    if (request.method !== 'GET') {
+      return;
+    }
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clonar resposta para cache
+          // Clonar resposta para cache (apenas GET)
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(request, responseClone);
