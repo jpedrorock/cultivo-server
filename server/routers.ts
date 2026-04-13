@@ -559,23 +559,34 @@ const tuyaRouter = router({
       const mysql = await import("mysql2/promise");
       const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
       try {
+        // 1. Verifica se há mapeamento ativo (sensor configurado para esta estufa)
+        const [mappingRows]: any = await conn.execute(
+          `SELECT id FROM tuyaSensorMappings WHERE userId = ? AND tentId = ? AND enabled = 1 LIMIT 1`,
+          [ctx.user.id, input.tentId]
+        );
+        if (mappingRows.length === 0) return null; // sensor não configurado
+
+        // 2. Busca leitura mais recente (pode não existir ainda)
         const [rows]: any = await conn.execute(
-          `SELECT slr.tempC, slr.rhPct, slr.readAt, tsm.enabled
+          `SELECT slr.tempC, slr.rhPct, slr.readAt
            FROM tuyaSensorMappings tsm
            INNER JOIN sensorLatestReadings slr ON slr.deviceId = tsm.deviceId
            WHERE tsm.userId = ? AND tsm.tentId = ?
            LIMIT 1`,
           [ctx.user.id, input.tentId]
         );
-        if (rows.length === 0) return null;
+
+        // Sensor configurado mas ainda sem leitura
+        if (rows.length === 0) return { hasSensor: true, isFresh: false, tempC: null, rhPct: null, readAt: null };
+
         const r = rows[0];
-        if (!r.enabled) return null; // sensor desativado para esta estufa
+        const readAt = r.readAt instanceof Date ? r.readAt : new Date(r.readAt);
         return {
+          hasSensor: true,
           tempC: r.tempC != null ? parseFloat(r.tempC) : null,
           rhPct: r.rhPct != null ? parseFloat(r.rhPct) : null,
-          readAt: r.readAt as Date,
-          // Fresco = menos de 2h (para que o usuário veja dados relevantes no QuickLog)
-          isFresh: (Date.now() - (r.readAt instanceof Date ? r.readAt : new Date(r.readAt)).getTime()) < 2 * 60 * 60 * 1000,
+          readAt,
+          isFresh: (Date.now() - readAt.getTime()) < 2 * 60 * 60 * 1000,
         };
       } finally {
         await conn.end();
@@ -598,14 +609,43 @@ const tuyaRouter = router({
         );
         if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum sensor ativo para esta estufa" });
         const cfg = cfgRows[0];
+
         const { readTuyaDeviceStatus } = await import("./lib/tuya");
         const reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+
+        // Upsert leitura mais recente
         await conn.execute(
           `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
            VALUES (?, ?, ?, ?, NOW())
            ON DUPLICATE KEY UPDATE tempC = VALUES(tempC), rhPct = VALUES(rhPct), readAt = NOW()`,
           [ctx.user.id, cfg.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
         );
+
+        // Busca último log manual para carregar pH, EC, ppfd, etc.
+        const [lastManual]: any = await conn.execute(
+          `SELECT ph, ec, ppfd, wateringVolume, runoffCollected, runoffPercentage
+           FROM dailyLogs
+           WHERE tentId = ? AND (source = 'MANUAL' OR source IS NULL)
+           ORDER BY logDate DESC LIMIT 1`,
+          [input.tentId]
+        );
+        const prev = lastManual[0] ?? {};
+
+        // Cria log automático com temp/rh atuais + últimos valores manuais
+        const turn = new Date().getHours() < 18 ? 'AM' : 'PM';
+        await conn.execute(
+          `INSERT IGNORE INTO dailyLogs
+             (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd,
+              wateringVolume, runoffCollected, runoffPercentage, source)
+           VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO')`,
+          [
+            input.tentId, turn,
+            reading.tempC ?? null, reading.rhPct ?? null,
+            prev.ph ?? null, prev.ec ?? null, prev.ppfd ?? null,
+            prev.wateringVolume ?? null, prev.runoffCollected ?? null, prev.runoffPercentage ?? null,
+          ]
+        );
+
         return { ...reading, readAt: new Date() };
       } finally {
         await conn.end();

@@ -992,8 +992,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { tentId: tent.id },
     { staleTime: 5 * 60 * 1000, retry: false }
   );
-  // Badge "A" aparece quando o sensor está ativo e a leitura é fresca (< 2h)
-  const isSensorAuto = !!(sensorReading?.isFresh);
+  // Badge "A" aparece sempre que o sensor estiver mapeado (hasSensor), independente de ter leitura
+  const isSensorAuto = !!(sensorReading?.hasSensor);
 
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
@@ -1364,8 +1364,10 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           {/* KPI Metrics — 3 colunas: Temp · RH · PPFD */}
           <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/40">
             {/* Temperature */}
-            <div
-              className={`flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08] relative ${isSensorAuto ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
+            <button
+              type="button"
+              disabled={!isSensorAuto || readNow.isPending}
+              className={`flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08] relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <ThermometerSun className="w-3.5 h-3.5 text-orange-400" />
@@ -1379,10 +1381,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               {isSensorAuto && (
                 <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
               )}
-            </div>
+            </button>
             {/* Humidity */}
-            <div
-              className={`flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08] relative ${isSensorAuto ? 'cursor-pointer active:scale-95 transition-transform' : ''}`}
+            <button
+              type="button"
+              disabled={!isSensorAuto || readNow.isPending}
+              className={`flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08] relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <Droplets className="w-3.5 h-3.5 text-teal-400" />
@@ -1396,7 +1400,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               {isSensorAuto && (
                 <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
               )}
-            </div>
+            </button>
             {/* PPFD */}
             <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.08]">
               <Sun className="w-3.5 h-3.5 text-yellow-400" />

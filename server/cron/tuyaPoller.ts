@@ -69,13 +69,28 @@ async function pollAllUsers() {
           [row.userId, row.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
         );
 
+        // Buscar última leitura manual para carregar pH, EC, ppfd etc.
+        const [lastManual]: any = await conn.execute(
+          `SELECT ph, ec, ppfd, wateringVolume, runoffCollected, runoffPercentage
+           FROM dailyLogs
+           WHERE tentId = ? AND (source = 'MANUAL' OR source IS NULL)
+           ORDER BY logDate DESC LIMIT 1`,
+          [row.tentId]
+        );
+        const prev = (lastManual as any[])[0] ?? {};
+
         // Inserir registro automático no dailyLogs
         const nowHour = new Date().getHours();
         const turn = nowHour < 18 ? 'AM' : 'PM';
         await conn.execute(
-          `INSERT IGNORE INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, source)
-           VALUES (?, NOW(), ?, ?, ?, 'AUTO')`,
-          [row.tentId, turn, reading.tempC ?? null, reading.rhPct ?? null]
+          `INSERT IGNORE INTO dailyLogs
+             (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd,
+              wateringVolume, runoffCollected, runoffPercentage, source)
+           VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO')`,
+          [row.tentId, turn,
+           reading.tempC ?? null, reading.rhPct ?? null,
+           prev.ph ?? null, prev.ec ?? null, prev.ppfd ?? null,
+           prev.wateringVolume ?? null, prev.runoffCollected ?? null, prev.runoffPercentage ?? null]
         );
 
         console.log(
