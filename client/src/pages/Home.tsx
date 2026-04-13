@@ -995,11 +995,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   // Badge "A" aparece quando o sensor está ativo e a leitura é fresca (< 2h)
   const isSensorAuto = !!(sensorReading?.isFresh);
 
-  const readNow = trpc.tuya.readNow.useMutation({
-    onSuccess: () => { refetchSensor(); toast.success("Leitura atualizada!"); },
-    onError: (e) => toast.error(`Sensor: ${e.message}`),
-  });
-
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
     if (!value || !min || !max) return "text-foreground";
@@ -1056,6 +1051,17 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   };
 
   const utils = trpc.useUtils();
+
+  const readNow = trpc.tuya.readNow.useMutation({
+    onSuccess: () => {
+      refetchSensor();
+      utils.dailyLogs.getLatestByTent.invalidate({ tentId: tent.id });
+      utils.dailyLogs.list.invalidate({ tentId: tent.id });
+      toast.success("Leitura atualizada!");
+    },
+    onError: (e) => toast.error(`Sensor: ${e.message}`),
+  });
+
   const toggleTask = trpc.tasks.toggleTask.useMutation({
     onSuccess: () => {
       utils.tasks.getTasksByTent.invalidate({ tentId: tent.id });
