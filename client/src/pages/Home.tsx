@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useHomeModals } from "@/hooks/useHomeModals";
 import { WeatherWidget } from "@/components/WeatherWidget";
 import StartCycleModal from "@/components/StartCycleModal";
@@ -47,6 +47,10 @@ import { ErrorState } from "@/components/ErrorState";
 export default function Home() {
   const [, setLocation] = useLocation();
   const [pendingLogsCount, setPendingLogsCount] = useState(0);
+
+  // utils DEVE ser declarado antes de qualquer mutation que o usa em callbacks
+  const utils = trpc.useUtils();
+
   const {
     cycleModalOpen, setCycleModalOpen,
     selectedTent, setSelectedTent,
@@ -84,6 +88,18 @@ export default function Home() {
 
   // Offline sync — contar pendentes e sincronizar ao reconectar
   const createLogMutation = trpc.dailyLogs.create.useMutation();
+  // Ref para evitar closure stale sobre mutateAsync
+  const createLogMutateRef = useRef(createLogMutation.mutateAsync);
+  useEffect(() => { createLogMutateRef.current = createLogMutation.mutateAsync; });
+
+  // Expor mutate para o SW via postMessage (sw.js não tem cookies, delega para cá)
+  useEffect(() => {
+    (window as any).__cultivo_sync__ = {
+      createLogMutate: (log: any) => createLogMutateRef.current(log),
+    };
+    return () => { delete (window as any).__cultivo_sync__; };
+  }, []);
+
   useEffect(() => {
     // Contar ao montar
     countPendingLogs().then(setPendingLogsCount);
@@ -94,7 +110,7 @@ export default function Home() {
       if (count === 0) return;
       toast("🔄 Conexão restaurada — sincronizando registros...", { duration: 3000 });
       const synced = await syncPendingLogs(async (log) => {
-        await createLogMutation.mutateAsync({
+        await createLogMutateRef.current({
           tentId: log.tentId,
           logDate: log.logDate instanceof Date ? log.logDate : new Date(log.logDate),
           turn: log.turn,
@@ -115,7 +131,6 @@ export default function Home() {
     });
 
     return unsubscribe;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Start missing readings monitor when component mounts
@@ -225,8 +240,6 @@ export default function Home() {
       }, 5000);
     }
   };
-
-  const utils = trpc.useUtils();
 
   // Prefetch plants.list para cada estufa com plantas — assim a navegação tent→plantas é instantânea
   useEffect(() => {

@@ -15,17 +15,15 @@
 
 import cron from "node-cron";
 import { readTuyaDeviceStatus, type TuyaRegion } from "../lib/tuya";
+import { getMysqlPool } from "../mysql-pool";
 
 async function pollAllUsers() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return;
-
-  const mysql = await import("mysql2/promise");
-  const conn = await mysql.default.createConnection(connectionString);
+  if (!process.env.DATABASE_URL) return;
+  const pool = getMysqlPool();
 
   try {
     // Busca todos os configs ativos com seus mapeamentos
-    const [rows]: any = await conn.execute(`
+    const [rows]: any = await pool.execute(`
       SELECT
         tc.userId,
         tc.accessId,
@@ -59,7 +57,7 @@ async function pollAllUsers() {
         );
 
         // Upsert na tabela de leituras
-        await conn.execute(
+        await pool.execute(
           `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
            VALUES (?, ?, ?, ?, NOW())
            ON DUPLICATE KEY UPDATE
@@ -70,7 +68,7 @@ async function pollAllUsers() {
         );
 
         // Buscar última leitura manual para carregar pH, EC, ppfd etc.
-        const [lastManual]: any = await conn.execute(
+        const [lastManual]: any = await pool.execute(
           `SELECT ph, ec, ppfd, wateringVolume, runoffCollected, runoffPercentage
            FROM dailyLogs
            WHERE tentId = ? AND (source = 'MANUAL' OR source IS NULL)
@@ -84,7 +82,7 @@ async function pollAllUsers() {
         // e atualiza tempC/rhPct a cada poll sem criar linhas extras
         const nowHour = new Date().getHours();
         const turn = nowHour < 18 ? 'AM' : 'PM';
-        await conn.execute(
+        await pool.execute(
           `INSERT INTO dailyLogs
              (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd,
               wateringVolume, runoffCollected, runoffPercentage, source)
@@ -107,8 +105,8 @@ async function pollAllUsers() {
         console.warn(`[TuyaPoller] Erro no device ${row.deviceId}:`, err?.message);
       }
     }
-  } finally {
-    await conn.end();
+  } catch (err: any) {
+    console.warn("[TuyaPoller] Erro geral no pool:", err?.message);
   }
 }
 

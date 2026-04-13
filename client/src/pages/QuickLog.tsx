@@ -72,14 +72,19 @@ export default function QuickLog() {
   
   const goNext = () => {
     triggerHaptic('medium');
-    if (currentStep === 0 && sensorReading?.isFresh && logMode === 'status') return setCurrentStep(3);
-    setCurrentStep(currentStep + 1);
+    // Só pula temp/rh se a query já retornou (sensorReading !== undefined) e está fresca
+    if (currentStep === 0 && sensorReading !== undefined && sensorReading?.isFresh && logMode === 'status') {
+      return setCurrentStep(3);
+    }
+    setCurrentStep(prev => prev + 1);
   };
 
   const goBack = () => {
     triggerHaptic('light');
-    if (currentStep === 3 && sensorReading?.isFresh && logMode === 'status') return setCurrentStep(0);
-    setCurrentStep(currentStep - 1);
+    if (currentStep === 3 && sensorReading !== undefined && sensorReading?.isFresh && logMode === 'status') {
+      return setCurrentStep(0);
+    }
+    setCurrentStep(prev => prev - 1);
   };
 
   // Auto-detect shift based on current time (AM before 6 PM, PM after 6 PM)
@@ -190,14 +195,18 @@ export default function QuickLog() {
   // Aplica leitura do sensor quando disponível (sobrescreve lastLog para temp/rh)
   useEffect(() => {
     if (sensorReading?.isFresh) {
+      // Sensor ativo com leitura fresca — preenche diretamente
       if (sensorReading.tempC != null) setTempC(String(sensorReading.tempC));
       if (sensorReading.rhPct  != null) setRhPct(String(sensorReading.rhPct));
-    } else if (!sensorReading) {
-      // Sem sensor → usa lastLog para temp/rh também
+    } else {
+      // Sem sensor, sensor sem leitura ainda, ou query ainda carregando
+      // → usa lastLog para temp/rh (limpa campos se não houver dado anterior)
       const last = lastLogs?.[0];
-      if (!last) return;
+      if (!last) { setTempC(""); setRhPct(""); return; }
       if (last.tempC != null) setTempC(String(parseFloat(String(last.tempC))));
+      else setTempC("");
       if (last.rhPct != null) setRhPct(String(parseFloat(String(last.rhPct))));
+      else setRhPct("");
     }
   }, [sensorReading, lastLogs]);
 

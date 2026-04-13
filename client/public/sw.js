@@ -1,6 +1,6 @@
 // Service Worker para App Cultivo PWA
 // Versão do cache - incrementar para forçar atualização
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `app-cultivo-${CACHE_VERSION}`;
 
 // Assets essenciais garantidos no install (sem hash — sempre os mesmos)
@@ -161,40 +161,19 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Background Sync para sincronização offline
+// Background Sync — delega para a página principal via postMessage
+// (o SW não tem cookies de sessão, não pode chamar o tRPC diretamente)
 self.addEventListener('sync', (event) => {
   console.log('[SW] Background sync triggered:', event.tag);
   if (event.tag === 'sync-daily-logs') {
-    event.waitUntil(syncDailyLogs());
+    event.waitUntil(notifyClientsToSync());
   }
 });
 
-// Função para sincronizar registros offline
-async function syncDailyLogs() {
-  try {
-    // Buscar registros pendentes do IndexedDB
-    const db = await openDB();
-    const pendingLogs = await db.getAll('pending-logs');
-
-    for (const log of pendingLogs) {
-      try {
-        const response = await fetch('/api/trpc/dailyLogs.create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(log.data),
-        });
-
-        if (response.ok) {
-          // Remover do IndexedDB após sucesso
-          await db.delete('pending-logs', log.id);
-          console.log('[SW] Synced log:', log.id);
-        }
-      } catch (error) {
-        console.error('[SW] Failed to sync log:', log.id, error);
-      }
-    }
-  } catch (error) {
-    console.error('[SW] Sync failed:', error);
+async function notifyClientsToSync() {
+  const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clientList) {
+    client.postMessage({ type: 'SYNC_PENDING_LOGS' });
   }
 }
 

@@ -1,6 +1,7 @@
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
+import { getMysqlPool } from "./mysql-pool";
 import { getUserById, updateUserProfile, updateUserPassword, getUserByEmail, approveUser, revokeUser, getPendingUsers } from "./db-auth";
 import { hashPassword, comparePassword } from "./_core/auth";
 import { users, userAiSettings, aiChatMessages } from "../drizzle/schema";
@@ -431,48 +432,37 @@ const tuyaRouter = router({
       enabled: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userId = ctx.user.id;
-      const mysql = await import("mysql2/promise");
-      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
-      try {
-        await conn.execute(
-          `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             accessId = VALUES(accessId),
-             accessSecret = VALUES(accessSecret),
-             region = VALUES(region),
-             pollIntervalMin = VALUES(pollIntervalMin),
-             enabled = VALUES(enabled)`,
-          [userId, input.accessId, input.accessSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0]
-        );
-        return { ok: true };
-      } finally {
-        await conn.end();
-      }
+      const pool = getMysqlPool();
+      await pool.execute(
+        `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           accessId = VALUES(accessId),
+           accessSecret = VALUES(accessSecret),
+           region = VALUES(region),
+           pollIntervalMin = VALUES(pollIntervalMin),
+           enabled = VALUES(enabled)`,
+        [ctx.user.id, input.accessId, input.accessSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0]
+      );
+      return { ok: true };
     }),
 
   /** Busca credenciais salvas */
   getConfig: protectedProcedure.query(async ({ ctx }) => {
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
-    try {
-      const [rows]: any = await conn.execute(
-        `SELECT accessId, accessSecret, region, pollIntervalMin, enabled FROM tuyaConfig WHERE userId = ?`,
-        [ctx.user.id]
-      );
-      if (rows.length === 0) return null;
-      const r = rows[0];
-      return {
-        accessId: r.accessId as string,
-        accessSecret: r.accessSecret as string,
-        region: r.region as string,
-        pollIntervalMin: r.pollIntervalMin as number,
-        enabled: Boolean(r.enabled),
-      };
-    } finally {
-      await conn.end();
-    }
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT accessId, accessSecret, region, pollIntervalMin, enabled FROM tuyaConfig WHERE userId = ?`,
+      [ctx.user.id]
+    );
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      accessId: r.accessId as string,
+      accessSecret: r.accessSecret as string,
+      region: r.region as string,
+      pollIntervalMin: r.pollIntervalMin as number,
+      enabled: Boolean(r.enabled),
+    };
   }),
 
   /** Testa a conexão com a API Tuya */
@@ -489,20 +479,15 @@ const tuyaRouter = router({
 
   /** Lista dispositivos da conta Tuya */
   listDevices: protectedProcedure.query(async ({ ctx }) => {
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
-    try {
-      const [rows]: any = await conn.execute(
-        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
-        [ctx.user.id]
-      );
-      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-      const cfg = rows[0];
-      const { listTuyaDevices } = await import("./lib/tuya");
-      return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region);
-    } finally {
-      await conn.end();
-    }
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+      [ctx.user.id]
+    );
+    if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+    const cfg = rows[0];
+    const { listTuyaDevices } = await import("./lib/tuya");
+    return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region);
   }),
 
   /** Salva mapeamento dispositivo ↔ estufa */
@@ -514,142 +499,127 @@ const tuyaRouter = router({
       enabled: z.boolean(),
     })))
     .mutation(async ({ ctx, input }) => {
-      const mysql = await import("mysql2/promise");
-      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
-      try {
-        // Apaga mapeamentos antigos do usuário e reinserir
-        await conn.execute(`DELETE FROM tuyaSensorMappings WHERE userId = ?`, [ctx.user.id]);
-        for (const m of input) {
-          await conn.execute(
-            `INSERT INTO tuyaSensorMappings (userId, tentId, deviceId, deviceName, enabled)
-             VALUES (?, ?, ?, ?, ?)`,
-            [ctx.user.id, m.tentId, m.deviceId, m.deviceName, m.enabled ? 1 : 0]
-          );
-        }
-        return { ok: true };
-      } finally {
-        await conn.end();
+      const pool = getMysqlPool();
+      await pool.execute(`DELETE FROM tuyaSensorMappings WHERE userId = ?`, [ctx.user.id]);
+      for (const m of input) {
+        await pool.execute(
+          `INSERT INTO tuyaSensorMappings (userId, tentId, deviceId, deviceName, enabled)
+           VALUES (?, ?, ?, ?, ?)`,
+          [ctx.user.id, m.tentId, m.deviceId, m.deviceName, m.enabled ? 1 : 0]
+        );
       }
+      return { ok: true };
     }),
 
   /** Busca mapeamentos salvos */
   getMappings: protectedProcedure.query(async ({ ctx }) => {
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
-    try {
-      const [rows]: any = await conn.execute(
-        `SELECT tentId, deviceId, deviceName, enabled FROM tuyaSensorMappings WHERE userId = ?`,
-        [ctx.user.id]
-      );
-      return (rows as any[]).map(r => ({
-        tentId: r.tentId as number,
-        deviceId: r.deviceId as string,
-        deviceName: r.deviceName as string,
-        enabled: Boolean(r.enabled),
-      }));
-    } finally {
-      await conn.end();
-    }
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT tentId, deviceId, deviceName, enabled FROM tuyaSensorMappings WHERE userId = ?`,
+      [ctx.user.id]
+    );
+    return (rows as any[]).map(r => ({
+      tentId: r.tentId as number,
+      deviceId: r.deviceId as string,
+      deviceName: r.deviceName as string,
+      enabled: Boolean(r.enabled),
+    }));
   }),
 
   /** Retorna a leitura mais recente do sensor de uma estufa específica */
   getLatestReadingForTent: protectedProcedure
     .input(z.object({ tentId: z.number() }))
     .query(async ({ ctx, input }) => {
-      const mysql = await import("mysql2/promise");
-      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
-      try {
-        // 1. Verifica se há mapeamento ativo (sensor configurado para esta estufa)
-        const [mappingRows]: any = await conn.execute(
-          `SELECT id FROM tuyaSensorMappings WHERE userId = ? AND tentId = ? AND enabled = 1 LIMIT 1`,
-          [ctx.user.id, input.tentId]
-        );
-        if (mappingRows.length === 0) return null; // sensor não configurado
+      const pool = getMysqlPool();
 
-        // 2. Busca leitura mais recente (pode não existir ainda)
-        const [rows]: any = await conn.execute(
-          `SELECT slr.tempC, slr.rhPct, slr.readAt
-           FROM tuyaSensorMappings tsm
-           INNER JOIN sensorLatestReadings slr ON slr.deviceId = tsm.deviceId
-           WHERE tsm.userId = ? AND tsm.tentId = ?
-           LIMIT 1`,
-          [ctx.user.id, input.tentId]
-        );
+      // 1. Verifica se há mapeamento ativo (sensor configurado para esta estufa)
+      const [mappingRows]: any = await pool.execute(
+        `SELECT id FROM tuyaSensorMappings WHERE userId = ? AND tentId = ? AND enabled = 1 LIMIT 1`,
+        [ctx.user.id, input.tentId]
+      );
+      if (mappingRows.length === 0) return null; // sensor não configurado
 
-        // Sensor configurado mas ainda sem leitura
-        if (rows.length === 0) return { hasSensor: true, isFresh: false, tempC: null, rhPct: null, readAt: null };
+      // 2. Busca leitura mais recente (pode não existir ainda)
+      const [rows]: any = await pool.execute(
+        `SELECT slr.tempC, slr.rhPct, slr.readAt
+         FROM tuyaSensorMappings tsm
+         INNER JOIN sensorLatestReadings slr ON slr.deviceId = tsm.deviceId
+         WHERE tsm.userId = ? AND tsm.tentId = ?
+         LIMIT 1`,
+        [ctx.user.id, input.tentId]
+      );
 
-        const r = rows[0];
-        const readAt = r.readAt instanceof Date ? r.readAt : new Date(r.readAt);
-        return {
-          hasSensor: true,
-          tempC: r.tempC != null ? parseFloat(r.tempC) : null,
-          rhPct: r.rhPct != null ? parseFloat(r.rhPct) : null,
-          readAt,
-          isFresh: (Date.now() - readAt.getTime()) < 2 * 60 * 60 * 1000,
-        };
-      } finally {
-        await conn.end();
-      }
+      // Sensor configurado mas ainda sem leitura
+      if (rows.length === 0) return { hasSensor: true, isFresh: false, tempC: null, rhPct: null, readAt: null };
+
+      const r = rows[0];
+      const readAt = r.readAt instanceof Date ? r.readAt : new Date(r.readAt);
+      return {
+        hasSensor: true,
+        tempC: r.tempC != null ? parseFloat(r.tempC) : null,
+        rhPct: r.rhPct != null ? parseFloat(r.rhPct) : null,
+        readAt,
+        isFresh: (Date.now() - readAt.getTime()) < 2 * 60 * 60 * 1000,
+      };
     }),
 
   /** Força leitura imediata de todos os sensores desta estufa */
   readNow: protectedProcedure
     .input(z.object({ tentId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const mysql = await import("mysql2/promise");
-      const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
-      try {
-        const [cfgRows]: any = await conn.execute(
-          `SELECT tc.accessId, tc.accessSecret, tc.region, tsm.deviceId
-           FROM tuyaConfig tc
-           INNER JOIN tuyaSensorMappings tsm ON tsm.userId = tc.userId AND tsm.tentId = ? AND tsm.enabled = 1
-           WHERE tc.userId = ? AND tc.enabled = 1`,
-          [input.tentId, ctx.user.id]
-        );
-        if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum sensor ativo para esta estufa" });
-        const cfg = cfgRows[0];
+      const pool = getMysqlPool();
 
-        const { readTuyaDeviceStatus } = await import("./lib/tuya");
-        const reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+      const [cfgRows]: any = await pool.execute(
+        `SELECT tc.accessId, tc.accessSecret, tc.region, tsm.deviceId
+         FROM tuyaConfig tc
+         INNER JOIN tuyaSensorMappings tsm ON tsm.userId = tc.userId AND tsm.tentId = ? AND tsm.enabled = 1
+         WHERE tc.userId = ? AND tc.enabled = 1`,
+        [input.tentId, ctx.user.id]
+      );
+      if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum sensor ativo para esta estufa" });
+      const cfg = cfgRows[0];
 
-        // Upsert leitura mais recente
-        await conn.execute(
-          `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
-           VALUES (?, ?, ?, ?, NOW())
-           ON DUPLICATE KEY UPDATE tempC = VALUES(tempC), rhPct = VALUES(rhPct), readAt = NOW()`,
-          [ctx.user.id, cfg.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
-        );
+      const { readTuyaDeviceStatus } = await import("./lib/tuya");
+      const reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
 
-        // Busca último log manual para carregar pH, EC, ppfd, etc.
-        const [lastManual]: any = await conn.execute(
-          `SELECT ph, ec, ppfd, wateringVolume, runoffCollected, runoffPercentage
-           FROM dailyLogs
-           WHERE tentId = ? AND (source = 'MANUAL' OR source IS NULL)
-           ORDER BY logDate DESC LIMIT 1`,
-          [input.tentId]
-        );
-        const prev = lastManual[0] ?? {};
+      // Upsert leitura mais recente
+      await pool.execute(
+        `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
+         VALUES (?, ?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE tempC = VALUES(tempC), rhPct = VALUES(rhPct), readAt = NOW()`,
+        [ctx.user.id, cfg.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
+      );
 
-        // Cria log automático com temp/rh atuais + últimos valores manuais
-        const turn = new Date().getHours() < 18 ? 'AM' : 'PM';
-        await conn.execute(
-          `INSERT IGNORE INTO dailyLogs
-             (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd,
-              wateringVolume, runoffCollected, runoffPercentage, source)
-           VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO')`,
-          [
-            input.tentId, turn,
-            reading.tempC ?? null, reading.rhPct ?? null,
-            prev.ph ?? null, prev.ec ?? null, prev.ppfd ?? null,
-            prev.wateringVolume ?? null, prev.runoffCollected ?? null, prev.runoffPercentage ?? null,
-          ]
-        );
+      // Busca último log manual para carregar pH, EC, ppfd, etc.
+      const [lastManual]: any = await pool.execute(
+        `SELECT ph, ec, ppfd, wateringVolume, runoffCollected, runoffPercentage
+         FROM dailyLogs
+         WHERE tentId = ? AND (source = 'MANUAL' OR source IS NULL)
+         ORDER BY logDate DESC LIMIT 1`,
+        [input.tentId]
+      );
+      const prev = (lastManual as any[])[0] ?? {};
 
-        return { ...reading, readAt: new Date() };
-      } finally {
-        await conn.end();
-      }
+      // Upsert log automático com temp/rh atuais + últimos valores manuais
+      const turn = new Date().getHours() < 18 ? 'AM' : 'PM';
+      await pool.execute(
+        `INSERT INTO dailyLogs
+           (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd,
+            wateringVolume, runoffCollected, runoffPercentage, source)
+         VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AUTO')
+         ON DUPLICATE KEY UPDATE
+           tempC  = VALUES(tempC),
+           rhPct  = VALUES(rhPct),
+           source = 'AUTO'`,
+        [
+          input.tentId, turn,
+          reading.tempC ?? null, reading.rhPct ?? null,
+          prev.ph ?? null, prev.ec ?? null, prev.ppfd ?? null,
+          prev.wateringVolume ?? null, prev.runoffCollected ?? null, prev.runoffPercentage ?? null,
+        ]
+      );
+
+      return { ...reading, readAt: new Date() };
     }),
 });
 

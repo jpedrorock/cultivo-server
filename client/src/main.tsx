@@ -77,7 +77,7 @@ if ('serviceWorker' in navigator) {
       .register('/sw.js')
       .then((registration) => {
         if (import.meta.env.DEV) console.log('[PWA] Service Worker registered:', registration.scope);
-        
+
         // Verificar atualizações a cada 60 segundos
         setInterval(() => {
           registration.update();
@@ -86,6 +86,18 @@ if ('serviceWorker' in navigator) {
       .catch((error) => {
         if (import.meta.env.DEV) console.error('[PWA] Service Worker registration failed:', error);
       });
+
+    // Ouvir mensagem do SW para sincronizar logs offline
+    // O SW não tem cookies, então delega o sync para a página via postMessage
+    navigator.serviceWorker.addEventListener('message', async (event) => {
+      if (event.data?.type !== 'SYNC_PENDING_LOGS') return;
+      const { countPendingLogs, syncPendingLogs } = await import('./lib/offlineStorage');
+      const count = await countPendingLogs();
+      if (count === 0) return;
+      const { createLogMutate } = (window as any).__cultivo_sync__ ?? {};
+      if (!createLogMutate) return; // página ainda não montou
+      await syncPendingLogs(createLogMutate);
+    });
   });
 }
 
