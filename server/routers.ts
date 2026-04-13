@@ -431,7 +431,7 @@ const tuyaRouter = router({
       enabled: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userId = ctx.userId;
+      const userId = ctx.user.id;
       const mysql = await import("mysql2/promise");
       const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
       try {
@@ -459,7 +459,7 @@ const tuyaRouter = router({
     try {
       const [rows]: any = await conn.execute(
         `SELECT accessId, accessSecret, region, pollIntervalMin, enabled FROM tuyaConfig WHERE userId = ?`,
-        [ctx.userId]
+        [ctx.user.id]
       );
       if (rows.length === 0) return null;
       const r = rows[0];
@@ -494,7 +494,7 @@ const tuyaRouter = router({
     try {
       const [rows]: any = await conn.execute(
         `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
-        [ctx.userId]
+        [ctx.user.id]
       );
       if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
       const cfg = rows[0];
@@ -518,12 +518,12 @@ const tuyaRouter = router({
       const conn = await mysql.default.createConnection(process.env.DATABASE_URL!);
       try {
         // Apaga mapeamentos antigos do usuário e reinserir
-        await conn.execute(`DELETE FROM tuyaSensorMappings WHERE userId = ?`, [ctx.userId]);
+        await conn.execute(`DELETE FROM tuyaSensorMappings WHERE userId = ?`, [ctx.user.id]);
         for (const m of input) {
           await conn.execute(
             `INSERT INTO tuyaSensorMappings (userId, tentId, deviceId, deviceName, enabled)
              VALUES (?, ?, ?, ?, ?)`,
-            [ctx.userId, m.tentId, m.deviceId, m.deviceName, m.enabled ? 1 : 0]
+            [ctx.user.id, m.tentId, m.deviceId, m.deviceName, m.enabled ? 1 : 0]
           );
         }
         return { ok: true };
@@ -539,7 +539,7 @@ const tuyaRouter = router({
     try {
       const [rows]: any = await conn.execute(
         `SELECT tentId, deviceId, deviceName, enabled FROM tuyaSensorMappings WHERE userId = ?`,
-        [ctx.userId]
+        [ctx.user.id]
       );
       return (rows as any[]).map(r => ({
         tentId: r.tentId as number,
@@ -565,7 +565,7 @@ const tuyaRouter = router({
            INNER JOIN sensorLatestReadings slr ON slr.deviceId = tsm.deviceId
            WHERE tsm.userId = ? AND tsm.tentId = ?
            LIMIT 1`,
-          [ctx.userId, input.tentId]
+          [ctx.user.id, input.tentId]
         );
         if (rows.length === 0) return null;
         const r = rows[0];
@@ -594,7 +594,7 @@ const tuyaRouter = router({
            FROM tuyaConfig tc
            INNER JOIN tuyaSensorMappings tsm ON tsm.userId = tc.userId AND tsm.tentId = ? AND tsm.enabled = 1
            WHERE tc.userId = ? AND tc.enabled = 1`,
-          [input.tentId, ctx.userId]
+          [input.tentId, ctx.user.id]
         );
         if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum sensor ativo para esta estufa" });
         const cfg = cfgRows[0];
@@ -604,7 +604,7 @@ const tuyaRouter = router({
           `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
            VALUES (?, ?, ?, ?, NOW())
            ON DUPLICATE KEY UPDATE tempC = VALUES(tempC), rhPct = VALUES(rhPct), readAt = NOW()`,
-          [ctx.userId, cfg.deviceId, reading.tempC, reading.rhPct]
+          [ctx.user.id, cfg.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
         );
         return { ...reading, readAt: new Date() };
       } finally {

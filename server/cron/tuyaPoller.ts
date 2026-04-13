@@ -66,7 +66,7 @@ async function pollAllUsers() {
              tempC  = VALUES(tempC),
              rhPct  = VALUES(rhPct),
              readAt = NOW()`,
-          [row.userId, row.deviceId, reading.tempC, reading.rhPct]
+          [row.userId, row.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
         );
 
         console.log(
