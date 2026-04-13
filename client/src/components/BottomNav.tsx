@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, ChevronDown, Bot } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ function ChatPlantPicker({
   tentMap: Record<string | number, string>;
   onSelect: (plant: any) => void;
 }) {
-  // Agrupar por estufa
+  // Build groups
   const groups: { key: string; tentName: string; plants: any[] }[] = [];
   const seen = new Map<string, number>();
   for (const p of plants) {
@@ -57,56 +57,72 @@ function ChatPlantPicker({
     groups[seen.get(key)!].plants.push(p);
   }
 
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const toggle = (key: string) => setCollapsed(c => ({ ...c, [key]: !c[key] }));
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
+  // If only one tent, skip straight to plants
+  const activeGroup = selectedGroup
+    ? groups.find(g => g.key === selectedGroup) ?? null
+    : groups.length === 1 ? groups[0] : null;
+
+  // ── Step 2: plants list ──────────────────────────────────────────────────
+  if (activeGroup) {
+    return (
+      <div>
+        {groups.length > 1 && (
+          <button
+            onClick={() => setSelectedGroup(null)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3 hover:text-foreground transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+            Estufas
+          </button>
+        )}
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
+          🏕️ {activeGroup.tentName}
+        </p>
+        <div className="space-y-0.5">
+          {activeGroup.plants.map((p: any) => {
+            const letter = (p.name ?? '?')[0].toUpperCase();
+            const grad = AVATAR_GRADIENTS[letter.charCodeAt(0) % AVATAR_GRADIENTS.length];
+            return (
+              <button
+                key={p.id}
+                onClick={() => onSelect(p)}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
+              >
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
+                  {letter}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{stageLabel(p.plantStage ?? '')}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 1: tent list ────────────────────────────────────────────────────
   return (
-    <div className="space-y-1">
-      {groups.map(group => {
-        const isCollapsed = !!collapsed[group.key];
-        return (
-          <div key={group.key}>
-            {/* Tent accordion header */}
-            <button
-              onClick={() => toggle(group.key)}
-              className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted/60 transition-colors"
-            >
-              <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0 text-base">🏕️</div>
-              <span className="flex-1 text-left text-sm font-semibold text-foreground">{group.tentName}</span>
-              <span className="text-[11px] text-muted-foreground">{group.plants.length}p</span>
-              {isCollapsed
-                ? <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
-            </button>
-
-            {/* Plant list */}
-            {!isCollapsed && (
-              <div className="ml-3 border-l border-border/50 pl-3 mb-1 space-y-0.5">
-                {group.plants.map((p: any) => {
-                  const letter = (p.name ?? '?')[0].toUpperCase();
-                  const grad = AVATAR_GRADIENTS[letter.charCodeAt(0) % AVATAR_GRADIENTS.length];
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => onSelect(p)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
-                    >
-                      <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
-                        {letter}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                        <p className="text-[11px] text-muted-foreground">{stageLabel(p.plantStage ?? '')}</p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+    <div className="space-y-1.5">
+      {groups.map(group => (
+        <button
+          key={group.key}
+          onClick={() => setSelectedGroup(group.key)}
+          className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
+        >
+          <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 text-xl">🏕️</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
+            <p className="text-[11px] text-muted-foreground">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
           </div>
-        );
-      })}
+          <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+        </button>
+      ))}
     </div>
   );
 }
