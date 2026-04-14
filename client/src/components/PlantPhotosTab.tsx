@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { uploadImage } from "@/lib/uploadImage";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -53,14 +54,15 @@ export default function PlantPhotosTab({ plantId }: Props) {
   // Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
 
-  const uploadMutation = trpc.plantPhotos.upload.useMutation({
+  const saveUrlMutation = trpc.plantPhotos.saveUrl.useMutation({
     onSuccess: () => {
       utils.plantPhotos.list.invalidate({ plantId });
       toast.success("Foto salva!");
     },
-    onError: (e) => toast.error(`Erro: ${e.message}`),
-    onSettled: () => setUploading(false),
+    onError: (e) => toast.error(`Erro ao salvar foto: ${e.message}`),
+    onSettled: () => { setUploading(false); setUploadPct(0); },
   });
 
   const deleteMutation = trpc.plantPhotos.delete.useMutation({
@@ -74,19 +76,22 @@ export default function PlantPhotosTab({ plantId }: Props) {
   });
 
   // ── Upload ────────────────────────────────────────────────────────────────
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Selecione uma imagem válida"); return; }
-    if (file.size > 10 * 1024 * 1024) { toast.error("Imagem muito grande (máx. 10MB)"); return; }
+    if (file.size > 20 * 1024 * 1024) { toast.error("Imagem muito grande (máx. 20MB)"); return; }
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = () => {
-      uploadMutation.mutate({ plantId, photoBase64: reader.result as string });
-    };
-    reader.onerror = () => { setUploading(false); toast.error("Erro ao ler arquivo"); };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    setUploadPct(0);
+    try {
+      const photoUrl = await uploadImage(file, (pct) => setUploadPct(pct));
+      saveUrlMutation.mutate({ plantId, photoUrl });
+    } catch (err: any) {
+      setUploading(false);
+      setUploadPct(0);
+      toast.error(err?.message ?? "Erro ao enviar foto");
+    }
   };
 
   // ── Zoom helpers ──────────────────────────────────────────────────────────
@@ -206,7 +211,11 @@ export default function PlantPhotosTab({ plantId }: Props) {
       >
         {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
         <span className="text-sm font-medium">
-          {uploading ? "Salvando foto…" : "Tirar / escolher foto"}
+          {uploading
+            ? uploadPct > 0 && uploadPct < 100
+              ? `Enviando… ${uploadPct}%`
+              : "Salvando foto…"
+            : "Tirar / escolher foto"}
         </span>
       </button>
 

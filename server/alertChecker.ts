@@ -110,6 +110,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
   // 6. Verificar cada métrica e criar alertas
   const newAlerts: Array<{
     metric: "TEMP" | "RH" | "PPFD";
+    direction: "HIGH" | "LOW";
     value: number;
     targetMin: number | null;
     targetMax: number | null;
@@ -125,6 +126,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     if (temp < min) {
       newAlerts.push({
         metric: "TEMP",
+        direction: "LOW",
         value: temp,
         targetMin: min,
         targetMax: max,
@@ -133,6 +135,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     } else if (temp > max) {
       newAlerts.push({
         metric: "TEMP",
+        direction: "HIGH",
         value: temp,
         targetMin: min,
         targetMax: max,
@@ -150,6 +153,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     if (rh < min) {
       newAlerts.push({
         metric: "RH",
+        direction: "LOW",
         value: rh,
         targetMin: min,
         targetMax: max,
@@ -158,6 +162,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     } else if (rh > max) {
       newAlerts.push({
         metric: "RH",
+        direction: "HIGH",
         value: rh,
         targetMin: min,
         targetMax: max,
@@ -175,6 +180,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     if (ppfd < min) {
       newAlerts.push({
         metric: "PPFD",
+        direction: "LOW",
         value: ppfd,
         targetMin: min,
         targetMax: max,
@@ -183,6 +189,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     } else if (ppfd > max) {
       newAlerts.push({
         metric: "PPFD",
+        direction: "HIGH",
         value: ppfd,
         targetMin: min,
         targetMax: max,
@@ -191,23 +198,32 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     }
   }
 
-  // 7. Salvar alertas no histórico — com deduplicação de 4h por métrica
-  //    Evita flood de alertas idênticos a cada ciclo de verificação
+  // 7. Salvar alertas no histórico — com deduplicação de 4h por métrica+direção
+  //    Evita flood de alertas idênticos, mas permite HIGH e LOW da mesma métrica
   const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
 
   // Buscar alertas recentes (últimas 4h) para este tent de uma vez
   const recentAlerts = await database
-    .select({ metric: alertHistory.metric })
+    .select({ metric: alertHistory.metric, value: alertHistory.value, targetMax: alertHistory.targetMax })
     .from(alertHistory)
     .where(and(eq(alertHistory.tentId, tentId), gte(alertHistory.createdAt, fourHoursAgo)));
 
-  const recentMetrics = new Set(recentAlerts.map(a => a.metric));
+  // Chave = "METRIC_HIGH" ou "METRIC_LOW" — deriva direção do valor vs targetMax
+  const recentMetrics = new Set(
+    recentAlerts.map(a => {
+      const v = parseFloat(a.value);
+      const tMax = a.targetMax ? parseFloat(a.targetMax) : null;
+      const dir = tMax !== null && v > tMax ? "HIGH" : "LOW";
+      return `${a.metric}_${dir}`;
+    })
+  );
 
   let saved = 0;
   for (const alert of newAlerts) {
-    // Pular se já existe alerta recente para a mesma métrica
-    if (recentMetrics.has(alert.metric)) {
-      console.log(`⏭️  Alerta duplicado ignorado (${alert.metric} — já existe nas últimas 4h)`);
+    const key = `${alert.metric}_${alert.direction}`;
+    // Pular se já existe alerta recente para a mesma métrica+direção
+    if (recentMetrics.has(key)) {
+      console.log(`⏭️  Alerta duplicado ignorado (${key} — já existe nas últimas 4h)`);
       continue;
     }
     await database.insert(alertHistory).values({

@@ -73,9 +73,19 @@ export default function Backup() {
         
         // Validar estrutura básica
         if (!backupData.version || !backupData.data) {
-          throw new Error("Arquivo de backup inválido");
+          throw new Error("Arquivo de backup inválido: faltam campos obrigatórios (version, data)");
         }
-        
+
+        // Validar compatibilidade de versão
+        const SUPPORTED_VERSIONS = ["1.0"];
+        if (!SUPPORTED_VERSIONS.includes(backupData.version)) {
+          throw new Error(
+            `Backup incompatível: versão "${backupData.version}" não suportada. ` +
+            `Versões suportadas: ${SUPPORTED_VERSIONS.join(", ")}. ` +
+            `Este backup pode ter sido criado por uma versão mais nova do app.`
+          );
+        }
+
         // Guardar dados e abrir confirm dialog
         setPendingFile(backupData);
         setIsImporting(false);

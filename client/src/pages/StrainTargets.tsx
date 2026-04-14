@@ -37,7 +37,7 @@ export default function StrainTargets() {
     { enabled: !!strainId }
   );
 
-  const createTarget = trpc.weeklyTargets.create.useMutation();
+  const createTarget = trpc.weeklyTargets.upsert.useMutation();
 
   const [editingTargets, setEditingTargets] = useState<Record<string, any>>({});
   const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({});

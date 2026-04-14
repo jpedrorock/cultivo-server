@@ -3027,6 +3027,57 @@ export const appRouter = router({
         await database.insert(weeklyTargets).values({ ...input, groupId: ctx.user.groupId ?? null });
         return { success: true };
       }),
+
+    // Upsert: atualiza se já existe (strainId+phase+weekNumber), senão cria
+    upsert: protectedProcedure
+      .input(
+        z.object({
+          strainId: z.number(),
+          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
+          weekNumber: z.number(),
+          tempMin: z.string().optional(),
+          tempMax: z.string().optional(),
+          rhMin: z.string().optional(),
+          rhMax: z.string().optional(),
+          ppfdMin: z.number().optional(),
+          ppfdMax: z.number().optional(),
+          photoperiod: z.string().optional(),
+          phMin: z.string().optional(),
+          phMax: z.string().optional(),
+          ecMin: z.string().optional(),
+          ecMax: z.string().optional(),
+          notes: z.string().max(2000).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) {
+          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
+        }
+        const { strainId, phase, weekNumber, ...fields } = input;
+
+        // Verificar se já existe target para esta cepa/fase/semana
+        const existing = await database
+          .select({ id: weeklyTargets.id })
+          .from(weeklyTargets)
+          .where(and(
+            eq(weeklyTargets.strainId, strainId),
+            eq(weeklyTargets.phase, phase),
+            eq(weeklyTargets.weekNumber, weekNumber),
+          ))
+          .limit(1);
+
+        if (existing.length > 0) {
+          await database
+            .update(weeklyTargets)
+            .set(fields)
+            .where(eq(weeklyTargets.id, existing[0].id));
+          return { success: true, action: "updated" };
+        } else {
+          await database.insert(weeklyTargets).values({ strainId, phase, weekNumber, ...fields, groupId: ctx.user.groupId ?? null });
+          return { success: true, action: "created" };
+        }
+      }),
   }),
 
   // Task Instances (Tarefas)
@@ -4643,12 +4694,59 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
+
         return await database
           .select()
           .from(plantObservations)
           .where(eq(plantObservations.plantId, input.plantId))
           .orderBy(desc(plantObservations.observationDate));
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        content: z.string().min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        // Ownership via planta associada
+        const [obs] = await database
+          .select({ plantId: plantObservations.plantId })
+          .from(plantObservations)
+          .where(eq(plantObservations.id, input.id))
+          .limit(1);
+        if (!obs) throw new Error("Observação não encontrada");
+        await validatePlantOwnership(obs.plantId, ctx.user.groupId);
+
+        await database
+          .update(plantObservations)
+          .set({ content: input.content })
+          .where(eq(plantObservations.id, input.id));
+
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+
+        const [obs] = await database
+          .select({ plantId: plantObservations.plantId })
+          .from(plantObservations)
+          .where(eq(plantObservations.id, input.id))
+          .limit(1);
+        if (!obs) throw new Error("Observação não encontrada");
+        await validatePlantOwnership(obs.plantId, ctx.user.groupId);
+
+        await database
+          .delete(plantObservations)
+          .where(eq(plantObservations.id, input.id));
+
+        return { success: true };
       }),
   }),
 
@@ -4757,6 +4855,48 @@ export const appRouter = router({
         return { success: true, photoUrl };
       }),
     
+    // Salvar URL de foto já enviada para o storage via /api/upload/image
+    saveUrl: protectedProcedure
+      .input(z.object({
+        plantId: z.number(),
+        photoUrl: z.string().url(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
+        // Auto-capture ciclo ativo e semana da planta
+        let capturedCycleId: number | undefined;
+        let capturedWeekNumber: number | undefined;
+        try {
+          const plant = await database.select({ currentTentId: plants.currentTentId }).from(plants).where(eq(plants.id, input.plantId)).limit(1);
+          if (plant[0]?.currentTentId) {
+            const cycle = await database.select({ id: cycles.id, startDate: cycles.startDate, floraStartDate: cycles.floraStartDate })
+              .from(cycles).where(and(eq(cycles.tentId, plant[0].currentTentId), eq(cycles.status, 'ACTIVE'))).limit(1);
+            if (cycle[0]) {
+              capturedCycleId = cycle[0].id;
+              const now = new Date();
+              const floraStart = cycle[0].floraStartDate ? new Date(cycle[0].floraStartDate) : null;
+              const refDate = floraStart && now >= floraStart ? floraStart : new Date(cycle[0].startDate);
+              capturedWeekNumber = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+            }
+          }
+        } catch {}
+
+        await database.insert(plantPhotos).values({
+          plantId: input.plantId,
+          photoUrl: input.photoUrl,
+          cycleId: capturedCycleId,
+          weekNumber: capturedWeekNumber,
+          description: input.description,
+          photoDate: new Date(),
+        });
+
+        return { success: true, photoUrl: input.photoUrl };
+      }),
+
     delete: protectedProcedure
       .input(z.object({ photoId: z.number() }))
       .mutation(async ({ input, ctx }) => {
