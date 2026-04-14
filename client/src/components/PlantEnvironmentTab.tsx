@@ -44,7 +44,7 @@ function Cell({
         {label}
       </span>
       {children ?? (
-        value ? (
+        value !== null && value !== undefined ? (
           <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
             {Icon && <Icon className={`w-3.5 h-3.5 shrink-0 ${iconColor}`} />}
             {value}

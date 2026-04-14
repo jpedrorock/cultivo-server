@@ -464,6 +464,40 @@ export default function QuickLog() {
       ppfd: ppfd || undefined,
     };
 
+    // Validação de faixa — evita dados absurdos que disparam alertas falsos
+    if (tempC) {
+      const v = parseFloat(tempC);
+      if (isNaN(v) || v < 0 || v > 60) {
+        toast.error("Temperatura inválida — use entre 0 e 60 °C");
+        return;
+      }
+    }
+    if (rhPct) {
+      const v = parseFloat(rhPct);
+      if (isNaN(v) || v < 0 || v > 100) {
+        toast.error("Umidade inválida — use entre 0 e 100 %");
+        return;
+      }
+    }
+    if (ph) {
+      const v = parseFloat(ph);
+      if (isNaN(v) || v < 0 || v > 14) {
+        toast.error("pH inválido — use entre 0 e 14");
+        return;
+      }
+    }
+    if (ec) {
+      const v = parseFloat(ec);
+      if (isNaN(v) || v < 0 || v > 15) {
+        toast.error("EC inválido — use entre 0 e 15 mS/cm");
+        return;
+      }
+    }
+    if (ppfd && (ppfd < 0 || ppfd > 3000)) {
+      toast.error("PPFD inválido — use entre 0 e 3000 µmol/m²/s");
+      return;
+    }
+
     // Sem conexão → salvar na fila offline e avançar normalmente
     if (!isOnline()) {
       try {

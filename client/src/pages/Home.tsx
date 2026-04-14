@@ -1495,6 +1495,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           open={promotePhaseOpen}
           onOpenChange={setPromotePhaseOpen}
           cycleId={cycle.id}
+          tentId={cycle.tentId}
           currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
           currentTentName={tent.name}
         />

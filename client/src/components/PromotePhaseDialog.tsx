@@ -25,6 +25,7 @@ interface PromotePhaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cycleId: number;
+  tentId: number;
   currentPhase: "VEGA" | "FLORA";
   currentTentName: string;
 }
@@ -33,6 +34,7 @@ export function PromotePhaseDialog({
   open,
   onOpenChange,
   cycleId,
+  tentId,
   currentPhase,
   currentTentName,
 }: PromotePhaseDialogProps) {
@@ -56,11 +58,14 @@ export function PromotePhaseDialog({
     onSuccess: (data) => {
       toast.success(data.message);
       onOpenChange(false);
-      // Refetch cycles to update UI
-      utils.cycles.getActiveCyclesWithProgress.refetch();
-      utils.cycles.listActive.refetch();
+      // Invalida todos os dados dependentes da fase
+      utils.cycles.getActiveCyclesWithProgress.invalidate();
+      utils.cycles.listActive.invalidate();
+      utils.tents.getById.invalidate({ id: tentId });
+      utils.tents.list.invalidate();
+      utils.alerts.list.invalidate();
       if (data.movedPlants) {
-        utils.plants.list.refetch();
+        utils.plants.list.invalidate();
       }
     },
     onError: (error) => {

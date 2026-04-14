@@ -50,6 +50,11 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
 
   const cycle = activeCycles[0];
 
+  // Guard: ciclos de MAINTENANCE/DRYING/CLONING não têm cepa — sem targets para verificar
+  if (!cycle.strainId) {
+    return;
+  }
+
   // 3. Calcular fase e semana atual
   const now = new Date();
   const startDate = new Date(cycle.startDate);

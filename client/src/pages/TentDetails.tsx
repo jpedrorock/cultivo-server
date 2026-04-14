@@ -1133,6 +1133,7 @@ export default function TentDetails() {
                   open={promotePhaseOpen}
                   onOpenChange={setPromotePhaseOpen}
                   cycleId={cycle.id}
+                  tentId={tentId}
                   currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
                   currentTentName={tent.name}
                 />
