@@ -91,6 +91,10 @@ export default function HarvestQueue() {
       toast.error("Selecione uma estufa destino");
       return;
     }
+    if (!selectAll && selectedPlantIds.length === 0) {
+      toast.error("Selecione ao menos uma planta");
+      return;
+    }
     moveToDryingMutation.mutate({
       targetTentId: parseInt(selectedTentId),
       plantIds: selectAll ? undefined : selectedPlantIds,

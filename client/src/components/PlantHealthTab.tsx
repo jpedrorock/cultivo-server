@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -104,6 +104,13 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
   });
 
   const utils = trpc.useUtils();
+
+  // Sync healthStatus from the most recent log when form is closed
+  useEffect(() => {
+    if (healthLogs && healthLogs.length > 0 && !isFormOpen) {
+      setHealthStatus(healthLogs[0].healthStatus as "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING");
+    }
+  }, [healthLogs, isFormOpen]);
 
   const createHealthLog = trpc.plantHealth.create.useMutation({
     onSuccess: () => {

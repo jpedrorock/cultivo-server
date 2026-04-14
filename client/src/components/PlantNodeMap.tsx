@@ -643,12 +643,15 @@ export default function PlantNodeMap({
         return;
       }
 
-      // Fim do drag de nó → marca aresta como recovering
+      // Fim do drag de nó → marca aresta como recovering; se tap → abre menu
       const nd = nodeGestureRef.current;
       if (nd && nd.pointerId === e.pointerId) {
         if (nd.moved) {
           // Marca a aresta do nó movido como recovering (linha azul por 5 dias)
           setNodes(ns => setEdgeRecovering(ns, nd.nodeId));
+        } else {
+          // Tap sem arrastar → abre menu de ações do nó
+          setSelectedId(nd.nodeId);
         }
         nodeGestureRef.current = null;
         return;

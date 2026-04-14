@@ -17,6 +17,7 @@ function UserAvatar({ user, size = 'md' }: { user: { name?: string | null; email
 }
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PageTransition } from '@/components/PageTransition';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
@@ -65,6 +66,7 @@ function ProfileCard() {
   const [showNew, setShowNew] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const updateName = trpc.profile.updateName.useMutation({
     onSuccess: () => { setEditingName(false); setFeedback('Nome atualizado!'); setTimeout(() => setFeedback(''), 3000); },
@@ -87,8 +89,7 @@ function ProfileCard() {
   });
 
   const handleDeleteAccount = () => {
-    if (!confirm('Excluir sua conta permanentemente? Esta ação não pode ser desfeita.')) return;
-    deleteAccount.mutate();
+    setDeleteConfirmOpen(true);
   };
 
   return (
@@ -173,6 +174,30 @@ function ProfileCard() {
           Excluir minha conta
         </button>
       </CardContent>
+
+      {/* Delete account confirmation dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="w-5 h-5" /> Excluir conta
+            </DialogTitle>
+            <DialogDescription>
+              Excluir sua conta permanentemente? Todos os seus dados serão removidos. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteAccount.isPending}
+              onClick={() => { setDeleteConfirmOpen(false); deleteAccount.mutate(); }}
+            >
+              {deleteAccount.isPending ? 'Excluindo…' : 'Excluir conta'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -181,6 +206,7 @@ function GroupCard() {
   const { user } = useAuth();
   const [copied, setCopied] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
+  const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
 
   const { data: group, refetch } = trpc.groups.mine.useQuery();
   const regenerate = trpc.groups.regenerateCode.useMutation({
@@ -200,8 +226,7 @@ function GroupCard() {
   };
 
   const handleRegenerate = () => {
-    if (!confirm('Gerar um novo código? O código atual deixará de funcionar.')) return;
-    regenerate.mutate();
+    setRegenConfirmOpen(true);
   };
 
   const handleRemove = (memberId: number) => {
@@ -274,6 +299,27 @@ function GroupCard() {
           </div>
         </div>
       </CardContent>
+
+      {/* Regen code confirmation dialog */}
+      <Dialog open={regenConfirmOpen} onOpenChange={setRegenConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerar novo código?</DialogTitle>
+            <DialogDescription>
+              O código de convite atual deixará de funcionar imediatamente. Membros novos precisarão do novo código.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRegenConfirmOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={regenerate.isPending}
+              onClick={() => { setRegenConfirmOpen(false); regenerate.mutate(); }}
+            >
+              {regenerate.isPending ? 'Gerando…' : 'Gerar novo código'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

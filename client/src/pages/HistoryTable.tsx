@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -77,6 +77,14 @@ export default function HistoryTable() {
   });
 
   const utils = trpc.useUtils();
+  const deleteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup pending delete timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+    };
+  }, []);
 
   const deleteMutation = trpc.dailyLogs.delete.useMutation({
     onSuccess: () => {
@@ -93,23 +101,24 @@ export default function HistoryTable() {
     if (deletingLogId) {
       const logId = deletingLogId;
       setDeletingLogId(null); // Close dialog immediately
-      
-      let timeoutId: NodeJS.Timeout | null = null;
-      
+
+      // Cancel any previous pending delete
+      if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
+
       // Show toast with undo button
       toast.info("Registro será excluído em 5 segundos", {
         duration: 5000,
         action: {
           label: "Desfazer",
           onClick: () => {
-            if (timeoutId) clearTimeout(timeoutId);
+            if (deleteTimeoutRef.current) clearTimeout(deleteTimeoutRef.current);
             toast.success("Exclusão cancelada!");
           },
         },
       });
-      
+
       // Schedule deletion after 5 seconds
-      timeoutId = setTimeout(() => {
+      deleteTimeoutRef.current = setTimeout(() => {
         deleteMutation.mutate({ id: logId });
       }, 5000);
     }

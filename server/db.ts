@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, isNotNull, or, inArray, max, count } from "drizzle-orm";
+import { eq, and, desc, sql, isNotNull, or, inArray, max, count, gte } from "drizzle-orm";
 import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import {
@@ -787,12 +787,34 @@ export async function checkAlertsForTent(tentId: number): Promise<{
     }
   }
 
-  // Inserir alertas no banco e no histórico
+  // Inserir alertas no banco e no histórico (com deduplicação)
+  let insertedCount = 0;
   if (alertsToInsert.length > 0) {
+    // Cutoff: ignore alerts for the same logDate+turn+metric already in alertHistory
+    const recentCutoff = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2h ago
+
     for (const alert of alertsToInsert) {
+      // Dedup: skip if same tentId + metric already alerted in the last 2 hours
+      const existing = await db
+        .select({ id: alertHistory.id })
+        .from(alertHistory)
+        .where(
+          and(
+            eq(alertHistory.tentId, alert.tentId),
+            eq(alertHistory.metric, alert.metric),
+            gte(alertHistory.createdAt, recentCutoff),
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        console.log(`[Alerts] Dedup: alerta ${alert.metric} para ${tent.name} já existe — ignorando`);
+        continue;
+      }
+
       // Inserir em alerts (tabela de alertas ativos)
       await db.insert(alerts).values(alert);
-      
+
       // Inserir em alertHistory (histórico permanente)
       await db.insert(alertHistory).values({
         tentId: alert.tentId,
@@ -803,13 +825,17 @@ export async function checkAlertsForTent(tentId: number): Promise<{
         value: alert.value,
         message: alert.message,
       });
+
+      insertedCount++;
     }
-    
-    console.log(`[Alerts] ${alertsToInsert.length} alerta(s) registrado(s) para ${tent.name} — visíveis no app`);
+
+    if (insertedCount > 0) {
+      console.log(`[Alerts] ${insertedCount} alerta(s) registrado(s) para ${tent.name} — visíveis no app`);
+    }
   }
 
   return {
-    alertsGenerated: alertsToInsert.length,
+    alertsGenerated: insertedCount,
     messages,
   };
 }

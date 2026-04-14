@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import React from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -345,9 +346,9 @@ function WateringRunoffCalculator() {
         notes: notes || undefined,
       });
       setNotes("");
-      alert("Receita salva com sucesso!");
+      toast.success("Receita salva com sucesso!");
     } catch (error) {
-      alert("Erro ao salvar receita");
+      toast.error("Erro ao salvar receita");
     }
   };
 

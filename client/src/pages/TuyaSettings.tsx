@@ -198,8 +198,8 @@ export default function TuyaSettings() {
 
               {/* Credenciais */}
               <div className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden">
-                <CredentialField label="Access ID" value={accessId} onChange={setAccessId} placeholder="Ex: 9gk3qwi8nf2mxxx" mono />
-                <CredentialField label="Access Secret" value={accessSecret} onChange={setAccessSecret} placeholder="Ex: a1b2c3d4e5f6..." mono secret />
+                <CredentialField label="Access ID" value={accessId} onChange={(v) => { setAccessId(v); setConnStatus(null); setConnMsg(''); }} placeholder="Ex: 9gk3qwi8nf2mxxx" mono />
+                <CredentialField label="Access Secret" value={accessSecret} onChange={(v) => { setAccessSecret(v); setConnStatus(null); setConnMsg(''); }} placeholder="Ex: a1b2c3d4e5f6..." mono secret />
               </div>
 
               {/* Região */}
@@ -207,7 +207,7 @@ export default function TuyaSettings() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 pt-3 pb-2">Região do servidor</p>
                 <div className="grid grid-cols-2 gap-2 px-4 pb-4">
                   {(Object.keys(REGION_LABELS) as Region[]).map(r => (
-                    <button key={r} onClick={() => setRegion(r)}
+                    <button key={r} onClick={() => { setRegion(r); setConnStatus(null); setConnMsg(''); }}
                       className={`px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                         region === r
                           ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-600 dark:text-emerald-400'

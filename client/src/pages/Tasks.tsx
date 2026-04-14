@@ -15,7 +15,7 @@ import { useState } from "react";
 export default function Tasks() {
   const { data: tasks, isLoading } = trpc.tasks.getCurrentWeekTasks.useQuery();
   const utils = trpc.useUtils();
-  const [selectedTent, setSelectedTent] = useState<string>("all");
+  const [selectedTent, setSelectedTent] = useState<number | "all">("all");
   const [showOnlyPending, setShowOnlyPending] = useState(false);
   const [deleteTaskConfirm, setDeleteTaskConfirm] = useState<{ open: boolean; taskId: number | null }>({
     open: false, taskId: null
@@ -70,8 +70,8 @@ export default function Tasks() {
 
   // Filter tasks
   const filteredTasks = tasks?.filter((task) => {
-    // Filter by tent
-    if (selectedTent !== "all" && !task.tentName.includes(selectedTent)) {
+    // Filter by tent (using tentId for reliable matching)
+    if (selectedTent !== "all" && task.tentId !== selectedTent) {
       return false;
     }
     // Filter by pending status
@@ -95,8 +95,10 @@ export default function Tasks() {
   const completedTasks = filteredTasks.filter((t) => t.isDone).length || 0;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  // Get unique tent names for filter buttons
-  const tentNames = Array.from(new Set(tasks?.map((t) => t.tentName) || []));
+  // Get unique tents (id + name) for filter buttons
+  const uniqueTents = Array.from(
+    new Map((tasks || []).map((t) => [t.tentId, { id: t.tentId, name: t.tentName }])).values()
+  );
 
   return (
     <>
@@ -148,19 +150,16 @@ export default function Tasks() {
                   >
                     Todas
                   </Button>
-                  {tentNames.map((tentName) => {
-                    const tentLetter = tentName.includes("A") ? "A" : tentName.includes("B") ? "B" : "C";
-                    return (
-                      <Button
-                        key={tentName}
-                        variant={selectedTent === tentLetter ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedTent(tentLetter)}
-                      >
-                        Estufa {tentLetter}
-                      </Button>
-                    );
-                  })}
+                  {uniqueTents.map((tent) => (
+                    <Button
+                      key={tent.id}
+                      variant={selectedTent === tent.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedTent(tent.id)}
+                    >
+                      {tent.name}
+                    </Button>
+                  ))}
                 </div>
               </div>
               

@@ -164,6 +164,15 @@ export default function PlantTrichomesTab({
       return;
     }
 
+    // Validate percentage sum ≤ 100
+    const clearVal = clearPercent ? parseInt(clearPercent) : 0;
+    const cloudyVal = cloudyPercent ? parseInt(cloudyPercent) : 0;
+    const amberVal = amberPercent ? parseInt(amberPercent) : 0;
+    if (clearVal + cloudyVal + amberVal > 100) {
+      toast.error("A soma das porcentagens não pode ultrapassar 100%");
+      return;
+    }
+
     // Foto já foi enviada ao S3 via /api/upload/image — apenas passa a URL
     createTrichomeLog.mutate({
       plantId,
