@@ -580,7 +580,20 @@ const tuyaRouter = router({
       const cfg = cfgRows[0];
 
       const { readTuyaDeviceStatus } = await import("./lib/tuya");
-      const reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+      let reading: { tempC: number | null; rhPct: number | null };
+      try {
+        reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        // "permission deny" → orientar o usuário a vincular o dispositivo no portal
+        if (msg.includes("permission deny") || msg.includes("1010")) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Dispositivo sem permissão. Acesse iot.tuya.com → Devices → Link App Account e vincule sua conta SmartLife.",
+          });
+        }
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Sensor: ${msg}` });
+      }
 
       // Upsert leitura mais recente
       await pool.execute(
