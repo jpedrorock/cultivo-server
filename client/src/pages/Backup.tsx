@@ -6,11 +6,17 @@ import { AlertCircle, Download, Upload, Database, Shield, AlertTriangle } from "
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+interface BackupFile {
+  version: string;
+  exportDate?: string;
+  data: Record<string, unknown[]>;
+}
+
 export default function Backup() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importConfirm, setImportConfirm] = useState(false);
-  const [pendingFile, setPendingFile] = useState<any>(null);
+  const [pendingFile, setPendingFile] = useState<BackupFile | null>(null);
 
   const exportBackup = trpc.backup.export.useQuery(undefined, {
     enabled: false,

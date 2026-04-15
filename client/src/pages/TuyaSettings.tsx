@@ -198,7 +198,7 @@ export default function TuyaSettings() {
 
               {/* Credenciais */}
               <div className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden">
-                <CredentialField label="Access ID" value={accessId} onChange={(v) => { setAccessId(v); setConnStatus(null); setConnMsg(''); }} placeholder="Ex: 9gk3qwi8nf2mxxx" mono />
+                <CredentialField label="Access ID" value={accessId} onChange={(v) => { setAccessId(v); setConnStatus(null); setConnMsg(''); }} placeholder="Ex: 9gk3qwi8nf2mxxx" mono secret />
                 <CredentialField label="Access Secret" value={accessSecret} onChange={(v) => { setAccessSecret(v); setConnStatus(null); setConnMsg(''); }} placeholder="Ex: a1b2c3d4e5f6..." mono secret />
               </div>
 

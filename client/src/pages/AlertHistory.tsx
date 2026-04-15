@@ -78,9 +78,9 @@ export default function AlertHistory() {
               </Link>
             </Button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold">Histórico de Alertas</h1>
+              <h1 className="text-2xl font-bold">Histórico de Notificações</h1>
               <p className="text-sm text-muted-foreground">
-                {filteredAlerts.length} notificação(ões) enviada(s)
+                {filteredAlerts.length} notificação(ões) push enviada(s)
               </p>
             </div>
             <div className="flex items-center gap-2">

@@ -6,6 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { Bell, BellOff, Check, Smartphone, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+
+const LS_KEY = "notificationSettings";
 import {
   isNotificationSupported,
   getNotificationPermission,
@@ -20,6 +22,11 @@ export default function NotificationSettings() {
   const [isTesting, setIsTesting] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [pushRegistered, setPushRegistered] = useState(false);
+  const [isSavingAlerts, setIsSavingAlerts] = useState(false);
+
+  // Dados das estufas para propagar alertsEnabled globalmente
+  const { data: tents = [] } = trpc.tents.list.useQuery();
+  const updateAlertSettings = trpc.alerts.updateSettings.useMutation();
 
   // Buscar chave pública VAPID do servidor
   const { data: vapidData } = trpc.push.getVapidKey.useQuery(undefined, {
@@ -34,7 +41,7 @@ export default function NotificationSettings() {
 
   // Carregar configurações do localStorage
   useEffect(() => {
-    const savedSettings = localStorage.getItem('notificationSettings');
+    const savedSettings = localStorage.getItem(LS_KEY);
     if (savedSettings) {
       try {
         const settings = JSON.parse(savedSettings);
@@ -120,10 +127,28 @@ export default function NotificationSettings() {
     }
   };
 
-  const handleSaveSettings = () => {
-    const settings = { alertsEnabled };
-    localStorage.setItem('notificationSettings', JSON.stringify(settings));
-    toast.success('Configurações salvas!');
+  const handleSaveSettings = async () => {
+    // 1. Persistir no localStorage (imediato, mesmo dispositivo)
+    localStorage.setItem(LS_KEY, JSON.stringify({ alertsEnabled }));
+
+    // 2. Propagar para todas as estufas no servidor (persiste cross-device)
+    if (tents.length > 0) {
+      setIsSavingAlerts(true);
+      try {
+        await Promise.all(
+          tents.map((tent) =>
+            updateAlertSettings.mutateAsync({ tentId: tent.id, alertsEnabled })
+          )
+        );
+        toast.success('Configurações salvas em todos os dispositivos!');
+      } catch {
+        toast.success('Configurações salvas localmente.');
+      } finally {
+        setIsSavingAlerts(false);
+      }
+    } else {
+      toast.success('Configurações salvas!');
+    }
   };
 
   const handleToggleAlerts = (enabled: boolean) => {
@@ -293,9 +318,9 @@ export default function NotificationSettings() {
 
       {/* Salvar */}
       <div className="flex justify-end">
-        <Button onClick={handleSaveSettings} size="lg">
+        <Button onClick={handleSaveSettings} size="lg" disabled={isSavingAlerts}>
           <Check className="w-4 h-4 mr-2" />
-          Salvar Configurações
+          {isSavingAlerts ? "Salvando…" : "Salvar Configurações"}
         </Button>
       </div>
     </div>
