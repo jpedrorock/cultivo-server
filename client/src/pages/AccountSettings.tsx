@@ -64,28 +64,34 @@ function ProfileCard() {
   const [newPassword, setNewPassword] = useState('');
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
-  const [feedback, setFeedback] = useState('');
-  const [error, setError] = useState('');
+  const [nameFeedback, setNameFeedback] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [pwFeedback, setPwFeedback] = useState('');
+  const [pwError, setPwError] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const updateName = trpc.profile.updateName.useMutation({
-    onSuccess: () => { setEditingName(false); setFeedback('Nome atualizado!'); setTimeout(() => setFeedback(''), 3000); },
-    onError: (e) => setError(e.message),
+    onSuccess: () => {
+      setEditingName(false);
+      setNameFeedback('Nome atualizado!');
+      setTimeout(() => setNameFeedback(''), 3000);
+    },
+    onError: (e) => setNameError(e.message),
   });
 
   const updatePassword = trpc.profile.updatePassword.useMutation({
     onSuccess: () => {
       setShowPasswordForm(false);
       setCurrentPassword(''); setNewPassword('');
-      setFeedback('Senha atualizada!');
-      setTimeout(() => setFeedback(''), 3000);
+      setPwFeedback('Senha atualizada!');
+      setTimeout(() => setPwFeedback(''), 3000);
     },
-    onError: (e) => setError(e.message),
+    onError: (e) => setPwError(e.message),
   });
 
   const deleteAccount = trpc.profile.deleteAccount.useMutation({
     onSuccess: async () => { await logout(); setLocation('/login'); },
-    onError: (e) => setError(e.message),
+    onError: (e) => setNameError(e.message),
   });
 
   const handleDeleteAccount = () => {
@@ -102,8 +108,8 @@ function ProfileCard() {
         <CardDescription className="text-xs sm:text-sm">{user?.email}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {feedback && <p className="text-sm text-emerald-600 font-medium">{feedback}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {nameFeedback && <p className="text-sm text-emerald-600 font-medium">{nameFeedback}</p>}
+        {nameError && <p className="text-sm text-destructive">{nameError}</p>}
 
         {editingName ? (
           <div className="flex gap-2">
@@ -120,7 +126,7 @@ function ProfileCard() {
           </div>
         ) : (
           <button
-            onClick={() => { setName(user?.name ?? ''); setEditingName(true); setError(''); }}
+            onClick={() => { setName(user?.name ?? ''); setEditingName(true); setNameError(''); }}
             className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm"
           >
             <span className="text-muted-foreground">Nome</span>
@@ -146,19 +152,21 @@ function ProfileCard() {
               </button>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => { setError(''); updatePassword.mutate({ currentPassword, newPassword }); }} disabled={updatePassword.isPending}>Salvar</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setShowPasswordForm(false); setError(''); }}>Cancelar</Button>
+              <Button size="sm" onClick={() => { setPwError(''); updatePassword.mutate({ currentPassword, newPassword }); }} disabled={updatePassword.isPending}>Salvar</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowPasswordForm(false); setPwError(''); }}>Cancelar</Button>
             </div>
           </div>
         ) : (
           <button
-            onClick={() => { setShowPasswordForm(true); setError(''); }}
+            onClick={() => { setShowPasswordForm(true); setPwError(''); }}
             className="flex items-center justify-between w-full px-3 py-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-sm"
           >
             <span className="text-muted-foreground">Senha</span>
             <span className="text-xs text-emerald-600 font-medium">alterar</span>
           </button>
         )}
+        {pwFeedback && <p className="text-sm text-emerald-600 font-medium">{pwFeedback}</p>}
+        {pwError && <p className="text-sm text-destructive">{pwError}</p>}
 
         <Button variant="outline" className="w-full justify-start gap-2" onClick={logout}>
           <LogOut className="w-4 h-4" />

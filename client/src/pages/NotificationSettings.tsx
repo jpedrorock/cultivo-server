@@ -85,7 +85,15 @@ export default function NotificationSettings() {
           toast.success('Push Web registrado! Notificações funcionarão em background.');
         }
       } else if (result === 'denied') {
-        toast.error('Permissão negada. Ative nas configurações do navegador.');
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+          toast.error(
+            'Permissão negada. No iPhone, adicione o app à Tela de Início via Safari (botão Compartilhar → Adicionar à Tela de Início) e tente novamente.',
+            { duration: 8000 }
+          );
+        } else {
+          toast.error('Permissão negada. Ative nas configurações do navegador.');
+        }
       }
     } finally {
       setIsRegistering(false);
@@ -203,7 +211,11 @@ export default function NotificationSettings() {
               <p className="font-medium">Status:</p>
               <p className="text-sm text-muted-foreground">
                 {permission === 'granted' && '✅ Ativado'}
-                {permission === 'denied' && '❌ Negado — ative nas configurações do navegador'}
+                {permission === 'denied' && (
+                  /iPhone|iPad|iPod/.test(navigator.userAgent)
+                    ? '❌ Negado — adicione à Tela de Início via Safari e tente novamente'
+                    : '❌ Negado — ative nas configurações do navegador'
+                )}
                 {permission === 'default' && '⏸️ Não configurado'}
               </p>
             </div>

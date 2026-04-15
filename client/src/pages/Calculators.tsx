@@ -44,7 +44,7 @@ para evitar acúmulo de sais.
   downloadTextFile(content, `receita-rega-${Date.now()}.txt`);
 }
 
-function exportFertilizationRecipe(waterVolume: string, targetEC: string, _unused: string, result: { calciumNitrate: number; potassiumNitrate: number; mkp: number; magnesiumSulfate: number; micronutrients: number; totalPPM: number }) {
+function exportFertilizationRecipe(waterVolume: string, targetEC: string, result: { calciumNitrate: number; potassiumNitrate: number; mkp: number; magnesiumSulfate: number; micronutrients: number; totalPPM: number }) {
   const content = `
 ===========================================
    RECEITA DE FERTILIZAÇÃO - APP CULTIVO
@@ -133,6 +133,7 @@ function downloadTextFile(content: string, filename: string) {
 }
 
 import { lazy, Suspense } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { useRoute, useLocation, Redirect } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
@@ -199,9 +200,11 @@ export default function Calculators() {
       <main className="container py-4 md:py-8">
         {calculatorId === "watering-runoff" && <WateringRunoffCalculator />}
         {calculatorId === "irrigation-schedule" && (
-          <Suspense fallback={<CalculatorSkeleton />}>
-            <IrrigationScheduleCalculator />
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense fallback={<CalculatorSkeleton />}>
+              <IrrigationScheduleCalculator />
+            </Suspense>
+          </ErrorBoundary>
         )}
         {calculatorId === "lux-ppfd" && <LuxPPFDCalculator />}
         {calculatorId === "ppm-ec" && <PPMECConverter />}

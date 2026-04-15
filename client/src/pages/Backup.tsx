@@ -25,8 +25,8 @@ export default function Backup() {
   const importBackup = trpc.backup.import.useMutation({
     onSuccess: () => {
       toast.success("Backup restaurado com sucesso!");
-      // Recarregar a página para atualizar todos os dados
-      setTimeout(() => window.location.reload(), 1500);
+      // Navegar para raiz — força busca limpa sem usar cache SPA
+      setTimeout(() => { window.location.href = "/"; }, 1500);
     },
     onError: (error) => {
       toast.error(`Erro ao importar backup: ${error.message}`);

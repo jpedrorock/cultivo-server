@@ -253,6 +253,7 @@ export default function Tasks() {
                             checked={task.isDone}
                             onCheckedChange={() => handleToggleTask(task.id, task.isDone)}
                             disabled={task.isDone || task.id === 0}
+                            title={task.id === 0 ? "Tarefa gerada automaticamente — não pode ser marcada individualmente" : undefined}
                             className="mt-1"
                           />
                           <div className="flex-1">
@@ -270,6 +271,11 @@ export default function Tasks() {
                                 <Circle className="w-5 h-5 text-gray-400 flex-shrink-0" />
                               )}
                             </div>
+                            {task.id === 0 && (
+                              <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground/60">
+                                Gerada automaticamente
+                              </span>
+                            )}
                             {task.description && (
                               <p className={`text-sm mt-1 ${task.isDone ? "text-gray-400" : "text-muted-foreground"}`}>
                                 {task.description}

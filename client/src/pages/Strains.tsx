@@ -26,6 +26,7 @@ export default function Strains() {
   });
 
   const { data: strains, isLoading } = trpc.strains.list.useQuery();
+  const { data: allPlants = [] } = trpc.plants.list.useQuery({ status: "ACTIVE" });
   const utils = trpc.useUtils();
 
   const createStrain = trpc.strains.create.useMutation({
@@ -106,6 +107,15 @@ export default function Strains() {
   };
 
   const handleDelete = (id: number, name: string) => {
+    const activePlants = allPlants.filter(
+      (p: any) => p.strainId === id && p.status === "ACTIVE"
+    );
+    if (activePlants.length > 0) {
+      toast.error(
+        `Não é possível excluir "${name}" — há ${activePlants.length} planta${activePlants.length > 1 ? "s ativas" : " ativa"} usando esta cepa.`
+      );
+      return;
+    }
     setDeleteConfirm({ open: true, id, name });
   };
 
