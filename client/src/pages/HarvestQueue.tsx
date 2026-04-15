@@ -67,10 +67,10 @@ export default function HarvestQueue() {
       setMoveToDryingOpen(false);
       setSelectedTentId("");
       setSelectedPlantIds([]);
-      utils.harvestQueue.list.refetch();
-      utils.tents.list.refetch();
-      utils.cycles.listActive.refetch();
-      utils.cycles.getActiveCyclesWithProgress.refetch();
+      utils.harvestQueue.list.invalidate();
+      utils.tents.list.invalidate();
+      utils.cycles.listActive.invalidate();
+      utils.cycles.getActiveCyclesWithProgress.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -81,7 +81,7 @@ export default function HarvestQueue() {
       setDiscardOpen(false);
       setDiscardReason("");
       setDiscardPlantIds([]);
-      utils.harvestQueue.list.refetch();
+      utils.harvestQueue.list.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });

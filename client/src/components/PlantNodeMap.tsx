@@ -132,6 +132,8 @@ const DEFAULT_VP: VP = { x: 0, y: 0, scale: 1 };
 interface Props {
   plantId?:            number;
   compact?:            boolean;
+  /** Callback chamado quando o usuário toca/clica no mapa em modo compact — permite abrir o sandbox */
+  onCompactTap?:       () => void;
   /** Nós estáticos para visualização de snapshot (sem DB, sem interação) */
   staticNodes?:        PlantGraphNode[];
   /** Ref populado pelo PlantNodeMap com os nós atuais (para capturar snapshot ao salvar) */
@@ -253,7 +255,7 @@ function NodeActionMenu({
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PlantNodeMap({
-  plantId, compact = false, staticNodes, nodeSnapshotRef,
+  plantId, compact = false, onCompactTap, staticNodes, nodeSnapshotRef,
   cancelSaveRef, onTechniqueApplied, onResetStructure,
 }: Props) {
   // Modo estático: só renderiza o snapshot, sem DB, sem interação
@@ -961,13 +963,13 @@ export default function PlantNodeMap({
               data-node-id={node.id}
               onClick={e => {
                 e.stopPropagation();
-                if (compact) return;
+                if (compact) { onCompactTap?.(); return; }
                 if (gestureRef.current.moved) return;
                 if (nodeGestureRef.current?.moved) return;
                 if (selectedId === node.id) { setSelectedId(null); return; }
                 setSelectedId(node.id);
               }}
-              style={{ cursor: compact ? 'default' : 'move' }}
+              style={{ cursor: compact ? (onCompactTap ? 'pointer' : 'default') : 'move' }}
             >
               {isTopBud ? (
                 <>

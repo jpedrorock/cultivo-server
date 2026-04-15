@@ -64,6 +64,8 @@ export function PromotePhaseDialog({
       utils.tents.getById.invalidate({ id: tentId });
       utils.tents.list.invalidate();
       utils.alerts.list.invalidate();
+      utils.weeklyTargets.getTargetsByTent.invalidate();
+      utils.weeklyTargets.getByStrain.invalidate();
       if (data.movedPlants) {
         utils.plants.list.invalidate();
       }

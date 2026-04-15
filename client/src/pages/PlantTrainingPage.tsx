@@ -224,6 +224,7 @@ export default function PlantTrainingPage() {
               <PlantNodeMap
                 plantId={plantId}
                 compact
+                onCompactTap={openSandbox}
                 onTechniqueApplied={handleTechniqueApplied}
                 onResetStructure={handleResetStructure}
               />

@@ -193,7 +193,7 @@ export default function PlantTrainingSummary({ plantId }: Props) {
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
         </div>
-        <PlantNodeMap plantId={plantId} compact />
+        <PlantNodeMap plantId={plantId} compact onCompactTap={openSandbox} />
         <button
           onClick={openSandbox}
           className="w-full py-2 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors flex items-center justify-center gap-1.5 border-t border-border/20"
