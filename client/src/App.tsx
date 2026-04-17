@@ -74,7 +74,6 @@ function Router() {
 
         <Route path={"/strains"} component={ManageStrains} />
         <Route path={"/manage-strains"} component={ManageStrains} />
-        <Route path={"/tasks"} component={Tarefas} />
         <Route path={"/tarefas"} component={Tarefas} />
         <Route path={"/calculators"} component={CalculatorMenu} />
         <Route path={"/calculators/:id"} component={Calculators} />
