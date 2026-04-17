@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRoute, useLocation, Link } from 'wouter';
-import { ArrowLeft, Bot, Send, ImagePlus, X, Leaf, AlertCircle, Trash2, Sparkles, ChevronRight, Images } from 'lucide-react';
+import { ArrowLeft, Bot, Send, ImagePlus, X, Leaf, AlertCircle, Trash2, Sparkles, ChevronRight, Images, Copy, Check } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { PageTransition } from '@/components/PageTransition';
 import { TentIcon } from '@/components/TentIcon';
@@ -15,6 +15,38 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   imagePreview?: string;
+}
+
+// ─── Cost estimate ────────────────────────────────────────────────────────────
+
+// Cost per 1M tokens (combined input+output approximation) in USD
+const MODEL_COSTS: Record<string, number> = {
+  'gemini-2.0-flash-lite':              0.10,
+  'gemini-2.5-flash-preview-04-17':     0.40,
+  'gemini-2.5-pro-preview-03-25':       2.00,
+  'deepseek-chat':                      0.50,
+  'deepseek-reasoner':                  1.00,
+  'gpt-4o-mini':                        0.20,
+  'gpt-4o':                             2.50,
+  'claude-haiku-4-5-20251001':          0.80,
+  'claude-sonnet-4-6':                  3.00,
+  'moonshot-v1-8k':                     0.30,
+  'moonshot-v1-32k':                    1.00,
+};
+
+function estimateSessionCost(msgs: Message[], model?: string | null) {
+  if (!msgs.length) return null;
+  const totalChars = msgs.reduce((s, m) => s + m.content.length, 0);
+  const tokens = Math.round(totalChars / 4);
+  const costPer1M = MODEL_COSTS[model ?? ''] ?? 0.50;
+  const costUSD = (tokens / 1_000_000) * costPer1M;
+  return { tokens, costUSD };
+}
+
+function formatCost(usd: number) {
+  if (usd < 0.001) return `< $0.001`;
+  if (usd < 0.01)  return `~$${(usd * 1000).toFixed(1)}m`; // millidollars notation
+  return `~$${usd.toFixed(3)}`;
 }
 
 // ─── Quick suggestions ────────────────────────────────────────────────────────
@@ -57,27 +89,47 @@ function SimpleMarkdown({ text }: { text: string }) {
 
 function ChatBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user';
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 group`}>
       {!isUser && (
         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 mr-2 mt-0.5">
           <Bot className="w-3.5 h-3.5 text-white" />
         </div>
       )}
-      <div
-        className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm ${
-          isUser
-            ? 'bg-emerald-600 text-white rounded-tr-sm'
-            : 'bg-card border border-border text-foreground rounded-tl-sm'
-        }`}
-      >
-        {msg.imagePreview && (
-          <img src={msg.imagePreview} alt="foto" className="rounded-lg mb-2 max-h-48 object-cover w-full" />
-        )}
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{msg.content}</p>
-        ) : (
-          <SimpleMarkdown text={msg.content} />
+      <div className="flex flex-col items-start max-w-[80%]">
+        <div
+          className={`rounded-2xl px-3.5 py-2.5 text-sm ${
+            isUser
+              ? 'bg-emerald-600 text-white rounded-tr-sm'
+              : 'bg-card border border-border text-foreground rounded-tl-sm'
+          }`}
+        >
+          {msg.imagePreview && (
+            <img src={msg.imagePreview} alt="foto" className="rounded-lg mb-2 max-h-48 object-cover w-full" />
+          )}
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{msg.content}</p>
+          ) : (
+            <SimpleMarkdown text={msg.content} />
+          )}
+        </div>
+        {!isUser && (
+          <button
+            onClick={handleCopy}
+            className="mt-1 ml-1 flex items-center gap-1 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors opacity-0 group-hover:opacity-100"
+          >
+            {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+            {copied ? 'Copiado!' : 'Copiar'}
+          </button>
         )}
       </div>
     </div>
@@ -587,6 +639,20 @@ export default function PlantChat() {
               <h1 className="text-sm font-bold text-foreground leading-tight">IA Especialista</h1>
               <p className="text-xs text-muted-foreground">Cannabis Indoor</p>
             </div>
+
+            {/* Cost estimate badge */}
+            {hasMessages && (() => {
+              const est = estimateSessionCost(messages, aiSettings?.model);
+              if (!est) return null;
+              return (
+                <span
+                  title={`~${est.tokens.toLocaleString()} tokens nesta sessão`}
+                  className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground/60 border border-border/40 shrink-0 select-none"
+                >
+                  {formatCost(est.costUSD)}
+                </span>
+              );
+            })()}
 
             {/* Clear history */}
             {hasMessages && (

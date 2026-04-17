@@ -62,9 +62,22 @@ function ProfileCard() {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [nameFeedback, setNameFeedback] = useState('');
+
+  // Password complexity
+  const pwReqs = {
+    length:  newPassword.length >= 8,
+    upper:   /[A-Z]/.test(newPassword),
+    lower:   /[a-z]/.test(newPassword),
+    digit:   /[0-9]/.test(newPassword),
+    special: /[^A-Za-z0-9]/.test(newPassword),
+  };
+  const pwScore = Object.values(pwReqs).filter(Boolean).length; // 0-5
+  const pwStrengthLabel = pwScore <= 1 ? 'Fraca' : pwScore <= 2 ? 'Razoável' : pwScore <= 3 ? 'Boa' : 'Forte';
+  const pwStrengthColor = pwScore <= 1 ? 'bg-destructive' : pwScore <= 2 ? 'bg-amber-500' : pwScore <= 3 ? 'bg-yellow-400' : 'bg-emerald-500';
   const [nameError, setNameError] = useState('');
   const [pwFeedback, setPwFeedback] = useState('');
   const [pwError, setPwError] = useState('');
@@ -82,7 +95,7 @@ function ProfileCard() {
   const updatePassword = trpc.profile.updatePassword.useMutation({
     onSuccess: () => {
       setShowPasswordForm(false);
-      setCurrentPassword(''); setNewPassword('');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       setPwFeedback('Senha atualizada!');
       setTimeout(() => setPwFeedback(''), 3000);
     },
@@ -146,14 +159,59 @@ function ProfileCard() {
             </div>
             <div className="relative">
               <input type={showNew ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                placeholder="Nova senha (mín. 6 caracteres)" className="w-full px-3 py-2 pr-9 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-emerald-500" />
+                placeholder="Nova senha (mín. 8 caracteres)" className="w-full px-3 py-2 pr-9 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-emerald-500" />
               <button onClick={() => setShowNew(!showNew)} className="absolute right-2.5 top-2.5 text-muted-foreground">
                 {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {newPassword.length > 0 && (
+              <div className="space-y-2">
+                {/* Strength bar */}
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-0.5 flex-1">
+                    {[1,2,3,4,5].map(i => (
+                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= pwScore ? pwStrengthColor : 'bg-muted'}`} />
+                    ))}
+                  </div>
+                  <span className={`text-[10px] font-medium w-14 text-right ${pwScore <= 1 ? 'text-destructive' : pwScore <= 2 ? 'text-amber-500' : pwScore <= 3 ? 'text-yellow-500' : 'text-emerald-500'}`}>
+                    {pwStrengthLabel}
+                  </span>
+                </div>
+                {/* Requirements checklist */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  {([
+                    ['length',  '8+ caracteres'],
+                    ['upper',   'Maiúscula (A-Z)'],
+                    ['lower',   'Minúscula (a-z)'],
+                    ['digit',   'Número (0-9)'],
+                    ['special', 'Símbolo (!@#…)'],
+                  ] as [keyof typeof pwReqs, string][]).map(([key, label]) => (
+                    <span key={key} className={`flex items-center gap-1 text-[10px] ${pwReqs[key] ? 'text-emerald-500' : 'text-muted-foreground/60'}`}>
+                      {pwReqs[key] ? '✓' : '·'} {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="relative">
+              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Confirmar nova senha"
+                className={`w-full px-3 py-2 pr-9 text-sm rounded-lg border bg-card focus:outline-none ${confirmPassword && confirmPassword !== newPassword ? 'border-destructive focus:border-destructive' : 'border-border focus:border-emerald-500'}`}
+              />
+              {confirmPassword && confirmPassword === newPassword && (
+                <span className="absolute right-2.5 top-2.5 text-emerald-500 text-xs">✓</span>
+              )}
+            </div>
+            {confirmPassword && confirmPassword !== newPassword && (
+              <p className="text-xs text-destructive">As senhas não coincidem</p>
+            )}
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => { setPwError(''); updatePassword.mutate({ currentPassword, newPassword }); }} disabled={updatePassword.isPending}>Salvar</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setShowPasswordForm(false); setPwError(''); }}>Cancelar</Button>
+              <Button size="sm" onClick={() => {
+                if (newPassword.length < 8) { setPwError('A senha deve ter pelo menos 8 caracteres'); return; }
+                if (newPassword !== confirmPassword) { setPwError('As senhas não coincidem'); return; }
+                setPwError(''); updatePassword.mutate({ currentPassword, newPassword });
+              }} disabled={updatePassword.isPending || (!!confirmPassword && confirmPassword !== newPassword)}>Salvar</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowPasswordForm(false); setPwError(''); setConfirmPassword(''); }}>Cancelar</Button>
             </div>
           </div>
         ) : (

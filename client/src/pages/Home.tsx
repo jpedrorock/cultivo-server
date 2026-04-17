@@ -78,6 +78,13 @@ export default function Home() {
   const { data: activeCycles } = trpc.cycles.listActive.useQuery();
   const { data: notifSettings, refetch: refetchNotifSettings } = trpc.alerts.getNotificationSettings.useQuery();
   const systemPaused = notifSettings?.systemPaused ?? false;
+
+  // Global unread alert count (all tents) — for the top banner
+  const { data: globalAlertCount } = trpc.alerts.getNewCount.useQuery(
+    {},
+    { staleTime: 2 * 60 * 1000 }
+  );
+  const totalNewAlerts = globalAlertCount != null ? Number(globalAlertCount) : 0;
   const toggleSystemPaused = trpc.alerts.toggleSystemPaused.useMutation({
     onSuccess: (data) => {
       refetchNotifSettings();
@@ -488,6 +495,23 @@ export default function Home() {
               {pendingLogsCount} registro{pendingLogsCount > 1 ? 's' : ''} salvo{pendingLogsCount > 1 ? 's' : ''} offline — aguardando conexão para sincronizar
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Banner de alertas novos */}
+      {totalNewAlerts > 0 && !systemPaused && (
+        <div className="container pt-4">
+          <Link href="/alerts">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/15 transition-colors cursor-pointer">
+              <Bell className="w-4 h-4 flex-shrink-0 animate-pulse" />
+              <span className="text-sm font-medium flex-1">
+                {totalNewAlerts === 1
+                  ? "1 alerta novo — toque para ver"
+                  : `${totalNewAlerts} alertas novos — toque para ver`}
+              </span>
+              <ArrowRight className="w-4 h-4 flex-shrink-0 opacity-60" />
+            </div>
+          </Link>
         </div>
       )}
 
@@ -1169,9 +1193,9 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 const diffH = Math.floor(diffMs / (1000 * 60 * 60));
                 const diffMin = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 const timeText = diffH === 0 ? `há ${diffMin}min` : `há ${diffH}h`;
-                const pill = diffH < 6
+                const pill = diffH < 24
                   ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                  : diffH < 20
+                  : diffH < 48
                   ? "border-amber-400/40 text-amber-400 bg-amber-500/10"
                   : "border-red-500/40 text-red-400 bg-red-500/10";
                 return (

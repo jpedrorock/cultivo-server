@@ -97,6 +97,7 @@ export const strains = mysqlTable("strains", {
   isActive: boolean("isActive").default(true).notNull(),
   /** null = strain global (visível para todos); preenchido = privada do grupo */
   groupId: int("groupId"),
+  origin: mysqlEnum("origin", ["FEMINIZED", "AUTOFLOWER", "CLONE"]).default("FEMINIZED"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -356,6 +357,26 @@ export const taskInstances = mysqlTable(
 
 export type TaskInstance = typeof taskInstances.$inferSelect;
 export type InsertTaskInstance = typeof taskInstances.$inferInsert;
+
+/**
+ * Tarefas Avulsas (standalone tasks)
+ */
+export const standaloneTasks = mysqlTable("standaloneTasks", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tentId: int("tentId"),  // opcional
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  priority: mysqlEnum("priority", ["LOW", "MEDIUM", "HIGH"]).default("MEDIUM").notNull(),
+  dueDate: timestamp("dueDate"),
+  isDone: boolean("isDone").default(false).notNull(),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("standaloneUserIdx").on(table.userId),
+}));
+
+export type StandaloneTask = typeof standaloneTasks.$inferSelect;
 
 /**
  * Alertas

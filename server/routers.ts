@@ -20,6 +20,7 @@ import {
   weeklyTargets,
   taskInstances,
   taskTemplates,
+  standaloneTasks,
   tentAState,
   cloningEvents,
   alertSettings,
@@ -563,6 +564,27 @@ const tuyaRouter = router({
       };
     }),
 
+  /** Retorna a última leitura de todos os sensores (todas as estufas) */
+  getLatestReadingsAll: protectedProcedure.query(async ({ ctx }) => {
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT tsm.tentId, slr.tempC, slr.rhPct, slr.readAt
+       FROM tuyaSensorMappings tsm
+       INNER JOIN sensorLatestReadings slr ON slr.deviceId = tsm.deviceId AND slr.userId = tsm.userId
+       WHERE tsm.userId = ? AND tsm.enabled = 1`,
+      [ctx.user.id]
+    );
+    const result: Record<number, { tempC: number | null; rhPct: number | null; readAt: Date }> = {};
+    for (const r of rows) {
+      result[r.tentId] = {
+        tempC: r.tempC != null ? parseFloat(r.tempC) : null,
+        rhPct: r.rhPct != null ? parseFloat(r.rhPct) : null,
+        readAt: r.readAt instanceof Date ? r.readAt : new Date(r.readAt),
+      };
+    }
+    return result;
+  }),
+
   /** Força leitura imediata de todos os sensores desta estufa */
   readNow: protectedProcedure
     .input(z.object({ tentId: z.number() }))
@@ -950,6 +972,7 @@ export const appRouter = router({
           description: z.string().max(2000).optional(),
           vegaWeeks: z.number().min(1).max(12),
           floraWeeks: z.number().min(1).max(16),
+          origin: z.enum(["FEMINIZED", "AUTOFLOWER", "CLONE"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -977,6 +1000,7 @@ export const appRouter = router({
           vegaWeeks: z.number().min(1).max(12).optional(),
           floraWeeks: z.number().min(1).max(16).optional(),
           isActive: z.boolean().optional(),
+          origin: z.enum(["FEMINIZED", "AUTOFLOWER", "CLONE"]).optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -3406,6 +3430,7 @@ export const appRouter = router({
               isDone: false,
               completedAt: null,
               notes: null,
+              dueDate: startOfWeek,
             });
           } else {
             allTasks.push({
@@ -3419,6 +3444,7 @@ export const appRouter = router({
               isDone: existing[0].isDone,
               completedAt: existing[0].completedAt,
               notes: existing[0].notes,
+              dueDate: existing[0].occurrenceDate,
             });
           }
         }
@@ -3485,6 +3511,65 @@ export const appRouter = router({
         const [task] = await database.select({ tentId: taskInstances.tentId }).from(taskInstances).where(eq(taskInstances.id, input.taskId)).limit(1);
         if (task) await validateTentOwnership(task.tentId, ctx.user.groupId);
         await database.delete(taskInstances).where(eq(taskInstances.id, input.taskId));
+        return { success: true };
+      }),
+
+    // ── Standalone tasks ──────────────────────────────────────────────────────
+    listStandalone: protectedProcedure.query(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) throw new Error("Database not available");
+      return database
+        .select()
+        .from(standaloneTasks)
+        .where(eq(standaloneTasks.userId, ctx.user.id))
+        .orderBy(standaloneTasks.isDone, standaloneTasks.dueDate, standaloneTasks.createdAt);
+    }),
+    createStandalone: protectedProcedure
+      .input(z.object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional(),
+        priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
+        dueDate: z.date().optional(),
+        tentId: z.number().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await database.insert(standaloneTasks).values({
+          userId: ctx.user.id,
+          title: input.title,
+          description: input.description,
+          priority: input.priority ?? "MEDIUM",
+          dueDate: input.dueDate,
+          tentId: input.tentId,
+          isDone: false,
+        });
+        return { success: true };
+      }),
+    toggleStandalone: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        const [task] = await database.select().from(standaloneTasks).where(
+          and(eq(standaloneTasks.id, input.id), eq(standaloneTasks.userId, ctx.user.id))
+        ).limit(1);
+        if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+        const newIsDone = !task.isDone;
+        await database.update(standaloneTasks).set({
+          isDone: newIsDone,
+          completedAt: newIsDone ? new Date() : null,
+        }).where(eq(standaloneTasks.id, input.id));
+        return { success: true };
+      }),
+    deleteStandalone: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await database.delete(standaloneTasks).where(
+          and(eq(standaloneTasks.id, input.id), eq(standaloneTasks.userId, ctx.user.id))
+        );
         return { success: true };
       }),
   }),
@@ -4674,6 +4759,7 @@ export const appRouter = router({
       .input(z.object({
         plantId: z.number(),
         content: z.string(),
+        observationDate: z.date().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
@@ -4683,6 +4769,7 @@ export const appRouter = router({
         await database.insert(plantObservations).values({
           plantId: input.plantId,
           content: input.content,
+          ...(input.observationDate ? { observationDate: input.observationDate } : {}),
         });
 
         return { success: true };

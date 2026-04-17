@@ -54,15 +54,10 @@ export default function PlantPhotosTab({ plantId }: Props) {
   // Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
 
   const saveUrlMutation = trpc.plantPhotos.saveUrl.useMutation({
-    onSuccess: () => {
-      utils.plantPhotos.list.invalidate({ plantId });
-      toast.success("Foto salva!");
-    },
     onError: (e) => toast.error(`Erro ao salvar foto: ${e.message}`),
-    onSettled: () => { setUploading(false); setUploadPct(0); },
   });
 
   const deleteMutation = trpc.plantPhotos.delete.useMutation({
@@ -77,21 +72,36 @@ export default function PlantPhotosTab({ plantId }: Props) {
 
   // ── Upload ────────────────────────────────────────────────────────────────
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { toast.error("Selecione uma imagem válida"); return; }
-    if (file.size > 20 * 1024 * 1024) { toast.error("Imagem muito grande (máx. 20MB)"); return; }
+    if (files.length === 0) return;
+
+    const validFiles = files.filter(f => {
+      if (!f.type.startsWith("image/")) { toast.error(`"${f.name}" não é uma imagem`); return false; }
+      if (f.size > 20 * 1024 * 1024) { toast.error(`"${f.name}" é muito grande (máx. 20MB)`); return false; }
+      return true;
+    });
+    if (validFiles.length === 0) return;
+
     setUploading(true);
-    setUploadPct(0);
-    try {
-      const photoUrl = await uploadImage(file, (pct) => setUploadPct(pct));
-      saveUrlMutation.mutate({ plantId, photoUrl });
-    } catch (err: any) {
-      setUploading(false);
-      setUploadPct(0);
-      toast.error(err?.message ?? "Erro ao enviar foto");
+    setUploadProgress({ done: 0, total: validFiles.length });
+
+    let saved = 0;
+    for (const file of validFiles) {
+      try {
+        const photoUrl = await uploadImage(file);
+        await saveUrlMutation.mutateAsync({ plantId, photoUrl });
+        saved++;
+        setUploadProgress({ done: saved, total: validFiles.length });
+      } catch (err: any) {
+        toast.error(err?.message ?? `Erro ao enviar ${file.name}`);
+      }
     }
+
+    utils.plantPhotos.list.invalidate({ plantId });
+    if (saved > 0) toast.success(saved === 1 ? "Foto salva!" : `${saved} fotos salvas!`);
+    setUploading(false);
+    setUploadProgress(null);
   };
 
   // ── Zoom helpers ──────────────────────────────────────────────────────────
@@ -200,7 +210,7 @@ export default function PlantPhotosTab({ plantId }: Props) {
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
+        multiple
         className="hidden"
         onChange={handleFileChange}
       />
@@ -211,11 +221,11 @@ export default function PlantPhotosTab({ plantId }: Props) {
       >
         {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
         <span className="text-sm font-medium">
-          {uploading
-            ? uploadPct > 0 && uploadPct < 100
-              ? `Enviando… ${uploadPct}%`
-              : "Salvando foto…"
-            : "Tirar / escolher foto"}
+          {uploading && uploadProgress
+            ? `Enviando ${uploadProgress.done}/${uploadProgress.total}…`
+            : uploading
+            ? "Enviando…"
+            : "Tirar / escolher fotos"}
         </span>
       </button>
 
@@ -248,7 +258,7 @@ export default function PlantPhotosTab({ plantId }: Props) {
                 <button
                   key={photo.id}
                   onClick={() => openLightbox(idx)}
-                  className="aspect-square rounded-xl overflow-hidden bg-muted/40 active:scale-95 transition-transform"
+                  className="group relative aspect-square rounded-xl overflow-hidden bg-muted/40 active:scale-95 transition-transform"
                 >
                   <img
                     src={photo.photoUrl}
@@ -256,6 +266,15 @@ export default function PlantPhotosTab({ plantId }: Props) {
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 pointer-events-none">
+                    <span className="text-[10px] text-white/90 font-medium leading-tight">
+                      {format(new Date(photo.photoDate), "dd/MM/yy")}
+                    </span>
+                    {(photo as any).weekNumber && (
+                      <span className="text-[9px] text-white/60">Sem. {(photo as any).weekNumber}</span>
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -337,14 +356,21 @@ export default function PlantPhotosTab({ plantId }: Props) {
             )}
           </div>
 
-          {/* Bottom: date + description */}
+          {/* Bottom: date + week + description */}
           <div
             className="px-5 py-4 pb-8 shrink-0 text-center"
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-xs text-white/40">
-              {format(new Date(currentPhoto.photoDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-            </p>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <p className="text-xs text-white/40">
+                {format(new Date(currentPhoto.photoDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              </p>
+              {(currentPhoto as any).weekNumber && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50">
+                  Semana {(currentPhoto as any).weekNumber}
+                </span>
+              )}
+            </div>
             {currentPhoto.description && (
               <p className="text-sm text-white/70 mt-1">{currentPhoto.description}</p>
             )}

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast as showToast } from "sonner";
-import { Beaker, Printer, Loader2, ArrowLeft, Download, Droplets, Zap, FlaskConical, Sprout, Leaf, Flower2, Wrench, Wind, ClipboardList } from "lucide-react";
+import { Beaker, Printer, Loader2, ArrowLeft, Download, Droplets, Zap, FlaskConical, Sprout, Leaf, Flower2, Wrench, Wind, ClipboardList, ArrowUpDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageTransition } from "@/components/PageTransition";
 import { useLocation } from "wouter";
@@ -255,6 +255,173 @@ function generateReceiptImage(
   return canvas.toDataURL("image/png");
 }
 
+// ── Compare Tab ───────────────────────────────────────────────────────────────
+
+function RecipeSelector({ label, phase, week, onPhase, onWeek }: {
+  label: string;
+  phase: Phase;
+  week: number;
+  onPhase: (p: Phase) => void;
+  onWeek: (w: number) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-3 space-y-2 flex-1 min-w-0">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+      <Select value={phase} onValueChange={(v) => onPhase(v as Phase)}>
+        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="CLONING">Clonagem</SelectItem>
+          <SelectItem value="VEGA">Vegetativa</SelectItem>
+          <SelectItem value="FLORA">Floração</SelectItem>
+          <SelectItem value="MAINTENANCE">Manutenção</SelectItem>
+          <SelectItem value="DRYING">Secagem</SelectItem>
+        </SelectContent>
+      </Select>
+      <Select value={week.toString()} onValueChange={(v) => onWeek(Number(v))}>
+        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {[1,2,3,4,5,6,7,8].map(w => (
+            <SelectItem key={w} value={w.toString()}>Semana {w}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${
+        phase === 'VEGA' ? 'bg-emerald-500/15 text-emerald-400' :
+        phase === 'FLORA' ? 'bg-purple-500/15 text-purple-400' :
+        'bg-muted/40 text-muted-foreground'
+      }`}>{PHASE_NAMES[phase]} · Sem. {week}</p>
+    </div>
+  );
+}
+
+function CompareTab() {
+  const [leftPhase, setLeftPhase]   = useState<Phase>("VEGA");
+  const [leftWeek, setLeftWeek]     = useState(1);
+  const [rightPhase, setRightPhase] = useState<Phase>("FLORA");
+  const [rightWeek, setRightWeek]   = useState(1);
+  const [volume, setVolume]         = useState(10);
+
+  const leftProds  = getProductsByPhaseWeek(leftPhase,  leftWeek).map(p => ({ ...p, totalG: p.gPerLiter * volume }));
+  const rightProds = getProductsByPhaseWeek(rightPhase, rightWeek).map(p => ({ ...p, totalG: p.gPerLiter * volume }));
+
+  // Unified product name list
+  const allNames = Array.from(new Set([...leftProds.map(p => p.name), ...rightProds.map(p => p.name)]));
+
+  const getAmt = (prods: typeof leftProds, name: string) =>
+    prods.find(p => p.name === name)?.totalG ?? 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Config row */}
+      <Card>
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-primary" />
+            Configuração da comparação
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <div className="flex gap-3">
+            <RecipeSelector label="Receita A" phase={leftPhase}  week={leftWeek}  onPhase={setLeftPhase}  onWeek={setLeftWeek} />
+            <div className="flex items-center shrink-0 self-center mt-4">
+              <span className="text-lg font-bold text-muted-foreground/40">vs</span>
+            </div>
+            <RecipeSelector label="Receita B" phase={rightPhase} week={rightWeek} onPhase={setRightPhase} onWeek={setRightWeek} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="text-xs shrink-0 text-muted-foreground">Volume (L)</Label>
+            <Input
+              type="number"
+              min={1}
+              value={volume}
+              onChange={e => setVolume(Math.max(1, Number(e.target.value)))}
+              className="w-20 h-7 text-xs"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Comparison table */}
+      <Card>
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-sm">Comparativo de doses</CardTitle>
+          <CardDescription className="text-xs">
+            {PHASE_NAMES[leftPhase]} Sem.{leftWeek} vs {PHASE_NAMES[rightPhase]} Sem.{rightWeek} · {volume}L
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-0 pb-4">
+          {/* Header */}
+          <div className="grid grid-cols-[1fr,auto,auto,auto] gap-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-4 pb-1 border-b border-border/40">
+            <span>Produto</span>
+            <span className="w-14 text-right text-emerald-400">{PHASE_NAMES[leftPhase].slice(0,4)} S{leftWeek}</span>
+            <span className="w-14 text-right text-purple-400">{PHASE_NAMES[rightPhase].slice(0,4)} S{rightWeek}</span>
+            <span className="w-8 text-center">Δ</span>
+          </div>
+          <div className="divide-y divide-border/20">
+            {allNames.map(name => {
+              const L = getAmt(leftProds, name);
+              const R = getAmt(rightProds, name);
+              const diff = R - L;
+              const pct = L > 0 ? Math.round((diff / L) * 100) : R > 0 ? 100 : 0;
+              const colors = PRODUCT_COLORS[name] ?? DEFAULT_COLOR;
+              return (
+                <div key={name} className={`grid grid-cols-[1fr,auto,auto,auto] gap-0 items-center px-4 py-2.5 ${colors.bg}`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
+                    <span className="text-xs font-medium truncate">{name}</span>
+                  </div>
+                  <span className="w-14 text-right text-xs font-mono text-emerald-300">
+                    {L > 0 ? `${L.toFixed(1)}g` : '—'}
+                  </span>
+                  <span className="w-14 text-right text-xs font-mono text-purple-300">
+                    {R > 0 ? `${R.toFixed(1)}g` : '—'}
+                  </span>
+                  <span className="w-8 flex justify-center">
+                    {diff === 0 || (L === 0 && R === 0) ? (
+                      <Minus className="w-3 h-3 text-muted-foreground/40" />
+                    ) : diff > 0 ? (
+                      <span title={`+${pct}%`}><TrendingUp className="w-3 h-3 text-amber-400" /></span>
+                    ) : (
+                      <span title={`${pct}%`}><TrendingDown className="w-3 h-3 text-sky-400" /></span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* EC comparison */}
+          {(() => {
+            const calcEC = (prods: typeof leftProds) => {
+              let ppm = 0;
+              prods.forEach(p => {
+                const [n, ph, k] = p.npk.split("-").map(Number);
+                ppm += ((n + ph + k) / 100) * p.gPerLiter * 1000;
+                ppm += (p.ca / 100) * p.gPerLiter * 1000;
+                ppm += (p.mg / 100) * p.gPerLiter * 1000;
+              });
+              return Math.round((ppm / 700) * 100) / 100;
+            };
+            const ecL = calcEC(leftProds), ecR = calcEC(rightProds);
+            return (
+              <div className="mx-4 mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 px-3 py-2 text-center">
+                  <p className="text-[10px] text-emerald-400 font-semibold uppercase">EC Receita A</p>
+                  <p className="text-lg font-bold text-emerald-300">{ecL} <span className="text-xs font-normal">mS/cm</span></p>
+                </div>
+                <div className="rounded-lg bg-purple-500/8 border border-purple-500/20 px-3 py-2 text-center">
+                  <p className="text-[10px] text-purple-400 font-semibold uppercase">EC Receita B</p>
+                  <p className="text-lg font-bold text-purple-300">{ecR} <span className="text-xs font-normal">mS/cm</span></p>
+                </div>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Nutrients() {
   const [, setLocation] = useLocation();
   const [phase, setPhase] = useState<Phase>("VEGA");
@@ -412,6 +579,7 @@ export default function Nutrients() {
         <Tabs defaultValue="calculator" className="space-y-6">
           <TabsList>
             <TabsTrigger value="calculator" className="flex items-center gap-1.5"><FlaskConical className="w-4 h-4"/>Calculadora</TabsTrigger>
+            <TabsTrigger value="compare" className="flex items-center gap-1.5"><ArrowUpDown className="w-4 h-4"/>Comparar</TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-1.5"><ClipboardList className="w-4 h-4"/>Histórico</TabsTrigger>
           </TabsList>
 
@@ -556,6 +724,36 @@ export default function Nutrients() {
                   </div>
                 )}
 
+                {/* NPK Total */}
+                {calculatedProducts.length > 0 && (() => {
+                  let totalN = 0, totalP = 0, totalK = 0;
+                  calculatedProducts.forEach(prod => {
+                    const [n, p, k] = prod.npk.split("-").map(Number);
+                    totalN += (n / 100) * prod.gPerLiter * 1000;
+                    totalP += (p / 100) * prod.gPerLiter * 1000;
+                    totalK += (k / 100) * prod.gPerLiter * 1000;
+                  });
+                  return (
+                    <div className="rounded-xl border border-border/30 bg-muted/20 p-3 mt-1">
+                      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mb-2">NPK Total (ppm)</p>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-2 py-1.5">
+                          <p className="text-[10px] text-green-400 font-semibold uppercase">N</p>
+                          <p className="text-base font-bold text-green-300">{totalN.toFixed(0)}</p>
+                        </div>
+                        <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1.5">
+                          <p className="text-[10px] text-orange-400 font-semibold uppercase">P</p>
+                          <p className="text-base font-bold text-orange-300">{totalP.toFixed(0)}</p>
+                        </div>
+                        <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg px-2 py-1.5">
+                          <p className="text-[10px] text-violet-400 font-semibold uppercase">K</p>
+                          <p className="text-base font-bold text-violet-300">{totalK.toFixed(0)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <p className="text-xs text-muted-foreground text-center pt-1">
                   Ajustar pH para <strong>5.8 – 6.2</strong> após diluição
                 </p>
@@ -608,6 +806,11 @@ export default function Nutrients() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* ── COMPARAR ── */}
+          <TabsContent value="compare">
+            <CompareTab />
           </TabsContent>
 
           {/* ── HISTÓRICO ── */}

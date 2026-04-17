@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList, Share2 } from "lucide-react";
+import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList, Share2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -45,6 +45,9 @@ export default function HistoryTable() {
   const [offset, setOffset] = useState<number>(0);
   const [editingLog, setEditingLog] = useState<any | null>(null);
   const [deletingLogId, setDeletingLogId] = useState<number | null>(null);
+  const [turnFilter, setTurnFilter] = useState<"AM" | "PM" | "ALL">("ALL");
+  const [sortField, setSortField] = useState<'logDate' | 'tempC' | 'rhPct' | 'ppfd' | 'ph' | 'ec' | 'vpd'>('logDate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const { data: tents, isLoading: tentsLoading } = trpc.tents.list.useQuery();
 
@@ -240,8 +243,56 @@ export default function HistoryTable() {
     );
   }
 
+  // VPD helper: kPa
+  const calcVPD = (tempC: number | null | undefined, rhPct: number | null | undefined): string | null => {
+    if (tempC == null || rhPct == null) return null;
+    const t = parseFloat(String(tempC));
+    const rh = parseFloat(String(rhPct));
+    if (isNaN(t) || isNaN(rh)) return null;
+    return (0.6108 * Math.exp(17.27 * t / (t + 237.3)) * (1 - rh / 100)).toFixed(2);
+  };
+
+  // Apply client-side turn filter + sort
+  const displayedLogs = useMemo(() => {
+    if (!logsData?.logs) return [];
+    const filtered = turnFilter === "ALL"
+      ? logsData.logs
+      : logsData.logs.filter((l: any) => l.turn === turnFilter);
+
+    return [...filtered].sort((a: any, b: any) => {
+      let av: number, bv: number;
+      if (sortField === 'logDate') {
+        av = new Date(a.logDate).getTime();
+        bv = new Date(b.logDate).getTime();
+      } else if (sortField === 'vpd') {
+        av = parseFloat(calcVPD(a.tempC, a.rhPct) ?? '0') || 0;
+        bv = parseFloat(calcVPD(b.tempC, b.rhPct) ?? '0') || 0;
+      } else {
+        av = parseFloat(a[sortField]) || 0;
+        bv = parseFloat(b[sortField]) || 0;
+      }
+      return sortDir === 'asc' ? av - bv : bv - av;
+    });
+  }, [logsData?.logs, turnFilter, sortField, sortDir]);
+
   const currentPage = Math.floor(offset / limit) + 1;
   const totalPages = logsData?.total ? Math.ceil(logsData.total / limit) : 1;
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: typeof sortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40 inline-block" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="w-3 h-3 ml-1 text-primary inline-block" />
+      : <ArrowDown className="w-3 h-3 ml-1 text-primary inline-block" />;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -352,6 +403,26 @@ export default function HistoryTable() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
+              {/* Turn Filter */}
+              <div className="space-y-2 md:col-span-2">
+                <Label>Turno</Label>
+                <div className="flex gap-2">
+                  {(["ALL", "AM", "PM"] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTurnFilter(t)}
+                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        turnFilter === t
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-border text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {t === "ALL" ? "Todos" : t === "AM" ? "Manhã (AM)" : "Tarde (PM)"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Period Filter */}
               <div className="space-y-2">
                 <Label htmlFor="period-filter">Período</Label>
@@ -460,7 +531,9 @@ export default function HistoryTable() {
               <>
                 {/* Mobile Card Layout */}
                 <div className="md:hidden space-y-6">
-                  {logsData.logs.map((log: any) => (
+                  {displayedLogs.map((log: any) => {
+                    const vpdMobile = calcVPD(log.tempC, log.rhPct);
+                    return (
                     <Card key={log.id} className="overflow-hidden shadow-sm">
                       <CardHeader className="pb-4 bg-muted/30">
                         <div className="flex items-start justify-between gap-3">
@@ -519,9 +592,13 @@ export default function HistoryTable() {
                             <p className="text-xs text-muted-foreground uppercase tracking-wide">pH</p>
                             <p className="text-lg font-semibold">{log.ph || "-"}</p>
                           </div>
-                          <div className="space-y-1 col-span-2">
+                          <div className="space-y-1">
                             <p className="text-xs text-muted-foreground uppercase tracking-wide">EC</p>
                             <p className="text-lg font-semibold">{log.ec || "-"}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide">VPD (kPa)</p>
+                            <p className="text-lg font-semibold font-mono">{vpdMobile ?? "-"}</p>
                           </div>
                         </div>
                         {log.notes && (
@@ -532,7 +609,8 @@ export default function HistoryTable() {
                         )}
                       </CardContent>
                     </Card>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Desktop Table Layout */}
@@ -540,20 +618,58 @@ export default function HistoryTable() {
                   <Table className="min-w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="whitespace-nowrap">Data</TableHead>
+                        <TableHead
+                          className="whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                          onClick={() => handleSort('logDate')}
+                        >
+                          <span className="flex items-center">Data <SortIcon field="logDate" /></span>
+                        </TableHead>
                         <TableHead className="whitespace-nowrap">Turno</TableHead>
                         <TableHead className="whitespace-nowrap">Estufa</TableHead>
-                        <TableHead className="text-right whitespace-nowrap">Temp<br className="md:hidden"/><span className="hidden md:inline"> (°C)</span></TableHead>
-                        <TableHead className="text-right whitespace-nowrap">RH<br className="md:hidden"/><span className="hidden md:inline"> (%)</span></TableHead>
-                        <TableHead className="text-right whitespace-nowrap">PPFD</TableHead>
-                        <TableHead className="text-right whitespace-nowrap">pH</TableHead>
-                        <TableHead className="text-right whitespace-nowrap">EC</TableHead>
+                        <TableHead
+                          className="text-right whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                          onClick={() => handleSort('tempC')}
+                        >
+                          <span className="flex items-center justify-end">Temp (°C) <SortIcon field="tempC" /></span>
+                        </TableHead>
+                        <TableHead
+                          className="text-right whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                          onClick={() => handleSort('rhPct')}
+                        >
+                          <span className="flex items-center justify-end">RH (%) <SortIcon field="rhPct" /></span>
+                        </TableHead>
+                        <TableHead
+                          className="text-right whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                          onClick={() => handleSort('ppfd')}
+                        >
+                          <span className="flex items-center justify-end">PPFD <SortIcon field="ppfd" /></span>
+                        </TableHead>
+                        <TableHead
+                          className="text-right whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                          onClick={() => handleSort('ph')}
+                        >
+                          <span className="flex items-center justify-end">pH <SortIcon field="ph" /></span>
+                        </TableHead>
+                        <TableHead
+                          className="text-right whitespace-nowrap cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                          onClick={() => handleSort('ec')}
+                        >
+                          <span className="flex items-center justify-end">EC <SortIcon field="ec" /></span>
+                        </TableHead>
+                        <TableHead
+                          className="text-right whitespace-nowrap hidden lg:table-cell cursor-pointer select-none hover:bg-muted/50 transition-colors"
+                          onClick={() => handleSort('vpd')}
+                        >
+                          <span className="flex items-center justify-end">VPD (kPa) <SortIcon field="vpd" /></span>
+                        </TableHead>
                         <TableHead className="whitespace-nowrap hidden md:table-cell">Observações</TableHead>
                         <TableHead className="text-right whitespace-nowrap print-hide">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {logsData.logs.map((log: any) => (
+                      {displayedLogs.map((log: any) => {
+                        const vpd = calcVPD(log.tempC, log.rhPct);
+                        return (
                         <TableRow key={log.id}>
                           <TableCell className="font-medium">
                             {new Date(log.logDate).toLocaleDateString("pt-BR")}
@@ -569,6 +685,9 @@ export default function HistoryTable() {
                           <TableCell className="text-right">{log.ppfd || "-"}</TableCell>
                           <TableCell className="text-right">{log.ph || "-"}</TableCell>
                           <TableCell className="text-right">{log.ec || "-"}</TableCell>
+                          <TableCell className="text-right hidden lg:table-cell font-mono text-xs">
+                            {vpd ?? "-"}
+                          </TableCell>
                           <TableCell className="max-w-xs truncate hidden md:table-cell" title={log.notes || ""}>
                             {log.notes || "-"}
                           </TableCell>
@@ -594,7 +713,8 @@ export default function HistoryTable() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

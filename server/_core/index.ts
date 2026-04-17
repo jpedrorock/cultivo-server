@@ -280,6 +280,56 @@ async function ensurePlantLSTLogsColumns() {
   }
 }
 
+async function ensureStandaloneTasksTable() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`standaloneTasks\` (
+        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\` INT NOT NULL,
+        \`tentId\` INT,
+        \`title\` VARCHAR(200) NOT NULL,
+        \`description\` TEXT,
+        \`priority\` ENUM('LOW','MEDIUM','HIGH') DEFAULT 'MEDIUM' NOT NULL,
+        \`dueDate\` TIMESTAMP NULL,
+        \`isDone\` TINYINT(1) DEFAULT 0 NOT NULL,
+        \`completedAt\` TIMESTAMP NULL,
+        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        INDEX \`standaloneUserIdx\` (\`userId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.end();
+    console.log("[DB] Tabela standaloneTasks OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao criar standaloneTasks:", err?.message);
+  }
+}
+
+async function ensureStrainOriginColumn() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    const [rows]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'strains' AND COLUMN_NAME = 'origin'`
+    );
+    if (rows.length === 0) {
+      await conn.execute(
+        `ALTER TABLE \`strains\` ADD COLUMN \`origin\` ENUM('FEMINIZED','AUTOFLOWER','CLONE') DEFAULT 'FEMINIZED'`
+      );
+      console.log("[DB] Coluna origin adicionada em strains");
+    }
+    await conn.end();
+  } catch (err: any) {
+    console.warn("[DB] Erro ao migrar strains origin:", err?.message);
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -304,6 +354,12 @@ async function startServer() {
 
   // Garantir que as tabelas de integração Tuya/SmartLife existem
   await ensureTuyaTables();
+
+  // Garantir que a tabela standaloneTasks existe
+  await ensureStandaloneTasksTable();
+
+  // Garantir que a coluna origin existe na tabela strains
+  await ensureStrainOriginColumn();
 
   // Garantir que a coluna source existe na tabela dailyLogs
   await ensureSourceColumn();

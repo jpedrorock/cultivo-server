@@ -236,7 +236,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
       notificationSent: false,
     });
     // Adicionar ao set local para evitar duplicatas dentro do mesmo lote
-    recentMetrics.add(alert.metric);
+    recentMetrics.add(key);
     saved++;
   }
 

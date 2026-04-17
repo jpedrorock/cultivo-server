@@ -132,11 +132,66 @@ function downloadTextFile(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useRoute, useLocation, Redirect } from "wouter";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock as ClockIcon, Bookmark } from "lucide-react";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
+
+// ── Calc history hook ─────────────────────────────────────────────────────────
+interface CalcEntry {
+  id: string;
+  label: string;
+  result: string;
+  at: string; // ISO
+}
+
+function useCalcHistory(key: string, maxEntries = 10) {
+  const storageKey = `calc_history_${key}`;
+  const [entries, setEntries] = useState<CalcEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? "[]"); } catch { return []; }
+  });
+
+  const push = useCallback((label: string, result: string) => {
+    setEntries(prev => {
+      const next = [{ id: Date.now().toString(), label, result, at: new Date().toISOString() }, ...prev].slice(0, maxEntries);
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  }, [storageKey, maxEntries]);
+
+  const clear = useCallback(() => {
+    localStorage.removeItem(storageKey);
+    setEntries([]);
+  }, [storageKey]);
+
+  return { entries, push, clear };
+}
+
+function CalcHistoryPanel({ entries, onClear }: { entries: CalcEntry[]; onClear: () => void }) {
+  if (entries.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <ClockIcon className="w-3.5 h-3.5" /> Histórico
+        </p>
+        <button onClick={onClear} className="text-[11px] text-muted-foreground/50 hover:text-destructive transition-colors">Limpar</button>
+      </div>
+      <div className="space-y-1.5">
+        {entries.map(e => (
+          <div key={e.id} className="flex items-center justify-between gap-3 text-xs py-1.5 border-b border-border/20 last:border-0">
+            <span className="text-muted-foreground/70 truncate flex-1">{e.label}</span>
+            <span className="font-semibold text-foreground font-mono">{e.result}</span>
+            <span className="text-muted-foreground/40 shrink-0 text-[10px]">
+              {new Date(e.at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Calculadoras pesadas — carregadas sob demanda conforme o id selecionado
 const IrrigationScheduleCalculator = lazy(() =>
@@ -1004,6 +1059,7 @@ function PHAdjustCalculator() {
   const [currentPH, setCurrentPH] = useState<number>(7.0);
   const [targetPH, setTargetPH] = useState<number>(6.2);
   const [result, setResult] = useState<{ amount: number; product: string } | null>(null);
+  const { entries: phHistory, push: pushPh, clear: clearPh } = useCalcHistory("ph-adjust");
 
   const getPHColor = (ph: number) => {
     if (ph < 4) return "#dc2626";
@@ -1150,6 +1206,12 @@ function PHAdjustCalculator() {
             <p className="text-xs text-muted-foreground mt-4">
               <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-amber-400"/><strong>Importante:</strong></span> Adicione aos poucos, misture bem e meça novamente. Nunca adicione tudo de uma vez!
             </p>
+            <button
+              onClick={() => { pushPh(`${waterVolume}L · pH ${currentPH.toFixed(1)}→${targetPH.toFixed(1)}`, `${result.amount} ml ${currentPH > targetPH ? 'pH Down' : 'pH Up'}`); toast.success('Salvo no histórico!'); }}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-blue-500/30 text-sm text-blue-400 hover:bg-blue-500/10 transition-colors mt-2"
+            >
+              <Bookmark className="w-3.5 h-3.5" /> Salvar no histórico
+            </button>
           </div>
         )}
 
@@ -1174,6 +1236,7 @@ function PHAdjustCalculator() {
             <span className="inline-flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/><strong>Dica:</strong></span> pH fora da faixa ideal bloqueia absorção de nutrientes, causando deficiências mesmo com fertilização adequada.
           </p>
         </div>
+        <CalcHistoryPanel entries={phHistory} onClear={clearPh} />
       </CardContent>
     </Card>
   );
@@ -1238,6 +1301,7 @@ function IrrigationCalculator() {
 function VPDCalculator() {
   const [tempC, setTempC] = useState(25);
   const [rh, setRh] = useState(60);
+  const { entries: vpdHistory, push: pushVpd, clear: clearVpd } = useCalcHistory("vpd");
 
   // SVP(T) = 0.6108 × e^(17.27×T / (T+237.3))
   const svp = (t: number) => 0.6108 * Math.exp((17.27 * t) / (t + 237.3));
@@ -1329,6 +1393,14 @@ function VPDCalculator() {
         </div>
       </div>
 
+      {/* Save to history */}
+      <button
+        onClick={() => { pushVpd(`${tempC}°C / ${rh}% UR`, `${vpdFixed} kPa — ${activeZone.label}`); toast.success('Salvo no histórico!'); }}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border/40 text-sm text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+      >
+        <Bookmark className="w-4 h-4" /> Salvar no histórico
+      </button>
+
       {/* Zone guide */}
       <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-2.5">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Guia de Zonas VPD</p>
@@ -1347,10 +1419,70 @@ function VPDCalculator() {
         ))}
       </div>
 
+      {/* 2D VPD reference grid */}
+      <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tabela de Referência VPD (kPa)</p>
+        <p className="text-[11px] text-muted-foreground/60">Temperatura do ar × Umidade Relativa</p>
+        {(() => {
+          const temps = [18, 20, 22, 24, 26, 28, 30];
+          const rhs = [40, 50, 60, 70, 80];
+          const svp = (t: number) => 0.6108 * Math.exp((17.27 * t) / (t + 237.3));
+          const vpdCell = (t: number, rh: number) => (svp(t - 2) * (1 - rh / 100)).toFixed(2);
+          const cellColor = (v: number) => {
+            if (v < 0.4) return "bg-red-500/20 text-red-400";
+            if (v < 0.8) return "bg-yellow-500/20 text-yellow-500";
+            if (v < 1.0) return "bg-emerald-500/20 text-emerald-400";
+            if (v < 1.5) return "bg-green-500/20 text-green-400";
+            return "bg-orange-500/20 text-orange-400";
+          };
+          return (
+            <div className="overflow-x-auto">
+              <table className="w-full text-center text-[11px]">
+                <thead>
+                  <tr>
+                    <th className="py-1 pr-2 text-muted-foreground font-normal text-left">UR \ T</th>
+                    {temps.map(t => (
+                      <th key={t} className={`px-1 py-1 font-semibold ${t === tempC ? 'text-orange-400' : 'text-muted-foreground'}`}>{t}°</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rhs.map(r => (
+                    <tr key={r}>
+                      <td className={`py-1 pr-2 font-semibold text-left ${r === rh ? 'text-teal-400' : 'text-muted-foreground'}`}>{r}%</td>
+                      {temps.map(t => {
+                        const v = parseFloat(vpdCell(t, r));
+                        const isActive = t === tempC && r === rh;
+                        return (
+                          <td key={t} className={`px-0.5 py-0.5`}>
+                            <span className={`inline-block w-full rounded px-1 py-0.5 tabular-nums font-medium ${cellColor(v)} ${isActive ? 'ring-2 ring-white/30' : ''}`}>
+                              {v}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground pt-1">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-500/40 inline-block"/>{'< 0.4 Risco mofo'}</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-yellow-500/40 inline-block"/>0.4–0.8 Mudas</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500/40 inline-block"/>0.8–1.0 Vega</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-500/40 inline-block"/>1.0–1.5 Flora</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-orange-500/40 inline-block"/>{'> 1.5 Estresse'}</span>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-border/40 bg-muted/20 p-4 text-xs text-muted-foreground space-y-1">
         <p><strong className="text-foreground">Fórmula:</strong> SVP(T) = 0.6108 × e<sup>17.27T/(T+237.3)</sup></p>
         <p>VPD = SVP(T<sub>folha</sub>) × (1 − UR/100) &nbsp;·&nbsp; T<sub>folha</sub> ≈ T<sub>ar</sub> − 2°C</p>
       </div>
+
+      <CalcHistoryPanel entries={vpdHistory} onClear={clearVpd} />
     </div>
   );
 }

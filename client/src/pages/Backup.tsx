@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Download, Upload, Database, Shield, AlertTriangle } from "lucide-react";
+import { AlertCircle, Download, Upload, Database, Shield, AlertTriangle, CalendarClock, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+const AUTO_BACKUP_KEY   = "cultivo:autoBackup";
+const LAST_BACKUP_KEY   = "cultivo:lastAutoBackup";
+const SEVEN_DAYS_MS     = 7 * 24 * 60 * 60 * 1000;
 
 interface BackupFile {
   version: string;
@@ -17,6 +21,13 @@ export default function Backup() {
   const [isImporting, setIsImporting] = useState(false);
   const [importConfirm, setImportConfirm] = useState(false);
   const [pendingFile, setPendingFile] = useState<BackupFile | null>(null);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(
+    () => localStorage.getItem(AUTO_BACKUP_KEY) === "true"
+  );
+  const [lastAutoBackup, setLastAutoBackup] = useState<Date | null>(() => {
+    const s = localStorage.getItem(LAST_BACKUP_KEY);
+    return s ? new Date(s) : null;
+  });
 
   const exportBackup = trpc.backup.export.useQuery(undefined, {
     enabled: false,
@@ -34,34 +45,55 @@ export default function Backup() {
     },
   });
 
+  // ── Shared export helper ─────────────────────────────────────────────────────
+  const doExport = useCallback(async (silent = false) => {
+    const result = await exportBackup.refetch();
+    if (!result.data) return;
+    const dataStr = JSON.stringify(result.data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    link.download = `cultivo-backup-${timestamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    const now = new Date();
+    localStorage.setItem(LAST_BACKUP_KEY, now.toISOString());
+    setLastAutoBackup(now);
+    if (!silent) toast.success("Backup exportado com sucesso!");
+  }, [exportBackup]);
+
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const result = await exportBackup.refetch();
-      if (result.data) {
-        // Criar arquivo JSON para download
-        const dataStr = JSON.stringify(result.data, null, 2);
-        const dataBlob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(dataBlob);
-        
-        // Criar link de download
-        const link = document.createElement("a");
-        link.href = url;
-        const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
-        link.download = `app-cultivo-backup-${timestamp}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        toast.success("Backup exportado com sucesso!");
-      }
+      await doExport(false);
     } catch (error: any) {
       toast.error(`Erro ao exportar backup: ${error.message}`);
     } finally {
       setIsExporting(false);
     }
   };
+
+  const handleToggleAutoBackup = () => {
+    const next = !autoBackupEnabled;
+    setAutoBackupEnabled(next);
+    localStorage.setItem(AUTO_BACKUP_KEY, String(next));
+    if (next) toast.success("Backup automático semanal ativado!");
+    else toast.info("Backup automático desativado");
+  };
+
+  // ── Auto-backup check on mount ────────────────────────────────────────────
+  useEffect(() => {
+    if (!autoBackupEnabled) return;
+    const last = lastAutoBackup?.getTime() ?? 0;
+    if (Date.now() - last >= SEVEN_DAYS_MS) {
+      toast.info("Fazendo backup automático semanal…", { duration: 3000 });
+      doExport(true).catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleImport = () => {
     const input = document.createElement("input");
@@ -136,6 +168,48 @@ export default function Backup() {
           <p className="text-amber-600 dark:text-amber-500 font-semibold">
             <span className="flex items-center gap-1"><AlertTriangle className="w-4 h-4 text-amber-400"/>Restaurar um backup irá SUBSTITUIR todos os dados atuais!</span>
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Backup Automático Semanal */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <CalendarClock className="h-5 w-5 text-primary" />
+            Backup Automático Semanal
+          </CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
+            Quando ativado, baixa um backup toda vez que você abrir esta página após 7 dias sem backup
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <button
+            onClick={handleToggleAutoBackup}
+            className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border transition-colors ${
+              autoBackupEnabled
+                ? "border-emerald-500/40 bg-emerald-500/8 hover:bg-emerald-500/12"
+                : "border-border hover:bg-muted/60"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {autoBackupEnabled
+                ? <ToggleRight className="w-6 h-6 text-emerald-500 shrink-0" />
+                : <ToggleLeft className="w-6 h-6 text-muted-foreground shrink-0" />}
+              <span className={`text-sm font-medium ${autoBackupEnabled ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                {autoBackupEnabled ? "Ativado" : "Desativado"}
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {lastAutoBackup
+                ? `Último: ${lastAutoBackup.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}`
+                : "Nunca realizado"}
+            </span>
+          </button>
+          {autoBackupEnabled && (
+            <p className="text-xs text-muted-foreground/70 px-1">
+              ✓ O backup será baixado automaticamente sempre que você abrir esta página após 7 dias sem realizar um.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -225,6 +299,25 @@ export default function Backup() {
             <DialogDescription className="space-y-2">
               <span className="block font-semibold text-foreground flex items-center gap-1"><AlertTriangle className="w-4 h-4 text-amber-400"/>ATENÇÃO: Esta ação é irreversível!</span>
               <span className="block">Importar este backup irá <strong>substituir todos os dados atuais</strong> do aplicativo — estufas, plantas, strains, tarefas, histórico e configurações.</span>
+              {pendingFile && (
+                <span className="block p-2 rounded bg-muted/60 border border-border/60 text-xs text-foreground space-y-1">
+                  {pendingFile.exportDate && (
+                    <span className="block text-muted-foreground">
+                      📅 Exportado em: <strong className="text-foreground">{new Date(pendingFile.exportDate).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</strong>
+                    </span>
+                  )}
+                  <span className="block text-muted-foreground">
+                    📦 Conteúdo:{" "}
+                    {(["tents","plants","cycles","dailyLogs","strains","tasks"] as const)
+                      .filter(k => pendingFile.data[k]?.length)
+                      .map(k => {
+                        const labels: Record<string, string> = { tents: "estufas", plants: "plantas", cycles: "ciclos", dailyLogs: "logs", strains: "strains", tasks: "tarefas" };
+                        return `${pendingFile.data[k]!.length} ${labels[k]}`;
+                      })
+                      .join(" · ") || "sem dados reconhecidos"}
+                  </span>
+                </span>
+              )}
               <span className="block text-muted-foreground text-xs">Recomendamos exportar um backup dos dados atuais antes de continuar.</span>
             </DialogDescription>
           </DialogHeader>
