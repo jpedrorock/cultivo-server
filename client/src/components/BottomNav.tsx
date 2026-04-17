@@ -208,14 +208,14 @@ export function BottomNav() {
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/plants", icon: Leaf, label: "Plantas" },
-    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
+    { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
   ];
 
   const moreMenuItems: NavItem[] = [
     { href: "/morning-check", icon: Sunrise, label: "Status" },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
-    { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
+    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
     { href: "/manage-strains", icon: Sprout, label: "Strains" },
     { href: "/help", icon: BookOpen, label: "Guia do Usuário" },
     { href: "/settings", icon: Settings, label: "Configurações" },
@@ -249,7 +249,7 @@ export function BottomNav() {
       <div className="max-w-screen-xl mx-auto px-2">
         <div className="flex justify-around items-end pb-3 pt-3">
           {/* FAB — Mini menu Force Touch style */}
-          <div ref={fabRef} className="relative flex items-center justify-center -mt-5" data-tour="quick-log-menu">
+          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-5" data-tour="quick-log-menu">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
               <div className="fixed bottom-[72px] left-3 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -407,6 +407,7 @@ export function BottomNav() {
 
             <button
               onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
+              aria-label="Registrar log diário"
               className={cn(
                 "w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 transition-all duration-200",
                 fabMenuOpen ? "scale-90 rotate-45" : "active:scale-95"
@@ -414,18 +415,29 @@ export function BottomNav() {
             >
               <Plus className="w-6 h-6 text-white stroke-[2.5]" />
             </button>
+            <span
+              className={cn(
+                "text-[10px] font-semibold mt-1 leading-none tracking-wide transition-colors",
+                fabMenuOpen ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+              )}
+            >
+              Registrar
+            </span>
           </div>
 
-          {/* Nav items — Estufas e Calculadoras */}
+          {/* Nav items — Estufas, Plantas, Alertas */}
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
+            const isAlertsItem = item.href === "/alerts";
+            const showBadge = item.badge !== undefined && item.badge > 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={triggerHapticFeedback}
-                data-tour={item.href === "/calculators" ? "calculators-menu" : undefined}
+                data-tour={item.href === "/alerts" ? "alerts-menu" : undefined}
+                aria-label={item.label}
                 className={cn(
                   "flex items-center justify-center p-3 rounded-xl transition-colors relative",
                   isActive
@@ -434,6 +446,16 @@ export function BottomNav() {
                 )}
               >
                 <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
+                {showBadge && (
+                  <span
+                    className={cn(
+                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
+                      isAlertsItem && badgeShaking ? "animate-badge-shake" : "animate-pulse"
+                    )}
+                  >
+                    {item.badge! > 9 ? '9+' : item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
