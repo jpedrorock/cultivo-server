@@ -94,6 +94,16 @@ export default function TuyaSettings() {
     onError: (e) => toast.error(`Erro ao salvar: ${e.message}`),
   });
 
+  const [syncingTentId, setSyncingTentId] = useState<number | null>(null);
+  const { data: latestReadings = {}, refetch: refetchReadings } = trpc.tuya.getLatestReadingsAll.useQuery(
+    undefined,
+    { enabled: tab === 'sensors' }
+  );
+  const readNow = trpc.tuya.readNow.useMutation({
+    onSuccess: () => { setSyncingTentId(null); toast.success('Leitura atualizada!'); refetchReadings(); },
+    onError: (e) => { setSyncingTentId(null); toast.error(`Sensor: ${e.message}`); },
+  });
+
   // Persiste imediatamente qualquer mudança de mapeamento
   const persistMappings = (newMappings: typeof mappings) => {
     saveMappings.mutate(
@@ -324,10 +334,25 @@ export default function TuyaSettings() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-foreground">{tent.name}</p>
                               {m ? (
-                                <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
-                                  <Wifi className="w-3 h-3 shrink-0 text-emerald-500" />
-                                  {m.deviceName}
-                                </p>
+                                <>
+                                  <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                                    <Wifi className="w-3 h-3 shrink-0 text-emerald-500" />
+                                    {m.deviceName}
+                                  </p>
+                                  {latestReadings[tent.id] && (
+                                    <p className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
+                                      {latestReadings[tent.id].tempC != null && (
+                                        <span className="text-amber-500 font-medium">{latestReadings[tent.id].tempC!.toFixed(1)}°C</span>
+                                      )}
+                                      {latestReadings[tent.id].rhPct != null && (
+                                        <span className="text-blue-500 font-medium">{latestReadings[tent.id].rhPct!.toFixed(0)}%</span>
+                                      )}
+                                      <span className="text-muted-foreground/60">
+                                        {new Date(latestReadings[tent.id].readAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    </p>
+                                  )}
+                                </>
                               ) : (
                                 <p className="text-[11px] text-muted-foreground italic">Sem sensor</p>
                               )}
@@ -338,6 +363,17 @@ export default function TuyaSettings() {
                                 {m.enabled
                                   ? <ToggleRight className="w-7 h-7 text-emerald-500" />
                                   : <ToggleLeft className="w-7 h-7 text-muted-foreground" />}
+                              </button>
+                            )}
+                            {/* Sincronizar agora */}
+                            {m && m.enabled && !isOpen && (
+                              <button
+                                onClick={() => { setSyncingTentId(tent.id); readNow.mutate({ tentId: tent.id }); }}
+                                disabled={syncingTentId === tent.id}
+                                className="shrink-0 w-8 h-8 rounded-lg bg-muted hover:bg-emerald-500/10 flex items-center justify-center transition-colors disabled:opacity-40"
+                                title="Sincronizar agora"
+                              >
+                                <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground ${syncingTentId === tent.id ? 'animate-spin' : ''}`} />
                               </button>
                             )}
                             {/* Remover */}

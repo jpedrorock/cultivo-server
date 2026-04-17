@@ -737,6 +737,17 @@ export default function TentDetails() {
                   <p className="text-xs text-muted-foreground">
                     {tent.category} • {tent.width}×{tent.depth}×{tent.height}cm
                   </p>
+                  {/* Semana corrente do ciclo */}
+                  {cycle && currentPhase && currentWeek && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary/80">
+                      <Calendar className="w-3 h-3" />
+                      Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : "Vega"}
+                      {" · "}
+                      <span className="text-muted-foreground font-normal">
+                        início {format(new Date(cycle.startDate), "dd/MM", { locale: ptBR })}
+                      </span>
+                    </span>
+                  )}
                   {/* Freshness badge — último registro */}
                   {logs && logs.length > 0 && (() => {
                     const lastLogDate = new Date(logs[0].logDate);

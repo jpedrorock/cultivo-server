@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Plus, Pencil, Trash2, Sprout, Search, Flower2, Timer } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Sprout, Search, Flower2, Timer, Leaf } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
@@ -23,7 +24,14 @@ export default function Strains() {
     description: "",
     vegaWeeks: 4,
     floraWeeks: 8,
+    origin: "FEMINIZED" as "FEMINIZED" | "AUTOFLOWER" | "CLONE",
   });
+
+  const ORIGIN_LABELS: Record<string, { label: string; color: string }> = {
+    FEMINIZED: { label: "Feminizada", color: "bg-pink-500/10 text-pink-600 border-pink-500/30" },
+    AUTOFLOWER: { label: "Autoflorescente", color: "bg-amber-500/10 text-amber-600 border-amber-500/30" },
+    CLONE: { label: "Clone", color: "bg-cyan-500/10 text-cyan-600 border-cyan-500/30" },
+  };
 
   const { data: strains, isLoading } = trpc.strains.list.useQuery();
   const { data: allPlants = [] } = trpc.plants.list.useQuery({ status: "ACTIVE" });
@@ -69,6 +77,7 @@ export default function Strains() {
         description: strain.description || "",
         vegaWeeks: strain.vegaWeeks,
         floraWeeks: strain.floraWeeks,
+        origin: (strain.origin as any) || "FEMINIZED",
       });
     } else {
       setEditingStrain(null);
@@ -77,6 +86,7 @@ export default function Strains() {
         description: "",
         vegaWeeks: 4,
         floraWeeks: 8,
+        origin: "FEMINIZED",
       });
     }
     setDialogOpen(true);
@@ -90,6 +100,7 @@ export default function Strains() {
       description: "",
       vegaWeeks: 4,
       floraWeeks: 8,
+      origin: "FEMINIZED",
     });
   };
 
@@ -213,7 +224,14 @@ export default function Strains() {
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <CardTitle className="text-lg">{strain.name}</CardTitle>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <CardTitle className="text-lg">{strain.name}</CardTitle>
+                              {strain.origin && ORIGIN_LABELS[strain.origin] && (
+                                <Badge variant="outline" className={`text-xs ${ORIGIN_LABELS[strain.origin].color}`}>
+                                  {ORIGIN_LABELS[strain.origin].label}
+                                </Badge>
+                              )}
+                            </div>
                             <CardDescription className="mt-1">
                               {strain.description || "Sem descrição"}
                             </CardDescription>
@@ -221,18 +239,24 @@ export default function Strains() {
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div className="grid grid-cols-4 gap-2 text-sm">
                           <div className="bg-background rounded-lg p-3 text-center">
                             <div className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1"><Sprout className="w-3 h-3"/>Vega</div>
-                            <div className="font-semibold text-foreground">{strain.vegaWeeks} sem</div>
+                            <div className="font-semibold text-foreground">{strain.vegaWeeks}s</div>
                           </div>
                           <div className="bg-background rounded-lg p-3 text-center">
                             <div className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1"><Flower2 className="w-3 h-3"/>Flora</div>
-                            <div className="font-semibold text-foreground">{strain.floraWeeks} sem</div>
+                            <div className="font-semibold text-foreground">{strain.floraWeeks}s</div>
                           </div>
                           <div className="bg-primary/10 rounded-lg p-3 text-center">
                             <div className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1"><Timer className="w-3.5 h-3.5"/>Total</div>
-                            <div className="font-bold text-green-600">{strain.vegaWeeks + strain.floraWeeks} sem</div>
+                            <div className="font-bold text-green-600">{strain.vegaWeeks + strain.floraWeeks}s</div>
+                          </div>
+                          <div className="bg-emerald-500/10 rounded-lg p-3 text-center">
+                            <div className="text-xs text-muted-foreground mb-1 flex items-center justify-center gap-1"><Leaf className="w-3 h-3"/>Ativas</div>
+                            <div className="font-bold text-emerald-600">
+                              {allPlants.filter((p: any) => p.strainId === strain.id).length}
+                            </div>
                           </div>
                         </div>
                         <div className="flex gap-2 pt-2">
@@ -266,10 +290,11 @@ export default function Strains() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nome</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead className="text-center">Vega (semanas)</TableHead>
-                        <TableHead className="text-center">Flora (semanas)</TableHead>
+                        <TableHead>Origem</TableHead>
+                        <TableHead className="text-center">Vega (sem)</TableHead>
+                        <TableHead className="text-center">Flora (sem)</TableHead>
                         <TableHead className="text-center">Total</TableHead>
+                        <TableHead className="text-center">Ativas</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -277,13 +302,22 @@ export default function Strains() {
                       {filteredStrains.map((strain) => (
                         <TableRow key={strain.id}>
                           <TableCell className="font-medium">{strain.name}</TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {strain.description || "-"}
+                          <TableCell>
+                            {strain.origin && ORIGIN_LABELS[strain.origin] ? (
+                              <Badge variant="outline" className={`text-xs ${ORIGIN_LABELS[strain.origin].color}`}>
+                                {ORIGIN_LABELS[strain.origin].label}
+                              </Badge>
+                            ) : "-"}
                           </TableCell>
                           <TableCell className="text-center">{strain.vegaWeeks}</TableCell>
                           <TableCell className="text-center">{strain.floraWeeks}</TableCell>
                           <TableCell className="text-center font-medium">
-                            {strain.vegaWeeks + strain.floraWeeks} semanas
+                            {strain.vegaWeeks + strain.floraWeeks} sem
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-semibold text-emerald-600">
+                              {allPlants.filter((p: any) => p.strainId === strain.id).length}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-2 justify-end">
@@ -357,6 +391,25 @@ export default function Strains() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Características da strain"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Origem</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["FEMINIZED", "AUTOFLOWER", "CLONE"] as const).map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, origin: o })}
+                      className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
+                        formData.origin === o
+                          ? ORIGIN_LABELS[o].color + " ring-2 ring-offset-1"
+                          : "border-border text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {ORIGIN_LABELS[o].label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

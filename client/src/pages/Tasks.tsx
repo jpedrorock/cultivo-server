@@ -3,22 +3,50 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, CheckCircle2, Circle, Sprout, Filter, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, Sprout, Filter, Trash2, AlertTriangle, Plus, Calendar, Flag } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { TaskTemplatesManager } from "@/components/TaskTemplatesManager";
 import { TaskCardSkeleton } from "@/components/ListSkeletons";
 import { useState } from "react";
+import { format, isAfter } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+const PRIORITY_LABELS: Record<string, { label: string; color: string; icon: string }> = {
+  LOW: { label: "Baixa", color: "text-gray-500", icon: "🔵" },
+  MEDIUM: { label: "Média", color: "text-amber-500", icon: "🟡" },
+  HIGH: { label: "Alta", color: "text-red-500", icon: "🔴" },
+};
 
 export default function Tasks() {
   const { data: tasks, isLoading } = trpc.tasks.getCurrentWeekTasks.useQuery();
+  const { data: standaloneTasks = [], refetch: refetchStandalone } = trpc.tasks.listStandalone.useQuery();
   const utils = trpc.useUtils();
   const [selectedTent, setSelectedTent] = useState<number | "all">("all");
   const [showOnlyPending, setShowOnlyPending] = useState(false);
   const [deleteTaskConfirm, setDeleteTaskConfirm] = useState<{ open: boolean; taskId: number | null }>({
     open: false, taskId: null
+  });
+
+  // Standalone task form
+  const [standaloneDialogOpen, setStandaloneDialogOpen] = useState(false);
+  const [standaloneForm, setStandaloneForm] = useState({ title: "", description: "", priority: "MEDIUM" as "LOW" | "MEDIUM" | "HIGH", dueDate: "" });
+
+  const createStandalone = trpc.tasks.createStandalone.useMutation({
+    onSuccess: () => { refetchStandalone(); setStandaloneDialogOpen(false); setStandaloneForm({ title: "", description: "", priority: "MEDIUM", dueDate: "" }); toast.success("Tarefa criada!"); },
+    onError: (e) => toast.error(`Erro: ${e.message}`),
+  });
+  const toggleStandalone = trpc.tasks.toggleStandalone.useMutation({
+    onSuccess: () => refetchStandalone(),
+    onError: (e) => toast.error(`Erro: ${e.message}`),
+  });
+  const deleteStandalone = trpc.tasks.deleteStandalone.useMutation({
+    onSuccess: () => { refetchStandalone(); toast.success("Tarefa excluída!"); },
+    onError: (e) => toast.error(`Erro: ${e.message}`),
   });
 
   const markAsDone = trpc.tasks.markAsDone.useMutation({
@@ -126,8 +154,16 @@ export default function Tasks() {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="tasks" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="tasks">Tarefas da Semana</TabsTrigger>
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="tasks">Semana</TabsTrigger>
+            <TabsTrigger value="standalone" className="relative">
+              Avulsas
+              {standaloneTasks.filter((t: any) => !t.isDone).length > 0 && (
+                <span className="ml-1.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-4 h-4 inline-flex items-center justify-center">
+                  {standaloneTasks.filter((t: any) => !t.isDone).length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="manage">Gerenciar</TabsTrigger>
           </TabsList>
 
@@ -281,6 +317,12 @@ export default function Tasks() {
                                 {task.description}
                               </p>
                             )}
+                            {task.dueDate && !task.isDone && (
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Semana de {format(new Date(task.dueDate), "dd/MM", { locale: ptBR })}
+                              </p>
+                            )}
                             {task.completedAt && (
                               <p className="text-xs text-muted-foreground mt-2">
                                 Concluída em {new Date(task.completedAt).toLocaleDateString("pt-BR")}
@@ -321,12 +363,160 @@ export default function Tasks() {
         )}
           </TabsContent>
 
+          <TabsContent value="standalone" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold">Tarefas Avulsas</h3>
+              <Button size="sm" onClick={() => setStandaloneDialogOpen(true)} className="bg-green-600 hover:bg-green-700">
+                <Plus className="w-4 h-4 mr-1" /> Nova Tarefa
+              </Button>
+            </div>
+            {standaloneTasks.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  <Circle className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Nenhuma tarefa avulsa</p>
+                  <p className="text-xs mt-1 opacity-60">Crie tarefas que não fazem parte de um ciclo</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {[...standaloneTasks]
+                  .sort((a: any, b: any) => {
+                    if (a.isDone !== b.isDone) return a.isDone ? 1 : -1;
+                    const pOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+                    const pd = (pOrder[a.priority as keyof typeof pOrder] ?? 1) - (pOrder[b.priority as keyof typeof pOrder] ?? 1);
+                    if (pd !== 0) return pd;
+                    if (a.dueDate && b.dueDate) return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                    if (a.dueDate) return -1;
+                    if (b.dueDate) return 1;
+                    return 0;
+                  })
+                  .map((task: any) => {
+                    const pr = PRIORITY_LABELS[task.priority] ?? PRIORITY_LABELS.MEDIUM;
+                    const isOverdue = task.dueDate && !task.isDone && isAfter(new Date(), new Date(task.dueDate));
+                    return (
+                      <div
+                        key={task.id}
+                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all ${
+                          task.isDone ? "bg-primary/5 border-primary/20 opacity-60" : "bg-card border-border"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={task.isDone}
+                          onCheckedChange={() => toggleStandalone.mutate({ id: task.id })}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`font-medium text-sm ${task.isDone ? "line-through text-muted-foreground" : ""}`}>
+                              {task.title}
+                            </span>
+                            <span className={`text-xs ${pr.color}`}>{pr.icon} {pr.label}</span>
+                          </div>
+                          {task.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
+                          )}
+                          {task.dueDate && (
+                            <p className={`text-xs mt-0.5 flex items-center gap-1 ${isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                              <Calendar className="w-3 h-3" />
+                              {isOverdue ? "Vencida em " : "Vence em "}
+                              {format(new Date(task.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => deleteStandalone.mutate({ id: task.id })}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="manage">
             <TaskTemplatesManager />
           </TabsContent>
         </Tabs>
       </div>
     </div>
+
+      {/* Standalone Task Create Dialog */}
+      <Dialog open={standaloneDialogOpen} onOpenChange={setStandaloneDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="w-5 h-5 text-green-600" />
+              Nova Tarefa Avulsa
+            </DialogTitle>
+            <DialogDescription>Crie uma tarefa fora de qualquer ciclo</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Título *</Label>
+              <Input
+                value={standaloneForm.title}
+                onChange={(e) => setStandaloneForm({ ...standaloneForm, title: e.target.value })}
+                placeholder="Ex: Trocar substrato"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descrição</Label>
+              <Input
+                value={standaloneForm.description}
+                onChange={(e) => setStandaloneForm({ ...standaloneForm, description: e.target.value })}
+                placeholder="Detalhes opcionais"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Prioridade</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["LOW", "MEDIUM", "HIGH"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setStandaloneForm({ ...standaloneForm, priority: p })}
+                    className={`py-2 rounded-lg border text-xs font-medium transition-all ${
+                      standaloneForm.priority === p
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {PRIORITY_LABELS[p].icon} {PRIORITY_LABELS[p].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data de Vencimento</Label>
+              <Input
+                type="date"
+                value={standaloneForm.dueDate}
+                onChange={(e) => setStandaloneForm({ ...standaloneForm, dueDate: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStandaloneDialogOpen(false)}>Cancelar</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              disabled={!standaloneForm.title.trim() || createStandalone.isPending}
+              onClick={() => createStandalone.mutate({
+                title: standaloneForm.title.trim(),
+                description: standaloneForm.description || undefined,
+                priority: standaloneForm.priority,
+                dueDate: standaloneForm.dueDate ? new Date(standaloneForm.dueDate) : undefined,
+              })}
+            >
+              {createStandalone.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Criar Tarefa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Task Confirm Dialog */}
       <Dialog open={deleteTaskConfirm.open} onOpenChange={(open) => !open && setDeleteTaskConfirm({ open: false, taskId: null })}>

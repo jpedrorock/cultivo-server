@@ -243,6 +243,10 @@ export default function HarvestQueue() {
                               "dd/MM/yyyy 'às' HH:mm",
                               { locale: ptBR }
                             )}
+                            {" "}·{" "}
+                            <span className="font-medium text-amber-600 dark:text-amber-400">
+                              Aguardando há {Math.floor((Date.now() - new Date(plant.harvestQueueAt).getTime()) / 86400000)}d
+                            </span>
                           </p>
                         )}
                         {plant.harvestQueueNotes && (

@@ -4,6 +4,14 @@ import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   Save,
   Loader2,
@@ -18,6 +26,7 @@ import {
   Leaf,
   Flower2,
   Scissors,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
@@ -42,6 +51,51 @@ export default function StrainTargets() {
   const [editingTargets, setEditingTargets] = useState<Record<string, any>>({});
   const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({});
   const [activePhase, setActivePhase] = useState<"CLONING" | "VEGA" | "FLORA">("VEGA");
+
+  // Copy from another strain
+  const [showComparison, setShowComparison] = useState(false);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [sourceStrainId, setSourceStrainId] = useState<number | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
+  const { data: allStrains = [] } = trpc.strains.list.useQuery();
+  const { data: sourceTargets } = trpc.weeklyTargets.getByStrain.useQuery(
+    { strainId: sourceStrainId! },
+    { enabled: !!sourceStrainId }
+  );
+
+  const handleCopyTargets = async () => {
+    if (!strainId || !sourceTargets || sourceTargets.length === 0) return;
+    setIsCopying(true);
+    try {
+      for (const t of sourceTargets) {
+        await createTarget.mutateAsync({
+          strainId,
+          phase: t.phase as any,
+          weekNumber: t.weekNumber,
+          tempMin: t.tempMin ?? undefined,
+          tempMax: t.tempMax ?? undefined,
+          rhMin: t.rhMin ?? undefined,
+          rhMax: t.rhMax ?? undefined,
+          ppfdMin: t.ppfdMin ?? undefined,
+          ppfdMax: t.ppfdMax ?? undefined,
+          photoperiod: t.photoperiod ?? undefined,
+          phMin: t.phMin ?? undefined,
+          phMax: t.phMax ?? undefined,
+          ecMin: t.ecMin ?? undefined,
+          ecMax: t.ecMax ?? undefined,
+          notes: t.notes ?? undefined,
+        });
+      }
+      await refetch();
+      setCopyDialogOpen(false);
+      setSourceStrainId(null);
+      toast.success(`${sourceTargets.length} targets copiados com sucesso!`);
+    } catch {
+      toast.error("Erro ao copiar targets");
+    } finally {
+      setIsCopying(false);
+    }
+  };
 
   useEffect(() => {
     if (targets.length > 0) {
@@ -325,10 +379,27 @@ export default function StrainTargets() {
               <h1 className="text-base font-bold text-foreground truncate leading-tight">{strain.name}</h1>
               <p className="text-[11px] text-muted-foreground/60 leading-tight">Parâmetros por Semana</p>
             </div>
-            <div className="flex gap-1.5 shrink-0">
-              <span className="text-[10px] text-muted-foreground/50 bg-muted/30 px-2 py-1 rounded-lg">
-                V{strain.vegaWeeks}sem · F{strain.floraWeeks}sem
-              </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => setShowComparison(v => !v)}
+                className={`px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-semibold transition-colors border ${
+                  showComparison
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "border-border/40 text-muted-foreground hover:border-border"
+                }`}
+                title="Comparar Vega vs Flora"
+              >
+                <Leaf className="w-3.5 h-3.5" />
+                vs
+                <Flower2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => { setSourceStrainId(null); setCopyDialogOpen(true); }}
+                className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-accent transition-colors text-muted-foreground"
+                title="Copiar targets de outra cepa"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </header>
@@ -376,12 +447,114 @@ export default function StrainTargets() {
             </div>
           </div>
 
+          {/* Comparison table: Vega vs Flora */}
+          {showComparison && (() => {
+            const vegaTargets = targets.filter((t: any) => t.phase === "VEGA");
+            const floraTargets = targets.filter((t: any) => t.phase === "FLORA");
+            const avg = (arr: any[], key: string) => {
+              const vals = arr.map((t: any) => parseFloat(t[key])).filter(v => !isNaN(v));
+              return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : "—";
+            };
+            const range = (arr: any[], minKey: string, maxKey: string) => {
+              const min = avg(arr, minKey);
+              const max = avg(arr, maxKey);
+              if (min === "—" && max === "—") return "—";
+              if (min === "—") return max;
+              if (max === "—") return min;
+              return `${min}–${max}`;
+            };
+            const rows = [
+              { label: "Temp (°C)", icon: Thermometer, iconColor: "text-orange-400", vega: range(vegaTargets, "tempMin", "tempMax"), flora: range(floraTargets, "tempMin", "tempMax") },
+              { label: "Umidade (%)", icon: Droplets, iconColor: "text-blue-400", vega: range(vegaTargets, "rhMin", "rhMax"), flora: range(floraTargets, "rhMin", "rhMax") },
+              { label: "PPFD (µmol)", icon: Sun, iconColor: "text-yellow-400", vega: range(vegaTargets, "ppfdMin", "ppfdMax"), flora: range(floraTargets, "ppfdMin", "ppfdMax") },
+              { label: "pH", icon: FlaskConical, iconColor: "text-teal-400", vega: range(vegaTargets, "phMin", "phMax"), flora: range(floraTargets, "phMin", "phMax") },
+              { label: "EC (mS/cm)", icon: Zap, iconColor: "text-violet-400", vega: range(vegaTargets, "ecMin", "ecMax"), flora: range(floraTargets, "ecMin", "ecMax") },
+            ];
+            return (
+              <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
+                {/* Column headers */}
+                <div className="grid grid-cols-3 text-xs font-semibold border-b border-border/30 bg-muted/20">
+                  <div className="px-3 py-2.5 text-muted-foreground/60 uppercase tracking-wider text-[10px]">Parâmetro</div>
+                  <div className="px-3 py-2.5 flex items-center gap-1.5 text-green-400 border-l border-border/20">
+                    <Leaf className="w-3.5 h-3.5" /> Vega
+                  </div>
+                  <div className="px-3 py-2.5 flex items-center gap-1.5 text-purple-400 border-l border-border/20">
+                    <Flower2 className="w-3.5 h-3.5" /> Flora
+                  </div>
+                </div>
+                {rows.map((row, i) => {
+                  const Icon = row.icon;
+                  return (
+                    <div key={row.label} className={`grid grid-cols-3 text-sm ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
+                      <div className="px-3 py-2.5 flex items-center gap-1.5 text-muted-foreground/70">
+                        <Icon className={`w-3.5 h-3.5 ${row.iconColor} shrink-0`} />
+                        <span className="text-[11px]">{row.label}</span>
+                      </div>
+                      <div className={`px-3 py-2.5 font-mono text-xs font-medium border-l border-border/20 ${row.vega === "—" ? "text-muted-foreground/30" : "text-green-400"}`}>
+                        {row.vega}
+                      </div>
+                      <div className={`px-3 py-2.5 font-mono text-xs font-medium border-l border-border/20 ${row.flora === "—" ? "text-muted-foreground/30" : "text-purple-400"}`}>
+                        {row.flora}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="px-3 py-2 border-t border-border/20 bg-muted/10">
+                  <p className="text-[10px] text-muted-foreground/50">Médias dos alvos configurados por semana</p>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Week cards */}
           {Array.from({ length: weekCount }, (_, i) => i + 1).map((week) =>
             renderWeekCard(activePhase, week)
           )}
         </main>
       </div>
+
+      {/* Copy dialog */}
+      <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="w-4 h-4" /> Copiar targets de outra cepa
+            </DialogTitle>
+            <DialogDescription>
+              Selecione a cepa de origem. Todos os targets existentes de <strong>{strain.name}</strong> serão substituídos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            {allStrains.filter(s => s.id !== strainId).map(s => (
+              <button
+                key={s.id}
+                onClick={() => setSourceStrainId(s.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left ${
+                  sourceStrainId === s.id
+                    ? "border-primary/50 bg-primary/5 text-foreground"
+                    : "border-border/40 hover:border-primary/30 hover:bg-muted/40 text-foreground"
+                }`}
+              >
+                <span className="flex-1 text-sm font-medium">{s.name}</span>
+                {sourceStrainId === s.id && <span className="text-xs text-primary font-semibold">✓</span>}
+              </button>
+            ))}
+            {allStrains.filter(s => s.id !== strainId).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma outra cepa disponível</p>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCopyDialogOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleCopyTargets}
+              disabled={!sourceStrainId || isCopying || !sourceTargets?.length}
+            >
+              {isCopying ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Copy className="w-4 h-4 mr-2" />}
+              Copiar {sourceTargets?.length ? `(${sourceTargets.length} semanas)` : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageTransition>
   );
 }

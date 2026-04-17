@@ -36,6 +36,18 @@ export default function Alerts() {
     },
   });
 
+  // Marcar todos como vistos
+  const markAllAsSeen = trpc.alerts.markAllAsSeen.useMutation({
+    onSuccess: (res) => {
+      utils.alerts.getNewCount.invalidate();
+      utils.alerts.list.invalidate();
+      toast.success(`${res.updated} alerta${res.updated !== 1 ? "s" : ""} marcado${res.updated !== 1 ? "s" : ""} como visto${res.updated !== 1 ? "s" : ""}`);
+    },
+    onError: () => {
+      toast.error("Erro ao marcar alertas como vistos");
+    },
+  });
+
   const handleMarkAsSeen = (alertId: number, currentStatus: string) => {
     if (currentStatus !== "NEW") return; // Já está visto, não faz nada
     markAsSeen.mutate({ alertId });
@@ -93,12 +105,29 @@ export default function Alerts() {
                   </p>
                 </div>
               </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/settings">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Configurar
-                </Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                {newCount > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => markAllAsSeen.mutate({ tentId: selectedTentId })}
+                    disabled={markAllAsSeen.isPending}
+                  >
+                    {markAllAsSeen.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                    )}
+                    Marcar todos como vistos
+                  </Button>
+                )}
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/settings">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Configurar
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </header>
@@ -217,6 +246,15 @@ export default function Alerts() {
                                     {!selectedTentId && (
                                       <Badge variant="outline" className="text-xs">
                                         {tents?.find(t => t.id === alert.tentId)?.name ?? `Estufa #${alert.tentId}`}
+                                      </Badge>
+                                    )}
+                                    {alert.value != null && (
+                                      <Badge variant="outline" className={cn("text-xs font-mono", isNew ? "border-primary/30 text-foreground" : "")}>
+                                        {alert.metric === "TEMP" ? `${parseFloat(alert.value).toFixed(1)}°C`
+                                          : alert.metric === "RH" ? `${parseFloat(alert.value).toFixed(0)}%`
+                                          : alert.metric === "PH" ? `pH ${parseFloat(alert.value).toFixed(1)}`
+                                          : alert.metric === "PPFD" ? `${parseFloat(alert.value).toFixed(0)} μmol`
+                                          : parseFloat(alert.value).toFixed(1)}
                                       </Badge>
                                     )}
                                     <Badge variant="secondary" className="text-xs">

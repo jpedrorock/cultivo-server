@@ -172,6 +172,45 @@ function LogRow({
   );
 }
 
+// ── Mini sparkline SVG ──────────────────────────────────────────────────────
+function Sparkline({
+  values,
+  color,
+  width = 80,
+  height = 24,
+}: {
+  values: number[];
+  color: string;
+  width?: number;
+  height?: number;
+}) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pad = 2;
+  const w = width - pad * 2;
+  const h = height - pad * 2;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * w;
+    const y = pad + h - ((v - min) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <polyline
+        points={pts.join(" ")}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity={0.8}
+      />
+    </svg>
+  );
+}
+
 function PeriodCard({
   period,
   index,
@@ -208,6 +247,8 @@ function PeriodCard({
   const avgRh = logsWithRh.length
     ? Math.round(logsWithRh.reduce((s: number, l: any) => s + parseFloat(l.rhPct), 0) / logsWithRh.length)
     : null;
+  const tempValues = logsWithTemp.map((l: any) => parseFloat(l.tempC));
+  const rhValues = logsWithRh.map((l: any) => parseFloat(l.rhPct));
 
   return (
     <div
@@ -233,9 +274,23 @@ function PeriodCard({
             {period.logCount} registro{period.logCount !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex gap-2 shrink-0 text-[11px] text-muted-foreground/50 font-medium">
-          {avgTemp && <span>{avgTemp}°</span>}
-          {avgRh && <span>{avgRh}%</span>}
+        <div className="flex items-center gap-3 shrink-0">
+          {tempValues.length >= 2 ? (
+            <div className="flex flex-col items-end gap-0.5">
+              <Sparkline values={tempValues} color="#f97316" width={72} height={20} />
+              {avgTemp && <span className="text-[10px] text-orange-400/70 font-medium tabular-nums">⌀ {avgTemp}°C</span>}
+            </div>
+          ) : avgTemp ? (
+            <span className="text-[11px] text-orange-400/70">{avgTemp}°C</span>
+          ) : null}
+          {rhValues.length >= 2 ? (
+            <div className="flex flex-col items-end gap-0.5">
+              <Sparkline values={rhValues} color="#60a5fa" width={72} height={20} />
+              {avgRh && <span className="text-[10px] text-blue-400/70 font-medium tabular-nums">⌀ {avgRh}%</span>}
+            </div>
+          ) : avgRh ? (
+            <span className="text-[11px] text-blue-400/70">{avgRh}%</span>
+          ) : null}
         </div>
         {open
           ? <ChevronUp className="w-4 h-4 text-muted-foreground/40 shrink-0" />

@@ -411,6 +411,30 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
             )}
           </h3>
         </div>
+        {/* Visual mini-timeline */}
+        {!isLoading && healthLogs && healthLogs.length >= 2 && (
+          <div className="bg-muted/30 rounded-xl px-4 py-3 overflow-x-auto">
+            <div className="flex items-end gap-0 min-w-max">
+              {[...healthLogs].reverse().map((log: any, i: number, arr: any[]) => {
+                const s = getStatusOption(log.healthStatus);
+                return (
+                  <div key={log.id} className="flex items-end">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`w-3 h-3 rounded-full ${s.dot} ring-2 ring-background`} />
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {new Date(log.logDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                      </span>
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div className="w-6 h-px bg-border mb-[18px] mx-0.5" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <HealthTabSkeleton />
         ) : healthLogs && healthLogs.length > 0 ? (

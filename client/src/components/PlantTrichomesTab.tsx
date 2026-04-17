@@ -529,51 +529,61 @@ export default function PlantTrichomesTab({
                       </div>
                     </div>
 
-                    {/* Percentage Bar - Compact Visual */}
-                    {hasPercentages && (
-                      <div className="space-y-1.5">
-                        <div className="flex h-3 rounded-full overflow-hidden bg-muted/50">
-                          {log.clearPercent !== null &&
-                            log.clearPercent > 0 && (
-                              <div
-                                className="bg-gray-400 transition-all"
-                                style={{
-                                  width: `${log.clearPercent}%`,
-                                }}
-                              />
-                            )}
-                          {log.cloudyPercent !== null &&
-                            log.cloudyPercent > 0 && (
-                              <div
-                                className="bg-blue-400 transition-all"
-                                style={{
-                                  width: `${log.cloudyPercent}%`,
-                                }}
-                              />
-                            )}
-                          {log.amberPercent !== null &&
-                            log.amberPercent > 0 && (
-                              <div
-                                className="bg-orange-400 transition-all"
-                                style={{
-                                  width: `${log.amberPercent}%`,
-                                }}
-                              />
-                            )}
+                    {/* Trichome percentages — pie chart + bar */}
+                    {hasPercentages && (() => {
+                      const c = log.clearPercent || 0;
+                      const cl = log.cloudyPercent || 0;
+                      const a = log.amberPercent || 0;
+                      const total = c + cl + a;
+                      const pC = total > 0 ? (c / total) * 100 : 0;
+                      const pCl = total > 0 ? (cl / total) * 100 : 0;
+                      return (
+                        <div className="flex items-center gap-3">
+                          {/* Mini pie donut */}
+                          <div className="relative shrink-0 w-10 h-10">
+                            <div
+                              className="w-10 h-10 rounded-full"
+                              style={{
+                                background: `conic-gradient(
+                                  #9ca3af 0% ${pC}%,
+                                  #60a5fa ${pC}% ${pC + pCl}%,
+                                  #f97316 ${pC + pCl}% 100%
+                                )`
+                              }}
+                            />
+                            <div className="absolute inset-[6px] rounded-full bg-card" />
+                          </div>
+                          {/* Legend + bar */}
+                          <div className="flex-1 space-y-1.5">
+                            <div className="flex h-2.5 rounded-full overflow-hidden bg-muted/50">
+                              {c > 0 && <div className="bg-gray-400" style={{ width: `${pC}%` }} />}
+                              {cl > 0 && <div className="bg-blue-400" style={{ width: `${pCl}%` }} />}
+                              {a > 0 && <div className="bg-orange-400" style={{ width: `${100 - pC - pCl}%` }} />}
+                            </div>
+                            <div className="flex gap-3 text-xs text-muted-foreground">
+                              {log.clearPercent !== null && (
+                                <span className="flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full bg-gray-400 shrink-0"/>
+                                  {log.clearPercent}%
+                                </span>
+                              )}
+                              {log.cloudyPercent !== null && (
+                                <span className="flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0"/>
+                                  {log.cloudyPercent}%
+                                </span>
+                              )}
+                              {log.amberPercent !== null && (
+                                <span className="flex items-center gap-1">
+                                  <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0"/>
+                                  {log.amberPercent}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-xs sm:text-[10px] text-foreground sm:text-muted-foreground font-medium sm:font-normal">
-                          {log.clearPercent !== null && (
-                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200 shrink-0 inline-block"/> {log.clearPercent}%</span>
-                          )}
-                          {log.cloudyPercent !== null && (
-                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 shrink-0 inline-block"/> {log.cloudyPercent}%</span>
-                          )}
-                          {log.amberPercent !== null && (
-                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 inline-block"/> {log.amberPercent}%</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Notes */}
                     {log.notes && (

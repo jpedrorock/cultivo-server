@@ -309,6 +309,28 @@ export default function QuickLog() {
     setTrichomeRecords(new Map());
   };
 
+  // Reinicia para registrar outra estufa sem sair do QuickLog
+  const resetForNewTent = () => {
+    setCurrentStep(0);
+    setTentId(null);
+    setTempC("");
+    setRhPct("");
+    setWateringVolume("");
+    setRunoffCollected("");
+    setRunoffPh("");
+    setRunoffEc("");
+    setPh("");
+    setEc("");
+    setPpfd(400);
+    setLuxValue(20000);
+    setRecordPlantHealth(null);
+    setCurrentPlantIndex(0);
+    setPlantHealthRecords(new Map());
+    setRecordTrichomes(null);
+    setCurrentTrichomeIndex(0);
+    setTrichomeRecords(new Map());
+  };
+
   const updateTrichomeRecord = (plantId: number, field: string, value: any) => {
     setTrichomeRecords((prev) => {
       const newMap = new Map(prev);
@@ -905,11 +927,18 @@ export default function QuickLog() {
                   </div>
                 )}
                 <BigStepper value={tempC} onChange={setTempC} step={0.1} min={-10} max={50} decimals={1} unit="°C" fieldType="temperature" colorClass={getValidationColor(tempC, targets?.tempMin ? parseFloat(String(targets.tempMin)) : null, targets?.tempMax ? parseFloat(String(targets.tempMax)) : null)} />
-                {targets?.tempMin && targets?.tempMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.tempMin))}–{parseFloat(String(targets.tempMax))}°C
-                  </p>
-                )}
+                <div className="flex items-center justify-center gap-4 flex-wrap">
+                  {targets?.tempMin && targets?.tempMax && (
+                    <p className="text-xs text-center text-muted-foreground flex items-center gap-1">
+                      <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.tempMin))}–{parseFloat(String(targets.tempMax))}°C
+                    </p>
+                  )}
+                  {!sensorReading?.isFresh && lastLogs?.[0]?.tempC != null && (
+                    <p className="text-xs text-center text-muted-foreground/70">
+                      Último: {parseFloat(String(lastLogs[0].tempC)).toFixed(1)}°C
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -929,11 +958,18 @@ export default function QuickLog() {
                   </div>
                 )}
                 <BigStepper value={rhPct} onChange={setRhPct} step={1} min={0} max={100} decimals={0} unit="%" fieldType="humidity" colorClass={getValidationColor(rhPct, targets?.rhMin ? parseFloat(String(targets.rhMin)) : null, targets?.rhMax ? parseFloat(String(targets.rhMax)) : null)} />
-                {targets?.rhMin && targets?.rhMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.rhMin))}–{parseFloat(String(targets.rhMax))}%
-                  </p>
-                )}
+                <div className="flex items-center justify-center gap-4 flex-wrap">
+                  {targets?.rhMin && targets?.rhMax && (
+                    <p className="text-xs text-center text-muted-foreground flex items-center gap-1">
+                      <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.rhMin))}–{parseFloat(String(targets.rhMax))}%
+                    </p>
+                  )}
+                  {!sensorReading?.isFresh && lastLogs?.[0]?.rhPct != null && (
+                    <p className="text-xs text-center text-muted-foreground/70">
+                      Último: {parseFloat(String(lastLogs[0].rhPct)).toFixed(0)}%
+                    </p>
+                  )}
+                </div>
                 {/* VPD ao vivo — aparece quando temp também está preenchida (L2) */}
                 {tempC && rhPct && (() => {
                   const t = parseFloat(tempC), rh = parseFloat(rhPct);
@@ -981,11 +1017,18 @@ export default function QuickLog() {
             {currentStep === 5 && (
               <div className="space-y-6 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <BigStepper value={ph} onChange={setPh} step={0.1} min={0} max={14} decimals={1} unit="pH" fieldType="ph" colorClass={getValidationColor(ph, targets?.phMin ? parseFloat(String(targets.phMin)) : null, targets?.phMax ? parseFloat(String(targets.phMax)) : null)} />
-                {targets?.phMin && targets?.phMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.phMin))}–{parseFloat(String(targets.phMax))} pH
-                  </p>
-                )}
+                <div className="flex items-center justify-center gap-4 flex-wrap">
+                  {targets?.phMin && targets?.phMax && (
+                    <p className="text-xs text-center text-muted-foreground flex items-center gap-1">
+                      <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.phMin))}–{parseFloat(String(targets.phMax))} pH
+                    </p>
+                  )}
+                  {lastLogs?.[0]?.ph != null && (
+                    <p className="text-xs text-center text-muted-foreground/70">
+                      Último: pH {parseFloat(String(lastLogs[0].ph)).toFixed(1)}
+                    </p>
+                  )}
+                </div>
                 <div className="pt-4 pb-2">
                   <RangeSlider
                     min={0}
@@ -1010,11 +1053,18 @@ export default function QuickLog() {
             {currentStep === 6 && (
               <div className="space-y-4 animate-[slide-in-from-bottom_0.8s_ease-out]">
                 <BigStepper value={ec} onChange={setEc} step={0.1} min={0} max={10} decimals={1} unit="mS/cm" colorClass={getValidationColor(ec, targets?.ecMin ? parseFloat(String(targets.ecMin)) : null, targets?.ecMax ? parseFloat(String(targets.ecMax)) : null)} />
-                {targets?.ecMin && targets?.ecMax && (
-                  <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1">
-                    <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.ecMin))}–{parseFloat(String(targets.ecMax))} mS/cm
-                  </p>
-                )}
+                <div className="flex items-center justify-center gap-4 flex-wrap">
+                  {targets?.ecMin && targets?.ecMax && (
+                    <p className="text-xs text-center text-muted-foreground flex items-center gap-1">
+                      <Target className="w-3 h-3 text-primary"/> {parseFloat(String(targets.ecMin))}–{parseFloat(String(targets.ecMax))} mS/cm
+                    </p>
+                  )}
+                  {lastLogs?.[0]?.ec != null && (
+                    <p className="text-xs text-center text-muted-foreground/70">
+                      Último: {parseFloat(String(lastLogs[0].ec)).toFixed(1)} mS/cm
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1172,14 +1222,22 @@ export default function QuickLog() {
                   Registrar Saúde das Plantas
                 </Button>
                 <Button
+                  onClick={resetForNewTent}
+                  variant="outline"
+                  className="w-full h-14 text-base font-semibold rounded-2xl border-2 border-primary/30 text-primary hover:bg-primary/5"
+                >
+                  <ArrowRight className="mr-2 h-5 w-5" />
+                  Registrar outra estufa
+                </Button>
+                <Button
                   onClick={() => {
                     resetForm();
                     setLocation("/");
                   }}
-                  variant="outline"
-                  className="w-full h-16 text-lg font-semibold rounded-2xl border-2"
+                  variant="ghost"
+                  className="w-full h-12 text-base font-medium rounded-2xl text-muted-foreground"
                 >
-                  <SkipForward className="mr-2 h-6 w-6" />
+                  <SkipForward className="mr-2 h-5 w-5" />
                   Finalizar
                 </Button>
               </div>

@@ -44,6 +44,7 @@ export default function PlantsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"ACTIVE" | "HARVESTED" | "DEAD" | "DISCARDED" | "AWAITING_DRYING" | undefined>();
   const [filterOpen, setFilterOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"name" | "phase" | "age" | "health">("name");
   
   // Ler query param ?tent=ID para auto-expandir estufa
   const tentParam = new URLSearchParams(window.location.search).get('tent');
@@ -197,13 +198,22 @@ export default function PlantsList() {
     },
   });
 
-  const filteredPlants = useMemo(() =>
-    plants?.filter((plant) =>
+  const healthOrder: Record<string, number> = { HEALTHY: 0, RECOVERING: 1, STRESSED: 2, SICK: 3 };
+  const phaseOrder: Record<string, number> = { FLORA: 0, VEGA: 1, CLONING: 2, SEEDLING: 3, MAINTENANCE: 4 };
+
+  const filteredPlants = useMemo(() => {
+    const filtered = plants?.filter((plant) =>
       plant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       plant.code?.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
-    [plants, searchTerm]
-  );
+    ) ?? [];
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name, "pt-BR");
+      if (sortBy === "phase") return (phaseOrder[a.cyclePhase ?? ""] ?? 99) - (phaseOrder[b.cyclePhase ?? ""] ?? 99);
+      if (sortBy === "age") return new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime();
+      if (sortBy === "health") return (healthOrder[a.lastHealthStatus ?? ""] ?? 99) - (healthOrder[b.lastHealthStatus ?? ""] ?? 99);
+      return 0;
+    });
+  }, [plants, searchTerm, sortBy]);
 
   // Agrupar plantas por estufa
   const plantsByTent = useMemo(() =>
@@ -372,6 +382,16 @@ export default function PlantsList() {
                   <option value="HARVESTED">Colhida</option>
                   <option value="DEAD">Morta</option>
                   <option value="DISCARDED">Descartada</option>
+                </select>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm sm:col-span-2"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                >
+                  <option value="name">Ordenar por: Nome (A–Z)</option>
+                  <option value="phase">Ordenar por: Fase (Flora → Vega)</option>
+                  <option value="age">Ordenar por: Idade (mais velhas primeiro)</option>
+                  <option value="health">Ordenar por: Saúde (melhor → pior)</option>
                 </select>
               </div>
           </div>

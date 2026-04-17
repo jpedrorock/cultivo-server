@@ -11,7 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, FileText, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2, Loader2, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface PlantObservationsTabProps {
@@ -21,6 +23,8 @@ interface PlantObservationsTabProps {
 export default function PlantObservationsTab({ plantId }: PlantObservationsTabProps) {
   const utils = trpc.useUtils();
   const [newObservation, setNewObservation] = useState("");
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [obsDate, setObsDate] = useState(todayStr);
 
   // Edit state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -60,7 +64,11 @@ export default function PlantObservationsTab({ plantId }: PlantObservationsTabPr
 
   const handleSubmit = () => {
     if (!newObservation.trim()) return;
-    createObservation.mutate({ plantId, content: newObservation });
+    createObservation.mutate({
+      plantId,
+      content: newObservation,
+      observationDate: obsDate ? new Date(obsDate) : undefined,
+    });
   };
 
   const handleEditStart = (obs: any) => {
@@ -88,6 +96,15 @@ export default function PlantObservationsTab({ plantId }: PlantObservationsTabPr
           rows={3}
           className="resize-none"
         />
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+          <Input
+            type="date"
+            value={obsDate}
+            onChange={(e) => setObsDate(e.target.value)}
+            className="w-40 text-sm h-8"
+          />
+        </div>
         <Button
           onClick={handleSubmit}
           disabled={!newObservation.trim() || createObservation.isPending}
