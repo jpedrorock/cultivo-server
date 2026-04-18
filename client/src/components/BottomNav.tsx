@@ -212,7 +212,7 @@ export function BottomNav() {
   ];
 
   const moreMenuItems: NavItem[] = [
-    { href: "/morning-check", icon: Sunrise, label: "Status" },
+    { href: "/morning-check", icon: Sunrise, label: "Checklist Matinal" },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },

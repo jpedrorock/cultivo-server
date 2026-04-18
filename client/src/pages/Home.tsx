@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, Bot } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
@@ -337,28 +337,19 @@ export default function Home() {
       key: 'n',
       ctrl: true,
       description: 'Criar Nova Estufa',
-      action: () => {
-        setCreateTentModalOpen(true);
-        toast.success('Atalho acionado: Criar Nova Estufa');
-      },
+      action: () => { setCreateTentModalOpen(true); },
     },
     {
       key: 'h',
       ctrl: true,
       description: 'Ir para Histórico',
-      action: () => {
-        setLocation('/history');
-        toast.success('Atalho acionado: Histórico');
-      },
+      action: () => { setLocation('/history'); },
     },
     {
       key: 'c',
       ctrl: true,
       description: 'Ir para Calculadoras',
-      action: () => {
-        setLocation('/calculators');
-        toast.success('Atalho acionado: Calculadoras');
-      },
+      action: () => { setLocation('/calculators'); },
     },
   ]);
 
@@ -1098,6 +1089,16 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
             <p className="text-xs text-muted-foreground mt-0.5">{tent.width}×{tent.depth}×{tent.height}cm</p>
           </div>
 
+          {/* IA — acesso rápido ao chat especialista */}
+          <Link href="/chat" onClick={e => e.stopPropagation()}>
+            <button
+              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
+              title="Perguntar para a IA"
+            >
+              <Bot className="w-4 h-4" />
+            </button>
+          </Link>
+
           {/* Monitor — acesso rápido ao display da estufa */}
           <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
             <button
@@ -1311,7 +1312,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 }
               </p>
               {isSensorAuto && (
-                <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
+                <span className="absolute top-1 right-1 text-cyan-400 opacity-80" title="Leitura automática (sensor)"><Wifi className="w-3 h-3" /></span>
               )}
             </button>
             {/* Humidity */}
@@ -1322,7 +1323,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <Droplets className="w-3.5 h-3.5 text-teal-400" />
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">RH</p>
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">Umid</p>
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
                 {readNow.isPending
                   ? <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
@@ -1337,7 +1338,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 }
               </p>
               {isSensorAuto && (
-                <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
+                <span className="absolute top-1 right-1 text-cyan-400 opacity-80" title="Leitura automática (sensor)"><Wifi className="w-3 h-3" /></span>
               )}
             </button>
             {/* PPFD */}
