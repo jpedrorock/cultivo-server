@@ -297,7 +297,7 @@ export default function PlantsList() {
     <PageTransition>
       <div className="min-h-screen bg-background">
       {/* Header — fixed para funcionar dentro do scroll do iOS */}
-      <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe">
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -339,7 +339,7 @@ export default function PlantsList() {
       </header>
 
       {/* Spacer = header height (py-4=32px + h-12=48px = 80px) + safe area */}
-      <div style={{ height: 'calc(80px + env(safe-area-inset-top, 0px))' }} />
+      <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '80px' }} />
 
       {/* Main Content */}
       <main className="container py-4">

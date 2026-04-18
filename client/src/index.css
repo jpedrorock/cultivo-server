@@ -1675,6 +1675,16 @@ input[type="range"]::-moz-range-track {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* Hero com altura que considera a safe area do topo (PlantDetail) */
+.h-hero-safe {
+  height: calc(300px + env(safe-area-inset-top, 0px));
+}
+
+/* Posicionamento de botões flutuantes abaixo do notch (PlantDetail) */
+.top-safe-1rem {
+  top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
 /* ============================================================
    FIX: position:fixed + backdrop-filter no iOS Safari / WebKit
    

@@ -356,7 +356,7 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe">
           <div className="container py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -369,7 +369,7 @@ export default function Home() {
           </div>
         </header>
         {/* Spacer = header height (py-4 = 16px × 2 + h-9 = 36px = 68px) + safe area */}
-        <div style={{ height: 'calc(68px + env(safe-area-inset-top, 0px))' }} />
+        <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '68px' }} />
         <main className="container py-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="h-8 w-24 bg-muted rounded animate-pulse" />
@@ -435,7 +435,7 @@ export default function Home() {
     <PageTransition>
       <div className="min-h-screen bg-background">
         {/* Header — fixed para funcionar independente do PullToRefresh */}
-        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe">
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -479,7 +479,7 @@ export default function Home() {
       </header>
 
       {/* Spacer = header height (py-4 = 32px + h-9 = 36px = 68px) + safe area */}
-      <div style={{ height: 'calc(68px + env(safe-area-inset-top, 0px))' }} />
+      <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '68px' }} />
 
       <PullToRefresh onRefresh={handleRefresh}>
         <div>

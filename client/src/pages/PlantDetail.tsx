@@ -380,10 +380,9 @@ export default function PlantDetail() {
 
         {/* ── Hero: foto full-bleed com nome sobreposto ── */}
         <div
-          className="relative w-full overflow-hidden"
+          className="relative w-full overflow-hidden h-hero-safe"
           style={{
             background: heroColor,
-            height: 'calc(300px + env(safe-area-inset-top, 0px))',
           }}
         >
           {/* Photo as full-bleed background */}
@@ -416,9 +415,8 @@ export default function PlantDetail() {
           {/* Floating back button — top left */}
           <button
             onClick={() => setLocation('/plants')}
-            className="absolute left-4 z-30 w-10 h-10 rounded-full flex items-center justify-center transition-opacity active:opacity-70"
+            className="absolute left-4 top-safe-1rem z-30 w-10 h-10 rounded-full flex items-center justify-center transition-opacity active:opacity-70"
             style={{
-              top: 'calc(1rem + env(safe-area-inset-top, 0px))',
               background: 'rgba(0,0,0,0.32)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
@@ -430,8 +428,7 @@ export default function PlantDetail() {
 
           {/* Floating action buttons — top right */}
           <div
-            className="absolute right-4 z-30 flex items-center gap-2"
-            style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+            className="absolute right-4 top-safe-1rem z-30 flex items-center gap-2"
           >
             <button
               onClick={handleEditClick}

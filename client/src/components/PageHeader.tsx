@@ -85,10 +85,9 @@ export function PageHeader({
     <header
       className={cn(
         "bg-card border-b border-border",
-        sticky ? "fixed top-0 left-0 right-0 z-20" : "relative",
+        sticky ? "fixed top-0 left-0 right-0 z-20 pt-safe" : "relative",
         className,
       )}
-      style={sticky ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}
     >
       <div className="container mx-auto px-4 py-3 flex items-center gap-3">
         <Button
@@ -136,7 +135,8 @@ export function PageHeader({
       {headerEl}
       <div
         aria-hidden="true"
-        style={{ height: `calc(${spacerHeight} + env(safe-area-inset-top, 0px))` }}
+        className="pt-safe"
+        style={{ paddingBottom: spacerHeight }}
       />
     </>
   );
