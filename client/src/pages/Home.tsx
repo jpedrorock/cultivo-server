@@ -880,77 +880,9 @@ export default function Home() {
 }
 
 
-function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; color: string; w?: number; h?: number }) {
-  if (values.length < 2) return null;
-  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
-  const pts = values.map((v, i) =>
-    `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`
-  );
-  const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
-  const uid = `ecg-${color.replace(/[^a-z0-9]/gi, "")}`;
-  const dur = "3.5s";
-
-  // Fórmula do rastro: todas as camadas terminam no mesmo ponto de varredura P.
-  // Com pathLength="1": stroke-dasharray="L (1-L)" e values="L;-(1-L)"
-  // garante que o traço de tamanho L sempre TERMINA em P para qualquer instante t.
-  // O efeito: L grande = rastro largo e tênue, L pequeno = ponta fina e brilhante.
-
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: "visible", opacity: 0.85 }}>
-      <defs>
-        <filter id={`${uid}-glow`} x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {/* Traço de fundo — sempre visível, muito apagado (o "papel" do ECG) */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1"
-        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.10" />
-
-      {/* Rastro longo e tênue — 35% do path, termina no ponto de varredura */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.18"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.35 0.65">
-        <animate attributeName="stroke-dashoffset" values="0.35;-0.65" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Rastro médio — 18% do path, mais brilhante */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.45"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.18 0.82">
-        <animate attributeName="stroke-dashoffset" values="0.18;-0.82" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Rastro curto — 7% do path, quase total */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.80"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.07 0.93">
-        <animate attributeName="stroke-dashoffset" values="0.07;-0.93" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Ponta brilhante — 2% com glow, a frente do scanner */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeOpacity="1"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.02 0.98"
-        filter={`url(#${uid}-glow)`}>
-        <animate attributeName="stroke-dashoffset" values="0.02;-0.98" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Ponto de luz na frente da varredura */}
-      <circle r="2.2" fill={color} filter={`url(#${uid}-glow)`} opacity="0.95">
-        <animateMotion path={pathD} dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </circle>
-    </svg>
-  );
-}
-
-// Separate component for Tent Card with Tasks
+// Separate component for Tent Card
 function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlora, onInitiateCycle, onEditCycle, onFinalizeCycle, onEditTent, onDeleteTent }: any) {
   const [, navigate] = useLocation();
-  const [tasksOpen, setTasksOpen] = useState(false);         // painel inteiro aberto/fechado
-  const [tasksExpanded, setTasksExpanded] = useState(true);  // semana expandida quando painel aberto
-  const [hideCompleted, setHideCompleted] = useState(false);
-  const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
 
   const [selectMotherOpen, setSelectMotherOpen] = useState(false);
   const [selectedMotherId, setSelectedMotherId] = useState<number | null>(null);
@@ -978,21 +910,9 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     }
   };
   
-  const { data: tasks, isLoading: tasksLoading } = trpc.tasks.getTasksByTent.useQuery(
-    { tentId: tent.id },
-    { enabled: !!cycle } // Only fetch if there's an active cycle
-  );
-  
   const { data: latestLog } = trpc.dailyLogs.getLatestByTent.useQuery(
     { tentId: tent.id }
   );
-
-  const { data: recentLogs } = trpc.dailyLogs.list.useQuery(
-    { tentId: tent.id, limit: 7 },
-    { staleTime: 5 * 60 * 1000 }
-  );
-  const sparkTemps    = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
-  const sparkRh       = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
 
   // Buscar targets ideais - usa média das strains das plantas na estufa
   const currentWeek = cycle ? (() => {
@@ -1103,43 +1023,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     },
     onError: (e) => toast.error(`Sensor: ${e.message}`),
   });
-
-  const toggleTask = trpc.tasks.toggleTask.useMutation({
-    onSuccess: () => {
-      utils.tasks.getTasksByTent.invalidate({ tentId: tent.id });
-      toast.success("Tarefa atualizada!");
-    },
-    onError: (error) => {
-      toast.error(`Erro ao atualizar tarefa: ${error.message}`);
-    },
-  });
-
-  const handleToggleTask = (taskId: number, currentIsDone: boolean) => {
-    toggleTask.mutate({ taskId });
-    
-    // Se a tarefa está sendo marcada como concluída, colapsa automaticamente após 500ms
-    if (!currentIsDone) {
-      setTimeout(() => {
-        setExpandedTasks(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(taskId);
-          return newSet;
-        });
-      }, 500);
-    } else {
-      // Se está sendo desmarcada, expande automaticamente
-      setExpandedTasks(prev => new Set(prev).add(taskId));
-    }
-  };
-
-  const completedTasks = tasks?.filter((t) => t.isDone).length || 0;
-  const totalTasks = tasks?.length || 0;
-
-  // Registros de hoje para tarefas diárias
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const todayLogs = (recentLogs ?? []).filter(l => new Date(l.logDate) >= todayStart);
-  const morningDone = todayLogs.length >= 1;
-  const afternoonDone = todayLogs.length >= 2;
 
   const phaseAccentColor = !cycle ? '#6b7280' :
     tent.category === 'VEGA'   ? '#4ade80' :
@@ -1427,7 +1310,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     })()
                 }
               </p>
-              <MiniSparkline values={sparkTemps} color="#f97316" />
               {isSensorAuto && (
                 <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
               )}
@@ -1454,7 +1336,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                     })()
                 }
               </p>
-              <MiniSparkline values={sparkRh} color="#2dd4bf" />
               {isSensorAuto && (
                 <span className="absolute top-1.5 right-1.5 text-[8px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">A</span>
               )}
@@ -1466,10 +1347,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               <p className="text-xl font-bold tracking-tight leading-none text-foreground">
                 {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
               </p>
-              {/* Linha de lâmpada — pulsa como luz aumentando e diminuindo */}
-              <div className="h-[18px] flex items-center w-full px-1">
-                <div className="ppfd-lamp-line w-full h-[2px] rounded-full" />
-              </div>
             </div>
           </div>
 
@@ -1536,115 +1413,19 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
       )}
     </Card>
 
-    {/* ── Tarefas — botão toggle + painel deslizante ── */}
+    {/* ── Acesso rápido à estufa ── */}
     {cycle && (
-      <div className="mx-1 mt-2">
-        {/* Botão toggle — sempre visível, fino */}
-        <button
-          onClick={e => { e.stopPropagation(); setTasksOpen(!tasksOpen); }}
-          className="w-full flex items-center justify-between px-5 py-3 rounded-b-xl bg-muted/20 border border-t-0 border-border/30 hover:bg-muted/40 transition-all duration-200"
-        >
-          <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            Tarefas
-            <span className="text-xs opacity-60 font-normal">
-              {(morningDone ? 1 : 0) + (afternoonDone ? 1 : 0)}/2 hoje · {completedTasks}/{totalTasks} semana
+      <Link href={`/tent/${tent.id}`}>
+        <div className="mx-1 mt-1">
+          <div className="w-full flex items-center justify-between px-5 py-2.5 rounded-b-xl bg-muted/20 border border-t-0 border-border/30 hover:bg-muted/40 active:scale-[0.99] transition-all duration-150">
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Ver tarefas e detalhes da estufa
             </span>
-          </span>
-          <span className={`text-muted-foreground transition-transform duration-300 ${tasksOpen ? "rotate-180" : ""}`}>
-            <ArrowRight className="w-4 h-4 rotate-90" />
-          </span>
-        </button>
-
-        {/* Painel expansível */}
-        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${tasksOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
-          <div className="rounded-b-xl bg-muted/30 border border-t-0 border-border/40 divide-y divide-border/40">
-
-            {/* Tarefas Diárias */}
-            <div className="px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2 flex items-center gap-1.5">
-                <Clock className="w-3 h-3" /> Diárias
-              </p>
-              <div className="space-y-1.5">
-                {[
-                  { label: "Registro Manhã", done: morningDone },
-                  { label: "Registro Tarde", done: afternoonDone },
-                ].map(({ label, done }) => (
-                  <Link key={label} href={`/quick-log?tentId=${tent.id}`}>
-                    <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200 ${
-                      done
-                        ? "border-primary/30 bg-primary/5"
-                        : "border-border/30 hover:border-primary/20 hover:bg-muted/30"
-                    }`}>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
-                        done
-                          ? "border-primary bg-primary"
-                          : "border-muted-foreground/30"
-                      }`}
-                        style={done ? { boxShadow: "0 0 8px rgba(74,222,128,0.5)" } : {}}
-                      >
-                        {done && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
-                      </div>
-                      <span className={`text-[13px] font-semibold flex-1 transition-colors ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                        {label}
-                      </span>
-                      {!done && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Tarefas da Semana */}
-            <div className="px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3 h-3" /> Semana
-                </p>
-                <div className="flex items-center gap-2">
-                  {tasks && tasks.length > 0 && (
-                    <button onClick={(e) => { e.stopPropagation(); setHideCompleted(!hideCompleted); }} className="text-muted-foreground hover:text-foreground transition-colors">
-                      {hideCompleted ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                    </button>
-                  )}
-                  <Badge variant="outline" className="text-xs h-5">{completedTasks}/{totalTasks}</Badge>
-                </div>
-              </div>
-              {tasksLoading ? (
-                <div className="flex justify-center py-3"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>
-              ) : tasks && tasks.length > 0 ? (
-                <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {tasks.filter(t => hideCompleted ? !t.isDone : true).map((task) => (
-                    <div
-                      key={task.id}
-                      onClick={(e) => { e.stopPropagation(); handleToggleTask(task.id, task.isDone); }}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 group ${
-                        task.isDone ? "opacity-60" : "hover:bg-muted/30"
-                      }`}
-                    >
-                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
-                        task.isDone
-                          ? "border-primary bg-primary"
-                          : "border-muted-foreground/30 group-hover:border-primary/50"
-                      }`}
-                        style={task.isDone ? { boxShadow: "0 0 8px rgba(74,222,128,0.4)" } : {}}
-                      >
-                        {task.isDone && <Check className="w-3 h-3 text-black" strokeWidth={3} />}
-                      </div>
-                      <span className={`text-xs flex-1 ${task.isDone ? "line-through text-muted-foreground" : "text-foreground/90"}`}>
-                        {task.title}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground text-center py-2">Nenhuma tarefa esta semana</p>
-              )}
-            </div>
-
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
           </div>
         </div>
-      </div>
+      </Link>
     )}
 
       </div>
