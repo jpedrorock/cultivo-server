@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'wouter';
-import { ArrowLeft, Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react';
+import { Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageTransition } from '@/components/PageTransition';
+import { PageHeader } from '@/components/PageHeader';
 import { TentIcon } from '@/components/TentIcon';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
@@ -150,17 +150,11 @@ export default function TuyaSettings() {
     <PageTransition>
       <div className="min-h-screen bg-background">
 
-        {/* Header */}
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-3 flex items-center gap-3">
-            <Button asChild variant="ghost" size="icon" className="shrink-0 h-9 w-9">
-              <Link href="/settings"><ArrowLeft className="w-4 h-4" /></Link>
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-base font-bold leading-tight">Sensores SmartLife / Tuya</h1>
-              <p className="text-xs text-muted-foreground">Temperatura e umidade automáticos</p>
-            </div>
-            {/* Tabs */}
+        <PageHeader
+          backHref="/settings"
+          title="Sensores SmartLife / Tuya"
+          subtitle="Temperatura e umidade automáticos"
+          rightActions={
             <div className="flex gap-1 bg-muted rounded-lg p-0.5">
               {(['api', 'sensors'] as const).map(t => (
                 <button
@@ -174,8 +168,8 @@ export default function TuyaSettings() {
                 </button>
               ))}
             </div>
-          </div>
-        </header>
+          }
+        />
 
         <main className="container mx-auto px-4 py-6 pb-28 max-w-2xl space-y-5">
 

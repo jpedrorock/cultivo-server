@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useLocation, Link } from 'wouter';
-import { ArrowLeft, Trash2, Shield, User, Crown, Check, X, Clock } from 'lucide-react';
+import { useLocation } from 'wouter';
+import { Trash2, Shield, User, Crown, Check, X, Clock } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageTransition } from '@/components/PageTransition';
+import { PageHeader } from '@/components/PageHeader';
 import { toast } from 'sonner';
 
 export default function AdminUsers() {
@@ -59,21 +60,11 @@ export default function AdminUsers() {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-3 sm:py-4">
-            <div className="flex items-center gap-3">
-              <Button asChild variant="ghost" size="icon" className="shrink-0 h-9 w-9">
-                <Link href="/settings">
-                  <ArrowLeft className="w-4 h-4" />
-                </Link>
-              </Button>
-              <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-foreground leading-tight">Usuários</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground">Painel de administração</p>
-              </div>
-            </div>
-          </div>
-
+        <PageHeader
+          backHref="/settings"
+          title="Usuários"
+          subtitle="Painel de administração"
+        >
           {/* Tabs */}
           <div className="container mx-auto px-4 flex gap-1 pb-0">
             <button
@@ -102,7 +93,7 @@ export default function AdminUsers() {
               )}
             </button>
           </div>
-        </header>
+        </PageHeader>
 
         <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl">
           {isLoading ? (

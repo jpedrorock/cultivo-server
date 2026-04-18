@@ -4,7 +4,6 @@ import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  ArrowLeft,
   Maximize2,
   X,
   Save,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
 import PlantNodeMap from "@/components/PlantNodeMap";
 import type { PlantGraphNode } from "@/features/cannaprune/plantGraph";
 import {
@@ -186,21 +186,11 @@ export default function PlantTrainingPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/40 px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={() => navigate(`/plants/${plantId}`)}
-          className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="font-semibold text-base leading-tight truncate">Treinamentos</h1>
-          {plant?.name && (
-            <p className="text-xs text-muted-foreground truncate">{plant.name}</p>
-          )}
-        </div>
-      </header>
+      <PageHeader
+        backHref={`/plants/${plantId}`}
+        title="Treinamentos"
+        subtitle={plant?.name || undefined}
+      />
 
       <div className="px-4 pt-4 space-y-5">
 
