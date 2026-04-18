@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
@@ -12,6 +13,20 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+
+// ── Notch SVG animation ──────────────────────────────────────────────────────
+// Centers for 5 justify-around slots in a 390px viewBox
+// (390/5) * (i + 0.5) → 39, 117, 195, 273, 351
+const SLOT_CX = [39, 117, 195, 273, 351] as const;
+
+function buildFill(cx: number): string {
+  const p = (o: number) => cx + o;
+  return `M0,1 L${p(-47)},1 C${p(-35)},1 ${p(-29)},8 ${p(-24)},18 C${p(-18)},30 ${p(-11)},38 ${cx},38 C${p(11)},38 ${p(18)},30 ${p(24)},18 C${p(29)},8 ${p(35)},1 ${p(47)},1 L390,1 L390,65 L0,65 Z`;
+}
+function buildBorder(cx: number): string {
+  const p = (o: number) => cx + o;
+  return `M0,1 L${p(-47)},1 C${p(-35)},1 ${p(-29)},8 ${p(-24)},18 C${p(-18)},30 ${p(-11)},38 ${cx},38 C${p(11)},38 ${p(18)},30 ${p(24)},18 C${p(29)},8 ${p(35)},1 ${p(47)},1 L390,1`;
+}
 
 // Haptic feedback helper
 const triggerHapticFeedback = () => {
@@ -223,6 +238,17 @@ export function BottomNav() {
 
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
 
+  // Which slot is elevated + has the notch under it
+  // 0=Estufas  1=Plantas  2=FAB(default)  3=Alertas
+  const activeElevatedSlot =
+    location === '/'       ? 0 :
+    location === '/plants' ? 1 :
+    location === '/alerts' ? 3 : 2;
+
+  const notchCx = SLOT_CX[activeElevatedSlot];
+  const springTransition = { type: 'spring', stiffness: 320, damping: 30 } as const;
+  const itemSpring      = { type: 'spring', stiffness: 400, damping: 28 } as const;
+
   if (isHidden) return null;
 
   return (
@@ -243,7 +269,7 @@ export function BottomNav() {
         overflow: 'visible',
       }}
     >
-      {/* Curved SVG background — notch in the center for the FAB */}
+      {/* Animated SVG curved background — notch follows active slot */}
       <svg
         className="absolute bottom-0 left-0 w-full pointer-events-none"
         style={{ height: '65px' }}
@@ -251,47 +277,67 @@ export function BottomNav() {
         preserveAspectRatio="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Border line following the curve */}
-        <path
-          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1"
+        <motion.path
+          animate={{ d: buildBorder(notchCx) }}
+          transition={springTransition}
           fill="none"
           stroke="hsl(var(--border))"
           strokeWidth="1"
           vectorEffect="non-scaling-stroke"
         />
-        {/* Fill */}
-        <path
-          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1 L390,65 L0,65 Z"
+        <motion.path
+          animate={{ d: buildFill(notchCx) }}
+          transition={springTransition}
           style={{ fill: 'hsl(var(--card))' }}
         />
       </svg>
 
       <div className="max-w-screen-xl mx-auto px-2">
         <div className="relative flex justify-around items-end pb-3 pt-2">
-          {/* Nav items — Estufas, Plantas (antes do FAB) */}
-          {navItems.slice(0, 2).map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={triggerHapticFeedback}
-                aria-label={item.label}
-                className={cn(
-                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
-                  isActive
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                )}
-              >
-                <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-              </Link>
-            );
-          })}
 
-          {/* FAB — Mini menu Force Touch style — CENTER */}
-          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-10" data-tour="quick-log-menu">
+          {/* ── Slot 0: Estufas ─────────────────────────────────────── */}
+          <motion.div
+            animate={{ y: activeElevatedSlot === 0 ? -28 : 0 }}
+            transition={itemSpring}
+            className="relative"
+          >
+            {activeElevatedSlot === 0 ? (
+              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40">
+                <TentIcon className="w-6 h-6 text-primary-foreground stroke-[2.5]" />
+              </div>
+            ) : (
+              <Link href="/" onClick={triggerHapticFeedback} aria-label="Estufas"
+                className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
+                <TentIcon className="w-6 h-6" />
+              </Link>
+            )}
+          </motion.div>
+
+          {/* ── Slot 1: Plantas ─────────────────────────────────────── */}
+          <motion.div
+            animate={{ y: activeElevatedSlot === 1 ? -28 : 0 }}
+            transition={itemSpring}
+            className="relative"
+          >
+            {activeElevatedSlot === 1 ? (
+              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40">
+                <Leaf className="w-6 h-6 text-primary-foreground stroke-[2.5]" />
+              </div>
+            ) : (
+              <Link href="/plants" onClick={triggerHapticFeedback} aria-label="Plantas"
+                className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
+                <Leaf className="w-6 h-6" />
+              </Link>
+            )}
+          </motion.div>
+
+          {/* ── Slot 2: FAB ─────────────────────────────────────────── */}
+          <div ref={fabRef} className="relative flex flex-col items-center justify-center" data-tour="quick-log-menu">
+            <motion.div
+              animate={{ y: activeElevatedSlot === 2 ? -28 : 0, scale: activeElevatedSlot === 2 ? 1 : 0.72 }}
+              transition={itemSpring}
+              className="flex items-center justify-center"
+            >
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
               <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -452,47 +498,44 @@ export function BottomNav() {
               aria-label="Registrar log diário"
               className={cn(
                 "w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 transition-all duration-200",
-                fabMenuOpen ? "scale-90 rotate-45" : "active:scale-95"
+                fabMenuOpen ? "rotate-45" : "active:scale-95"
               )}
             >
               <Plus className="w-6 h-6 text-white stroke-[2.5]" />
             </button>
+            </motion.div>
           </div>
 
-          {/* Nav items — Alertas (após o FAB) */}
-          {navItems.slice(2).map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.href;
-            const isAlertsItem = item.href === "/alerts";
-            const showBadge = item.badge !== undefined && item.badge > 0;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={triggerHapticFeedback}
-                data-tour={item.href === "/alerts" ? "alerts-menu" : undefined}
-                aria-label={item.label}
-                className={cn(
-                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
-                  isActive
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+          {/* ── Slot 3: Alertas ─────────────────────────────────────── */}
+          <motion.div
+            animate={{ y: activeElevatedSlot === 3 ? -28 : 0 }}
+            transition={itemSpring}
+            className="relative"
+          >
+            {activeElevatedSlot === 3 ? (
+              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40 relative">
+                <Bell className="w-6 h-6 text-primary-foreground stroke-[2.5]" />
+                {alertCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                    {alertCount > 9 ? '9+' : alertCount}
+                  </span>
                 )}
-              >
-                <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-                {showBadge && (
-                  <span
-                    className={cn(
-                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
-                      isAlertsItem && badgeShaking ? "animate-badge-shake" : "animate-pulse"
-                    )}
-                  >
-                    {item.badge! > 9 ? '9+' : item.badge}
+              </div>
+            ) : (
+              <Link href="/alerts" onClick={triggerHapticFeedback} aria-label="Alertas" data-tour="alerts-menu"
+                className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors relative">
+                <Bell className="w-6 h-6" />
+                {alertCount > 0 && (
+                  <span className={cn(
+                    "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
+                    badgeShaking ? "animate-badge-shake" : "animate-pulse"
+                  )}>
+                    {alertCount > 9 ? '9+' : alertCount}
                   </span>
                 )}
               </Link>
-            );
-          })}
+            )}
+          </motion.div>
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
