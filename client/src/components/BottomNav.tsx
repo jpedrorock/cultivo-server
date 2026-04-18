@@ -259,14 +259,13 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 aria-label={item.label}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 p-2 rounded-xl transition-colors relative",
+                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
                 <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-                <span className="text-[10px] font-medium leading-none">{item.label}</span>
               </Link>
             );
           })}
@@ -438,14 +437,6 @@ export function BottomNav() {
             >
               <Plus className="w-6 h-6 text-white stroke-[2.5]" />
             </button>
-            <span
-              className={cn(
-                "text-[10px] font-semibold mt-1 leading-none tracking-wide transition-colors",
-                fabMenuOpen ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-              )}
-            >
-              Registrar
-            </span>
           </div>
 
           {/* Nav items — Alertas (após o FAB) */}
@@ -462,14 +453,13 @@ export function BottomNav() {
                 data-tour={item.href === "/alerts" ? "alerts-menu" : undefined}
                 aria-label={item.label}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 p-2 rounded-xl transition-colors relative",
+                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
                 <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-                <span className="text-[10px] font-medium leading-none">{item.label}</span>
                 {showBadge && (
                   <span
                     className={cn(
