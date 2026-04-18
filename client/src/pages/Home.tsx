@@ -508,8 +508,63 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="container py-4">
-        {/* Tents Grid */}
 
+        {/* ── Widget "Missão de hoje" ── */}
+        {!isLoading && tents && tents.length > 0 && (() => {
+          const activeTents = tents.filter((t: any) => getTentCycle(t.id));
+          const registeredToday = activeTents.filter((t: any) => {
+            if (!t.lastReadingAt) return false;
+            const diff = Date.now() - t.lastReadingAt;
+            return diff < 24 * 60 * 60 * 1000;
+          });
+          const pendingRegistrations = activeTents.length - registeredToday.length;
+          const allDone = pendingRegistrations === 0 && totalNewAlerts === 0;
+
+          return (
+            <div className={`mb-4 rounded-2xl border px-4 py-3 flex items-center gap-4 ${
+              allDone
+                ? 'border-emerald-500/25 bg-emerald-500/[0.06]'
+                : 'border-border/50 bg-card'
+            }`}>
+              {/* Status icon */}
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                allDone ? 'bg-emerald-500/20' : 'bg-muted/60'
+              }`}>
+                {allDone
+                  ? <CheckCircle className="w-5 h-5 text-emerald-500" />
+                  : <CheckCircle2 className="w-5 h-5 text-muted-foreground" />}
+              </div>
+
+              {/* Metrics */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  {allDone ? 'Tudo certo hoje! 🌿' : 'Missão de hoje'}
+                </p>
+                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                  <span className={`text-xs flex items-center gap-1 ${pendingRegistrations > 0 ? 'text-amber-500 font-medium' : 'text-muted-foreground line-through'}`}>
+                    <Zap className="w-3 h-3" />
+                    {pendingRegistrations > 0 ? `${pendingRegistrations} registro${pendingRegistrations > 1 ? 's' : ''} pendente${pendingRegistrations > 1 ? 's' : ''}` : 'Registros OK'}
+                  </span>
+                  <span className={`text-xs flex items-center gap-1 ${totalNewAlerts > 0 ? 'text-red-500 font-medium' : 'text-muted-foreground line-through'}`}>
+                    <Bell className="w-3 h-3" />
+                    {totalNewAlerts > 0 ? `${totalNewAlerts} alerta${totalNewAlerts > 1 ? 's' : ''} novo${totalNewAlerts > 1 ? 's' : ''}` : 'Sem alertas'}
+                  </span>
+                </div>
+              </div>
+
+              {/* CTA */}
+              {!allDone && (
+                <Link href={pendingRegistrations > 0 ? '/quick-log' : '/alerts'} onClick={e => e.stopPropagation()}>
+                  <button className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                    {pendingRegistrations > 0 ? 'Registrar' : 'Ver alertas'}
+                  </button>
+                </Link>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Tents Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
