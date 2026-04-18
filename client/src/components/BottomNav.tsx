@@ -242,6 +242,8 @@ export function BottomNav() {
       }}
     >
       {/* Curved SVG background — cobre apenas a área da barra (65px) */}
+      {/* SVG não consegue resolver CSS vars confiável no iOS: usamos um rect bg-card por baixo */}
+      <div className="absolute top-0 left-0 w-full bg-card pointer-events-none" style={{ height: '65px' }} />
       <svg
         className="absolute top-0 left-0 w-full pointer-events-none"
         style={{ height: '65px' }}
@@ -249,26 +251,31 @@ export function BottomNav() {
         preserveAspectRatio="none"
         xmlns="http://www.w3.org/2000/svg"
       >
+        {/* Notch cutout: transparente no centro para o FAB "flutuar" acima */}
+        <path
+          d="M0,0 L148,0 C160,0 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,0 242,0 L390,0 L390,65 L0,65 Z"
+          className="fill-background"
+        />
+        {/* Fill da barra (card) — preenche a área da barra abaixo da curva */}
+        <path
+          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1 L390,65 L0,65 Z"
+          className="fill-card"
+        />
         {/* Border line following the curve */}
         <path
           d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1"
           fill="none"
-          stroke="hsl(var(--border))"
+          className="stroke-border"
           strokeWidth="1"
           vectorEffect="non-scaling-stroke"
-        />
-        {/* Fill */}
-        <path
-          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1 L390,65 L0,65 Z"
-          style={{ fill: 'hsl(var(--card))' }}
         />
       </svg>
 
       {/* Background fill: do bottom do SVG (65px) até a borda inferior da tela
-          Cobre qualquer gap entre o SVG e a safe area do home indicator */}
+          Usa bg-card (classe Tailwind) pois CSS var em inline style não resolve no iOS Safari */}
       <div
-        className="absolute left-0 right-0 bottom-0 pointer-events-none"
-        style={{ top: '65px', background: 'hsl(var(--card))' }}
+        className="absolute left-0 right-0 bottom-0 bg-card pointer-events-none"
+        style={{ top: '65px' }}
       />
 
       <div className="max-w-screen-xl mx-auto px-2">
