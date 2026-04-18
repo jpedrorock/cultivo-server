@@ -378,93 +378,42 @@ export default function PlantDetail() {
     <PageTransition>
       <div className="min-h-screen bg-background">
 
-        {/* ── Hero ─────────────────────────────────────────────── */}
+        {/* ── Hero: foto full-bleed com nome sobreposto ── */}
         <div
           className="relative w-full overflow-hidden"
           style={{
             background: heroColor,
-            height: 'calc(380px + env(safe-area-inset-top, 0px))',
+            height: 'calc(300px + env(safe-area-inset-top, 0px))',
           }}
         >
-          {/* Photo as full-bleed background (when available) */}
+          {/* Photo as full-bleed background */}
           {lastPhoto ? (
-            <>
-              <img
-                src={lastPhoto}
-                alt={plant.name}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-              />
-              {/* Very light vignette over the whole image for depth */}
-              <div className="absolute inset-0 pointer-events-none"
-                style={{ background: 'rgba(0,0,0,0.18)' }} />
-            </>
+            <img
+              src={lastPhoto}
+              alt={plant.name}
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+            />
           ) : (
-            /* No photo — subtle radial highlight on phase color */
             <div className="absolute inset-0 pointer-events-none"
-              style={{ background: 'radial-gradient(ellipse 90% 50% at 50% 0%, rgba(255,255,255,0.06) 0%, transparent 70%)' }} />
+              style={{ background: 'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 70%)' }} />
           )}
 
-          {/* Split layout: left shows photo | right = frosted glass panel */}
-          <div
-            className="relative flex h-full"
-            style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
-          >
-            {/* Left — photo breathes through (just a transparent spacer) */}
-            <div className="w-[45%] shrink-0" />
+          {/* Gradient fade da parte inferior — legibilidade do texto */}
+          <div className="absolute inset-x-0 bottom-0 pointer-events-none"
+            style={{ height: '55%', background: 'linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.35) 55%, transparent 100%)' }} />
 
-            {/* Right — frosted glass with blur + phase-color fade */}
-            <div
-              className="flex-1 min-w-0 flex flex-col justify-center gap-5 pr-5 pl-4 pb-4"
-              style={lastPhoto ? {
-                backdropFilter: 'blur(22px) saturate(0.75)',
-                WebkitBackdropFilter: 'blur(22px) saturate(0.75)',
-                background: `linear-gradient(160deg, ${heroColor}b0 0%, ${heroColor}e0 100%)`,
-                borderLeft: '1px solid rgba(255,255,255,0.10)',
-              } : {}}
-            >
-              {/* Name + strain */}
-              <div>
-                <h1 className="text-2xl font-bold text-white leading-[1.1] truncate">{plant.name}</h1>
-                {strain?.name && (
-                  <p className="text-sm text-white/70 mt-1 truncate">{strain.name}</p>
-                )}
-              </div>
-
-              {/* Stats stacked — typography only, no cards */}
-              <div className="space-y-3.5">
-                <div>
-                  <p className="text-2xl font-bold text-white leading-none tabular-nums">
-                    {daysOld}
-                    <span className="text-base font-normal text-white/60 ml-1.5">dias</span>
-                  </p>
-                  <p className="text-[11px] font-medium text-white/55 uppercase tracking-wider mt-1">Idade</p>
-                </div>
-
-                {(plant.cyclePhase || tent?.category) && (
-                  <div>
-                    <p className="text-xl font-bold text-white leading-none truncate">
-                      {phaseLabel}{plant.cycleWeek ? ` · S${plant.cycleWeek}` : ''}
-                    </p>
-                    <p className="text-[11px] font-medium text-white/55 uppercase tracking-wider mt-1">Fase</p>
-                  </div>
-                )}
-
-                {tent?.name && (
-                  <div>
-                    <p className="text-lg font-semibold text-white leading-none truncate">{tent.name}</p>
-                    <p className="text-[11px] font-medium text-white/55 uppercase tracking-wider mt-1">
-                      Estufa{plant.code ? ` · #${plant.code}` : ''}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+          {/* Nome + strain no bottom da foto */}
+          <div className="absolute inset-x-0 bottom-0 px-5 pb-5 z-10">
+            <h1 className="text-2xl font-bold text-white leading-tight drop-shadow">{plant.name}</h1>
+            {strain?.name && (
+              <p className="text-sm text-white/70 mt-0.5 drop-shadow">{strain.name}</p>
+            )}
           </div>
 
-          {/* Floating back button — top left, safe-area aware */}
+          {/* Floating back button — top left */}
           <button
             onClick={() => setLocation('/plants')}
             className="absolute left-4 z-30 w-10 h-10 rounded-full flex items-center justify-center transition-opacity active:opacity-70"
@@ -472,6 +421,7 @@ export default function PlantDetail() {
               top: 'calc(1rem + env(safe-area-inset-top, 0px))',
               background: 'rgba(0,0,0,0.32)',
               backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
               border: '1px solid rgba(255,255,255,0.15)',
             }}
           >
@@ -486,7 +436,7 @@ export default function PlantDetail() {
             <button
               onClick={handleEditClick}
               className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity active:opacity-70"
-              style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
+              style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               <Edit className="w-4 h-4 text-white" />
             </button>
@@ -495,7 +445,7 @@ export default function PlantDetail() {
               <DropdownMenuTrigger asChild>
                 <button
                   className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity active:opacity-70"
-                  style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
+                  style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
                 >
                   <MoreVertical className="w-4 h-4 text-white" />
                 </button>
@@ -585,6 +535,38 @@ export default function PlantDetail() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </div>
+
+        {/* ── Stats: IDADE · FASE · ESTUFA ── */}
+        <div className="divide-y divide-border/50">
+          {/* Idade */}
+          <div className="px-5 py-3.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-bold text-foreground tabular-nums leading-none">{daysOld}</span>
+              <span className="text-sm text-muted-foreground">dias</span>
+            </div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">IDADE</p>
+          </div>
+
+          {/* Fase */}
+          {(plant.cyclePhase || tent?.category) && (
+            <div className="px-5 py-3.5">
+              <p className="text-xl font-bold text-foreground leading-none">
+                {phaseLabel}{plant.cycleWeek ? ` · S${plant.cycleWeek}` : ''}
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">FASE</p>
+            </div>
+          )}
+
+          {/* Estufa */}
+          {tent?.name && (
+            <div className="px-5 py-3.5">
+              <p className="text-xl font-bold text-foreground leading-none">{tent.name}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">
+                ESTUFA{plant.code ? ` · #${plant.code}` : ''}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* ── Tabs ─────────────────────────────────────────────── */}
