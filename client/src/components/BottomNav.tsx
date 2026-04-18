@@ -264,10 +264,11 @@ export function BottomNav() {
         />
       </svg>
 
-      {/* Safe area fill — preenche a área do home indicator com a cor do card */}
+      {/* Background fill: do bottom do SVG (65px) até a borda inferior da tela
+          Cobre qualquer gap entre o SVG e a safe area do home indicator */}
       <div
-        className="absolute bottom-0 left-0 right-0 pointer-events-none"
-        style={{ height: 'env(safe-area-inset-bottom, 0px)', background: 'hsl(var(--card))' }}
+        className="absolute left-0 right-0 bottom-0 pointer-events-none"
+        style={{ top: '65px', background: 'hsl(var(--card))' }}
       />
 
       <div className="max-w-screen-xl mx-auto px-2">
