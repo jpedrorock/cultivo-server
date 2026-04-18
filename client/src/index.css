@@ -43,65 +43,64 @@
 }
 
 :root {
-  /* === LIGHT THEME (refined off-white, premium feel) === */
+  /* === LIGHT THEME (clean neutral — verde só no acento) === */
   --font-sans: 'Geist', 'Inter', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
 
-  /* Primary: rich green, slightly more saturated */
-  --primary: oklch(0.50 0.155 145);   /* green-600 equivalent, richer */
+  /* Primary: verde — único acento de cor */
+  --primary: oklch(0.50 0.155 145);
   --primary-foreground: oklch(0.98 0 0);
   --sidebar-primary: oklch(0.50 0.155 145);
   --sidebar-primary-foreground: oklch(0.98 0 0);
 
-  /* Radius: slightly larger for modern premium look */
   --radius: 0.75rem;
 
-  /* Background: warm off-white instead of pure white */
-  --background: oklch(0.985 0.003 95);     /* warm off-white */
-  --foreground: oklch(0.18 0.015 145);     /* deep forest green text */
+  /* Background: cinza levíssimo (não branco puro, não amarelado) */
+  --background: oklch(0.968 0 0);
+  --foreground: oklch(0.12 0 0);        /* preto neutro */
 
-  /* Cards: pure white with slight elevation feel */
+  /* Cards: branco puro — elevação clara sobre o fundo */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.015 145);
+  --card-foreground: oklch(0.12 0 0);
 
   /* Popover */
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.015 145);
+  --popover-foreground: oklch(0.12 0 0);
 
-  /* Secondary: warm light gray */
-  --secondary: oklch(0.96 0.005 95);
-  --secondary-foreground: oklch(0.35 0.015 145);
+  /* Secondary: cinza claro neutro */
+  --secondary: oklch(0.94 0 0);
+  --secondary-foreground: oklch(0.25 0 0);
 
-  /* Muted: soft warm gray */
-  --muted: oklch(0.955 0.005 95);
-  --muted-foreground: oklch(0.50 0.012 145);
+  /* Muted: cinza levíssimo */
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.52 0 0);   /* cinza médio neutro */
 
-  /* Accent: very light green tint */
-  --accent: oklch(0.96 0.025 145);
-  --accent-foreground: oklch(0.25 0.015 145);
+  /* Accent: tint verde muito suave — só para hover/seleção */
+  --accent: oklch(0.95 0.018 145);
+  --accent-foreground: oklch(0.20 0 0);
 
   /* Destructive */
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
 
-  /* Borders: subtle warm gray */
-  --border: oklch(0.90 0.008 95);
-  --input: oklch(0.93 0.005 95);
+  /* Borders: cinza neutro visível mas discreto */
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.91 0 0);
   --ring: oklch(0.50 0.155 145);
 
-  /* Charts: vibrant multi-color palette */
-  --chart-1: oklch(0.55 0.155 145);  /* green */
-  --chart-2: oklch(0.60 0.14 200);   /* teal */
-  --chart-3: oklch(0.65 0.18 55);    /* amber */
-  --chart-4: oklch(0.60 0.18 280);   /* purple */
-  --chart-5: oklch(0.62 0.20 25);    /* red-orange */
+  /* Charts */
+  --chart-1: oklch(0.55 0.155 145);
+  --chart-2: oklch(0.60 0.14 200);
+  --chart-3: oklch(0.65 0.18 55);
+  --chart-4: oklch(0.60 0.18 280);
+  --chart-5: oklch(0.62 0.20 25);
 
-  /* Sidebar: warm white with green tint */
-  --sidebar: oklch(0.975 0.008 145);
-  --sidebar-foreground: oklch(0.18 0.015 145);
-  --sidebar-accent: oklch(0.94 0.020 145);
-  --sidebar-accent-foreground: oklch(0.25 0.015 145);
-  --sidebar-border: oklch(0.88 0.010 145);
+  /* Sidebar: branco neutro */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.12 0 0);
+  --sidebar-accent: oklch(0.95 0.018 145);
+  --sidebar-accent-foreground: oklch(0.20 0 0);
+  --sidebar-border: oklch(0.88 0 0);
   --sidebar-ring: oklch(0.50 0.155 145);
 }
 
