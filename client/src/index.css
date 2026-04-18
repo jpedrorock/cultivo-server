@@ -43,65 +43,65 @@
 }
 
 :root {
-  /* === LIGHT THEME (clean neutral — verde só no acento) === */
+  /* === LIGHT THEME — Forest Ink === */
   --font-sans: 'Geist', 'Inter', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
 
-  /* Primary: verde — único acento de cor */
-  --primary: oklch(0.50 0.155 145);
-  --primary-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.50 0.155 145);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
+  /* Primary: verde-floresta profundo — rico, sério, não-neon */
+  --primary: oklch(0.35 0.11 148);
+  --primary-foreground: oklch(0.99 0 0);
+  --sidebar-primary: oklch(0.35 0.11 148);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
 
   --radius: 0.75rem;
 
-  /* Background: cinza levíssimo (não branco puro, não amarelado) */
-  --background: oklch(0.968 0 0);
-  --foreground: oklch(0.12 0 0);        /* preto neutro */
+  /* Background: off-white neutro-fresco — harmoniza com verde-floresta */
+  --background: oklch(0.975 0.003 140);
+  --foreground: oklch(0.13 0.008 148);   /* quase preto com micro tint verde-floresta */
 
-  /* Cards: branco puro — elevação clara sobre o fundo */
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.12 0 0);
+  /* Cards: branco puro com micro tint floresta */
+  --card: oklch(0.999 0.002 140);
+  --card-foreground: oklch(0.13 0.008 148);
 
   /* Popover */
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.12 0 0);
+  --popover: oklch(0.999 0.002 140);
+  --popover-foreground: oklch(0.13 0.008 148);
 
-  /* Secondary: cinza claro neutro */
-  --secondary: oklch(0.94 0 0);
-  --secondary-foreground: oklch(0.25 0 0);
+  /* Secondary: cinza-neutro suave */
+  --secondary: oklch(0.936 0.006 140);
+  --secondary-foreground: oklch(0.28 0.010 148);
 
-  /* Muted: cinza levíssimo */
-  --muted: oklch(0.95 0 0);
-  --muted-foreground: oklch(0.52 0 0);   /* cinza médio neutro */
+  /* Muted */
+  --muted: oklch(0.946 0.005 140);
+  --muted-foreground: oklch(0.50 0.012 148);   /* cinza com tint floresta */
 
-  /* Accent: tint verde muito suave — só para hover/seleção */
-  --accent: oklch(0.95 0.018 145);
-  --accent-foreground: oklch(0.20 0 0);
+  /* Accent: tint floresta muito suave — hover/seleção */
+  --accent: oklch(0.930 0.022 148);
+  --accent-foreground: oklch(0.22 0.010 148);
 
   /* Destructive */
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.52 0.20 27);
   --destructive-foreground: oklch(0.985 0 0);
 
-  /* Borders: cinza neutro visível mas discreto */
-  --border: oklch(0.88 0 0);
-  --input: oklch(0.91 0 0);
-  --ring: oklch(0.50 0.155 145);
+  /* Borders: neutro-fresco, discreto */
+  --border: oklch(0.878 0.007 140);
+  --input: oklch(0.910 0.005 140);
+  --ring: oklch(0.35 0.11 148);
 
-  /* Charts */
-  --chart-1: oklch(0.55 0.155 145);
-  --chart-2: oklch(0.60 0.14 200);
-  --chart-3: oklch(0.65 0.18 55);
-  --chart-4: oklch(0.60 0.18 280);
-  --chart-5: oklch(0.62 0.20 25);
+  /* Charts — paleta floresta+terra */
+  --chart-1: oklch(0.40 0.13 148);   /* verde-floresta */
+  --chart-2: oklch(0.52 0.12 195);   /* teal */
+  --chart-3: oklch(0.60 0.16 55);    /* âmbar */
+  --chart-4: oklch(0.50 0.16 280);   /* violeta */
+  --chart-5: oklch(0.55 0.18 25);    /* terra */
 
-  /* Sidebar: branco neutro */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.12 0 0);
-  --sidebar-accent: oklch(0.95 0.018 145);
-  --sidebar-accent-foreground: oklch(0.20 0 0);
-  --sidebar-border: oklch(0.88 0 0);
-  --sidebar-ring: oklch(0.50 0.155 145);
+  /* Sidebar */
+  --sidebar: oklch(0.985 0.003 140);
+  --sidebar-foreground: oklch(0.13 0.008 148);
+  --sidebar-accent: oklch(0.930 0.022 148);
+  --sidebar-accent-foreground: oklch(0.22 0.010 148);
+  --sidebar-border: oklch(0.878 0.007 140);
+  --sidebar-ring: oklch(0.35 0.11 148);
 }
 
 .dark {
@@ -167,14 +167,15 @@
    Light: saturação moderada para legibilidade.
    Dark: sobrepostos abaixo com maior brilho.                                  */
 :root {
-  --phase-seedling:   #5fa85c;   /* verde claro — muda */
-  --phase-vegetative: #2f9e44;   /* verde médio — vegetativa */
-  --phase-flowering:  #9c36b5;   /* roxo — floração */
-  --phase-flushing:   #0ca678;   /* teal — flush */
-  --phase-harvest:    #e8590c;   /* âmbar intenso — colheita */
-  --phase-drying:     #ad8621;   /* âmbar escuro — secagem */
-  --phase-curing:     #7d5a2a;   /* âmbar terra — cura */
-  --phase-maintenance:#60a5fa;   /* azul — manutenção/mãe */
+  /* Phase palette light — mais ricas/profundas, combinam com Forest Ink */
+  --phase-seedling:   #3d8b3a;   /* verde-floresta claro */
+  --phase-vegetative: #276b30;   /* verde-floresta médio */
+  --phase-flowering:  #7c3aad;   /* ametista profundo */
+  --phase-flushing:   #0e7c5c;   /* teal-floresta */
+  --phase-harvest:    #c2410c;   /* terracota */
+  --phase-drying:     #92660e;   /* âmbar-terra */
+  --phase-curing:     #6b4423;   /* mogno */
+  --phase-maintenance:#2563b8;   /* azul-ardósia */
 
   /* Motion tokens — use no lugar de durações hard-coded */
   --motion-fast:    150ms;
@@ -183,9 +184,66 @@
   --motion-breath:  2500ms;
   --ease-standard:  cubic-bezier(0.4, 0, 0.2, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+
+  /* Cycle info box backgrounds — light: tint muito suave */
+  --phase-vega-card-bg:        linear-gradient(135deg, rgba(34,197,94,0.06) 0%, rgba(34,197,94,0.02) 100%);
+  --phase-flora-card-bg:       linear-gradient(135deg, rgba(168,85,247,0.06) 0%, rgba(168,85,247,0.02) 100%);
+  --phase-drying-card-bg:      linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(245,158,11,0.02) 100%);
+  --phase-maintenance-card-bg: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(59,130,246,0.02) 100%);
 }
 
+/* ─── KPI cells — solid fill no light, gradient no dark ───────────────────── */
+/* Light: tent cards com sombra verde-floresta para descolem do fundo */
+:root [data-tour="tent-card"] {
+  box-shadow:
+    0 4px 20px -2px rgba(22, 101, 52, 0.10),
+    0 2px 6px -1px rgba(22, 101, 52, 0.07),
+    0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Light: card branco neutro — sem cor de fundo */
+.kpi-temp, .kpi-rh, .kpi-ppfd { background: hsl(var(--card)); }
+
+/* Dark: gradiente tintado como antes */
+.dark .kpi-temp  { background: linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(234,88,12,0.08) 60%, rgba(249,115,22,0.02) 100%); }
+.dark .kpi-rh    { background: linear-gradient(135deg, rgba(8,145,178,0.15) 0%, rgba(6,182,212,0.07) 60%, rgba(8,145,178,0.02) 100%); }
+.dark .kpi-ppfd  { background: linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(202,138,4,0.08) 60%, rgba(234,179,8,0.02) 100%); }
+
+/* ─── Freshness pill (há Xh) — solid no light, transparente no dark ─────── */
+.pill-fresh   { background: #059669; color: white; border-color: transparent; }
+.pill-warning { background: #d97706; color: white; border-color: transparent; }
+.pill-danger  { background: #dc2626; color: white; border-color: transparent; }
+
+.dark .pill-fresh   { background: rgba(16,185,129,0.10); color: #34d399; border-color: rgba(16,185,129,0.40); }
+.dark .pill-warning { background: rgba(245,158,11,0.10); color: #fbbf24; border-color: rgba(251,191,36,0.40); }
+.dark .pill-danger  { background: rgba(239,68,68,0.10);  color: #f87171; border-color: rgba(239,68,68,0.40);  }
+
+/* ─── Cycle info box — solid no light, gradiente neon no dark ─────────────
+   !important nas regras dark para garantir override independente de especificidade */
+.phase-card-vega        { background: #166534; border-color: transparent; }
+.phase-card-flora       { background: #7e22ce; border-color: transparent; }
+.phase-card-drying      { background: #92400e; border-color: transparent; }
+.phase-card-maintenance { background: #1e40af; border-color: transparent; }
+
+.dark .phase-card-vega        { background: linear-gradient(135deg, rgba(34,197,94,0.28)  0%, rgba(34,197,94,0.07)  100%) !important; border-color: rgba(34,197,94,0.28)   !important; }
+.dark .phase-card-flora       { background: linear-gradient(135deg, rgba(168,85,247,0.28) 0%, rgba(168,85,247,0.07) 100%) !important; border-color: rgba(168,85,247,0.28)  !important; }
+.dark .phase-card-drying      { background: linear-gradient(135deg, rgba(245,158,11,0.28) 0%, rgba(245,158,11,0.07) 100%) !important; border-color: rgba(245,158,11,0.28)  !important; }
+.dark .phase-card-maintenance { background: linear-gradient(135deg, rgba(59,130,246,0.28) 0%, rgba(59,130,246,0.07) 100%) !important; border-color: rgba(59,130,246,0.28)  !important; }
+
+/* ─── Streak pill (∅ Nd) — solid no light, transparente no dark ─────────── */
+.pill-streak-done    { background: #059669; color: white; border-color: transparent; }
+.pill-streak-pending { background: #d1fae5; color: #065f46; border-color: transparent; }
+
+.dark .pill-streak-done    { background: rgba(16,185,129,0.10); color: #34d399; border-color: rgba(16,185,129,0.40); }
+.dark .pill-streak-pending { background: rgba(16,185,129,0.05); color: rgba(52,211,153,0.60); border-color: rgba(16,185,129,0.30); }
+
 .dark {
+  /* Cycle info box backgrounds — dark: tints saturados como originais */
+  --phase-vega-card-bg:        linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%);
+  --phase-flora-card-bg:       linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(168,85,247,0.04) 100%);
+  --phase-drying-card-bg:      linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 100%);
+  --phase-maintenance-card-bg: linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%);
+
   /* Phase palette — versão dark: mais vibrante no fundo escuro */
   --phase-seedling:   #8ec58c;
   --phase-vegetative: #40c057;

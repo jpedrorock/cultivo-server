@@ -49,6 +49,12 @@ export function ThemeProvider({
     root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "positivus", "highcontrast", "highcontrast-dark");
     // Add current theme class
     root.classList.add(theme);
+    // dark: utilitários do Tailwind dependem da classe .dark no <html>
+    // Temas escuros: hps, vision, forest — temas claros: monstera
+    const isDarkTheme = theme === "hps" || theme === "vision" || theme === "forest";
+    if (isDarkTheme) {
+      root.classList.add("dark");
+    }
     // Remover a classe splash-loading do body para permitir que o CSS do tema assuma
     if (document.body) {
       document.body.classList.remove('splash-loading');

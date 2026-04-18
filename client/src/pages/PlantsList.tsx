@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Flower2, Wrench } from "lucide-react";
+import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Flower2, Wrench, Check } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
@@ -301,7 +301,7 @@ export default function PlantsList() {
         <div className="container py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg">
                 <Sprout className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -411,33 +411,32 @@ export default function PlantsList() {
                 :                                 { border: 'border-border/60', accent: 'text-emerald-300', glow: 'rgba(16,185,129,0.10)', dot: 'bg-emerald-400' };
 
               return (
-                <div key={tent.id} className={`rounded-2xl border ${tentColor.border} bg-card overflow-hidden`}>
-                  {/* Header — gradiente de fase igual às seções da calculadora */}
+                <div key={tent.id} className="space-y-2">
+                  {/* Header da estufa — linha simples, sem box */}
                   <div
-                    className="flex items-center justify-between px-4 py-4 border-b border-border/40 cursor-pointer"
-                    style={{ background: `linear-gradient(135deg, ${tentColor.glow} 0%, rgba(0,0,0,0) 100%)` }}
+                    className="flex items-center justify-between px-1 cursor-pointer select-none"
                     onClick={() => toggleTent(tent.id)}
                   >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
                       {isExpanded
                         ? <ChevronDown className={`w-4 h-4 shrink-0 ${tentColor.accent}`} />
                         : <ChevronRight className={`w-4 h-4 shrink-0 ${tentColor.accent}`} />
                       }
                       <span className={`w-2 h-2 rounded-full shrink-0 ${tentColor.dot}`} />
-                      <span className="font-semibold text-foreground truncate">{tent.name}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">
+                      <span className="font-bold text-foreground truncate">{tent.name}</span>
+                      <span className="text-xs text-muted-foreground/70 shrink-0">
                         {tentPlants.length} {tentPlants.length === 1 ? "planta" : "plantas"}
                       </span>
                       {selectedInTent > 0 && (
-                        <span className={`text-xs font-semibold shrink-0 ${tentColor.accent}`}>
-                          · {selectedInTent} selecionada{selectedInTent > 1 ? 's' : ''}
+                        <span className={`text-xs font-bold shrink-0 ${tentColor.accent}`}>
+                          · {selectedInTent} ✓
                         </span>
                       )}
                     </div>
                     {isExpanded && tentPlants.length > 0 && (
                       <button
                         onClick={(e) => { e.stopPropagation(); tentPlants.every((p: any) => selectedPlants.has(p.id)) ? deselectAllInTent(tent.id) : selectAllInTent(tent.id); }}
-                        className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-lg border border-border/40 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors`}
+                        className="shrink-0 text-xs font-semibold px-2.5 py-1 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {tentPlants.every((p: any) => selectedPlants.has(p.id)) ? 'Desmarcar' : 'Selec. todas'}
                       </button>
@@ -445,109 +444,121 @@ export default function PlantsList() {
                   </div>
 
                   {isExpanded && (
-                    <div className="px-3 pt-3 pb-3">
-                      <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div>
+                      <StaggerList className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                         {tentPlants.map((plant: any) => {
                           const isSelected = selectedPlants.has(plant.id);
-                          const fitness = getFitnessScore(plant.lastHealthStatus);
+
+                          // Cor de fundo do card baseada na categoria da estufa
+                          const cardBg =
+                            tent.category === 'FLORA'       ? '#581c87' :  // purple-900
+                            tent.category === 'DRYING'      ? '#78350f' :  // amber-900
+                            tent.category === 'MAINTENANCE' ? '#1e3a8a' :  // blue-900
+                            '#14532d';                                      // green-900 (VEGA / default)
+
+                          // Badge de saúde
+                          const healthBadge =
+                            plant.lastHealthStatus === 'HEALTHY'    ? { icon: '✓', bg: 'rgba(74,222,128,0.22)', color: '#4ade80' } :
+                            plant.lastHealthStatus === 'STRESSED'   ? { icon: '!', bg: 'rgba(251,191,36,0.25)', color: '#fbbf24' } :
+                            plant.lastHealthStatus === 'SICK'       ? { icon: '✕', bg: 'rgba(248,113,113,0.25)', color: '#f87171' } :
+                            plant.lastHealthStatus === 'RECOVERING' ? { icon: '↻', bg: 'rgba(96,165,250,0.25)', color: '#60a5fa' } :
+                            null;
+
+                          // Label de fase/semana
+                          const phaseLabel =
+                            plant.plantStage === 'SEEDLING'      ? 'Muda' :
+                            plant.cyclePhase === 'FLORA' && plant.cycleWeek ? `Flora · S${plant.cycleWeek}` :
+                            plant.cyclePhase === 'VEGA'  && plant.cycleWeek ? `Vega · S${plant.cycleWeek}`  :
+                            getStrainName(plant.strainId) || '—';
+
+                          const thumbUrl = plant.lastHealthPhotoUrl
+                            ? (plant.lastHealthPhotoUrl.startsWith('/uploads/')
+                                ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=300&h=400&q=75`
+                                : plant.lastHealthPhotoUrl)
+                            : null;
 
                           return (
                           <ListItemAnimation key={plant.id}>
-                            {/* Card: foto direita + info esquerda */}
-                            <div className={`rounded-2xl border overflow-hidden bg-card flex transition-all duration-200 ${
-                              isSelected ? 'border-primary/50' : 'border-border/40'
-                            }`}>
+                            <div
+                              className={`rounded-2xl overflow-hidden relative transition-all duration-200 ${
+                                isSelected ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-background scale-[0.96]' : ''
+                              }`}
+                              style={{ background: cardBg }}
+                            >
+                              {/* Badge saúde / toggle seleção — canto superior esquerdo */}
+                              <button
+                                onClick={e => { e.preventDefault(); e.stopPropagation(); togglePlantSelection(plant.id); }}
+                                className="absolute top-2 left-2 z-20 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 shadow-sm"
+                                style={isSelected
+                                  ? { background: 'hsl(var(--primary))', color: '#fff' }
+                                  : healthBadge
+                                  ? { background: healthBadge.bg, color: healthBadge.color }
+                                  : { background: 'rgba(0,0,0,0.25)', color: 'rgba(255,255,255,0.45)' }
+                                }
+                              >
+                                {isSelected
+                                  ? <Check className="w-3.5 h-3.5" />
+                                  : healthBadge
+                                  ? <span className="leading-none">{healthBadge.icon}</span>
+                                  : <Sprout className="w-3 h-3" />
+                                }
+                              </button>
 
-                              {/* Info à esquerda */}
-                              <Link href={`/plants/${plant.id}`} className="flex-1 min-w-0 pl-3 pr-1 pt-3 pb-3 flex flex-col justify-start items-start gap-1">
-                                {/* Nome — hierarquia principal */}
-                                <p className="text-base font-bold text-foreground leading-tight w-full">{plant.name}</p>
-                                {/* Código + strain — secundário */}
-                                <p className="text-[11px] text-muted-foreground/50 truncate w-full">
-                                  {plant.code && <span className="font-mono">{plant.code} · </span>}
-                                  {getStrainName(plant.strainId) || '—'}
-                                </p>
-                                {/* Fase + saúde */}
-                                <div className="flex items-center gap-2 flex-wrap w-full mt-0.5">
-                                  {(plant.cyclePhase && plant.cycleWeek) && (
-                                    <span className={`text-xs font-semibold flex items-center gap-0.5 ${plant.cyclePhase === 'VEGA' ? 'text-green-400' : 'text-purple-400'}`}>
-                                      {plant.cyclePhase === 'VEGA' ? <Leaf className="w-3 h-3"/> : <Flower2 className="w-3 h-3"/>}
-                                      {plant.cyclePhase === 'VEGA' ? 'Vega' : 'Flora'} S{plant.cycleWeek}
-                                    </span>
+                              {/* Menu 3 pontos — canto superior direito */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); }}
+                                    className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/25 flex items-center justify-center text-white/65 hover:bg-black/40 hover:text-white transition-colors"
+                                  >
+                                    <MoreHorizontal className="w-3.5 h-3.5" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  {plant.status === "ACTIVE" && (
+                                    <DropdownMenuItem onClick={() => handleMovePlant(plant, tent.id)}>
+                                      <MoveRight className="w-4 h-4 mr-2" /> Mover
+                                    </DropdownMenuItem>
                                   )}
-                                  {fitness && (
-                                    <span className="text-xs flex items-center gap-1" style={{ color: fitness.color }}>
-                                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: fitness.color }}/>
-                                      {plant.lastHealthStatus === "HEALTHY" ? "Saudável" : plant.lastHealthStatus === "STRESSED" ? "Estressada" : plant.lastHealthStatus === "SICK" ? "Doente" : "Recuperando"}
-                                    </span>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => setDialog({ type: 'deletePlant', plant: { id: plant.id, name: plant.name } })}
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+
+                              {/* Foto — aspect 3:4, object-contain para "planta flutuando" */}
+                              <Link href={`/plants/${plant.id}`} className="block">
+                                <div className="w-full aspect-[3/4] relative">
+                                  {thumbUrl ? (
+                                    <img
+                                      src={thumbUrl}
+                                      alt={plant.name}
+                                      className="absolute inset-0 w-full h-full object-contain pt-8 px-3 pb-1"
+                                      loading="lazy"
+                                      decoding="async"
+                                    />
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <Sprout className="w-14 h-14 text-white/12" />
+                                    </div>
                                   )}
-                                </div>
-                                {/* Badge de status — abaixo de tudo */}
-                                <div className={`mt-1 px-1.5 py-px rounded text-[10px] font-semibold border ${getStatusColor(plant.status)}`}>
-                                  {getStatusLabel(plant.status)}
                                 </div>
                               </Link>
 
-                              {/* Foto + ações à direita */}
-                              <div className="w-[110px] shrink-0 border-l border-border/30 flex flex-col">
-                                {/* Foto em aspect-ratio 3:4 (iPhone portrait) */}
-                                <Link href={`/plants/${plant.id}`} className="block w-full" style={{ aspectRatio: '3/4' }}>
-                                  <div className="w-full h-full bg-white/5">
-                                    {plant.lastHealthPhotoUrl
-                                      ? <img
-                                          src={plant.lastHealthPhotoUrl.startsWith('/uploads/')
-                                            ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=192&h=256&q=72`
-                                            : plant.lastHealthPhotoUrl}
-                                          alt={plant.name}
-                                          width={110}
-                                          height={147}
-                                          className="w-full h-full object-cover"
-                                          loading="lazy"
-                                          decoding="async"
-                                        />
-                                      : <div className="w-full h-full flex items-center justify-center">
-                                          <Sprout className="w-6 h-6 text-muted-foreground/20" />
-                                        </div>
-                                    }
-                                  </div>
-                                </Link>
-                                {/* Ações: seleção | menu */}
-                                <div className="flex border-t border-border/30 shrink-0">
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePlantSelection(plant.id); }}
-                                    className={`flex-1 h-9 flex items-center justify-center transition-colors ${
-                                      isSelected ? 'bg-primary/20 text-primary' : 'text-muted-foreground/40 hover:bg-white/5'
-                                    }`}
-                                  >
-                                    {isSelected
-                                      ? <svg className="w-3.5 h-3.5" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                      : <svg className="w-3.5 h-3.5" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="1.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/></svg>
-                                    }
-                                  </button>
-                                  <div className="w-px bg-border/30" />
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button className="flex-1 h-9 flex items-center justify-center text-muted-foreground/40 hover:bg-white/5 transition-colors">
-                                        <MoreHorizontal className="w-3.5 h-3.5" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
-                                      {plant.status === "ACTIVE" && (
-                                        <DropdownMenuItem onClick={() => handleMovePlant(plant, tent.id)}>
-                                          <MoveRight className="w-4 h-4 mr-2" /> Mover
-                                        </DropdownMenuItem>
-                                      )}
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        className="text-destructive focus:text-destructive"
-                                        onClick={() => setDialog({ type: 'deletePlant', plant: { id: plant.id, name: plant.name } })}
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-2" /> Excluir
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </div>
+                              {/* Info — nome + fase */}
+                              <Link href={`/plants/${plant.id}`} className="block px-3 pt-1 pb-3">
+                                <p className="text-white font-bold text-sm leading-tight truncate">{plant.name}</p>
+                                <p className="text-white/55 text-[11px] mt-0.5 uppercase tracking-wider truncate">{phaseLabel}</p>
+                              </Link>
+
+                              {/* Overlay de seleção */}
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-primary/20 pointer-events-none rounded-2xl" />
+                              )}
                             </div>
                           </ListItemAnimation>
                           );
@@ -558,6 +569,7 @@ export default function PlantsList() {
                 </div>
               );
             })}
+
           </div>
         ) : filterStatus || searchTerm ? (
           <EmptyState
@@ -1071,7 +1083,7 @@ export default function PlantsList() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialog(null)}>Cancelar</Button>
             <Button
-              className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 border-0"
               onClick={() => { bulkPromote.mutate({ plantIds: Array.from(selectedPlants) }); setDialog(null); }}
               disabled={bulkPromote.isPending}
             >
@@ -1099,7 +1111,7 @@ export default function PlantsList() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialog(null)}>Cancelar</Button>
             <Button
-              className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 border-0"
               onClick={() => { bulkHarvest.mutate({ plantIds: Array.from(selectedPlants) }); setDialog(null); }}
               disabled={bulkHarvest.isPending}
             >

@@ -431,9 +431,8 @@ export default function Home() {
 
   return (
     <PageTransition>
-      <PullToRefresh onRefresh={handleRefresh}>
-        <div className="min-h-screen bg-background">
-        {/* Header */}
+      <div className="min-h-screen bg-background">
+        {/* Header — fora do PullToRefresh para sticky funcionar */}
         <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
         <div className="container py-6">
           <div className="flex items-center justify-between">
@@ -477,6 +476,8 @@ export default function Home() {
         </div>
       </header>
 
+      <PullToRefresh onRefresh={handleRefresh}>
+        <div>
       {/* Banner de registros offline pendentes */}
       {pendingLogsCount > 0 && (
         <div className="container pt-4">
@@ -921,10 +922,65 @@ export default function Home() {
       </Dialog>
         </div>
       </PullToRefresh>
+      </div>
     </PageTransition>
   );
 }
 
+
+// Mini-sparkline ECG animado — mostra tendência dos últimos 7 dias
+function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; color: string; w?: number; h?: number }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
+  const pts = values.map((v, i) =>
+    `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`
+  );
+  const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
+  const uid = `ecg-${color.replace(/[^a-z0-9]/gi, "")}`;
+  const dur = "3.5s";
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: "visible", opacity: 0.85 }}>
+      <defs>
+        <filter id={`${uid}-glow`} x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {/* Traço de fundo apagado */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1"
+        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.10" />
+      {/* Rastro longo e tênue */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.18"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.35 0.65">
+        <animate attributeName="stroke-dashoffset" values="0.35;-0.65" dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </path>
+      {/* Rastro médio */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.45"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.18 0.82">
+        <animate attributeName="stroke-dashoffset" values="0.18;-0.82" dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </path>
+      {/* Rastro curto */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.80"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.07 0.93">
+        <animate attributeName="stroke-dashoffset" values="0.07;-0.93" dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </path>
+      {/* Ponta brilhante com glow */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeOpacity="1"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.02 0.98"
+        filter={`url(#${uid}-glow)`}>
+        <animate attributeName="stroke-dashoffset" values="0.02;-0.98" dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </path>
+      {/* Ponto de luz na frente */}
+      <circle r="2.2" fill={color} filter={`url(#${uid}-glow)`} opacity="0.95">
+        <animateMotion path={pathD} dur={dur} repeatCount="indefinite" calcMode="linear" />
+      </circle>
+    </svg>
+  );
+}
 
 // Separate component for Tent Card
 function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlora, onInitiateCycle, onEditCycle, onFinalizeCycle, onEditTent, onDeleteTent }: any) {
@@ -959,6 +1015,13 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const { data: latestLog } = trpc.dailyLogs.getLatestByTent.useQuery(
     { tentId: tent.id }
   );
+
+  const { data: recentLogs } = trpc.dailyLogs.list.useQuery(
+    { tentId: tent.id, limit: 7 },
+    { staleTime: 5 * 60 * 1000 }
+  );
+  const sparkTemps = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
+  const sparkRh    = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
 
   // Buscar targets ideais - usa média das strains das plantas na estufa
   const currentWeek = cycle ? (() => {
@@ -1076,14 +1139,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     tent.category === 'DRYING' ? '#fbbf24' :
     '#60a5fa';
 
-  const phaseBg = !cycle ? 'none' :
-    tent.category === 'VEGA'
-      ? 'linear-gradient(160deg, rgba(74,222,128,0.07) 0%, transparent 50%)'
-      : tent.category === 'FLORA'
-      ? 'linear-gradient(160deg, rgba(167,139,250,0.08) 0%, transparent 50%)'
-      : tent.category === 'DRYING'
-      ? 'linear-gradient(160deg, rgba(251,191,36,0.07) 0%, transparent 50%)'
-      : 'linear-gradient(160deg, rgba(96,165,250,0.07) 0%, transparent 50%)';
+  // Fundo da fase — só no dark mode via data-theme check; no light ficamos flat
+  const phaseBg = 'none';
 
   return (
     <ListItemAnimation>
@@ -1122,11 +1179,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 const diffH = Math.floor(diffMs / (1000 * 60 * 60));
                 const diffMin = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 const timeText = diffH === 0 ? `há ${diffMin}min` : `há ${diffH}h`;
-                const pill = diffH < 24
-                  ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
-                  : diffH < 48
-                  ? "border-amber-400/40 text-amber-400 bg-amber-500/10"
-                  : "border-red-500/40 text-red-400 bg-red-500/10";
+                const pill = diffH < 24 ? "pill-fresh" : diffH < 48 ? "pill-warning" : "pill-danger";
                 return (
                   <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${pill}`}>
                     <Clock className="w-3 h-3" />{timeText}
@@ -1135,7 +1188,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               })()}
               {/* Streak badge */}
               {streak && streak.current > 0 && (
-                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : 'border-emerald-400/30 text-emerald-400/60 bg-emerald-500/5'}`}>
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'pill-streak-done' : 'pill-streak-pending'}`}>
                   <Leaf className="w-2.5 h-2.5" />{streak.current}d
                 </span>
               )}
@@ -1277,25 +1330,15 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
             <div
               onClick={() => navigate(`/tent/${tent.id}`)}
               className={`rounded-xl p-3.5 border cursor-pointer active:scale-[0.99] transition-all duration-150 ${
-                tent.category === 'VEGA'        ? 'border-green-500/20'
-                : tent.category === 'FLORA'     ? 'border-purple-500/20'
-                : tent.category === 'DRYING'    ? 'border-amber-500/20'
-                : 'border-blue-500/20'
+                tent.category === 'VEGA'        ? 'phase-card-vega'
+                : tent.category === 'FLORA'     ? 'phase-card-flora'
+                : tent.category === 'DRYING'    ? 'phase-card-drying'
+                : 'phase-card-maintenance'
               }`}
-              style={{
-                background:
-                  tent.category === 'VEGA'
-                    ? 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)'
-                    : tent.category === 'FLORA'
-                    ? 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(168,85,247,0.04) 100%)'
-                    : tent.category === 'DRYING'
-                    ? 'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 100%)'
-                    : 'linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%)',
-              }}
             >
               {/* Linha 1: fase | semana / clonagem */}
               <div className="flex justify-between items-center">
-                <span className={`text-sm font-semibold flex items-center gap-1.5 ${
+                <span className={`text-sm font-semibold flex items-center gap-1.5 text-white dark:${
                   tent.category === 'VEGA'    ? 'text-green-400'
                   : tent.category === 'FLORA' ? 'text-purple-400'
                   : tent.category === 'DRYING'? 'text-amber-400'
@@ -1304,7 +1347,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   <PhaseIcon className="w-3.5 h-3.5" />
                   {tent.category === 'MAINTENANCE' ? 'Manutenção Perpétua' : 'Ciclo Ativo'}
                 </span>
-                <span className={`text-sm font-bold ${
+                <span className={`text-sm font-bold text-white dark:${
                   tent.category === 'VEGA'    ? 'text-green-400'
                   : tent.category === 'FLORA' ? 'text-purple-400'
                   : tent.category === 'DRYING'? 'text-amber-400'
@@ -1326,10 +1369,10 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
               </div>
               {/* Linha 2: label | data */}
               <div className="flex justify-between items-center mt-1.5">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-white/70 dark:text-muted-foreground">
                   {tent.category === 'MAINTENANCE' ? 'Última Clonagem' : 'Iniciado em'}
                 </span>
-                <span className="text-xs font-medium text-foreground/70">
+                <span className="text-xs font-medium text-white/90 dark:text-foreground/70">
                   {tent.category === 'MAINTENANCE'
                     ? (tent.lastCloningAt ? new Date(tent.lastCloningAt).toLocaleDateString('pt-BR') : '—')
                     : new Date(cycle.startDate).toLocaleDateString('pt-BR')}
@@ -1343,66 +1386,66 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           )}
 
           {/* KPI Metrics — 3 colunas: Temp · RH · PPFD */}
-          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border/40">
+          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border/60">
             {/* Temperature */}
             <button
               type="button"
               disabled={!isSensorAuto || readNow.isPending}
-              className={`flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-orange-500/20 bg-orange-500/[0.08] relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
+              className={`kpi-temp flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-orange-500/20 dark:border-orange-500/15 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
-              <ThermometerSun className="w-3.5 h-3.5 text-orange-400" />
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">Temp</p>
-              <p className="text-xl font-bold tracking-tight leading-none text-foreground">
-                {readNow.isPending
-                  ? <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-                  : (() => {
-                      const val = sensorReading?.isFresh && sensorReading.tempC != null
-                        ? sensorReading.tempC
-                        : latestLog?.tempC ? parseFloat(latestLog.tempC) : null;
-                      return val != null
-                        ? <AnimatedCounter value={val} decimals={1} suffix="°" />
-                        : <span className="text-muted-foreground/40">--</span>;
-                    })()
-                }
-              </p>
+              <ThermometerSun className="w-4 h-4 text-orange-500 dark:text-orange-400 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Temp</p>
+              <div className="flex items-center gap-0.5">
+                <p className="text-base font-bold tracking-tight leading-none text-foreground">
+                  {readNow.isPending
+                    ? <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
+                    : (() => {
+                        const val = sensorReading?.isFresh && sensorReading.tempC != null ? sensorReading.tempC : latestLog?.tempC ? parseFloat(latestLog.tempC) : null;
+                        return val != null ? <AnimatedCounter value={val} decimals={1} suffix="°" /> : <span className="text-muted-foreground/40">--</span>;
+                      })()
+                  }
+                </p>
+              </div>
+              <MiniSparkline values={sparkTemps} color="#f97316" />
               {isSensorAuto && (
-                <span className="absolute top-1 right-1 text-cyan-400 opacity-80" title="Leitura automática (sensor)"><Wifi className="w-3 h-3" /></span>
+                <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-cyan-400 opacity-80"><Wifi className="w-3 h-3" /></span>
               )}
             </button>
             {/* Humidity */}
             <button
               type="button"
               disabled={!isSensorAuto || readNow.isPending}
-              className={`flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-teal-400/20 bg-teal-400/[0.08] relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
+              className={`kpi-rh flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-cyan-500/20 dark:border-cyan-500/20 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
-              <Droplets className="w-3.5 h-3.5 text-teal-400" />
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">Umid</p>
-              <p className="text-xl font-bold tracking-tight leading-none text-foreground">
-                {readNow.isPending
-                  ? <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-                  : (() => {
-                      const val = sensorReading?.isFresh && sensorReading.rhPct != null
-                        ? sensorReading.rhPct
-                        : latestLog?.rhPct ? parseFloat(latestLog.rhPct) : null;
-                      return val != null
-                        ? <AnimatedCounter value={val} decimals={0} suffix="%" />
-                        : <span className="text-muted-foreground/40">--</span>;
-                    })()
-                }
-              </p>
+              <Droplets className="w-4 h-4 text-cyan-500 dark:text-cyan-400 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">RH</p>
+              <div className="flex items-center gap-0.5">
+                <p className="text-base font-bold tracking-tight leading-none text-foreground">
+                  {readNow.isPending
+                    ? <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
+                    : (() => {
+                        const val = sensorReading?.isFresh && sensorReading.rhPct != null ? sensorReading.rhPct : latestLog?.rhPct ? parseFloat(latestLog.rhPct) : null;
+                        return val != null ? <AnimatedCounter value={val} decimals={0} suffix="%" /> : <span className="text-muted-foreground/40">--</span>;
+                      })()
+                  }
+                </p>
+              </div>
+              <MiniSparkline values={sparkRh} color="#0891b2" />
               {isSensorAuto && (
-                <span className="absolute top-1 right-1 text-cyan-400 opacity-80" title="Leitura automática (sensor)"><Wifi className="w-3 h-3" /></span>
+                <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-cyan-400 opacity-80"><Wifi className="w-3 h-3" /></span>
               )}
             </button>
             {/* PPFD */}
-            <div className="flex flex-col items-center gap-1 py-3 px-1 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.08]">
-              <Sun className="w-3.5 h-3.5 text-yellow-400" />
-              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">PPFD</p>
-              <p className="text-xl font-bold tracking-tight leading-none text-foreground">
-                {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
-              </p>
+            <div className="kpi-ppfd flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-amber-500/20 dark:border-yellow-500/15">
+              <Sun className="w-4 h-4 text-amber-500 dark:text-yellow-400 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PPFD</p>
+              <div className="flex items-center gap-0.5">
+                <p className="text-base font-bold tracking-tight leading-none text-foreground">
+                  {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
+                </p>
+              </div>
             </div>
           </div>
 

@@ -69,6 +69,10 @@ function applyThemeToDOM(t: ThemeValue) {
   const root = document.documentElement;
   root.classList.remove("forest", "hps", "monstera", "vision", "light", "dark");
   root.classList.add(t);
+  // Adiciona .dark para temas escuros (necessário para utilitários dark: do Tailwind)
+  if (t === "hps" || t === "vision" || t === "forest") {
+    root.classList.add("dark");
+  }
 }
 
 export function ThemeToggle() {
