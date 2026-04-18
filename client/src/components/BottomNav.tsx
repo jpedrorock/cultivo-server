@@ -227,10 +227,8 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden"
       style={{
-        // iOS Safari: position:fixed pode falhar quando ancestrais têm transform/backdrop-filter.
-        // Forçar contexto de composição próprio na GPU com translate3d.
         position: 'fixed',
         bottom: 0,
         left: 0,
@@ -240,14 +238,36 @@ export function BottomNav() {
         willChange: 'transform',
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
-        // Padding bottom para safe-area (iPhone com notch/home indicator)
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        // zIndex 100: acima dos headers sticky (z-10/z-40) mas abaixo dos modais/sheets (z-[200]+)
         zIndex: 100,
+        overflow: 'visible',
       }}
     >
+      {/* Curved SVG background — notch in the center for the FAB */}
+      <svg
+        className="absolute bottom-0 left-0 w-full pointer-events-none"
+        style={{ height: '65px' }}
+        viewBox="0 0 390 65"
+        preserveAspectRatio="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Border line following the curve */}
+        <path
+          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1"
+          fill="none"
+          stroke="hsl(var(--border))"
+          strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
+        />
+        {/* Fill */}
+        <path
+          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1 L390,65 L0,65 Z"
+          style={{ fill: 'hsl(var(--card))' }}
+        />
+      </svg>
+
       <div className="max-w-screen-xl mx-auto px-2">
-        <div className="flex justify-around items-end pb-3 pt-3">
+        <div className="relative flex justify-around items-end pb-3 pt-2">
           {/* Nav items — Estufas, Plantas (antes do FAB) */}
           {navItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
@@ -271,7 +291,7 @@ export function BottomNav() {
           })}
 
           {/* FAB — Mini menu Force Touch style — CENTER */}
-          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-5" data-tour="quick-log-menu">
+          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-10" data-tour="quick-log-menu">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
               <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
