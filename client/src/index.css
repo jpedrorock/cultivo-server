@@ -163,6 +163,41 @@
   --sidebar-ring: oklch(0.62 0.17 145);
 }
 
+/* ─── Phase palette — cores semânticas por fase do ciclo ──────────────────────
+   Usadas em PhaseBadge, cycle timeline, tent headers.
+   Light: saturação moderada para legibilidade.
+   Dark: sobrepostos abaixo com maior brilho.                                  */
+:root {
+  --phase-seedling:   #5fa85c;   /* verde claro — muda */
+  --phase-vegetative: #2f9e44;   /* verde médio — vegetativa */
+  --phase-flowering:  #9c36b5;   /* roxo — floração */
+  --phase-flushing:   #0ca678;   /* teal — flush */
+  --phase-harvest:    #e8590c;   /* âmbar intenso — colheita */
+  --phase-drying:     #ad8621;   /* âmbar escuro — secagem */
+  --phase-curing:     #7d5a2a;   /* âmbar terra — cura */
+  --phase-maintenance:#60a5fa;   /* azul — manutenção/mãe */
+
+  /* Motion tokens — use no lugar de durações hard-coded */
+  --motion-fast:    150ms;
+  --motion-medium:  300ms;
+  --motion-slow:    600ms;
+  --motion-breath:  2500ms;
+  --ease-standard:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+}
+
+.dark {
+  /* Phase palette — versão dark: mais vibrante no fundo escuro */
+  --phase-seedling:   #8ec58c;
+  --phase-vegetative: #40c057;
+  --phase-flowering:  #be4bdb;
+  --phase-flushing:   #20c997;
+  --phase-harvest:    #fd7c36;
+  --phase-drying:     #e0a32e;
+  --phase-curing:     #b07e3a;
+  --phase-maintenance:#93c5fd;
+}
+
 .forest {
   /* === FOREST THEME (deep green, inspired by PlantPulse & LittleBee) === */
   
@@ -1472,6 +1507,15 @@ input[type="range"]::-moz-range-track {
 .metric-glow-orange { animation: metric-glow-orange 2.5s ease-in-out infinite; }
 .metric-glow-teal   { animation: metric-glow-teal   2.5s ease-in-out infinite 0.8s; }
 .metric-glow-yellow { animation: metric-glow-yellow 2.5s ease-in-out infinite 1.6s; }
+
+/* DS: cultivo-metric-glow — usa --metric-glow CSS var injetada inline no elemento */
+@keyframes cultivo-metric-glow {
+  0%, 100% { box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 0 0 0 var(--metric-glow, transparent); }
+  50%       { box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 0 14px 3px var(--metric-glow, transparent); }
+}
+.cultivo-metric-glow {
+  animation: cultivo-metric-glow var(--motion-breath, 2500ms) ease-in-out infinite;
+}
 
 /* Linha de lâmpada PPFD — pulsa como luz de filamento aumentando/diminuindo */
 @keyframes ppfd-lamp {

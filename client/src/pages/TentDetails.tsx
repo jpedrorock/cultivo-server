@@ -3,7 +3,6 @@ import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -20,6 +19,7 @@ import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
 import { EditTentDialog } from "@/components/EditTentDialog";
 import { EditLogDialog } from "@/components/EditLogDialog";
 import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
+import { PhaseBadge } from "@/components/PhaseBadge";
 import {
   Dialog,
   DialogContent,
@@ -778,7 +778,14 @@ export default function TentDetails() {
 
             {/* Ações */}
             <div className="flex items-center gap-2 shrink-0 print-hide">
-              <Badge className={`${phaseInfo.color} text-white border-0 text-xs hidden sm:inline-flex`}>{phaseInfo.phase}</Badge>
+              {cycle && (
+                <PhaseBadge
+                  phase={tent.category === "MAINTENANCE" ? "MAINTENANCE" : currentPhase ?? "VEGA"}
+                  week={currentWeek ?? undefined}
+                  size="sm"
+                  className="hidden sm:inline-flex"
+                />
+              )}
               {/* QR + Monitor — só desktop */}
               <div className="hidden sm:flex items-center gap-2">
                 <Button variant="outline" size="icon" onClick={() => setQrModalOpen(true)} title="QR Code para log rápido">
@@ -958,116 +965,30 @@ export default function TentDetails() {
           );
         })()}
 
-        {/* ── Progress bar do ciclo ── */}
-        {cycle && tent.category !== 'MAINTENANCE' && (() => {
-          const startDate = new Date(cycle.startDate);
-          const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-          const totalDays = Math.floor((Date.now() - startDate.getTime()) / (24 * 60 * 60 * 1000));
-          const weekNum = Math.floor(totalDays / 7) + 1;
-
-          // Estima total de semanas: vega ≈ 8, flora ≈ 8
-          const vegaWeeks = 8;
-          const floraWeeks = 8;
-          const isFlora = !!floraStart;
-          const totalEstWeeks = vegaWeeks + floraWeeks;
-          const progressPct = Math.min((weekNum / totalEstWeeks) * 100, 100);
-
-          const phases = [
-            { label: "Clonagem", range: "Sem 1-2", active: !isFlora && weekNum <= 2 },
-            { label: "Vega", range: "Sem 3-8", active: !isFlora && weekNum > 2 },
-            { label: "Flora", range: "Sem 9-16", active: isFlora },
-            { label: "Colheita", range: "", active: false },
-          ];
-
-          return (
-            <Card className="bg-card/90">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-semibold text-foreground">
-                    Semana <span className="text-primary text-base">{weekNum}</span>
-                    <span className="text-muted-foreground font-normal"> / ~{totalEstWeeks} estimadas</span>
-                  </p>
-                  <span className="text-xs text-muted-foreground">{Math.round(progressPct)}%</span>
-                </div>
-                {/* Barra */}
-                <div className="h-2 rounded-full bg-muted overflow-hidden mb-3">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-700"
-                    style={{ width: `${progressPct}%` }}
-                  />
-                </div>
-                {/* Marcadores de fase */}
-                <div className="grid grid-cols-4 gap-1">
-                  {phases.map((p) => (
-                    <div key={p.label} className="flex flex-col items-center gap-0.5">
-                      <div className={`w-2 h-2 rounded-full ${p.active ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
-                      <span className={`text-[10px] font-medium text-center leading-tight ${p.active ? 'text-primary' : 'text-muted-foreground/60'}`}>
-                        {p.label}
-                      </span>
-                      {p.range && <span className="text-[9px] text-muted-foreground/40">{p.range}</span>}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
-
-        {/* Cycle Info */}
-        {cycle && (
-          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden mb-6">
-            {/* Grid de métricas */}
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-border/40">
-              <div className="px-4 py-3">
-                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">
-                  {tent?.category === 'MAINTENANCE' ? 'Última Clonagem' : 'Ciclo Ativo'}
-                </p>
-                <p className="text-sm font-semibold text-foreground">
-                  {tent?.category === 'MAINTENANCE'
-                    ? ((tent as any).lastCloningAt
-                        ? (() => {
-                            const days = Math.floor((Date.now() - (tent as any).lastCloningAt) / (24 * 60 * 60 * 1000));
-                            if (days === 0) return 'Hoje';
-                            if (days === 1) return 'Ontem';
-                            return `Há ${days} dias`;
-                          })()
-                        : 'Nenhuma')
-                    : `Semana ${Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1}`
-                  }
-                </p>
-              </div>
-              <div className="px-4 py-3">
-                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Início</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {new Date(cycle.startDate).toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              <div className="px-4 py-3">
-                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Dias</p>
-                <p className="text-sm font-semibold text-foreground">
+        {/* Cycle — fase + botões de avanço de fase */}
+        {cycle && tent && (
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+            {/* Linha de resumo do ciclo */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40">
+              <PhaseBadge
+                phase={tent.category === "MAINTENANCE" ? "MAINTENANCE" : currentPhase ?? "VEGA"}
+                week={currentWeek ?? undefined}
+              />
+              <div className="flex items-center gap-3 text-xs text-muted-foreground divide-x divide-border/40">
+                <span>Início {format(new Date(cycle.startDate), "dd/MM/yy", { locale: ptBR })}</span>
+                <span className="pl-3">
                   {Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / (24 * 60 * 60 * 1000))} dias
-                </p>
-              </div>
-              <div className="px-4 py-3">
-                <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-1">Status</p>
-                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md border ${
-                  cycle.status === 'ACTIVE'
-                    ? 'bg-green-500/15 border-green-500/30 text-green-400'
-                    : cycle.status === 'FINISHED'
-                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                    : 'bg-muted/40 border-border/40 text-muted-foreground'
+                </span>
+                <span className={`pl-3 font-semibold ${
+                  cycle.status === 'ACTIVE' ? 'text-green-400' : 'text-amber-400'
                 }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    cycle.status === 'ACTIVE' ? 'bg-green-400' : cycle.status === 'FINISHED' ? 'bg-amber-400' : 'bg-muted-foreground'
-                  }`} />
-                  {cycle.status === 'ACTIVE' ? 'Ativo' : cycle.status === 'FINISHED' ? 'Finalizado' : cycle.status}
+                  {cycle.status === 'ACTIVE' ? 'Ativo' : 'Finalizado'}
                 </span>
               </div>
             </div>
 
             {/* Botões de avanço de fase */}
-            {tent && (
-              <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-border/40">
+            <div className="flex flex-wrap gap-2 px-4 py-3">
                 {tent.category === "MAINTENANCE" && (
                   <button
                     onClick={() => openPhaseConfirm("CLONING")}
@@ -1104,8 +1025,7 @@ export default function TentDetails() {
                     </button>
                   </>
                 )}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -1160,100 +1080,8 @@ export default function TentDetails() {
           </>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {/* Temperatura */}
-          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #f97316" }}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <ThermometerSun className="w-4 h-4 text-orange-500" />
-                    Temperatura Média
-                  </p>
-                  <p className="text-3xl font-bold text-foreground">{avgTemp}°C</p>
-                  <p className="text-xs text-muted-foreground mt-1">Últimos {dateRange} dias</p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-orange-500/10 ring-1 ring-orange-500/30 flex items-center justify-center"
-                     style={{ boxShadow: "0 0 12px rgba(249,115,22,0.25)" }}>
-                  <ThermometerSun className="w-6 h-6 text-orange-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Umidade */}
-          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #2dd4bf" }}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-teal-400" />
-                    Umidade Média
-                  </p>
-                  <p className="text-3xl font-bold text-foreground">{avgRh}%</p>
-                  <p className="text-xs text-muted-foreground mt-1">Últimos {dateRange} dias</p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-teal-400/10 ring-1 ring-teal-400/30 flex items-center justify-center"
-                     style={{ boxShadow: "0 0 12px rgba(45,212,191,0.25)" }}>
-                  <Droplets className="w-6 h-6 text-teal-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* PPFD */}
-          <Card className="bg-card/90 backdrop-blur-sm overflow-hidden" style={{ borderLeft: "3px solid #facc15" }}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Sun className="w-4 h-4 text-yellow-400" />
-                    PPFD Médio
-                  </p>
-                  <p className="text-3xl font-bold text-foreground">{avgPpfd}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Últimos {dateRange} dias</p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-yellow-400/10 ring-1 ring-yellow-400/30 flex items-center justify-center"
-                     style={{ boxShadow: "0 0 12px rgba(250,204,21,0.25)" }}>
-                  <Sun className="w-6 h-6 text-yellow-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Sensor SmartLife */}
         <TentSensorCard tentId={tentId} />
-
-        {/* Date Range Selector */}
-        <div className="flex items-center gap-3 mb-6">
-          <Calendar className="w-5 h-5 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Período:</span>
-          <div className="flex gap-2">
-            <Button
-              variant={dateRange === 7 ? "default" : "outline"}
-              size="sm"
-              onClick={() => setDateRange(7)}
-            >
-              7 dias
-            </Button>
-            <Button
-              variant={dateRange === 14 ? "default" : "outline"}
-              size="sm"
-              onClick={() => setDateRange(14)}
-            >
-              14 dias
-            </Button>
-            <Button
-              variant={dateRange === 30 ? "default" : "outline"}
-              size="sm"
-              onClick={() => setDateRange(30)}
-            >
-              30 dias
-            </Button>
-          </div>
-        </div>
 
         {/* Charts and History */}
         <Tabs defaultValue="plants" className="space-y-6" id="charts-container">
@@ -1271,6 +1099,34 @@ export default function TentDetails() {
           </TabsContent>
 
           <TabsContent value="charts" className="space-y-6">
+            {/* Date Range Selector */}
+            <div className="flex items-center gap-3">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Período:</span>
+              <div className="flex gap-2">
+                <Button
+                  variant={dateRange === 7 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDateRange(7)}
+                >
+                  7 dias
+                </Button>
+                <Button
+                  variant={dateRange === 14 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDateRange(14)}
+                >
+                  14 dias
+                </Button>
+                <Button
+                  variant={dateRange === 30 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDateRange(30)}
+                >
+                  30 dias
+                </Button>
+              </div>
+            </div>
             {logsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
