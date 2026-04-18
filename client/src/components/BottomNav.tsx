@@ -231,25 +231,19 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-[100] md:hidden"
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
         transform: 'translateZ(0)',
         WebkitTransform: 'translateZ(0)',
         willChange: 'transform',
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        zIndex: 100,
         overflow: 'visible',
       }}
     >
-      {/* Curved SVG background — notch in the center for the FAB */}
+      {/* Curved SVG background — cobre apenas a área da barra (65px) */}
       <svg
-        className="absolute bottom-0 left-0 w-full pointer-events-none"
+        className="absolute top-0 left-0 w-full pointer-events-none"
         style={{ height: '65px' }}
         viewBox="0 0 390 65"
         preserveAspectRatio="none"
@@ -270,8 +264,14 @@ export function BottomNav() {
         />
       </svg>
 
+      {/* Safe area fill — preenche a área do home indicator com a cor do card */}
+      <div
+        className="absolute bottom-0 left-0 right-0 pointer-events-none"
+        style={{ height: 'env(safe-area-inset-bottom, 0px)', background: 'hsl(var(--card))' }}
+      />
+
       <div className="max-w-screen-xl mx-auto px-2">
-        <div className="relative flex justify-around items-end pb-3 pt-2">
+        <div className="relative flex justify-around items-end pt-2" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Nav items — Estufas, Plantas (antes do FAB) */}
           {navItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
@@ -298,7 +298,7 @@ export function BottomNav() {
           <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-10" data-tour="quick-log-menu">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
-              <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+              <div className="fixed left-1/2 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
                 {/* Seta apontando para o FAB (centro) */}
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-border/60" />
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[5px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-card/95" />

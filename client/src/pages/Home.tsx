@@ -356,8 +356,8 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container py-6">
+        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="container py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
@@ -368,6 +368,8 @@ export default function Home() {
             </div>
           </div>
         </header>
+        {/* Spacer = header height (py-4 = 16px × 2 + h-9 = 36px = 68px) + safe area */}
+        <div style={{ height: 'calc(68px + env(safe-area-inset-top, 0px))' }} />
         <main className="container py-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="h-8 w-24 bg-muted rounded animate-pulse" />
@@ -432,9 +434,9 @@ export default function Home() {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
-        {/* Header — fora do PullToRefresh para sticky funcionar */}
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container py-6">
+        {/* Header — fixed para funcionar independente do PullToRefresh */}
+        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
@@ -475,6 +477,9 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* Spacer = header height (py-4 = 32px + h-9 = 36px = 68px) + safe area */}
+      <div style={{ height: 'calc(68px + env(safe-area-inset-top, 0px))' }} />
 
       <PullToRefresh onRefresh={handleRefresh}>
         <div>
