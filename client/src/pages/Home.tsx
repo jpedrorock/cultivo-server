@@ -1464,6 +1464,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           open={harvestQueueOpen}
           onOpenChange={setHarvestQueueOpen}
           cycleId={cycle.id}
+          tentId={tent.id}
           tentName={tent.name}
         />
       )}

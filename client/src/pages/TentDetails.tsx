@@ -1152,6 +1152,7 @@ export default function TentDetails() {
                   open={harvestQueueOpen}
                   onOpenChange={setHarvestQueueOpen}
                   cycleId={cycle.id}
+                  tentId={tentId}
                   tentName={tent.name}
                 />
               </>
