@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
@@ -14,19 +14,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-// ── Notch SVG animation ──────────────────────────────────────────────────────
-// Centers for 5 justify-around slots in a 390px viewBox
-// (390/5) * (i + 0.5) → 39, 117, 195, 273, 351
-const SLOT_CX = [39, 117, 195, 273, 351] as const;
-
-function buildFill(cx: number): string {
-  const p = (o: number) => cx + o;
-  return `M0,1 L${p(-47)},1 C${p(-35)},1 ${p(-29)},8 ${p(-24)},18 C${p(-18)},30 ${p(-11)},38 ${cx},38 C${p(11)},38 ${p(18)},30 ${p(24)},18 C${p(29)},8 ${p(35)},1 ${p(47)},1 L390,1 L390,65 L0,65 Z`;
-}
-function buildBorder(cx: number): string {
-  const p = (o: number) => cx + o;
-  return `M0,1 L${p(-47)},1 C${p(-35)},1 ${p(-29)},8 ${p(-24)},18 C${p(-18)},30 ${p(-11)},38 ${cx},38 C${p(11)},38 ${p(18)},30 ${p(24)},18 C${p(29)},8 ${p(35)},1 ${p(47)},1 L390,1`;
-}
 
 // Haptic feedback helper
 const triggerHapticFeedback = () => {
@@ -238,18 +225,31 @@ export function BottomNav() {
 
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
 
-  // Which slot is elevated + has the notch under it
-  // 0=Estufas  1=Plantas  2=FAB(default)  3=Alertas
-  const activeElevatedSlot =
-    location === '/'       ? 0 :
-    location === '/plants' ? 1 :
-    location === '/alerts' ? 3 : 2;
-
-  const notchCx = SLOT_CX[activeElevatedSlot];
-  const springTransition = { type: 'spring', stiffness: 320, damping: 30 } as const;
-  const itemSpring      = { type: 'spring', stiffness: 400, damping: 28 } as const;
+  // Which nav route is active? null = FAB stays at center as default
+  const NAV_ROUTES = [
+    { href: '/',       icon: TentIcon, slot: 0 },
+    { href: '/plants', icon: Leaf,     slot: 1 },
+    { href: '/alerts', icon: Bell,     slot: 3 },
+  ] as const;
+  const activeNavRoute = NAV_ROUTES.find(r => r.href === location) ?? null;
+  const itemSpring = { type: 'spring', stiffness: 420, damping: 30 } as const;
 
   if (isHidden) return null;
+
+  // Helper — renders the mini + that replaces an icon when its slot is active
+  const MiniPlus = () => (
+    <motion.button
+      initial={{ scale: 0, rotate: -45 }}
+      animate={{ scale: 1, rotate: 0 }}
+      exit={{ scale: 0, rotate: 45 }}
+      transition={itemSpring}
+      onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
+      aria-label="Registrar"
+      className="w-11 h-11 rounded-full border border-border/60 bg-card flex items-center justify-center text-muted-foreground active:scale-90 transition-colors hover:text-primary"
+    >
+      <Plus className="w-5 h-5" />
+    </motion.button>
+  );
 
   return (
     <nav
@@ -269,7 +269,7 @@ export function BottomNav() {
         overflow: 'visible',
       }}
     >
-      {/* Animated SVG curved background — notch follows active slot */}
+      {/* Static SVG curved background — notch always at center */}
       <svg
         className="absolute bottom-0 left-0 w-full pointer-events-none"
         style={{ height: '65px' }}
@@ -277,17 +277,15 @@ export function BottomNav() {
         preserveAspectRatio="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <motion.path
-          animate={{ d: buildBorder(notchCx) }}
-          transition={springTransition}
+        <path
+          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1"
           fill="none"
           stroke="hsl(var(--border))"
           strokeWidth="1"
           vectorEffect="non-scaling-stroke"
         />
-        <motion.path
-          animate={{ d: buildFill(notchCx) }}
-          transition={springTransition}
+        <path
+          d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1 L390,65 L0,65 Z"
           style={{ fill: 'hsl(var(--card))' }}
         />
       </svg>
@@ -296,48 +294,36 @@ export function BottomNav() {
         <div className="relative flex justify-around items-end pb-3 pt-2">
 
           {/* ── Slot 0: Estufas ─────────────────────────────────────── */}
-          <motion.div
-            animate={{ y: activeElevatedSlot === 0 ? -28 : 0 }}
-            transition={itemSpring}
-            className="relative"
-          >
-            {activeElevatedSlot === 0 ? (
-              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40">
-                <TentIcon className="w-6 h-6 text-primary-foreground stroke-[2.5]" />
-              </div>
+          <AnimatePresence mode="wait">
+            {activeNavRoute?.slot === 0 ? (
+              <MiniPlus key="mini-0" />
             ) : (
-              <Link href="/" onClick={triggerHapticFeedback} aria-label="Estufas"
-                className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
-                <TentIcon className="w-6 h-6" />
-              </Link>
+              <motion.div key="estufas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <Link href="/" onClick={triggerHapticFeedback} aria-label="Estufas"
+                  className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
+                  <TentIcon className="w-6 h-6" />
+                </Link>
+              </motion.div>
             )}
-          </motion.div>
+          </AnimatePresence>
 
           {/* ── Slot 1: Plantas ─────────────────────────────────────── */}
-          <motion.div
-            animate={{ y: activeElevatedSlot === 1 ? -28 : 0 }}
-            transition={itemSpring}
-            className="relative"
-          >
-            {activeElevatedSlot === 1 ? (
-              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40">
-                <Leaf className="w-6 h-6 text-primary-foreground stroke-[2.5]" />
-              </div>
+          <AnimatePresence mode="wait">
+            {activeNavRoute?.slot === 1 ? (
+              <MiniPlus key="mini-1" />
             ) : (
-              <Link href="/plants" onClick={triggerHapticFeedback} aria-label="Plantas"
-                className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
-                <Leaf className="w-6 h-6" />
-              </Link>
+              <motion.div key="plantas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <Link href="/plants" onClick={triggerHapticFeedback} aria-label="Plantas"
+                  className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
+                  <Leaf className="w-6 h-6" />
+                </Link>
+              </motion.div>
             )}
-          </motion.div>
+          </AnimatePresence>
 
-          {/* ── Slot 2: FAB ─────────────────────────────────────────── */}
-          <div ref={fabRef} className="relative flex flex-col items-center justify-center" data-tour="quick-log-menu">
-            <motion.div
-              animate={{ y: activeElevatedSlot === 2 ? -28 : 0, scale: activeElevatedSlot === 2 ? 1 : 0.72 }}
-              transition={itemSpring}
-              className="flex items-center justify-center"
-            >
+          {/* ── Slot 2: FAB (centro — sempre elevado) ───────────────── */}
+          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-8" data-tour="quick-log-menu">
+            <div className="flex items-center justify-center">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
               <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -497,45 +483,63 @@ export function BottomNav() {
               onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
               aria-label="Registrar log diário"
               className={cn(
-                "w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 transition-all duration-200",
-                fabMenuOpen ? "rotate-45" : "active:scale-95"
+                "w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40",
+                fabMenuOpen ? "scale-90" : "active:scale-95 transition-transform"
               )}
             >
-              <Plus className="w-6 h-6 text-white stroke-[2.5]" />
+              <AnimatePresence mode="wait">
+                {activeNavRoute ? (
+                  // Active nav route icon appears in center
+                  <motion.span
+                    key={activeNavRoute.href}
+                    initial={{ scale: 0, rotate: -45, opacity: 0 }}
+                    animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                    exit={{ scale: 0, rotate: 45, opacity: 0 }}
+                    transition={itemSpring}
+                    className="flex"
+                  >
+                    <activeNavRoute.icon className="w-7 h-7 text-white stroke-[2.5]" />
+                  </motion.span>
+                ) : (
+                  // Default: Plus icon
+                  <motion.span
+                    key="plus"
+                    initial={{ scale: 0, rotate: -45, opacity: 0 }}
+                    animate={{ scale: 1, rotate: fabMenuOpen ? 45 : 0, opacity: 1 }}
+                    exit={{ scale: 0, rotate: 45, opacity: 0 }}
+                    transition={itemSpring}
+                    className="flex"
+                  >
+                    <Plus className="w-7 h-7 text-white stroke-[2.5]" />
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
-            </motion.div>
+          </div>
           </div>
 
           {/* ── Slot 3: Alertas ─────────────────────────────────────── */}
-          <motion.div
-            animate={{ y: activeElevatedSlot === 3 ? -28 : 0 }}
-            transition={itemSpring}
-            className="relative"
-          >
-            {activeElevatedSlot === 3 ? (
-              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40 relative">
-                <Bell className="w-6 h-6 text-primary-foreground stroke-[2.5]" />
-                {alertCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                    {alertCount > 9 ? '9+' : alertCount}
-                  </span>
-                )}
-              </div>
+          <AnimatePresence mode="wait">
+            {activeNavRoute?.slot === 3 ? (
+              <MiniPlus key="mini-3" />
             ) : (
-              <Link href="/alerts" onClick={triggerHapticFeedback} aria-label="Alertas" data-tour="alerts-menu"
-                className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors relative">
-                <Bell className="w-6 h-6" />
-                {alertCount > 0 && (
-                  <span className={cn(
-                    "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
-                    badgeShaking ? "animate-badge-shake" : "animate-pulse"
-                  )}>
-                    {alertCount > 9 ? '9+' : alertCount}
-                  </span>
-                )}
-              </Link>
+              <motion.div key="alertas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="relative">
+                <Link href="/alerts" onClick={triggerHapticFeedback} aria-label="Alertas" data-tour="alerts-menu"
+                  className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors relative">
+                  <Bell className="w-6 h-6" />
+                  {alertCount > 0 && (
+                    <span className={cn(
+                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
+                      badgeShaking ? "animate-badge-shake" : "animate-pulse"
+                    )}>
+                      {alertCount > 9 ? '9+' : alertCount}
+                    </span>
+                  )}
+                </Link>
+              </motion.div>
             )}
-          </motion.div>
+          </AnimatePresence>
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
