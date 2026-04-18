@@ -528,7 +528,7 @@ export default function PlantsList() {
                           return (
                           <ListItemAnimation key={plant.id}>
                             <div
-                              className={`rounded-2xl overflow-hidden relative transition-all duration-200 ${
+                              className={`rounded-2xl overflow-hidden relative aspect-[3/4] transition-all duration-200 ${
                                 isSelected ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-background scale-[0.96]' : ''
                               }`}
                               style={{ background: cardBg }}
@@ -536,12 +536,12 @@ export default function PlantsList() {
                               {/* Badge saúde / toggle seleção — canto superior esquerdo */}
                               <button
                                 onClick={e => { e.preventDefault(); e.stopPropagation(); togglePlantSelection(plant.id); }}
-                                className="absolute top-2 left-2 z-20 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 shadow-sm"
+                                className="absolute top-2 left-2 z-30 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 shadow-sm"
                                 style={isSelected
                                   ? { background: 'hsl(var(--primary))', color: '#fff' }
                                   : healthBadge
                                   ? { background: healthBadge.bg, color: healthBadge.color }
-                                  : { background: 'rgba(0,0,0,0.25)', color: 'rgba(255,255,255,0.45)' }
+                                  : { background: 'rgba(0,0,0,0.30)', color: 'rgba(255,255,255,0.55)' }
                                 }
                               >
                                 {isSelected
@@ -557,7 +557,7 @@ export default function PlantsList() {
                                 <DropdownMenuTrigger asChild>
                                   <button
                                     onClick={e => { e.preventDefault(); e.stopPropagation(); }}
-                                    className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/25 flex items-center justify-center text-white/65 hover:bg-black/40 hover:text-white transition-colors"
+                                    className="absolute top-2 right-2 z-30 w-7 h-7 rounded-full bg-black/30 flex items-center justify-center text-white/70 hover:bg-black/50 hover:text-white transition-colors"
                                   >
                                     <MoreHorizontal className="w-3.5 h-3.5" />
                                   </button>
@@ -578,34 +578,39 @@ export default function PlantsList() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
 
-                              {/* Foto — aspect 3:4, object-cover para preencher o card */}
-                              <Link href={`/plants/${plant.id}`} className="block">
-                                <div className="w-full aspect-[3/4] relative">
-                                  {thumbUrl ? (
-                                    <img
-                                      src={thumbUrl}
-                                      alt={plant.name}
-                                      className="absolute inset-0 w-full h-full object-cover"
-                                      loading="lazy"
-                                      decoding="async"
-                                    />
-                                  ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <Sprout className="w-14 h-14 text-white/12" />
-                                    </div>
-                                  )}
-                                </div>
-                              </Link>
+                              {/* Link cobre todo o card — foto + gradient + info */}
+                              <Link href={`/plants/${plant.id}`} className="absolute inset-0 z-10">
+                                {/* Foto full-card */}
+                                {thumbUrl ? (
+                                  <img
+                                    src={thumbUrl}
+                                    alt={plant.name}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Sprout className="w-14 h-14 text-white/15" />
+                                  </div>
+                                )}
 
-                              {/* Info — nome + fase */}
-                              <Link href={`/plants/${plant.id}`} className="block px-3 pt-1 pb-3">
-                                <p className="text-white font-bold text-sm leading-tight truncate">{plant.name}</p>
-                                <p className="text-white/55 text-[11px] mt-0.5 uppercase tracking-wider truncate">{phaseLabel}</p>
+                                {/* Gradient fade no bottom para legibilidade do texto */}
+                                <div
+                                  className="absolute inset-x-0 bottom-0 pointer-events-none"
+                                  style={{ height: '55%', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.25) 55%, transparent 100%)' }}
+                                />
+
+                                {/* Nome + fase sobrepostos */}
+                                <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+                                  <p className="text-white font-bold text-sm leading-tight truncate drop-shadow">{plant.name}</p>
+                                  <p className="text-white/70 text-[11px] mt-0.5 uppercase tracking-wider truncate drop-shadow">{phaseLabel}</p>
+                                </div>
                               </Link>
 
                               {/* Overlay de seleção */}
                               {isSelected && (
-                                <div className="absolute inset-0 bg-primary/20 pointer-events-none rounded-2xl" />
+                                <div className="absolute inset-0 bg-primary/20 pointer-events-none rounded-2xl z-20" />
                               )}
                             </div>
                           </ListItemAnimation>
