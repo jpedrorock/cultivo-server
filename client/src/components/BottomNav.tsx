@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from "framer-motion";
 import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
@@ -13,7 +12,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-
 
 // Haptic feedback helper
 const triggerHapticFeedback = () => {
@@ -225,31 +223,7 @@ export function BottomNav() {
 
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
 
-  // Which nav route is active? null = FAB stays at center as default
-  const NAV_ROUTES = [
-    { href: '/',       icon: TentIcon, slot: 0 },
-    { href: '/plants', icon: Leaf,     slot: 1 },
-    { href: '/alerts', icon: Bell,     slot: 3 },
-  ] as const;
-  const activeNavRoute = NAV_ROUTES.find(r => r.href === location) ?? null;
-  const itemSpring = { type: 'spring', stiffness: 420, damping: 30 } as const;
-
   if (isHidden) return null;
-
-  // Helper — renders the mini + that replaces an icon when its slot is active
-  const MiniPlus = () => (
-    <motion.button
-      initial={{ scale: 0, rotate: -45 }}
-      animate={{ scale: 1, rotate: 0 }}
-      exit={{ scale: 0, rotate: 45 }}
-      transition={itemSpring}
-      onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
-      aria-label="Registrar"
-      className="w-11 h-11 rounded-full border border-border/60 bg-card flex items-center justify-center text-muted-foreground active:scale-90 transition-colors hover:text-primary"
-    >
-      <Plus className="w-5 h-5" />
-    </motion.button>
-  );
 
   return (
     <nav
@@ -269,7 +243,7 @@ export function BottomNav() {
         overflow: 'visible',
       }}
     >
-      {/* Static SVG curved background — notch always at center */}
+      {/* Curved SVG background — notch in the center for the FAB */}
       <svg
         className="absolute bottom-0 left-0 w-full pointer-events-none"
         style={{ height: '65px' }}
@@ -277,6 +251,7 @@ export function BottomNav() {
         preserveAspectRatio="none"
         xmlns="http://www.w3.org/2000/svg"
       >
+        {/* Border line following the curve */}
         <path
           d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1"
           fill="none"
@@ -284,6 +259,7 @@ export function BottomNav() {
           strokeWidth="1"
           vectorEffect="non-scaling-stroke"
         />
+        {/* Fill */}
         <path
           d="M0,1 L148,1 C160,1 166,8 171,18 C177,30 184,38 195,38 C206,38 213,30 219,18 C224,8 230,1 242,1 L390,1 L390,65 L0,65 Z"
           style={{ fill: 'hsl(var(--card))' }}
@@ -292,38 +268,30 @@ export function BottomNav() {
 
       <div className="max-w-screen-xl mx-auto px-2">
         <div className="relative flex justify-around items-end pb-3 pt-2">
+          {/* Nav items — Estufas, Plantas (antes do FAB) */}
+          {navItems.slice(0, 2).map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={triggerHapticFeedback}
+                aria-label={item.label}
+                className={cn(
+                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
+                  isActive
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                )}
+              >
+                <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
+              </Link>
+            );
+          })}
 
-          {/* ── Slot 0: Estufas ─────────────────────────────────────── */}
-          <AnimatePresence mode="wait">
-            {activeNavRoute?.slot === 0 ? (
-              <MiniPlus key="mini-0" />
-            ) : (
-              <motion.div key="estufas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Link href="/" onClick={triggerHapticFeedback} aria-label="Estufas"
-                  className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
-                  <TentIcon className="w-6 h-6" />
-                </Link>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ── Slot 1: Plantas ─────────────────────────────────────── */}
-          <AnimatePresence mode="wait">
-            {activeNavRoute?.slot === 1 ? (
-              <MiniPlus key="mini-1" />
-            ) : (
-              <motion.div key="plantas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Link href="/plants" onClick={triggerHapticFeedback} aria-label="Plantas"
-                  className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors">
-                  <Leaf className="w-6 h-6" />
-                </Link>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ── Slot 2: FAB (centro — sempre elevado) ───────────────── */}
-          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-8" data-tour="quick-log-menu">
-            <div className="flex items-center justify-center">
+          {/* FAB — Mini menu Force Touch style — CENTER */}
+          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-10" data-tour="quick-log-menu">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
               <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -483,63 +451,48 @@ export function BottomNav() {
               onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
               aria-label="Registrar log diário"
               className={cn(
-                "w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40",
-                fabMenuOpen ? "scale-90" : "active:scale-95 transition-transform"
+                "w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 transition-all duration-200",
+                fabMenuOpen ? "scale-90 rotate-45" : "active:scale-95"
               )}
             >
-              <AnimatePresence mode="wait">
-                {activeNavRoute ? (
-                  // Active nav route icon appears in center
-                  <motion.span
-                    key={activeNavRoute.href}
-                    initial={{ scale: 0, rotate: -45, opacity: 0 }}
-                    animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                    exit={{ scale: 0, rotate: 45, opacity: 0 }}
-                    transition={itemSpring}
-                    className="flex"
-                  >
-                    <activeNavRoute.icon className="w-7 h-7 text-white stroke-[2.5]" />
-                  </motion.span>
-                ) : (
-                  // Default: Plus icon
-                  <motion.span
-                    key="plus"
-                    initial={{ scale: 0, rotate: -45, opacity: 0 }}
-                    animate={{ scale: 1, rotate: fabMenuOpen ? 45 : 0, opacity: 1 }}
-                    exit={{ scale: 0, rotate: 45, opacity: 0 }}
-                    transition={itemSpring}
-                    className="flex"
-                  >
-                    <Plus className="w-7 h-7 text-white stroke-[2.5]" />
-                  </motion.span>
-                )}
-              </AnimatePresence>
+              <Plus className="w-6 h-6 text-white stroke-[2.5]" />
             </button>
           </div>
-          </div>
 
-          {/* ── Slot 3: Alertas ─────────────────────────────────────── */}
-          <AnimatePresence mode="wait">
-            {activeNavRoute?.slot === 3 ? (
-              <MiniPlus key="mini-3" />
-            ) : (
-              <motion.div key="alertas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="relative">
-                <Link href="/alerts" onClick={triggerHapticFeedback} aria-label="Alertas" data-tour="alerts-menu"
-                  className="flex items-center justify-center p-3 rounded-xl text-muted-foreground hover:text-primary transition-colors relative">
-                  <Bell className="w-6 h-6" />
-                  {alertCount > 0 && (
-                    <span className={cn(
+          {/* Nav items — Alertas (após o FAB) */}
+          {navItems.slice(2).map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.href;
+            const isAlertsItem = item.href === "/alerts";
+            const showBadge = item.badge !== undefined && item.badge > 0;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={triggerHapticFeedback}
+                data-tour={item.href === "/alerts" ? "alerts-menu" : undefined}
+                aria-label={item.label}
+                className={cn(
+                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
+                  isActive
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                )}
+              >
+                <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
+                {showBadge && (
+                  <span
+                    className={cn(
                       "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
-                      badgeShaking ? "animate-badge-shake" : "animate-pulse"
-                    )}>
-                      {alertCount > 9 ? '9+' : alertCount}
-                    </span>
-                  )}
-                </Link>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                      isAlertsItem && badgeShaking ? "animate-badge-shake" : "animate-pulse"
+                    )}
+                  >
+                    {item.badge! > 9 ? '9+' : item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
