@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, ArrowLeft, FlaskConical, CheckCircle2 } from "lucide-react";
+import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, FlaskConical, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { PageHeader } from "@/components/PageHeader";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -81,56 +82,62 @@ export default function Alerts() {
     <PageTransition>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button asChild variant="ghost" size="icon">
-                  <Link href="/">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Link>
+        <PageHeader
+          backHref="/"
+          title={
+            <>
+              <Bell className="w-5 h-5 text-primary shrink-0" />
+              <span className="truncate">Histórico de Alertas</span>
+              {newCount > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-2 py-0 h-5 animate-pulse shrink-0">
+                  {newCount} novo{newCount !== 1 ? "s" : ""}
+                </Badge>
+              )}
+            </>
+          }
+          subtitle="Toque em um alerta para marcá-lo como visto"
+          rightActions={
+            <>
+              {newCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => markAllAsSeen.mutate({ tentId: selectedTentId })}
+                  disabled={markAllAsSeen.isPending}
+                  className="hidden sm:inline-flex"
+                >
+                  {markAllAsSeen.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                  )}
+                  Marcar todos como vistos
                 </Button>
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                    <Bell className="w-6 h-6 text-primary" />
-                    Histórico de Alertas
-                    {newCount > 0 && (
-                      <Badge variant="destructive" className="text-xs px-2 py-0.5 animate-pulse">
-                        {newCount} novo{newCount !== 1 ? "s" : ""}
-                      </Badge>
-                    )}
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Clique em um alerta para marcá-lo como visto
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {newCount > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => markAllAsSeen.mutate({ tentId: selectedTentId })}
-                    disabled={markAllAsSeen.isPending}
-                  >
-                    {markAllAsSeen.isPending ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                    )}
-                    Marcar todos como vistos
-                  </Button>
-                )}
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/settings">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Configurar
-                  </Link>
+              )}
+              {newCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => markAllAsSeen.mutate({ tentId: selectedTentId })}
+                  disabled={markAllAsSeen.isPending}
+                  className="sm:hidden h-9 w-9"
+                  aria-label="Marcar todos como vistos"
+                >
+                  {markAllAsSeen.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
                 </Button>
-              </div>
-            </div>
-          </div>
-        </header>
+              )}
+              <Button asChild variant="outline" size="icon" className="h-9 w-9" aria-label="Configurar alertas">
+                <Link href="/settings">
+                  <Settings className="w-4 h-4" />
+                </Link>
+              </Button>
+            </>
+          }
+        />
 
         {/* Content */}
         <main className="container mx-auto px-4 py-8">

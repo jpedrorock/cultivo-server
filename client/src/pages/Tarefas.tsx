@@ -4,12 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, CheckCircle2, Circle, ArrowLeft, Filter, Trash2, ListChecks, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, Filter, Trash2, ListChecks, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Link } from "wouter";
 import { toast } from "sonner";
 import { TaskTemplatesManager } from "@/components/TaskTemplatesManager";
 import { TaskCardSkeleton } from "@/components/ListSkeletons";
+import { PageHeader } from "@/components/PageHeader";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { useState } from "react";
 
@@ -51,16 +51,7 @@ export default function Tarefas() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-3 flex items-center gap-3">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <h1 className="text-lg font-bold">Tarefas da Semana</h1>
-          </div>
-        </div>
+        <PageHeader backHref="/" title="Tarefas da Semana" />
         <main className="container mx-auto px-4 py-6">
           <TaskCardSkeleton count={3} />
         </main>
@@ -94,33 +85,19 @@ export default function Tarefas() {
   return (
     <PageTransition>
     <div className="min-h-screen bg-background">
-      {/* Header sticky */}
-      <div className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" aria-label="Voltar">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
-
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">
-              Tarefas Semanais
-            </h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">
-              Organizadas por estufa e semana do ciclo
-            </p>
-          </div>
-
-          {/* Badge de progresso — compacto */}
+      <PageHeader
+        backHref="/"
+        title="Tarefas Semanais"
+        subtitle="Organizadas por estufa e semana do ciclo"
+        rightActions={
           <Badge
             variant="outline"
             className="shrink-0 text-xs sm:text-sm px-2 py-1 whitespace-nowrap"
           >
             {completedTasks}/{totalTasks}
           </Badge>
-        </div>
-      </div>
+        }
+      />
 
       <div className="container mx-auto px-4 py-5">
         <Tabs defaultValue="tasks" className="space-y-5">

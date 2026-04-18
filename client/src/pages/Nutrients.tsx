@@ -20,10 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast as showToast } from "sonner";
-import { Beaker, Printer, Loader2, ArrowLeft, Download, Droplets, Zap, FlaskConical, Sprout, Leaf, Flower2, Wrench, Wind, ClipboardList, ArrowUpDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { Breadcrumb } from "@/components/Breadcrumb";
+import { Beaker, Printer, Loader2, Download, Droplets, Zap, FlaskConical, Sprout, Leaf, Flower2, Wrench, Wind, ClipboardList, ArrowUpDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import { PageTransition } from "@/components/PageTransition";
-import { useLocation } from "wouter";
 
 type Phase = "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
 
@@ -423,7 +422,6 @@ function CompareTab() {
 }
 
 export default function Nutrients() {
-  const [, setLocation] = useLocation();
   const [phase, setPhase] = useState<Phase>("VEGA");
   const [week, setWeek] = useState(1);
   const [volumeL, setVolumeL] = useState(10);
@@ -563,19 +561,17 @@ export default function Nutrients() {
 
   return (
     <PageTransition>
+      <PageHeader
+        backHref="/calculators"
+        title={
+          <>
+            <Beaker className="w-5 h-5 text-green-600 shrink-0" />
+            <span className="truncate">Calculadora de Fertilização</span>
+          </>
+        }
+        subtitle="Quantidades de nutrientes por fase e semana"
+      />
       <div className="container py-6 max-w-5xl">
-        <Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Calculadoras", href: "/calculators" }, { label: "Fertilização" }]} />
-        <Button variant="ghost" size="sm" onClick={() => setLocation("/calculators")} className="mb-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />Voltar
-        </Button>
-        <div className="flex items-center gap-3 mb-6">
-          <Beaker className="w-8 h-8 text-green-600" />
-          <div>
-            <h1 className="text-3xl font-bold">Calculadora de Fertilização</h1>
-            <p className="text-muted-foreground">Calcule automaticamente as quantidades de nutrientes baseado em fase e semana</p>
-          </div>
-        </div>
-
         <Tabs defaultValue="calculator" className="space-y-6">
           <TabsList>
             <TabsTrigger value="calculator" className="flex items-center gap-1.5"><FlaskConical className="w-4 h-4"/>Calculadora</TabsTrigger>

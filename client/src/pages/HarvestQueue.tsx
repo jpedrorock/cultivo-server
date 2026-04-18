@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -140,33 +141,31 @@ export default function HarvestQueue() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-orange-100 dark:bg-orange-900/30">
-              <Wind className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Aguardando Secagem
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {plantCount === 0
-                  ? "Nenhuma planta aguardando"
-                  : `${plantCount} planta${plantCount !== 1 ? "s" : ""} aguardando uma estufa livre`}
-              </p>
-            </div>
-          </div>
-          {plantCount > 0 && (
+      <PageHeader
+        backHref="/"
+        title={
+          <>
+            <Wind className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0" />
+            <span className="truncate">Aguardando Secagem</span>
+          </>
+        }
+        subtitle={
+          plantCount === 0
+            ? "Nenhuma planta aguardando"
+            : `${plantCount} planta${plantCount !== 1 ? "s" : ""} aguardando uma estufa livre`
+        }
+        rightActions={
+          plantCount > 0 ? (
             <Badge
               variant="outline"
               className="border-orange-300 text-orange-700 dark:text-orange-400 text-sm px-3 py-1"
             >
               {plantCount}
             </Badge>
-          )}
-        </div>
+          ) : undefined
+        }
+      />
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
 
         {/* Empty state */}
         {plantCount === 0 && (
