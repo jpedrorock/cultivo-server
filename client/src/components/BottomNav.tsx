@@ -31,10 +31,14 @@ type NavItem = {
 const HIDDEN_NAV_ROUTES = ["/quick-log"];
 const HIDDEN_NAV_PREFIXES = ["/tent/", "/display"];
 
+// Avatar colors — light usa 700 (sóbrio), dark mantém 500 (vibrante)
 const AVATAR_GRADIENTS = [
-  'from-emerald-500 to-teal-600', 'from-blue-500 to-indigo-600',
-  'from-violet-500 to-purple-600', 'from-rose-500 to-pink-600',
-  'from-amber-500 to-orange-600', 'from-cyan-500 to-sky-600',
+  'bg-teal-600',
+  'bg-blue-600',
+  'bg-violet-600',
+  'bg-rose-600',
+  'bg-amber-600',
+  'bg-cyan-600',
 ];
 const stageLabel = (s: string) =>
   s === 'CLONE' ? 'Clone' : s === 'SEEDLING' ? 'Seedling' :
@@ -97,7 +101,7 @@ function ChatPlantPicker({
                 onClick={() => onSelect(p)}
                 className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
               >
-                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
+                <div className={`w-11 h-11 rounded-xl ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
                   {letter}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -304,7 +308,7 @@ export function BottomNav() {
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
                   className="flex items-center gap-3 px-4 py-3.5 hover:bg-teal-500/8 active:bg-teal-500/15 transition-colors border-b border-border/30 w-full"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-teal-600 flex items-center justify-center shrink-0 shadow-sm">
                     <ThermometerSun className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -318,7 +322,7 @@ export function BottomNav() {
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
                   className="flex items-center gap-3 px-4 py-3.5 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors border-b border-border/30 w-full"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-rose-600 flex items-center justify-center shrink-0 shadow-sm">
                     <Heart className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -332,7 +336,7 @@ export function BottomNav() {
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
                   className="flex items-center gap-3 px-4 py-3.5 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors border-b border-border/30 w-full"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 shadow-sm">
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -346,8 +350,8 @@ export function BottomNav() {
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setTrainingPickerOpen(true); }}
                   className="flex items-center gap-3 px-4 py-3.5 hover:bg-green-500/8 active:bg-green-500/15 transition-colors border-b border-border/30 w-full text-left"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shrink-0 shadow-sm">
-                    <Scissors className="w-4 h-4 text-white" />
+                  <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shrink-0 shadow-sm">
+                    <Scissors className="w-4 h-4 text-primary-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground leading-tight">Treinamento</p>
@@ -361,7 +365,7 @@ export function BottomNav() {
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setChatPickerOpen(true); }}
                   className="flex items-center gap-3 px-4 py-3.5 hover:bg-blue-500/8 active:bg-blue-500/15 transition-colors w-full text-left"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -419,7 +423,7 @@ export function BottomNav() {
                 {/* Header */}
                 <div className="shrink-0 mb-5">
                   <div className="flex items-center gap-2.5 mb-1">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
                       <Bot className="w-4 h-4 text-white" />
                     </div>
                     <p className="font-bold text-base">Conversar sobre qual planta?</p>
@@ -451,7 +455,7 @@ export function BottomNav() {
               onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
               aria-label="Registrar log diário"
               className={cn(
-                "w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-xl shadow-green-900/40 transition-all duration-200",
+                "w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/30 transition-all duration-200",
                 fabMenuOpen ? "scale-90 rotate-45" : "active:scale-95"
               )}
             >

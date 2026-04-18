@@ -76,7 +76,7 @@ export default function Setup() {
             <button
               onClick={() => { setError(''); createGroup.mutate({ name: groupName }); }}
               disabled={!groupName.trim() || createGroup.isPending}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
             >
               {createGroup.isPending ? 'Criando...' : 'Criar cultivo'}
             </button>
@@ -101,7 +101,7 @@ export default function Setup() {
             <button
               onClick={() => { setError(''); joinGroup.mutate({ inviteCode }); }}
               disabled={inviteCode.length < 6 || joinGroup.isPending}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
             >
               {joinGroup.isPending ? 'Entrando...' : 'Entrar no cultivo'}
             </button>

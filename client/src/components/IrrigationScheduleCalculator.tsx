@@ -493,7 +493,7 @@ export function IrrigationScheduleCalculator() {
       {/* ── SEÇÃO 1: Configuração da Bomba ── */}
       <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12) 0%, rgba(59,130,246,0.05) 100%)' }}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/30">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
             <Zap className="w-4 h-4 text-white" />
           </div>
           <div>
@@ -598,7 +598,7 @@ export function IrrigationScheduleCalculator() {
       {/* ── SEÇÃO 2: Configuração da Planta ── */}
       <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(74,222,128,0.10) 0%, rgba(16,185,129,0.04) 100%)' }}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
             <Droplets className="w-4 h-4 text-white" />
           </div>
           <div>
@@ -700,7 +700,7 @@ export function IrrigationScheduleCalculator() {
       <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.10) 0%, rgba(202,138,4,0.04) 100%)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-900/30">
+            <div className="w-8 h-8 rounded-lg bg-amber-600 flex items-center justify-center shadow-sm">
               <Sun className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -832,7 +832,7 @@ export function IrrigationScheduleCalculator() {
       {result && (
         <div className="rounded-2xl border border-cyan-500/30 bg-card overflow-hidden">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-cyan-500/20" style={{ background: 'linear-gradient(135deg, rgba(34,211,238,0.12) 0%, rgba(6,182,212,0.05) 100%)' }}>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-900/30">
+            <div className="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center shadow-sm">
               <Timer className="w-4 h-4 text-white" />
             </div>
             <div>

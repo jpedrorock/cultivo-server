@@ -71,7 +71,7 @@ export default function NewPlant() {
         backHref="/plants"
         title={
           <>
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow shrink-0">
+            <span className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow shrink-0">
               <Sprout className="w-4 h-4 text-white" />
             </span>
             <span className="truncate">Nova Planta</span>

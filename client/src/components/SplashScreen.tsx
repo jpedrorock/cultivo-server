@@ -21,7 +21,7 @@ export function SplashScreen({ onFinish }: SplashScreenProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-500 bg-gradient-to-br from-green-500 via-green-600 to-green-700 ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-500 bg-primary ${
         isVisible ? "opacity-100" : "opacity-0"
       }`}
     >

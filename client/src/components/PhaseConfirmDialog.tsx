@@ -41,7 +41,7 @@ const PHASE_CONFIG: Record<
       "bg-purple-500/10 border border-purple-500/30 dark:bg-purple-500/15 dark:border-purple-500/35",
     iconColor: "text-purple-500 dark:text-purple-400",
     confirmClass:
-      "bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white border-0",
+      "bg-violet-500 hover:bg-violet-600 text-white border-0",
     confirmLabel: "Sim, iniciar Floração",
   },
   DRYING: {
@@ -53,7 +53,7 @@ const PHASE_CONFIG: Record<
       "bg-amber-500/10 border border-amber-500/30 dark:bg-amber-500/15 dark:border-amber-500/35",
     iconColor: "text-amber-600 dark:text-amber-400",
     confirmClass:
-      "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black border-0",
+      "bg-amber-500 hover:bg-amber-600 text-black border-0",
     confirmLabel: "Sim, iniciar Secagem",
   },
   CLONING: {
@@ -65,7 +65,7 @@ const PHASE_CONFIG: Record<
       "bg-sky-500/10 border border-sky-500/30 dark:bg-sky-500/15 dark:border-sky-500/35",
     iconColor: "text-sky-500 dark:text-sky-400",
     confirmClass:
-      "bg-gradient-to-r from-sky-400 to-cyan-500 hover:from-sky-500 hover:to-cyan-600 text-black border-0",
+      "bg-sky-500 hover:bg-sky-600 text-black border-0",
     confirmLabel: "Sim, iniciar Clonagem",
   },
 };

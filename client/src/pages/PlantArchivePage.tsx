@@ -327,7 +327,7 @@ export default function PlantArchivePage() {
           backHref="/plants"
           title={
             <>
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-500 to-gray-700 flex items-center justify-center shadow shrink-0">
+              <span className="w-8 h-8 rounded-lg bg-muted-foreground/60 flex items-center justify-center shadow shrink-0">
                 <Archive className="w-4 h-4 text-white" />
               </span>
               <span className="truncate">Arquivo de Plantas</span>

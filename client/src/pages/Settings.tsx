@@ -12,7 +12,7 @@ function UserAvatar({ user, size = 'md' }: { user: { name?: string | null; email
     return <img src={user.avatarUrl} alt={user.name || ''} className={`${dim} rounded-full object-cover shrink-0`} />;
   }
   return (
-    <div className={`${dim} rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0`}>
+    <div className={`${dim} rounded-full bg-primary flex items-center justify-center shrink-0`}>
       <span className={`text-white font-bold ${text}`}>{initial}</span>
     </div>
   );

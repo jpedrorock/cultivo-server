@@ -101,7 +101,7 @@ function ChatBubble({ msg }: { msg: Message }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 group`}>
       {!isUser && (
-        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 mr-2 mt-0.5">
+        <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mr-2 mt-0.5">
           <Bot className="w-3.5 h-3.5 text-white" />
         </div>
       )}
@@ -141,7 +141,7 @@ function ChatBubble({ msg }: { msg: Message }) {
 function LoadingBubble() {
   return (
     <div className="flex justify-start mb-3">
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 mr-2 mt-0.5">
+      <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center shrink-0 mr-2 mt-0.5">
         <Bot className="w-3.5 h-3.5 text-white" />
       </div>
       <div className="bg-card border border-border rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1.5 items-center">
@@ -194,7 +194,7 @@ function PlantContextBar({
         className="w-full flex items-center gap-3 px-4 py-2.5 bg-emerald-500/8 border-b border-emerald-500/15 hover:bg-emerald-500/12 active:bg-emerald-500/15 transition-colors"
       >
         {/* Avatar */}
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 text-white font-bold text-sm shadow-sm shadow-emerald-500/20">
+        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0 text-primary-foreground font-bold text-sm shadow-sm shadow-primary/20">
           {plant.name.charAt(0).toUpperCase()}
         </div>
 
@@ -335,14 +335,14 @@ function PlantGallerySheet({
 
 // ─── Plant picker sheet ───────────────────────────────────────────────────────
 
-// Gradients por letra para dar personalidade aos avatares
+// Avatar colors — light 600 (sóbrio saturado), dark vivo
 const AVATAR_GRADIENTS = [
-  'from-emerald-500 to-teal-600',
-  'from-blue-500 to-indigo-600',
-  'from-violet-500 to-purple-600',
-  'from-rose-500 to-pink-600',
-  'from-amber-500 to-orange-600',
-  'from-cyan-500 to-sky-600',
+  'bg-teal-600',
+  'bg-blue-600',
+  'bg-violet-600',
+  'bg-rose-600',
+  'bg-amber-600',
+  'bg-cyan-600',
 ];
 function avatarGradient(name: string) {
   return AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length];
@@ -469,7 +469,7 @@ function PlantPickerSheet({
                       isCurrent ? 'bg-emerald-500/10 hover:bg-emerald-500/15' : 'hover:bg-muted/60'
                     }`}
                   >
-                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm`}>
+                    <div className={`w-11 h-11 rounded-xl ${grad} flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm`}>
                       {letter}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -631,7 +631,7 @@ export default function PlantChat() {
               </Link>
             </Button>
 
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
               <Bot className="w-4 h-4 text-white" />
             </div>
 
@@ -709,7 +709,7 @@ export default function PlantChat() {
             <div className="flex flex-col items-center justify-center h-full gap-5 pb-10">
               {/* Icon */}
               <div className="relative">
-                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <div className="w-20 h-20 rounded-3xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
                   <Bot className="w-10 h-10 text-white" />
                 </div>
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">

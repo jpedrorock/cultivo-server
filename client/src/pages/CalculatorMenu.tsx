@@ -9,7 +9,7 @@ export default function CalculatorMenu() {
       title: "Rega e Runoff",
       description: "Volume ideal de rega e medição de runoff real",
       icon: Droplets,
-      gradient: "from-teal-400 to-cyan-500",
+      gradient: "bg-teal-500",
       border: "border-teal-500/20",
       glow: "rgba(20,184,166,0.09)",
       accentColor: "text-teal-400",
@@ -22,7 +22,7 @@ export default function CalculatorMenu() {
       title: "Rega Automática",
       description: "Cronograma de ciclos por bomba gotejadora e janela de luz",
       icon: Timer,
-      gradient: "from-blue-400 to-cyan-500",
+      gradient: "bg-blue-500",
       border: "border-blue-500/20",
       glow: "rgba(59,130,246,0.09)",
       accentColor: "text-blue-400",
@@ -35,7 +35,7 @@ export default function CalculatorMenu() {
       title: "Fertilização",
       description: "Receitas de sais minerais por fase e semana de cultivo",
       icon: FlaskConical,
-      gradient: "from-emerald-400 to-green-500",
+      gradient: "bg-emerald-500",
       border: "border-emerald-500/20",
       glow: "rgba(16,185,129,0.09)",
       accentColor: "text-emerald-400",
@@ -48,7 +48,7 @@ export default function CalculatorMenu() {
       title: "Conversor Lux → PPFD",
       description: "Converta leitura de luxímetro para PPFD por tipo de luz",
       icon: Sun,
-      gradient: "from-yellow-400 to-amber-500",
+      gradient: "bg-amber-500",
       border: "border-yellow-500/20",
       glow: "rgba(234,179,8,0.08)",
       accentColor: "text-yellow-400",
@@ -61,7 +61,7 @@ export default function CalculatorMenu() {
       title: "Conversor PPM ↔ EC",
       description: "Converta entre partes por milhão e condutividade elétrica",
       icon: Calculator,
-      gradient: "from-violet-400 to-purple-500",
+      gradient: "bg-violet-500",
       border: "border-violet-500/20",
       glow: "rgba(139,92,246,0.08)",
       accentColor: "text-violet-400",
@@ -74,7 +74,7 @@ export default function CalculatorMenu() {
       title: "Calculadora de pH",
       description: "Calcule quanto ácido ou base adicionar para ajustar o pH",
       icon: TestTube,
-      gradient: "from-rose-400 to-red-500",
+      gradient: "bg-rose-500",
       border: "border-rose-500/20",
       glow: "rgba(244,63,94,0.08)",
       accentColor: "text-rose-400",
@@ -87,7 +87,7 @@ export default function CalculatorMenu() {
       title: "VPD",
       description: "Pressão de vapor deficit — zona ideal de temperatura e umidade",
       icon: Wind,
-      gradient: "from-indigo-400 to-sky-500",
+      gradient: "bg-indigo-500",
       border: "border-indigo-500/20",
       glow: "rgba(99,102,241,0.09)",
       accentColor: "text-indigo-400",
@@ -102,7 +102,7 @@ export default function CalculatorMenu() {
       header={
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/40">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
               <Calculator className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
@@ -129,7 +129,7 @@ export default function CalculatorMenu() {
                 >
                   {/* Mobile: horizontal layout — fixed h-[88px] = 56px icon + 16px padding each side */}
                   <div className="flex md:hidden items-center gap-4 px-4 h-[88px] overflow-hidden">
-                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} shrink-0`}>
+                    <div className={`w-14 h-14 rounded-2xl ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} shrink-0`}>
                       <Icon className="w-7 h-7 text-white drop-shadow-sm" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -152,7 +152,7 @@ export default function CalculatorMenu() {
                   {/* Tablet/Desktop: vertical layout — CSS Grid equalizes row heights */}
                   <div className="hidden md:flex flex-col p-5 h-full">
                     <div className="flex items-start justify-between gap-2 mb-4">
-                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
+                      <div className={`w-14 h-14 rounded-2xl ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
                         <Icon className="w-7 h-7 text-white drop-shadow-sm" />
                       </div>
                       {calc.badge && (

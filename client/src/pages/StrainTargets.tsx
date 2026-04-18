@@ -160,7 +160,7 @@ export default function StrainTargets() {
     CLONING: {
       label: "Clonagem",
       icon: Scissors,
-      gradient: "from-amber-500 to-orange-600",
+      gradient: "bg-amber-500",
       glow: "rgba(245,158,11,0.09)",
       border: "border-amber-500/25",
       dot: "bg-amber-400",
@@ -171,7 +171,7 @@ export default function StrainTargets() {
     VEGA: {
       label: "Vegetativa",
       icon: Leaf,
-      gradient: "from-green-500 to-emerald-600",
+      gradient: "bg-primary",
       glow: "rgba(34,197,94,0.09)",
       border: "border-green-500/25",
       dot: "bg-green-400",
@@ -182,7 +182,7 @@ export default function StrainTargets() {
     FLORA: {
       label: "Floração",
       icon: Flower2,
-      gradient: "from-purple-500 to-violet-600",
+      gradient: "bg-violet-500",
       glow: "rgba(168,85,247,0.09)",
       border: "border-purple-500/25",
       dot: "bg-purple-400",
@@ -325,7 +325,7 @@ export default function StrainTargets() {
             <Button
               onClick={() => handleSave(phase, weekNumber)}
               disabled={createTarget.isPending}
-              className={`w-full mt-2 rounded-xl h-11 bg-gradient-to-r ${config.gradient} text-white border-0 shadow-md hover:opacity-90`}
+              className={`w-full mt-2 rounded-xl h-11 ${config.gradient} text-white border-0 shadow-md hover:opacity-90`}
             >
               {createTarget.isPending
                 ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -409,7 +409,7 @@ export default function StrainTargets() {
                   onClick={() => setActivePhase(phase)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
                     isActive
-                      ? `bg-gradient-to-r ${cfg.gradient} text-white border-transparent shadow-md`
+                      ? `${cfg.gradient} text-white border-transparent shadow-md`
                       : "bg-card border-border/40 text-muted-foreground hover:border-border"
                   }`}
                 >
@@ -428,7 +428,7 @@ export default function StrainTargets() {
             className={`rounded-2xl border ${activeConfig.border} px-4 py-3 flex items-center gap-3`}
             style={{ background: `linear-gradient(135deg, ${activeConfig.glow} 0%, hsl(var(--card)) 60%)` }}
           >
-            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${activeConfig.gradient} flex items-center justify-center shadow-md shrink-0`}>
+            <div className={`w-9 h-9 rounded-xl ${activeConfig.gradient} flex items-center justify-center shadow-md shrink-0`}>
               <ActiveIcon className="w-5 h-5 text-white" />
             </div>
             <div>

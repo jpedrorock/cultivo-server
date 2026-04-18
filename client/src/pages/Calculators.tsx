@@ -428,7 +428,7 @@ function WateringRunoffCalculator() {
           <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
             {/* Header do bloco */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.12) 0%, rgba(6,182,212,0.05) 100%)' }}>
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center shadow-lg shadow-cyan-900/30">
+              <div className="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center shadow-sm">
                 <Droplets className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -549,7 +549,7 @@ function WateringRunoffCalculator() {
           {/* ── Verificar Runoff Real ── */}
           <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(74,222,128,0.10) 0%, rgba(16,185,129,0.04) 100%)' }}>
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
                 <CheckCircle2 className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -604,7 +604,7 @@ function WateringRunoffCalculator() {
           {/* ── Salvar Receita ── */}
           <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.10) 0%, rgba(109,40,217,0.04) 100%)' }}>
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-900/30">
+              <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-sm">
                 <Download className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -628,7 +628,7 @@ function WateringRunoffCalculator() {
                   placeholder="Ex: Ajustado volume devido ao runoff baixo..." />
               </div>
               <Button onClick={handleSaveRecipe} disabled={!selectedTent || saveApplication.isPending}
-                className="w-full h-11 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-violet-900/30 border-0">
+                className="w-full h-11 bg-violet-700 hover:bg-violet-700 text-white font-semibold shadow-sm border-0">
                 {saveApplication.isPending ? "Salvando..." : "Salvar Receita"}
               </Button>
             </div>
@@ -780,7 +780,7 @@ function LuxPPFDCalculator() {
   return (
     <div className="rounded-2xl border border-border/60 bg-card overflow-hidden" data-tour="calculator-lux-ppfd">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.12) 0%, rgba(202,138,4,0.05) 100%)' }}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-900/30">
+        <div className="w-8 h-8 rounded-lg bg-amber-600 flex items-center justify-center shadow-sm">
           <Sun className="w-4 h-4 text-white" />
         </div>
         <div>
@@ -940,7 +940,7 @@ function PPMECConverter() {
   return (
     <div className="rounded-2xl border border-border/60 bg-card overflow-hidden" data-tour="calculator-ppm-ec">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(139,92,246,0.05) 100%)' }}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-900/30">
+        <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-sm">
           <Calculator className="w-4 h-4 text-white" />
         </div>
         <div>

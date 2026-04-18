@@ -100,7 +100,7 @@ function AccordionSection({ section }: { section: Section }) {
         aria-expanded={open}
         className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
       >
-        <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${section.gradient} flex items-center justify-center shadow-sm shrink-0`}>
+        <div className={`w-8 h-8 rounded-xl ${section.gradient} flex items-center justify-center shadow-sm shrink-0`}>
           <Icon className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
@@ -128,7 +128,7 @@ const sections: Section[] = [
     id: "fluxo",
     icon: ClipboardList,
     title: "Fluxo de Cultivo Recomendado",
-    gradient: "from-primary to-emerald-600",
+    gradient: "bg-primary",
     glow: "rgba(77,184,77,0.10)",
     border: "border-primary/25",
     badge: "Começar aqui",
@@ -155,7 +155,7 @@ const sections: Section[] = [
     id: "quicklog",
     icon: Zap,
     title: "Registro Rápido",
-    gradient: "from-yellow-500 to-orange-500",
+    gradient: "bg-yellow-500",
     glow: "rgba(234,179,8,0.09)",
     border: "border-yellow-500/25",
     badge: "Principal",
@@ -184,7 +184,7 @@ const sections: Section[] = [
     id: "inicio",
     icon: Home,
     title: "Painel Principal",
-    gradient: "from-emerald-500 to-teal-600",
+    gradient: "bg-emerald-500",
     glow: "rgba(16,185,129,0.09)",
     border: "border-emerald-500/25",
     content: (
@@ -206,7 +206,7 @@ const sections: Section[] = [
     id: "estufas",
     icon: Home,
     title: "Estufas e Ciclos",
-    gradient: "from-teal-500 to-cyan-600",
+    gradient: "bg-teal-500",
     glow: "rgba(20,184,166,0.09)",
     border: "border-teal-500/25",
     content: (
@@ -233,7 +233,7 @@ const sections: Section[] = [
     id: "plantas",
     icon: Sprout,
     title: "Sistema de Plantas",
-    gradient: "from-green-500 to-emerald-600",
+    gradient: "bg-green-500",
     glow: "rgba(34,197,94,0.09)",
     border: "border-green-500/25",
     badge: "Central do cultivo",
@@ -264,7 +264,7 @@ const sections: Section[] = [
     id: "saude",
     icon: Activity,
     title: "Registros de Saúde",
-    gradient: "from-rose-500 to-pink-600",
+    gradient: "bg-rose-500",
     glow: "rgba(244,63,94,0.09)",
     border: "border-rose-500/25",
     content: (
@@ -292,7 +292,7 @@ const sections: Section[] = [
     id: "tricomas",
     icon: Sparkles,
     title: "Análise de Tricomas",
-    gradient: "from-violet-500 to-purple-600",
+    gradient: "bg-violet-500",
     glow: "rgba(139,92,246,0.09)",
     border: "border-violet-500/25",
     content: (
@@ -313,7 +313,7 @@ const sections: Section[] = [
     id: "lst",
     icon: Scissors,
     title: "Técnicas de LST",
-    gradient: "from-orange-500 to-amber-600",
+    gradient: "bg-orange-500",
     glow: "rgba(249,115,22,0.09)",
     border: "border-orange-500/25",
     content: (
@@ -343,7 +343,7 @@ const sections: Section[] = [
     id: "ambiente",
     icon: Thermometer,
     title: "Ambiente por Planta",
-    gradient: "from-sky-500 to-blue-600",
+    gradient: "bg-sky-500",
     glow: "rgba(14,165,233,0.09)",
     border: "border-sky-500/25",
     badge: "Novo",
@@ -364,7 +364,7 @@ const sections: Section[] = [
     id: "fotos",
     icon: Image,
     title: "Galeria de Fotos",
-    gradient: "from-pink-500 to-rose-600",
+    gradient: "bg-pink-500",
     glow: "rgba(236,72,153,0.09)",
     border: "border-pink-500/25",
     content: (
@@ -384,7 +384,7 @@ const sections: Section[] = [
     id: "tarefas",
     icon: CheckSquare,
     title: "Tarefas Semanais",
-    gradient: "from-blue-500 to-indigo-600",
+    gradient: "bg-blue-500",
     glow: "rgba(59,130,246,0.09)",
     border: "border-blue-500/25",
     badge: "Automático",
@@ -410,7 +410,7 @@ const sections: Section[] = [
     id: "calculadoras",
     icon: Calculator,
     title: "Calculadoras",
-    gradient: "from-indigo-500 to-violet-600",
+    gradient: "bg-indigo-500",
     glow: "rgba(99,102,241,0.09)",
     border: "border-indigo-500/25",
     content: (
@@ -440,7 +440,7 @@ const sections: Section[] = [
     id: "alertas",
     icon: Bell,
     title: "Sistema de Alertas",
-    gradient: "from-amber-500 to-orange-600",
+    gradient: "bg-amber-500",
     glow: "rgba(245,158,11,0.09)",
     border: "border-amber-500/25",
     content: (
@@ -464,7 +464,7 @@ const sections: Section[] = [
     id: "strains",
     icon: Leaf,
     title: "Strains e Targets Semanais",
-    gradient: "from-lime-500 to-green-600",
+    gradient: "bg-lime-500",
     glow: "rgba(132,204,22,0.09)",
     border: "border-lime-500/25",
     content: (
@@ -484,7 +484,7 @@ const sections: Section[] = [
     id: "historico",
     icon: BarChart3,
     title: "Histórico e Gráficos",
-    gradient: "from-cyan-500 to-sky-600",
+    gradient: "bg-cyan-500",
     glow: "rgba(6,182,212,0.09)",
     border: "border-cyan-500/25",
     content: (
@@ -504,7 +504,7 @@ const sections: Section[] = [
     id: "arquivo",
     icon: Archive,
     title: "Arquivo de Plantas",
-    gradient: "from-stone-500 to-zinc-600",
+    gradient: "bg-stone-500",
     glow: "rgba(120,113,108,0.09)",
     border: "border-stone-500/25",
     content: (
@@ -527,7 +527,7 @@ const sections: Section[] = [
     id: "configuracoes",
     icon: Settings,
     title: "Configurações",
-    gradient: "from-slate-500 to-gray-600",
+    gradient: "bg-slate-500",
     glow: "rgba(100,116,139,0.09)",
     border: "border-slate-500/25",
     content: (
@@ -548,7 +548,7 @@ const sections: Section[] = [
     id: "sensores",
     icon: Wifi,
     title: "Sensores SmartLife / Tuya",
-    gradient: "from-cyan-500 to-teal-600",
+    gradient: "bg-cyan-500",
     glow: "rgba(6,182,212,0.09)",
     border: "border-cyan-500/25",
     badge: "Novo",
@@ -596,7 +596,7 @@ const sections: Section[] = [
     id: "iphone",
     icon: Smartphone,
     title: "Dicas para iPhone / Mobile",
-    gradient: "from-sky-400 to-blue-500",
+    gradient: "bg-sky-400",
     glow: "rgba(56,189,248,0.09)",
     border: "border-sky-400/25",
     badge: "Mobile",
@@ -655,7 +655,7 @@ export default function Help() {
           {/* Intro banner */}
           <div className="rounded-2xl border border-primary/25 px-4 py-3.5 flex items-center gap-3"
             style={{ background: "linear-gradient(135deg, rgba(77,184,77,0.10) 0%, hsl(var(--card)) 60%)" }}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center shadow-md shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-md shrink-0">
               <ClipboardList className="w-5 h-5 text-white" />
             </div>
             <div>

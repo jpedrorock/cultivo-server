@@ -10,13 +10,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-gradient-to-br from-emerald-400 to-green-600 text-white shadow-[0_0_10px_rgba(74,222,128,0.2)] hover:from-emerald-500 hover:to-green-700 hover:shadow-[0_0_14px_rgba(74,222,128,0.35)] active:scale-[0.98]",
+          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 active:scale-[0.98] dark:bg-gradient-to-br dark:from-emerald-400 dark:to-green-600 dark:shadow-[0_0_10px_rgba(74,222,128,0.2)] dark:hover:from-emerald-500 dark:hover:to-green-700 dark:hover:shadow-[0_0_14px_rgba(74,222,128,0.35)]",
         destructive:
-          "bg-gradient-to-br from-red-400 to-red-600 text-white shadow-[0_0_8px_rgba(239,68,68,0.2)] hover:from-red-500 hover:to-red-700 hover:shadow-[0_0_12px_rgba(239,68,68,0.35)] focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 active:scale-[0.98]",
+          "bg-destructive text-white shadow-xs hover:bg-destructive/90 active:scale-[0.98] focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-gradient-to-br dark:from-red-400 dark:to-red-600 dark:shadow-[0_0_8px_rgba(239,68,68,0.2)] dark:hover:from-red-500 dark:hover:to-red-700 dark:hover:shadow-[0_0_12px_rgba(239,68,68,0.35)]",
         outline:
           "border border-border bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-muted/20 dark:border-border dark:hover:bg-muted/40 dark:hover:border-border",
         secondary:
-          "bg-gradient-to-br from-secondary to-secondary/70 text-secondary-foreground hover:from-secondary/90 hover:to-secondary/60",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
           "hover:bg-accent dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",

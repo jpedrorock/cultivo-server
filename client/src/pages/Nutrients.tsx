@@ -820,7 +820,7 @@ export default function Nutrients() {
                   <Button
                     onClick={saveRecipe}
                     disabled={recordApplication.isPending}
-                    className="w-full sm:flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white border-0"
+                    className="w-full sm:flex-1 bg-primary text-primary-foreground hover:bg-primary/90 border-0"
                   >
                     {recordApplication.isPending ? (
                       <><Loader2 className="w-4 h-4 mr-2 animate-spin shrink-0" />Salvando...</>

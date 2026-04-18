@@ -11,7 +11,7 @@ function UserAvatar({ user, size = 'md' }: { user: { name?: string | null; email
     return <img src={user.avatarUrl} alt={user.name || ''} className={`${dim} rounded-full object-cover shrink-0`} />;
   }
   return (
-    <div className={`${dim} rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0`}>
+    <div className={`${dim} rounded-full bg-primary flex items-center justify-center shrink-0`}>
       <span className={`text-white font-bold ${text}`}>{initial}</span>
     </div>
   );
@@ -328,7 +328,7 @@ function GroupCard() {
           <div className="space-y-1.5">
             {group.members.map(m => (
               <div key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0">
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
                   <span className="text-white text-xs font-bold">{(m.name || m.email).charAt(0).toUpperCase()}</span>
                 </div>
                 <div className="flex-1 min-w-0">

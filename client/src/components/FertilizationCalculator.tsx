@@ -218,7 +218,7 @@ export function FertilizationCalculator() {
     <div className="space-y-6">
       <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(139,92,246,0.05) 100%)' }}>
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-900/30">
+          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-sm">
             <FlaskConical className="w-4 h-4 text-white" />
           </div>
           <div>
@@ -357,7 +357,7 @@ export function FertilizationCalculator() {
               }
             }}
             size="lg"
-            className="w-full bg-gradient-to-r from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white font-bold text-lg py-6 border-0"
+            className="w-full bg-primary text-primary-foreground font-bold text-lg py-6 border-0"
           >
             <FlaskConical className="w-4 h-4"/> Calcular Receita
           </Button>
@@ -391,8 +391,8 @@ export function FertilizationCalculator() {
       {result && (
         <div data-result-card className="rounded-2xl border border-green-400/30 bg-card overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.08) 0%, rgba(16,185,129,0.04) 100%)' }}>
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(16,185,129,0.05) 100%)' }}>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-900/30">
-              <FlaskConical className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+              <FlaskConical className="w-4 h-4 text-primary-foreground" />
             </div>
             <p className="text-sm font-semibold text-foreground">Receita de Fertilização para {result.volume}L</p>
           </div>
@@ -567,7 +567,7 @@ Gerado por App Cultivo em ${now.toLocaleString('pt-BR')}
       {presetsList.data && presetsList.data.length > 0 && (
         <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.10) 0%, rgba(37,99,235,0.04) 100%)' }}>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/30">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
               <BookOpen className="w-4 h-4 text-white" />
             </div>
             <p className="text-sm font-semibold text-foreground">Minhas Predefinições</p>

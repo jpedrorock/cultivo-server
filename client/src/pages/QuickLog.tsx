@@ -680,7 +680,7 @@ export default function QuickLog() {
                   style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.08) 0%, hsl(var(--card)) 60%)' }}
                 >
                   <div className="p-4 flex items-center gap-4 w-full">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-900/30 shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center shadow-lg shrink-0">
                       <ThermometerSun className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
@@ -698,7 +698,7 @@ export default function QuickLog() {
                   style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.08) 0%, hsl(var(--card)) 60%)' }}
                 >
                   <div className="p-4 flex items-center gap-4 w-full">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-rose-900/30 shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-rose-600 flex items-center justify-center shadow-lg shrink-0">
                       <Heart className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
@@ -716,7 +716,7 @@ export default function QuickLog() {
                   style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, hsl(var(--card)) 60%)' }}
                 >
                   <div className="p-4 flex items-center gap-4 w-full">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-900/30 shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shrink-0">
                       <Sparkles className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
@@ -788,7 +788,7 @@ export default function QuickLog() {
               <div className="flex justify-center mb-6">
                 <div className="relative flex items-center justify-center">
                   <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
+                  <div className="w-32 h-32 rounded-full bg-rose-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
                     <Heart className="w-16 h-16 text-white" />
                   </div>
                 </div>
@@ -798,7 +798,7 @@ export default function QuickLog() {
 
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
               <div className="flex items-center gap-5 animate-[slide-in-from-bottom_0.6s_ease-out]">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shrink-0">
+                <div className="w-20 h-20 rounded-full bg-teal-600 flex items-center justify-center shadow-lg shrink-0">
                   <Activity className="w-10 h-10 text-white" />
                 </div>
                 <div className="min-w-0">
@@ -1195,7 +1195,7 @@ export default function QuickLog() {
                 </p>
                 <Button
                   onClick={() => setRecordPlantHealth(true)}
-                  className="w-full h-16 text-lg font-semibold rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 shadow-lg"
+                  className="w-full h-16 text-lg font-semibold rounded-2xl bg-rose-700 hover:bg-rose-700 text-white shadow-lg border-0"
                 >
                   <Heart className="mr-2 h-6 w-6" />
                   Registrar Saúde das Plantas
@@ -1234,7 +1234,7 @@ export default function QuickLog() {
                 </div>
                 <Button
                   onClick={() => { resetForm(); setLocation("/"); }}
-                  className="h-14 px-8 text-lg font-medium rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+                  className="h-14 px-8 text-lg font-medium rounded-xl"
                 >
                   <Check className="mr-2 h-5 w-5" />
                   Finalizar
@@ -1248,9 +1248,9 @@ export default function QuickLog() {
                 {/* Status buttons */}
                 <div className="flex flex-col gap-3">
                   {[
-                    { value: "healthy",   label: "Saudável", Icon: CheckCircle2, active: "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg border-transparent" },
-                    { value: "attention", label: "Atenção",  Icon: AlertTriangle, active: "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg border-transparent" },
-                    { value: "sick",      label: "Doente",   Icon: XCircle,       active: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg border-transparent" },
+                    { value: "healthy",   label: "Saudável", Icon: CheckCircle2, active: "bg-green-500 text-white shadow-lg border-transparent" },
+                    { value: "attention", label: "Atenção",  Icon: AlertTriangle, active: "bg-yellow-500 text-white shadow-lg border-transparent" },
+                    { value: "sick",      label: "Doente",   Icon: XCircle,       active: "bg-red-500 text-white shadow-lg border-transparent" },
                   ].map(({ value, label, Icon, active }) => {
                     const selected = (plantHealthRecords.get(plants[currentPlantIndex].id)?.status || "healthy") === value;
                     return (
@@ -1346,7 +1346,7 @@ export default function QuickLog() {
                 <div className="flex justify-center mb-6">
                   <div className="relative flex items-center justify-center">
                     <div className="absolute w-44 h-44 border-4 border-dashed border-border rounded-full opacity-30 animate-[spin_20s_linear_infinite] pointer-events-none" />
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
+                    <div className="w-32 h-32 rounded-full bg-violet-600 flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]">
                       <Sparkles className="w-16 h-16 text-white" />
                     </div>
                   </div>
@@ -1359,7 +1359,7 @@ export default function QuickLog() {
                 <div className="space-y-3 animate-[slide-in-from-bottom_0.8s_ease-out]">
                   <Button
                     onClick={() => setRecordTrichomes(true)}
-                    className="w-full h-16 text-lg font-semibold rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-lg"
+                    className="w-full h-16 text-lg font-semibold rounded-2xl bg-violet-700 hover:bg-violet-700 text-white shadow-lg border-0"
                   >
                     <Sparkles className="mr-2 h-6 w-6" />
                     Registrar Tricomas
@@ -1381,10 +1381,10 @@ export default function QuickLog() {
               const plant = plants[currentTrichomeIndex];
               const rec = trichomeRecords.get(plant.id) || { status: "CLOUDY" as const, clearPct: "", cloudyPct: "", amberPct: "", notes: "" };
               const trichomeOptions: { value: "CLEAR"|"CLOUDY"|"AMBER"|"MIXED"; label: string; sub: string; gradient: string }[] = [
-                { value: "CLEAR",  label: "Translúcidos",   sub: "Cedo demais",    gradient: "from-sky-400 to-blue-500" },
-                { value: "CLOUDY", label: "Opacos",         sub: "Maturação ideal",gradient: "from-slate-400 to-slate-500" },
-                { value: "AMBER",  label: "Âmbar",          sub: "Efeito sedativo",gradient: "from-amber-400 to-orange-500" },
-                { value: "MIXED",  label: "Misturado",      sub: "Equilibrado",    gradient: "from-violet-400 to-purple-500" },
+                { value: "CLEAR",  label: "Translúcidos",   sub: "Cedo demais",    gradient: "bg-sky-400" },
+                { value: "CLOUDY", label: "Opacos",         sub: "Maturação ideal",gradient: "bg-slate-500" },
+                { value: "AMBER",  label: "Âmbar",          sub: "Efeito sedativo",gradient: "bg-amber-500" },
+                { value: "MIXED",  label: "Misturado",      sub: "Equilibrado",    gradient: "bg-violet-500" },
               ];
               return (
                 <div className="space-y-4 animate-[slide-in-from-bottom_0.6s_ease-out]">
@@ -1408,7 +1408,7 @@ export default function QuickLog() {
                         onClick={() => updateTrichomeRecord(plant.id, "status", value)}
                         className={`flex flex-col items-center justify-center gap-1 p-4 rounded-2xl border-2 font-bold transition-all duration-200 ${
                           rec.status === value
-                            ? `bg-gradient-to-br ${gradient} text-white border-transparent shadow-lg scale-[1.02]`
+                            ? `${gradient} text-white border-transparent shadow-lg scale-[1.02]`
                             : "bg-card text-card-foreground border-border active:scale-[0.98]"
                         }`}
                       >
@@ -1494,7 +1494,7 @@ export default function QuickLog() {
           <Button
             onClick={goNext}
             disabled={!canGoNext()}
-            className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+            className="flex-1 h-14 text-lg font-medium rounded-xl"
           >
             Próximo
             <ArrowRight className="ml-2 h-5 w-5" />
@@ -1509,7 +1509,7 @@ export default function QuickLog() {
               handleSaveDailyLog();
             }}
             disabled={saveDailyLogMutation.isPending}
-            className="flex-1 h-14 text-sm font-medium rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+            className="flex-1 h-14 text-sm font-medium rounded-xl"
           >
             {saveDailyLogMutation.isPending ? (
               <>
@@ -1542,7 +1542,7 @@ export default function QuickLog() {
             <AnimatedButton
               onClick={handleSavePlantHealth}
               disabled={savePlantHealthMutation.isPending || uploadPhotoMutation.isPending || !hasDetail}
-              className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+              className="flex-1 h-14 text-lg font-medium rounded-xl"
             >
               {(savePlantHealthMutation.isPending || uploadPhotoMutation.isPending) ? (
                 <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Salvando...</>
@@ -1570,7 +1570,7 @@ export default function QuickLog() {
             <AnimatedButton
               onClick={handleSaveTrichome}
               disabled={saveTrichomeMutation.isPending}
-              className="flex-1 h-14 text-lg font-medium rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
+              className="flex-1 h-14 text-lg font-medium rounded-xl bg-violet-700 hover:bg-violet-700 text-white border-0"
             >
               {saveTrichomeMutation.isPending ? (
                 <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Salvando...</>
