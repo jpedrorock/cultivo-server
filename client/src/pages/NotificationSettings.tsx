@@ -15,6 +15,8 @@ import {
   showNotification,
   registerPushSubscription,
 } from "@/lib/notifications";
+import { PageTransition } from "@/components/PageTransition";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function NotificationSettings() {
   const [permission, setPermission] = useState<string>(getNotificationPermission());
@@ -169,30 +171,36 @@ export default function NotificationSettings() {
 
   if (!isNotificationSupported()) {
     return (
-      <div className="container py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BellOff className="w-5 h-5" />
-              Notificações Não Suportadas
-            </CardTitle>
-            <CardDescription>
-              No iPhone, adicione o app à Tela de Início via Safari para ativar notificações.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <PageTransition>
+        <div className="min-h-screen bg-background">
+          <PageHeader backHref="/settings" title="Notificações" />
+          <div className="container py-8 pb-28 sm:pb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BellOff className="w-5 h-5" />
+                  Notificações Não Suportadas
+                </CardTitle>
+                <CardDescription>
+                  No iPhone, adicione o app à Tela de Início via Safari para ativar notificações.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+      </PageTransition>
     );
   }
 
   return (
-    <div className="container py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold mb-2">Notificações</h1>
-        <p className="text-muted-foreground">
-          Configure lembretes e alertas para não perder nenhum registro ou problema nas estufas
-        </p>
-      </div>
+    <PageTransition>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          backHref="/settings"
+          title="Notificações"
+          subtitle="Configure lembretes e alertas para não perder nenhum registro ou problema nas estufas"
+        />
+        <div className="container py-8 pb-28 sm:pb-8 space-y-6">
 
       {/* Status de Permissão */}
       <Card>
@@ -328,13 +336,15 @@ export default function NotificationSettings() {
         </CardContent>
       </Card>
 
-      {/* Salvar */}
-      <div className="flex justify-end">
-        <Button onClick={handleSaveSettings} size="lg" disabled={isSavingAlerts}>
-          <Check className="w-4 h-4 mr-2" />
-          {isSavingAlerts ? "Salvando…" : "Salvar Configurações"}
-        </Button>
+        {/* Salvar */}
+        <div className="flex justify-end">
+          <Button onClick={handleSaveSettings} size="lg" disabled={isSavingAlerts}>
+            <Check className="w-4 h-4 mr-2" />
+            {isSavingAlerts ? "Salvando…" : "Salvar Configurações"}
+          </Button>
+        </div>
+        </div>
       </div>
-    </div>
+    </PageTransition>
   );
 }

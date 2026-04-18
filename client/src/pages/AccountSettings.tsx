@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ArrowLeft, User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 function UserAvatar({ user, size = 'md' }: { user: { name?: string | null; email?: string; avatarUrl?: string | null } | null; size?: 'md' | 'lg' }) {
   const dim = size === 'lg' ? 'w-12 h-12' : 'w-8 h-8';
@@ -28,22 +29,16 @@ export default function AccountSettings() {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-3 sm:py-4">
-            <div className="flex items-center gap-3">
-              <Button asChild variant="ghost" size="icon" className="shrink-0 h-9 w-9">
-                <Link href="/settings">
-                  <ArrowLeft className="w-4 h-4" />
-                </Link>
-              </Button>
-              <UserAvatar user={user} size="lg" />
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-bold text-foreground leading-tight truncate">{user?.name || 'Sem nome'}</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">{user?.email}</p>
-              </div>
-            </div>
-          </div>
-        </header>
+        <PageHeader
+          backHref="/settings"
+          title={
+            <>
+              <UserAvatar user={user} size="md" />
+              <span className="truncate">{user?.name || 'Sem nome'}</span>
+            </>
+          }
+          subtitle={user?.email}
+        />
         <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl space-y-5">
           <ProfileCard />
           <GroupCard />

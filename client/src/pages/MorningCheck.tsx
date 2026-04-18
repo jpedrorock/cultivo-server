@@ -1,11 +1,12 @@
 import { trpc } from "@/lib/trpc";
 import { useMemo } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Plus, ThermometerSun, Droplets, Sun, Clock, CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
+import { Plus, ThermometerSun, Droplets, Sun, Clock, CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { differenceInHours, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageTransition } from "@/components/PageTransition";
+import { PageHeader } from "@/components/PageHeader";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -183,24 +184,17 @@ export default function MorningCheck() {
     <PageTransition>
       <div className="min-h-screen bg-background pb-28">
 
-        {/* Header */}
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container py-4">
-            <div className="flex items-center gap-3">
-              <Button asChild variant="ghost" size="icon" className="shrink-0">
-                <Link href="/"><ArrowLeft className="w-5 h-5" /></Link>
-              </Button>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold text-foreground">Status</h1>
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-base font-bold text-primary tabular-nums">{timeStr}</span>
-                </div>
-                <p className="text-xs text-muted-foreground capitalize">{dateStr}</p>
-              </div>
-            </div>
-          </div>
-        </header>
+        <PageHeader
+          backHref="/"
+          title={
+            <>
+              <span className="truncate">Status</span>
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-base font-bold text-primary tabular-nums">{timeStr}</span>
+            </>
+          }
+          subtitle={<span className="capitalize">{dateStr}</span>}
+        />
 
         <main className="container py-4 max-w-2xl space-y-3">
 

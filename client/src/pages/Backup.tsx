@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AlertCircle, Download, Upload, Database, Shield, AlertTriangle, CalendarClock, ToggleLeft, ToggleRight } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PageTransition } from "@/components/PageTransition";
+import { PageHeader } from "@/components/PageHeader";
 
 const AUTO_BACKUP_KEY   = "cultivo:autoBackup";
 const LAST_BACKUP_KEY   = "cultivo:lastAutoBackup";
@@ -139,13 +141,14 @@ export default function Backup() {
   };
 
   return (
-    <div className="container max-w-4xl py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Backup e Restauração</h1>
-        <p className="text-muted-foreground">
-          Faça backup dos seus dados ou restaure de um backup anterior
-        </p>
-      </div>
+    <PageTransition>
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          backHref="/settings"
+          title="Backup e Restauração"
+          subtitle="Faça backup dos seus dados ou restaure de um backup anterior"
+        />
+        <div className="container max-w-4xl py-8 pb-28 sm:pb-8">
 
       {/* Aviso de Segurança */}
       <Card className="mb-6 border-amber-500/50 bg-amber-500/5">
@@ -352,6 +355,8 @@ export default function Backup() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
+      </div>
+    </PageTransition>
   );
 }
