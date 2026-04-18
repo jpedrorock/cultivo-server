@@ -3,8 +3,9 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Edit, Trash2, ArrowLeft, Copy, Search, Sprout, Clock, Flower2 } from "lucide-react";
+import { Plus, Edit, Trash2, Copy, Search, Sprout, Clock, Flower2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -180,39 +181,21 @@ export default function ManageStrains() {
   return (
     <PageTransition>
         <div className="min-h-screen bg-background">
-      {/* Header — sticky, compacto no mobile */}
-      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container mx-auto px-4 py-3 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation("/")}
-            className="shrink-0 h-10 w-10"
-            aria-label="Voltar"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">
-              Gerenciar Strains
-            </h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">
-              Crie e edite variedades com seus parâmetros ideais
-            </p>
-          </div>
-
-          {/* Botão: ícone no mobile, texto completo no desktop */}
+      <PageHeader
+        backHref="/"
+        title="Gerenciar Strains"
+        subtitle="Crie e edite variedades com seus parâmetros ideais"
+        rightActions={
           <AnimatedButton
             onClick={() => setIsCreateOpen(true)}
-            className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0 shrink-0 h-10"
+            className="bg-gradient-to-br from-emerald-400 to-green-600 hover:from-emerald-500 hover:to-green-700 text-white border-0 h-10"
             aria-label="Nova Strain"
           >
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Nova Strain</span>
           </AnimatedButton>
-        </div>
-      </header>
+        }
+      />
 
       {/* Conteúdo */}
       <div className="container mx-auto px-4 py-6 space-y-5">

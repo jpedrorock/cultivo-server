@@ -19,9 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  ArrowLeft, 
-  Archive, 
+import {
+  Archive,
   CheckCircle, 
   XCircle, 
   Skull,
@@ -44,6 +43,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageTransition } from "@/components/PageTransition";
+import { PageHeader } from "@/components/PageHeader";
 
 // Componente de histórico expansível por planta
 function PlantHistorySection({ plantId }: { plantId: number }) {
@@ -323,29 +323,18 @@ export default function PlantArchivePage() {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="border-b bg-card sticky top-0 z-20 pt-safe">
-          <div className="container py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" asChild>
-                  <Link href="/plants">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Link>
-                </Button>
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-500 to-gray-700 flex items-center justify-center shadow-lg">
-                  <Archive className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-foreground">Arquivo de Plantas</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Plantas colhidas, descartadas e mortas
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <PageHeader
+          backHref="/plants"
+          title={
+            <>
+              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-500 to-gray-700 flex items-center justify-center shadow shrink-0">
+                <Archive className="w-4 h-4 text-white" />
+              </span>
+              <span className="truncate">Arquivo de Plantas</span>
+            </>
+          }
+          subtitle="Plantas colhidas, descartadas e mortas"
+        />
 
         {/* Main Content */}
         <main className="container py-8 pb-32 md:pb-8">

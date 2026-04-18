@@ -7,10 +7,11 @@ import { AnimatedButton } from "@/components/AnimatedButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Sprout, Loader2 } from "lucide-react";
+import { Sprout, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { PageTransition } from "@/components/PageTransition";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function NewPlant() {
   const [, setLocation] = useLocation();
@@ -66,25 +67,18 @@ export default function NewPlant() {
   return (
     <PageTransition>
         <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container py-6">
-          <div className="flex items-center gap-3">
-            <Link href="/plants">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
-              <Sprout className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Nova Planta</h1>
-              <p className="text-sm text-muted-foreground">Adicionar planta ao sistema</p>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        backHref="/plants"
+        title={
+          <>
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow shrink-0">
+              <Sprout className="w-4 h-4 text-white" />
+            </span>
+            <span className="truncate">Nova Planta</span>
+          </>
+        }
+        subtitle="Adicionar planta ao sistema"
+      />
 
       {/* Main Content */}
       <main className="container py-8">

@@ -1,6 +1,6 @@
 import { Link } from 'wouter';
-import { ArrowLeft, Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette, Wifi } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette, Wifi } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 import { PageTransition } from '@/components/PageTransition';
 import { useAuth } from '@/_core/hooks/useAuth';
 
@@ -24,20 +24,7 @@ export default function Settings() {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-3 sm:py-4">
-            <div className="flex items-center gap-3">
-              <Button asChild variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10">
-                <Link href="/">
-                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                </Link>
-              </Button>
-              <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-foreground leading-tight">Configurações</h1>
-              </div>
-            </div>
-          </div>
-        </header>
+        <PageHeader backHref="/" title="Configurações" />
 
         <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl space-y-6">
 
