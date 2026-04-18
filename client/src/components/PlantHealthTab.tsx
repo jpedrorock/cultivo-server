@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,7 +26,9 @@ import {
   Image,
   ChevronDown,
   Loader2,
+  Bot,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
 import EditHealthLogDialog from "@/components/EditHealthLogDialog";
@@ -71,6 +73,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
+  const [, navigate] = useLocation();
   const [healthStatus, setHealthStatus] = useState<
     "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING"
   >("HEALTHY");
@@ -113,8 +116,21 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
   }, [healthLogs, isFormOpen]);
 
   const createHealthLog = trpc.plantHealth.create.useMutation({
-    onSuccess: () => {
-      toast.success("Registro de saúde adicionado!");
+    onSuccess: (_, vars) => {
+      const isCritical = vars.healthStatus === "SICK" || vars.healthStatus === "STRESSED";
+      if (isCritical) {
+        toast("Registro de saúde salvo", {
+          description: "A IA pode ajudar a diagnosticar o problema.",
+          action: {
+            label: "Diagnosticar com IA",
+            onClick: () => navigate(`/chat/${plantId}`),
+          },
+          icon: <Bot className="w-4 h-4 text-blue-400" />,
+          duration: 8000,
+        });
+      } else {
+        toast.success("Registro de saúde adicionado!");
+      }
       setSymptoms("");
       setTreatment("");
       setNotes("");
