@@ -795,14 +795,6 @@ export default function TentDetails() {
                   <Monitor className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="hidden sm:block">
-                <Button asChild size="sm" className="gap-1.5">
-                  <Link href={`/tent/${tentId}/log`}>
-                    <Plus className="w-4 h-4" />
-                    Novo Registro
-                  </Link>
-                </Button>
-              </div>
               {/* Dropdown de ações secundárias */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1083,20 +1075,25 @@ export default function TentDetails() {
         {/* Sensor SmartLife */}
         <TentSensorCard tentId={tentId} />
 
-        {/* Charts and History */}
-        <Tabs defaultValue="plants" className="space-y-6" id="charts-container">
-          <TabsList className="bg-card/90 backdrop-blur-sm">
-            <TabsTrigger value="plants">
-              <Leaf className="w-4 h-4 mr-1.5" />
-              Plantas
-            </TabsTrigger>
-            <TabsTrigger value="charts">Gráficos</TabsTrigger>
-            <TabsTrigger value="history">Histórico</TabsTrigger>
-          </TabsList>
+        {/* Plantas — sempre visível */}
+        <TentPlantsTab tentId={tentId} tentName={tent.name} />
 
-          <TabsContent value="plants">
-            <TentPlantsTab tentId={tentId} tentName={tent.name} />
-          </TabsContent>
+        {/* Charts and History */}
+        <Tabs defaultValue="charts" className="space-y-6" id="charts-container">
+          <TabsList className="bg-card/90 backdrop-blur-sm w-full flex p-1 h-auto gap-1">
+            <TabsTrigger value="charts" className="flex-1">
+              Gráficos
+            </TabsTrigger>
+            <Button asChild size="sm" className="flex-1 h-8 gap-1.5 rounded-sm font-semibold shadow-none">
+              <Link href={`/tent/${tentId}/log`}>
+                <Plus className="w-4 h-4" />
+                Registrar
+              </Link>
+            </Button>
+            <TabsTrigger value="history" className="flex-1">
+              Histórico
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="charts" className="space-y-6">
             {/* Date Range Selector */}
