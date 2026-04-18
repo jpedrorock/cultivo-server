@@ -309,27 +309,6 @@ export default function QuickLog() {
     setTrichomeRecords(new Map());
   };
 
-  // Reinicia para registrar outra estufa sem sair do QuickLog
-  const resetForNewTent = () => {
-    setCurrentStep(0);
-    setTentId(null);
-    setTempC("");
-    setRhPct("");
-    setWateringVolume("");
-    setRunoffCollected("");
-    setRunoffPh("");
-    setRunoffEc("");
-    setPh("");
-    setEc("");
-    setPpfd(400);
-    setLuxValue(20000);
-    setRecordPlantHealth(null);
-    setCurrentPlantIndex(0);
-    setPlantHealthRecords(new Map());
-    setRecordTrichomes(null);
-    setCurrentTrichomeIndex(0);
-    setTrichomeRecords(new Map());
-  };
 
   const updateTrichomeRecord = (plantId: number, field: string, value: any) => {
     setTrichomeRecords((prev) => {
@@ -1222,7 +1201,7 @@ export default function QuickLog() {
                   Registrar Saúde das Plantas
                 </Button>
                 <Button
-                  onClick={resetForNewTent}
+                  onClick={resetForm}
                   variant="outline"
                   className="w-full h-14 text-base font-semibold rounded-2xl border-2 border-primary/30 text-primary hover:bg-primary/5"
                 >
