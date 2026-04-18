@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Plus, Pencil, Trash2, Sprout, Search, Flower2, Timer, Leaf } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Link } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function Strains() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -171,24 +171,22 @@ export default function Strains() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/">
-            <button className="flex items-center gap-2 text-primary hover:text-green-800 transition-colors">
-              <Sprout className="w-6 h-6" />
-              <div>
-                <h1 className="text-xl font-bold">App Cultivo</h1>
-                <p className="text-xs text-muted-foreground">Gerenciamento de Strains</p>
-              </div>
-            </button>
-          </Link>
-          <Button onClick={() => handleOpenDialog()} className="bg-green-600 hover:bg-green-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Strain
+      <PageHeader
+        backHref="/"
+        title={
+          <>
+            <Sprout className="w-5 h-5 text-primary shrink-0" />
+            <span className="truncate">Strains</span>
+          </>
+        }
+        subtitle="Gerenciamento de variedades"
+        rightActions={
+          <Button onClick={() => handleOpenDialog()} className="bg-green-600 hover:bg-green-700 h-10">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nova Strain</span>
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {/* Content */}
       <div className="container mx-auto px-4 py-8">

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ArrowLeft, Bell, Clock, AlertTriangle, CheckSquare, Filter } from "lucide-react";
+import { Bell, Clock, AlertTriangle, CheckSquare, Filter } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
@@ -68,38 +69,27 @@ export default function AlertHistory() {
   return (
     <PageTransition>
         <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button asChild variant="ghost" size="icon">
-              <Link href="/settings/alerts">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold">Histórico de Notificações</h1>
-              <p className="text-sm text-muted-foreground">
-                {filteredAlerts.length} notificação(ões) push enviada(s)
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <Select value={filterType} onValueChange={(value) => setFilterType(value as AlertType)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filtrar por tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="daily_reminder">Lembretes Diários</SelectItem>
-                  <SelectItem value="environment_alert">Alertas Ambientais</SelectItem>
-                  <SelectItem value="task_reminder">Lembretes de Tarefas</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <PageHeader
+        backHref="/settings/alerts"
+        title="Histórico de Notificações"
+        subtitle={`${filteredAlerts.length} notificação(ões) push enviada(s)`}
+        rightActions={
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground hidden sm:block" />
+            <Select value={filterType} onValueChange={(value) => setFilterType(value as AlertType)}>
+              <SelectTrigger className="w-[140px] sm:w-[180px] h-10">
+                <SelectValue placeholder="Filtrar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="daily_reminder">Lembretes Diários</SelectItem>
+                <SelectItem value="environment_alert">Alertas Ambientais</SelectItem>
+                <SelectItem value="task_reminder">Lembretes de Tarefas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* Content */}
       <main className="container mx-auto px-4 py-8">

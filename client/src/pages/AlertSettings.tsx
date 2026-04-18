@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, BellOff, Clock, AlertTriangle, CheckSquare, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Bell, BellOff, Clock, AlertTriangle, CheckSquare, Plus, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -216,16 +217,7 @@ export default function AlertSettings() {
   if (!isNotificationSupported()) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="icon">
-                <Link href="/settings"><ArrowLeft className="w-5 h-5" /></Link>
-              </Button>
-              <h1 className="text-xl font-bold">Alertas</h1>
-            </div>
-          </div>
-        </header>
+        <PageHeader backHref="/settings" title="Alertas" />
         <main className="container mx-auto px-4 py-8">
           <Card>
             <CardHeader>
@@ -246,25 +238,18 @@ export default function AlertSettings() {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="icon">
-                <Link href="/settings"><ArrowLeft className="w-5 h-5" /></Link>
-              </Button>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
-                  <Bell className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold">Alertas</h1>
-                  <p className="text-sm text-muted-foreground">Notificações e lembretes</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <PageHeader
+          backHref="/settings"
+          title={
+            <>
+              <span className="w-8 h-8 bg-primary/15 rounded-lg flex items-center justify-center ring-1 ring-primary/20 shrink-0">
+                <Bell className="w-4 h-4 text-primary" strokeWidth={2} />
+              </span>
+              <span className="truncate">Alertas</span>
+            </>
+          }
+          subtitle="Notificações e lembretes"
+        />
 
         <main className="container mx-auto px-4 py-6">
           <div className="max-w-2xl mx-auto space-y-5">

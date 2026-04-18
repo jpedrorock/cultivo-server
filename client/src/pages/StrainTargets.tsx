@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  ArrowLeft,
   Save,
   Loader2,
   Thermometer,
@@ -30,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function StrainTargets() {
   const [, params] = useRoute("/strains/:id/targets");
@@ -366,20 +366,12 @@ export default function StrainTargets() {
     <PageTransition>
       <div className="min-h-screen bg-background">
 
-        {/* Header */}
-        <header className="bg-card/80 backdrop-blur-md border-b border-border/60 sticky top-0 z-20 pt-safe">
-          <div className="px-4 py-3 flex items-center gap-3">
-            <button
-              onClick={() => setLocation("/manage-strains")}
-              className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-accent transition-colors shrink-0"
-            >
-              <ArrowLeft className="w-5 h-5 text-foreground/70" />
-            </button>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-base font-bold text-foreground truncate leading-tight">{strain.name}</h1>
-              <p className="text-[11px] text-muted-foreground/60 leading-tight">Parâmetros por Semana</p>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+        <PageHeader
+          backHref="/manage-strains"
+          title={strain.name}
+          subtitle="Parâmetros por Semana"
+          rightActions={
+            <>
               <button
                 onClick={() => setShowComparison(v => !v)}
                 className={`px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-semibold transition-colors border ${
@@ -400,9 +392,9 @@ export default function StrainTargets() {
               >
                 <Copy className="w-4 h-4" />
               </button>
-            </div>
-          </div>
-        </header>
+            </>
+          }
+        />
 
         {/* Phase selector */}
         <div className="sticky top-[56px] z-10 bg-background/90 backdrop-blur-md border-b border-border/30 px-4 py-2">
