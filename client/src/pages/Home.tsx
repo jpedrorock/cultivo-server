@@ -1202,16 +1202,6 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
             <p className="text-xs text-muted-foreground mt-0.5">{tent.width}×{tent.depth}×{tent.height}cm</p>
           </div>
 
-          {/* IA — acesso rápido ao chat especialista */}
-          <Link href="/chat" onClick={e => e.stopPropagation()}>
-            <button
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
-              title="Perguntar para a IA"
-            >
-              <Bot className="w-4 h-4" />
-            </button>
-          </Link>
-
           {/* Monitor — acesso rápido ao display da estufa */}
           <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
             <button

@@ -296,9 +296,9 @@ export default function PlantsList() {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container py-6">
+      {/* Header — fixed para funcionar dentro do scroll do iOS */}
+      <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg">
@@ -338,8 +338,11 @@ export default function PlantsList() {
         </div>
       </header>
 
+      {/* Spacer = header height (py-4=32px + h-12=48px = 80px) + safe area */}
+      <div style={{ height: 'calc(80px + env(safe-area-inset-top, 0px))' }} />
+
       {/* Main Content */}
-      <main className="container py-8">
+      <main className="container py-4">
         {/* Filters — collapsible */}
         {filterOpen && (
           <div className="mb-4 rounded-2xl border border-primary/25 bg-card overflow-hidden p-3" style={{ background: 'linear-gradient(135deg, rgba(var(--primary)/0.05) 0%, rgba(0,0,0,0) 60%)' }}>
@@ -410,6 +413,13 @@ export default function PlantsList() {
                 : tent.category === 'VEGA'      ? { border: 'border-border/60', accent: 'text-green-300', glow: 'rgba(34,197,94,0.12)', dot: 'bg-green-400' }
                 :                                 { border: 'border-border/60', accent: 'text-emerald-300', glow: 'rgba(16,185,129,0.10)', dot: 'bg-emerald-400' };
 
+              // Card bg para thumbnails no collapsed
+              const tentCardBg =
+                tent.category === 'FLORA'       ? '#581c87' :
+                tent.category === 'DRYING'      ? '#78350f' :
+                tent.category === 'MAINTENANCE' ? '#1e3a8a' :
+                '#14532d';
+
               return (
                 <div key={tent.id} className="space-y-2">
                   {/* Header da estufa — linha simples, sem box */}
@@ -442,6 +452,44 @@ export default function PlantsList() {
                       </button>
                     )}
                   </div>
+
+                  {/* Thumbnails das plantas quando recolhido — preview visual sem expandir */}
+                  {!isExpanded && tentPlants.length > 0 && (
+                    <div className="flex gap-2 pl-7 pb-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {tentPlants.slice(0, 7).map((p: any) => {
+                        const letter = (p.name ?? '?')[0].toUpperCase();
+                        const thumbUrl = p.lastHealthPhotoUrl
+                          ? (p.lastHealthPhotoUrl.startsWith('/uploads/')
+                              ? `/api/upload/thumbnail?url=${encodeURIComponent(p.lastHealthPhotoUrl)}&w=120&h=120&q=70`
+                              : p.lastHealthPhotoUrl)
+                          : null;
+                        return (
+                          <Link key={p.id} href={`/plants/${p.id}`} onClick={e => e.stopPropagation()}>
+                            <div
+                              className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border-2 border-border/20 active:scale-95 transition-transform"
+                              style={{ background: tentCardBg }}
+                            >
+                              {thumbUrl ? (
+                                <img src={thumbUrl} alt={p.name} className="w-full h-full object-cover" loading="lazy" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white/50 text-sm font-bold">
+                                  {letter}
+                                </div>
+                              )}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                      {tentPlants.length > 7 && (
+                        <div
+                          className="w-12 h-12 rounded-xl border-2 border-border/20 flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0"
+                          style={{ background: `${tentCardBg}60` }}
+                        >
+                          +{tentPlants.length - 7}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {isExpanded && (
                     <div>
@@ -530,14 +578,14 @@ export default function PlantsList() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
 
-                              {/* Foto — aspect 3:4, object-contain para "planta flutuando" */}
+                              {/* Foto — aspect 3:4, object-cover para preencher o card */}
                               <Link href={`/plants/${plant.id}`} className="block">
                                 <div className="w-full aspect-[3/4] relative">
                                   {thumbUrl ? (
                                     <img
                                       src={thumbUrl}
                                       alt={plant.name}
-                                      className="absolute inset-0 w-full h-full object-contain pt-8 px-3 pb-1"
+                                      className="absolute inset-0 w-full h-full object-cover"
                                       loading="lazy"
                                       decoding="async"
                                     />

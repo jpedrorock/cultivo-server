@@ -216,7 +216,6 @@ export function BottomNav() {
   ];
 
   const moreMenuItems: NavItem[] = [
-    { href: "/morning-check", icon: Sunrise, label: "Checklist Matinal" },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },
@@ -306,7 +305,7 @@ export function BottomNav() {
           <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-10" data-tour="quick-log-menu">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
-              <div className="fixed left-1/2 -translate-x-1/2 w-56 rounded-2xl border border-border/60 bg-card/95 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
+              <div className="fixed left-1/2 -translate-x-1/2 w-[85vw] max-w-sm rounded-2xl border border-border/60 bg-card/98 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
                 {/* Seta apontando para o FAB (centro) */}
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-border/60" />
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[5px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-card/95" />
@@ -314,56 +313,56 @@ export function BottomNav() {
                 <Link
                   href="/quick-log?mode=status"
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-teal-500/8 active:bg-teal-500/15 transition-colors border-b border-border/30 w-full"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-teal-500/8 active:bg-teal-500/15 transition-colors border-b border-border/30 w-full"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-teal-600 flex items-center justify-center shrink-0 shadow-sm">
-                    <ThermometerSun className="w-4 h-4 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <ThermometerSun className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">Status da Estufa</p>
-                    <p className="text-[11px] text-muted-foreground/60">Temp, RH, pH, EC, luz</p>
+                    <p className="text-base font-semibold text-foreground leading-tight">Status da Estufa</p>
+                    <p className="text-xs text-muted-foreground/60 mt-0.5">Temp, RH, pH, EC, luz</p>
                   </div>
                 </Link>
 
                 <Link
                   href="/quick-log?mode=plant"
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors border-b border-border/30 w-full"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors border-b border-border/30 w-full"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-rose-600 flex items-center justify-center shrink-0 shadow-sm">
-                    <Heart className="w-4 h-4 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <Heart className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">Saúde de Planta</p>
-                    <p className="text-[11px] text-muted-foreground/60">Status, sintomas, foto</p>
+                    <p className="text-base font-semibold text-foreground leading-tight">Saúde de Planta</p>
+                    <p className="text-xs text-muted-foreground/60 mt-0.5">Status, sintomas, foto</p>
                   </div>
                 </Link>
 
                 <Link
                   href="/quick-log?mode=trichome"
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors border-b border-border/30 w-full"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-violet-500/8 active:bg-violet-500/15 transition-colors border-b border-border/30 w-full"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 shadow-sm">
-                    <Sparkles className="w-4 h-4 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <Sparkles className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">Tricomas</p>
-                    <p className="text-[11px] text-muted-foreground/60">Maturação · Flora</p>
+                    <p className="text-base font-semibold text-foreground leading-tight">Tricomas</p>
+                    <p className="text-xs text-muted-foreground/60 mt-0.5">Maturação · Flora</p>
                   </div>
                 </Link>
 
                 {/* Treinamento — abre picker de planta */}
                 <button
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setTrainingPickerOpen(true); }}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-green-500/8 active:bg-green-500/15 transition-colors border-b border-border/30 w-full text-left"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-green-500/8 active:bg-green-500/15 transition-colors border-b border-border/30 w-full text-left"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shrink-0 shadow-sm">
-                    <Scissors className="w-4 h-4 text-primary-foreground" />
+                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0 shadow-sm">
+                    <Scissors className="w-5 h-5 text-primary-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">Treinamento</p>
-                    <p className="text-[11px] text-muted-foreground/60">LST, topping, super crop</p>
+                    <p className="text-base font-semibold text-foreground leading-tight">Treinamento</p>
+                    <p className="text-xs text-muted-foreground/60 mt-0.5">LST, topping, super crop</p>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
                 </button>
@@ -371,14 +370,14 @@ export function BottomNav() {
                 {/* IA Especialista — abre picker de planta */}
                 <button
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setChatPickerOpen(true); }}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-blue-500/8 active:bg-blue-500/15 transition-colors w-full text-left"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-blue-500/8 active:bg-blue-500/15 transition-colors w-full text-left"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
-                    <Bot className="w-4 h-4 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                    <Bot className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">IA Especialista</p>
-                    <p className="text-[11px] text-muted-foreground/60">Diagnóstico · LST · Tricomas</p>
+                    <p className="text-base font-semibold text-foreground leading-tight">IA Especialista</p>
+                    <p className="text-xs text-muted-foreground/60 mt-0.5">Diagnóstico · LST · Tricomas</p>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
                 </button>

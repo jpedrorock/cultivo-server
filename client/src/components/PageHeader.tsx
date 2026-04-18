@@ -23,9 +23,15 @@ interface PageHeaderProps {
    */
   rightActions?: ReactNode;
   /**
-   * Se true, header fica sticky no topo (default: true).
+   * Se true, header fica fixed no topo (default: true).
+   * Usar false em telas sem scroll ou modais.
    */
   sticky?: boolean;
+  /**
+   * Altura do spacer que reserva o espaço do header fixed no flow normal.
+   * Default: '64px' (py-3 + h-10). Aumentar se houver children (tab bars).
+   */
+  spacerHeight?: string;
   /**
    * Classes extras para o `<header>`.
    */
@@ -48,7 +54,8 @@ interface PageHeaderProps {
  *   (preserva filtros/scroll da página anterior) e cai em `backHref` quando
  *   o usuário chegou por URL direta, refresh, bookmark.
  * - Safe area superior (iPhone com notch) por padrão.
- * - Sticky por padrão — passe `sticky={false}` em telas sem scroll.
+ * - Fixed por padrão — funciona corretamente dentro de PullToRefresh no iOS.
+ *   Passe `sticky={false}` em telas sem scroll.
  */
 export function PageHeader({
   title,
@@ -56,6 +63,7 @@ export function PageHeader({
   backHref,
   rightActions,
   sticky = true,
+  spacerHeight = "64px",
   className,
   titleClassName,
   children,
@@ -73,13 +81,14 @@ export function PageHeader({
     }
   };
 
-  return (
+  const headerEl = (
     <header
       className={cn(
-        "bg-card border-b border-border pt-safe",
-        sticky && "sticky top-0 z-20",
+        "bg-card border-b border-border",
+        sticky ? "fixed top-0 left-0 right-0 z-20" : "relative",
         className,
       )}
+      style={sticky ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}
     >
       <div className="container mx-auto px-4 py-3 flex items-center gap-3">
         <Button
@@ -117,5 +126,18 @@ export function PageHeader({
       </div>
       {children}
     </header>
+  );
+
+  if (!sticky) return headerEl;
+
+  // Fixed header: precisa de spacer no flow normal para o conteúdo não ficar debaixo do header
+  return (
+    <>
+      {headerEl}
+      <div
+        aria-hidden="true"
+        style={{ height: `calc(${spacerHeight} + env(safe-area-inset-top, 0px))` }}
+      />
+    </>
   );
 }
