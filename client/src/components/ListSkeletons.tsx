@@ -79,6 +79,50 @@ export function TaskListSkeleton({ count = 4 }: { count?: number }) {
 }
 
 /**
+ * Skeleton for alerts list items — reflete layout real:
+ * ícone arredondado + mensagem de 2 linhas + chips inline.
+ */
+export function AlertsListSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="p-4 rounded-lg border bg-muted/20">
+          <div className="flex items-start gap-3">
+            <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+            <div className="flex-1 space-y-2 min-w-0">
+              <Skeleton className="h-4 w-full max-w-sm" />
+              <Skeleton className="h-4 w-2/3" />
+              <div className="flex gap-2 pt-1 flex-wrap">
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+            </div>
+            <Skeleton className="h-4 w-4 shrink-0 mt-1" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Skeleton for tent filter buttons na página de alertas.
+ */
+export function TentFilterSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="border rounded-md px-3 py-3 space-y-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Skeleton for card-based task sections (grouped by tent)
  */
 export function TaskCardSkeleton({ count = 2 }: { count?: number }) {

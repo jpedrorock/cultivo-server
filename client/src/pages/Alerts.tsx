@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { PageHeader } from "@/components/PageHeader";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
+import { AlertsListSkeleton, TentFilterSkeleton } from "@/components/ListSkeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -65,9 +67,37 @@ export default function Alerts() {
 
   if (loadingTents) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
+      <PageTransition>
+        <div className="min-h-screen bg-background">
+          <PageHeader
+            backHref="/"
+            title={
+              <>
+                <Bell className="w-5 h-5 text-primary shrink-0" />
+                <span className="truncate">Histórico de Alertas</span>
+              </>
+            }
+            subtitle="Carregando alertas…"
+          />
+          <main className="container mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div>
+                <Skeleton className="h-5 w-36 mb-3" />
+                <TentFilterSkeleton count={4} />
+              </div>
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                  <Skeleton className="h-4 w-64" />
+                </CardHeader>
+                <CardContent>
+                  <AlertsListSkeleton count={4} />
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+        </div>
+      </PageTransition>
     );
   }
 
@@ -194,9 +224,7 @@ export default function Alerts() {
               </CardHeader>
               <CardContent>
                 {loadingAlerts ? (
-                  <div className="flex justify-center py-12">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                  </div>
+                  <AlertsListSkeleton count={4} />
                 ) : alertList && alertList.length > 0 ? (
                   <div className="space-y-3">
                     <StaggerList className="space-y-3">
