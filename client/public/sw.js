@@ -200,16 +200,36 @@ self.addEventListener('push', (event) => {
 
   const data = event.data ? event.data.json() : {};
   const title = data.title || 'App Cultivo';
+  const isAlert = (data.tag || '').startsWith('alert-');
+  const isReminder = data.tag === 'daily-reminder';
+
+  // Ações contextuais: alertas têm CTA de registro; lembretes têm CTA de abertura
+  const actions = isAlert
+    ? [
+        { action: 'register', title: '📝 Registrar' },
+        { action: 'close',    title: 'Fechar' },
+      ]
+    : isReminder
+    ? [
+        { action: 'open',  title: '📝 Registrar agora' },
+        { action: 'close', title: 'Mais tarde' },
+      ]
+    : [
+        { action: 'open',  title: 'Abrir' },
+        { action: 'close', title: 'Fechar' },
+      ];
+
   const options = {
     body: data.body || 'Nova notificação',
     icon: '/icon-192.png',
     badge: '/favicon-32.png',
-    vibrate: [200, 100, 200],
-    data: data.url || '/',
-    actions: [
-      { action: 'open', title: 'Abrir', icon: '/icon-192.png' },
-      { action: 'close', title: 'Fechar' },
-    ],
+    vibrate: isAlert ? [300, 100, 300, 100, 300] : [200, 100, 200],
+    data: {
+      url: data.url || '/',
+      alertsUrl: isAlert ? '/alerts' : null,
+    },
+    actions,
+    requireInteraction: isAlert, // alertas ficam visíveis até o usuário interagir
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -220,17 +240,24 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event.action);
   event.notification.close();
 
-  if (event.action === 'open' || !event.action) {
-    const urlToOpen = event.notification.data || '/';
+  // 'alerts' action → abrir /alerts; qualquer outro (open/register/click direto) → abrir url principal
+  const notifData = event.notification.data || {};
+  const urlToOpen =
+    event.action === 'alerts'
+      ? (notifData.alertsUrl || '/alerts')
+      : (typeof notifData === 'string' ? notifData : (notifData.url || '/'));
+
+  if (event.action !== 'close') {
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        // Se já tem uma janela aberta, focar nela
+        // Tentar focar tab já aberta com essa URL
         for (const client of clientList) {
-          if (client.url === urlToOpen && 'focus' in client) {
+          if ('focus' in client) {
+            client.navigate ? client.navigate(urlToOpen) : null;
             return client.focus();
           }
         }
-        // Senão, abrir nova janela
+        // Senão abrir nova janela
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen);
         }

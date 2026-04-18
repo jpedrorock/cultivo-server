@@ -6517,9 +6517,9 @@ export const appRouter = router({
       const { sendPushToAll } = await import("./pushService");
       await sendPushToAll({
         title: "🧪 Teste — App Cultivo",
-        body: "Notificações Push funcionando! 🌱",
-        url: "/",
-        tag: "test-push",
+        body: "Notificações Push funcionando! Toque para registrar. 🌱",
+        url: "/quick-log",
+        tag: "daily-reminder",
       });
       return { success: true };
     }),

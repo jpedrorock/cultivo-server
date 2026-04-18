@@ -831,6 +831,29 @@ export async function checkAlertsForTent(tentId: number): Promise<{
 
     if (insertedCount > 0) {
       console.log(`[Alerts] ${insertedCount} alerta(s) registrado(s) para ${tent.name} — visíveis no app`);
+
+      // Push notification — deep link direto para o QuickLog do tent afetado
+      try {
+        const { sendPushToAll, isPushConfigured } = await import("./pushService");
+        if (isPushConfigured()) {
+          const firstAlert = alertsToInsert[0];
+          const metricEmoji: Record<string, string> = { TEMP: "🌡️", RH: "💧", PH: "🧪", VPD: "💨", CO2: "🌫️", EC: "⚡" };
+          const emoji = metricEmoji[firstAlert?.metric ?? ""] ?? "⚠️";
+          const body =
+            insertedCount === 1
+              ? firstAlert.message
+              : `${firstAlert.message} (+${insertedCount - 1} alerta${insertedCount > 2 ? "s" : ""})`;
+          await sendPushToAll({
+            title: `${emoji} Alerta — ${tent.name}`,
+            body,
+            url: `/quick-log?tentId=${tentId}`,
+            tag: `alert-tent-${tentId}`,
+          });
+        }
+      } catch (err) {
+        // Push é opcional — nunca bloquear a inserção de alertas
+        console.warn("[Alerts] Push notification failed (non-critical):", (err as any)?.message);
+      }
     }
   }
 
