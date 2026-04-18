@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -432,10 +432,32 @@ export default function Nutrients() {
   const [historyPhaseFilter, setHistoryPhaseFilter] = useState<Phase | "all">("all");
 
   const tents = trpc.tents.list.useQuery();
+  const { data: activeCycles } = trpc.cycles.listActive.useQuery();
 
   // Auto-selecionar a primeira estufa quando carregar
   const firstTentId = tents.data?.[0]?.id?.toString();
   const effectiveTentId = selectedTentId || firstTentId || "";
+
+  // Auto-detectar fase e semana do ciclo ativo da estufa selecionada
+  useEffect(() => {
+    if (!activeCycles?.length) return;
+    const tentIdNum = effectiveTentId ? Number(effectiveTentId) : activeCycles[0]?.tentId;
+    const cycle = activeCycles.find((c: any) => c.tentId === tentIdNum) ?? activeCycles[0];
+    if (!cycle) return;
+
+    // Detectar fase
+    const detectedPhase: Phase = cycle.floraStartDate ? "FLORA" : "VEGA";
+    setPhase(detectedPhase);
+
+    // Calcular semana atual
+    const now = new Date();
+    const refDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : new Date(cycle.startDate);
+    if (!isNaN(refDate.getTime())) {
+      const weeks = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+      setWeek(weeks);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCycles, effectiveTentId]);
 
   const applications = trpc.nutrients.listApplications.useQuery(
     historyTentFilter !== "all" || historyPhaseFilter !== "all"
@@ -585,7 +607,12 @@ export default function Nutrients() {
               {/* Fase e Semana */}
               <Card>
                 <CardHeader>
-                  <CardTitle>1. Fase e Semana</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>1. Fase e Semana</CardTitle>
+                    {activeCycles?.length ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">auto-detectado</span>
+                    ) : null}
+                  </div>
                   <CardDescription>O sistema calculará automaticamente os produtos e quantidades</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
