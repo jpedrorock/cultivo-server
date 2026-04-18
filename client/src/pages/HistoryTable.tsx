@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList, Share2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList, Share2, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -34,6 +34,21 @@ import { Printer } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { HistoryTableSkeleton } from "@/components/ListSkeletons";
 import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function HistoryTable() {
   const [, navigate] = useLocation();
@@ -48,6 +63,16 @@ export default function HistoryTable() {
   const [turnFilter, setTurnFilter] = useState<"AM" | "PM" | "ALL">("ALL");
   const [sortField, setSortField] = useState<'logDate' | 'tempC' | 'rhPct' | 'ppfd' | 'ph' | 'ec' | 'vpd'>('logDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Quantos filtros estão ativos além dos defaults (30d, turn ALL, limit 50).
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (period !== "30") n++;
+    if (turnFilter !== "ALL") n++;
+    if (limit !== 50) n++;
+    return n;
+  }, [period, turnFilter, limit]);
 
   const { data: tents, isLoading: tentsLoading } = trpc.tents.list.useQuery();
 
@@ -237,8 +262,11 @@ export default function HistoryTable() {
 
   if (tentsLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <PageHeader backHref="/" title="Histórico" subtitle="Carregando…" />
+        <main className="container mx-auto px-4 py-8">
+          <HistoryTableSkeleton count={6} />
+        </main>
       </div>
     );
   }
@@ -296,40 +324,86 @@ export default function HistoryTable() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                <TableIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Histórico de Registros</h1>
-                <p className="text-sm text-muted-foreground">Visualize e exporte todos os registros diários</p>
-              </div>
-            </div>
-            <div className="flex gap-2 w-full md:w-auto">
-              <Button variant="default" onClick={() => navigate("/quick-log")} className="flex-1 md:flex-none">
-                <ClipboardList className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Novo Registro</span>
-              </Button>
-              <Button variant="outline" onClick={handlePrint} disabled={!logsData?.logs || logsData.logs.length === 0} className="flex-1 md:flex-none">
-                <Printer className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Imprimir</span>
-              </Button>
-              <Button variant="outline" onClick={handleShare} disabled={!logsData?.logs || logsData.logs.length === 0} className="flex-1 md:flex-none" title="Compartilhar">
-                <Share2 className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Compartilhar</span>
-              </Button>
-              <Button onClick={exportToCSV} disabled={!logsData?.logs || logsData.logs.length === 0} className="flex-1 md:flex-none">
-                <Download className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Exportar CSV</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        backHref="/"
+        title={
+          <>
+            <TableIcon className="w-5 h-5 text-primary shrink-0" />
+            <span className="truncate">Histórico</span>
+          </>
+        }
+        subtitle="Registros diários das estufas"
+        rightActions={
+          <>
+            {/* Ação principal: Novo Registro (sempre visível) */}
+            <Button
+              size="sm"
+              onClick={() => navigate("/quick-log")}
+              className="h-9"
+              aria-label="Novo Registro"
+            >
+              <ClipboardList className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Novo Registro</span>
+            </Button>
+            {/* Ações secundárias no desktop */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              disabled={!logsData?.logs || logsData.logs.length === 0}
+              className="hidden md:inline-flex h-9"
+            >
+              <Printer className="w-4 h-4 mr-2" />Imprimir
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleShare}
+              disabled={!logsData?.logs || logsData.logs.length === 0}
+              className="hidden md:inline-flex h-9"
+            >
+              <Share2 className="w-4 h-4 mr-2" />Compartilhar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToCSV}
+              disabled={!logsData?.logs || logsData.logs.length === 0}
+              className="hidden md:inline-flex h-9"
+            >
+              <Download className="w-4 h-4 mr-2" />Exportar
+            </Button>
+            {/* Ações secundárias no mobile — dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="md:hidden h-9 w-9" aria-label="Mais ações">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={handlePrint}
+                  disabled={!logsData?.logs || logsData.logs.length === 0}
+                >
+                  <Printer className="w-4 h-4 mr-2" />Imprimir
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleShare}
+                  disabled={!logsData?.logs || logsData.logs.length === 0}
+                >
+                  <Share2 className="w-4 h-4 mr-2" />Compartilhar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={exportToCSV}
+                  disabled={!logsData?.logs || logsData.logs.length === 0}
+                >
+                  <Download className="w-4 h-4 mr-2" />Exportar CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
 
       {/* Content */}
       <main className="container mx-auto px-4 py-8 space-y-8" id="history-table-container">
@@ -391,8 +465,74 @@ export default function HistoryTable() {
               <AnalyticsCharts logs={logsData.logs} />
             )}
 
-            {/* Filters and Table */}
-            <Card className="print-hide">
+            {/* Filtros — mobile: botão que abre Sheet; desktop: Card inline */}
+            <div className="md:hidden print-hide">
+              <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" className="w-full h-11 justify-between">
+                    <span className="flex items-center gap-2">
+                      <Filter className="w-4 h-4" />
+                      Filtros
+                      {activeFilterCount > 0 && (
+                        <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                          {activeFilterCount}
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {period === "7" ? "7 dias"
+                        : period === "30" ? "30 dias"
+                        : period === "90" ? "90 dias"
+                        : period === "all" ? "Todos"
+                        : "Personalizado"}
+                      {turnFilter !== "ALL" && ` · ${turnFilter}`}
+                    </span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+                  <SheetHeader className="text-left">
+                    <SheetTitle className="flex items-center gap-2">
+                      <Filter className="w-5 h-5" />Filtros
+                    </SheetTitle>
+                    <SheetDescription>Ajuste para encontrar registros específicos</SheetDescription>
+                  </SheetHeader>
+                  <FiltersForm
+                    turnFilter={turnFilter}
+                    setTurnFilter={setTurnFilter}
+                    period={period}
+                    setPeriod={(v) => { setPeriod(v); setOffset(0); }}
+                    limit={limit}
+                    setLimit={(v) => { setLimit(v); setOffset(0); }}
+                    startDate={startDate}
+                    setStartDate={(v) => { setStartDate(v); setOffset(0); }}
+                    endDate={endDate}
+                    setEndDate={(v) => { setEndDate(v); setOffset(0); }}
+                  />
+                  <div className="pt-4 flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setTurnFilter("ALL");
+                        setPeriod("30");
+                        setLimit(50);
+                        setStartDate("");
+                        setEndDate("");
+                        setOffset(0);
+                      }}
+                      disabled={activeFilterCount === 0}
+                    >
+                      Limpar
+                    </Button>
+                    <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
+                      Aplicar
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
+            <Card className="print-hide hidden md:block">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Filter className="w-5 h-5" />
@@ -401,105 +541,20 @@ export default function HistoryTable() {
                 <CardDescription>Filtre os registros por período</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              {/* Turn Filter */}
-              <div className="space-y-2 md:col-span-2">
-                <Label>Turno</Label>
-                <div className="flex gap-2">
-                  {(["ALL", "AM", "PM"] as const).map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setTurnFilter(t)}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                        turnFilter === t
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border text-muted-foreground hover:border-primary/40"
-                      }`}
-                    >
-                      {t === "ALL" ? "Todos" : t === "AM" ? "Manhã (AM)" : "Tarde (PM)"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Period Filter */}
-              <div className="space-y-2">
-                <Label htmlFor="period-filter">Período</Label>
-                <Select
-                  value={period}
-                  onValueChange={(value) => {
-                    setPeriod(value);
-                    setOffset(0);
-                  }}
-                >
-                  <SelectTrigger id="period-filter">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7">Últimos 7 dias</SelectItem>
-                    <SelectItem value="30">Últimos 30 dias</SelectItem>
-                    <SelectItem value="90">Últimos 90 dias</SelectItem>
-                    <SelectItem value="all">Todos os registros</SelectItem>
-                    <SelectItem value="custom">Personalizado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Items per page */}
-              <div className="space-y-2">
-                <Label htmlFor="limit-filter">Registros por página</Label>
-                <Select
-                  value={limit.toString()}
-                  onValueChange={(value) => {
-                    setLimit(parseInt(value));
-                    setOffset(0);
-                  }}
-                >
-                  <SelectTrigger id="limit-filter">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Custom Date Range */}
-            {period === "custom" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start-date">Data Inicial</Label>
-                  <Input
-                    id="start-date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      setOffset(0);
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end-date">Data Final</Label>
-                  <Input
-                    id="end-date"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
-                      setOffset(0);
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                <FiltersForm
+                  turnFilter={turnFilter}
+                  setTurnFilter={setTurnFilter}
+                  period={period}
+                  setPeriod={(v) => { setPeriod(v); setOffset(0); }}
+                  limit={limit}
+                  setLimit={(v) => { setLimit(v); setOffset(0); }}
+                  startDate={startDate}
+                  setStartDate={(v) => { setStartDate(v); setOffset(0); }}
+                  endDate={endDate}
+                  setEndDate={(v) => { setEndDate(v); setOffset(0); }}
+                />
+              </CardContent>
+            </Card>
 
         {/* Table */}
         <Card className="mt-6">
@@ -783,6 +838,115 @@ export default function HistoryTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+interface FiltersFormProps {
+  turnFilter: "AM" | "PM" | "ALL";
+  setTurnFilter: (v: "AM" | "PM" | "ALL") => void;
+  period: string;
+  setPeriod: (v: string) => void;
+  limit: number;
+  setLimit: (v: number) => void;
+  startDate: string;
+  setStartDate: (v: string) => void;
+  endDate: string;
+  setEndDate: (v: string) => void;
+}
+
+function FiltersForm({
+  turnFilter,
+  setTurnFilter,
+  period,
+  setPeriod,
+  limit,
+  setLimit,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate,
+}: FiltersFormProps) {
+  return (
+    <div className="space-y-4 pt-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Turn Filter */}
+        <div className="space-y-2 md:col-span-2">
+          <Label>Turno</Label>
+          <div className="flex gap-2">
+            {(["ALL", "AM", "PM"] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setTurnFilter(t)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  turnFilter === t
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                }`}
+              >
+                {t === "ALL" ? "Todos" : t === "AM" ? "Manhã (AM)" : "Tarde (PM)"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Period Filter */}
+        <div className="space-y-2">
+          <Label htmlFor="period-filter">Período</Label>
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger id="period-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Últimos 7 dias</SelectItem>
+              <SelectItem value="30">Últimos 30 dias</SelectItem>
+              <SelectItem value="90">Últimos 90 dias</SelectItem>
+              <SelectItem value="all">Todos os registros</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Items per page */}
+        <div className="space-y-2">
+          <Label htmlFor="limit-filter">Registros por página</Label>
+          <Select value={limit.toString()} onValueChange={(v) => setLimit(parseInt(v))}>
+            <SelectTrigger id="limit-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Custom Date Range */}
+      {period === "custom" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="start-date">Data Inicial</Label>
+            <Input
+              id="start-date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="end-date">Data Final</Label>
+            <Input
+              id="end-date"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
