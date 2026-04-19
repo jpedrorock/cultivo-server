@@ -58,8 +58,8 @@
   static const int SCREEN_H = 240;
 #endif
 
-// Altura da barra do lv_tabview + altura util da area de cada aba
-static const int TABBAR_H = 38;   // so icones, sem texto
+// Altura da navbar custom + altura util de cada screen
+static const int TABBAR_H = 48;   // icones Lucide 28px + padding
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
 // ── Cores do tema (espelham DisplayMode.tsx) ───────────────────────────────────
@@ -92,8 +92,14 @@ static unsigned long lastFetch = 0;
 static const unsigned long FETCH_INTERVAL = 30000;
 
 // ── Widgets HOME ────────────────────────────────────────────────────────────────
-static lv_obj_t *tabview;
-static lv_obj_t *tabHome, *tabRegar, *tabPhEc, *tabTarefa, *tabGrafic;
+static lv_obj_t *contentArea;
+static lv_obj_t *screenHome, *screenRegar, *screenPhEc, *screenTarefa, *screenGrafic;
+static lv_obj_t *navbar;
+static lv_obj_t *navIcons[5];
+static int activeScreen = 0;
+static const uint32_t NAV_COLORS[5] = { COL_GRN, 0x60A5FA, COL_PRP, COL_YEL, COL_CYN };
+static const lv_img_dsc_t *NAV_ICONS_IMG[5] = { &ic_home, &ic_droplets, &ic_flask, &ic_tasks, &ic_activity };
+
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
 static lv_obj_t *chartTemp, *chartRh;
@@ -882,60 +888,148 @@ static void fetchHistoryAll() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Tema dark + tabview com background gradient
+// Navegação custom: content area + bottom nav com icones Lucide coloridos
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Destaca tab ativa e esmaece as outras
+static void navSetActive(int idx) {
+  for (int i = 0; i < 5; i++) {
+    bool sel = (i == idx);
+    lv_obj_set_style_img_recolor(navIcons[i],
+      lv_color_hex(sel ? NAV_COLORS[i] : COL_DIM), 0);
+    lv_obj_set_style_img_recolor_opa(navIcons[i], LV_OPA_COVER, 0);
+  }
+}
+
+// Fade out do screen atual + fade in do novo
+static void switchScreen(int idx) {
+  if (idx == activeScreen) return;
+  lv_obj_t *screens[5] = { screenHome, screenRegar, screenPhEc, screenTarefa, screenGrafic };
+  if (idx < 0 || idx >= 5) return;
+
+  lv_obj_add_flag(screens[activeScreen], LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(screens[idx], LV_OBJ_FLAG_HIDDEN);
+
+  // Fade-in suave do novo screen
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, screens[idx]);
+  lv_anim_set_values(&a, LV_OPA_TRANSP, LV_OPA_COVER);
+  lv_anim_set_time(&a, 180);
+  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+    lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
+  });
+  lv_anim_start(&a);
+
+  activeScreen = idx;
+  navSetActive(idx);
+
+  // Re-fetch dados quando entra em tab dinamica
+  if (idx == 3 && wifiOk) {           // TAREFA
+    fetchTasks();
+    rebuildTarefasList();
+  } else if (idx == 4 && wifiOk) {    // GRAFIC
+    applyHistToChart();
+  } else if (idx == 0) {
+    refreshHomeValues();
+  }
+}
+
+// Callback de clique no icone da navbar
+static void navBtnClickCb(lv_event_t *e) {
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  switchScreen(idx);
+}
+
+static void buildNavbar(lv_obj_t *parent) {
+  navbar = lv_obj_create(parent);
+  lv_obj_set_size(navbar, SCREEN_W, TABBAR_H);
+  lv_obj_align(navbar, LV_ALIGN_BOTTOM_MID, 0, 0);
+  lv_obj_set_style_bg_color(navbar, lv_color_hex(0x0A0F17), 0);
+  lv_obj_set_style_bg_opa(navbar, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(navbar, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(navbar, 1, 0);
+  lv_obj_set_style_border_side(navbar, LV_BORDER_SIDE_TOP, 0);
+  lv_obj_set_style_radius(navbar, 0, 0);
+  lv_obj_set_style_pad_all(navbar, 0, 0);
+  lv_obj_clear_flag(navbar, LV_OBJ_FLAG_SCROLLABLE);
+
+  int btnW = SCREEN_W / 5;
+  for (int i = 0; i < 5; i++) {
+    // Container clicavel (sem visual proprio — so area de toque)
+    lv_obj_t *btn = lv_obj_create(navbar);
+    lv_obj_set_size(btn, btnW, TABBAR_H);
+    lv_obj_set_pos(btn, i * btnW, 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(btn, 0, 0);
+    lv_obj_set_style_radius(btn, 0, 0);
+    lv_obj_set_style_pad_all(btn, 0, 0);
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(btn, navBtnClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+
+    // Icone Lucide tintado
+    lv_obj_t *ic = lv_img_create(btn);
+    lv_img_set_src(ic, NAV_ICONS_IMG[i]);
+    lv_img_set_pivot(ic, 0, 0);
+    lv_img_set_zoom(ic, 112);   // 64px * 112/256 = ~28px
+    lv_obj_set_style_img_recolor_opa(ic, LV_OPA_COVER, 0);
+    lv_obj_center(ic);
+    navIcons[i] = ic;
+  }
+
+  navSetActive(0);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Tema dark + layout principal
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildUI() {
   lv_obj_t *scr = lv_scr_act();
-  // Background gradient diagonal (azul escuro -> preto puro)
+  // Background gradient vertical (azul escuro -> preto puro)
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x0F1729), 0);
   lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x000000), 0);
   lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_all(scr, 0, 0);
 
-  tabview = lv_tabview_create(scr, LV_DIR_BOTTOM, TABBAR_H);
-  lv_obj_set_style_bg_opa(tabview, LV_OPA_TRANSP, 0);
+  // Area de conteudo (ocupa a tela inteira menos a navbar)
+  contentArea = lv_obj_create(scr);
+  lv_obj_set_size(contentArea, SCREEN_W, TAB_H);
+  lv_obj_set_pos(contentArea, 0, 0);
+  lv_obj_set_style_bg_opa(contentArea, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(contentArea, 0, 0);
+  lv_obj_set_style_pad_all(contentArea, 0, 0);
+  lv_obj_clear_flag(contentArea, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Estilo da barra de tabs (so icones, iOS-like)
-  lv_obj_t *tabBtns = lv_tabview_get_tab_btns(tabview);
-  lv_obj_set_style_bg_color(tabBtns, lv_color_hex(0x0A0F17), 0);
-  lv_obj_set_style_bg_opa(tabBtns, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(tabBtns, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(tabBtns, 1, LV_PART_MAIN);
-  lv_obj_set_style_border_side(tabBtns, LV_BORDER_SIDE_TOP, LV_PART_MAIN);
-  // Simbolos LV_SYMBOL_* sao chars unicode da fonte Montserrat default do LVGL.
-  // Manrope nao tem esses glifos — manter Montserrat_24 aqui pra icones visiveis.
-  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_24, LV_PART_ITEMS);
-  lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_GRN), LV_PART_ITEMS | LV_STATE_CHECKED);
-  // Sem fundo destacado — visual limpo, so a cor do icone muda
-  lv_obj_set_style_bg_opa(tabBtns, LV_OPA_TRANSP, LV_PART_ITEMS);
-  lv_obj_set_style_bg_opa(tabBtns, LV_OPA_TRANSP, LV_PART_ITEMS | LV_STATE_CHECKED);
-  lv_obj_set_style_border_opa(tabBtns, LV_OPA_TRANSP, LV_PART_ITEMS);
+  // Helper pra criar cada screen como lv_obj do mesmo tamanho
+  auto makeScreen = [&]() -> lv_obj_t* {
+    lv_obj_t *s = lv_obj_create(contentArea);
+    lv_obj_set_size(s, SCREEN_W, TAB_H);
+    lv_obj_set_pos(s, 0, 0);
+    lv_obj_set_style_bg_opa(s, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(s, 0, 0);
+    lv_obj_set_style_pad_all(s, 0, 0);
+    lv_obj_clear_flag(s, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s, LV_OBJ_FLAG_HIDDEN);
+    return s;
+  };
 
-  // Tabs so com icone (sem texto, estilo iOS)
-  tabHome   = lv_tabview_add_tab(tabview, LV_SYMBOL_HOME);
-  tabRegar  = lv_tabview_add_tab(tabview, LV_SYMBOL_TINT);
-  tabPhEc   = lv_tabview_add_tab(tabview, LV_SYMBOL_GPS);
-  tabTarefa = lv_tabview_add_tab(tabview, LV_SYMBOL_LIST);
-  tabGrafic = lv_tabview_add_tab(tabview, LV_SYMBOL_BARS);
+  screenHome   = makeScreen();
+  screenRegar  = makeScreen();
+  screenPhEc   = makeScreen();
+  screenTarefa = makeScreen();
+  screenGrafic = makeScreen();
 
-  buildHome(tabHome);
-  buildRegar(tabRegar);
-  buildPhEc(tabPhEc);
-  buildTarefas(tabTarefa);
-  buildHistorico(tabGrafic);
+  buildHome(screenHome);
+  buildRegar(screenRegar);
+  buildPhEc(screenPhEc);
+  buildTarefas(screenTarefa);
+  buildHistorico(screenGrafic);
 
-  // Re-fetch dados quando muda de aba
-  lv_obj_add_event_cb(tabview, [](lv_event_t *e) {
-    uint16_t idx = lv_tabview_get_tab_act((lv_obj_t*)lv_event_get_target(e));
-    if (idx == 3 && wifiOk) {           // TAREFA
-      fetchTasks();
-      rebuildTarefasList();
-    } else if (idx == 4 && wifiOk) {    // GRAFIC
-      applyHistToChart();
-    }
-  }, LV_EVENT_VALUE_CHANGED, NULL);
+  // HOME visivel por padrao
+  lv_obj_clear_flag(screenHome, LV_OBJ_FLAG_HIDDEN);
 
+  buildNavbar(scr);
   refreshHomeValues();
 }
 
