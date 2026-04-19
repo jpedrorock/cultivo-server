@@ -228,11 +228,9 @@ static void buildHome(lv_obj_t *tab) {
   // Header com icone broto (Lucide) + nome estufa + wifi (Lucide)
   lv_obj_t *hdrIcon = lv_img_create(tab);
   lv_img_set_src(hdrIcon, &ic_sprout);
-  lv_img_set_pivot(hdrIcon, 0, 0);
-  lv_img_set_zoom(hdrIcon, 128);  // 128 = 50% (ic é 64px, fica 32px)
   lv_obj_set_style_img_recolor(hdrIcon, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_img_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
-  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 0, -4);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 2, 0);
 
   lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, 32, 2);
 
@@ -243,11 +241,9 @@ static void buildHome(lv_obj_t *tab) {
   // WiFi com icone Lucide (tint dinamico verde/cinza)
   lv_obj_t *wifiIcon = lv_img_create(tab);
   lv_img_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
-  lv_img_set_pivot(wifiIcon, 0, 0);
-  lv_img_set_zoom(wifiIcon, 96);  // 96 = 37.5% (fica ~24px)
   lv_obj_set_style_img_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
   lv_obj_set_style_img_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
-  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, 0, 0);
+  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -2, 2);
   lblWifi = wifiIcon;
 
   // Layout grid 2x2 — cards TEMP/RH (row 1), pH/EC (row 2)
@@ -282,11 +278,9 @@ static void buildHome(lv_obj_t *tab) {
   auto addCardIcon = [](lv_obj_t *card, const lv_img_dsc_t *ic, uint32_t color) {
     lv_obj_t *img = lv_img_create(card);
     lv_img_set_src(img, ic);
-    lv_img_set_pivot(img, 0, 0);
-    lv_img_set_zoom(img, 96);     // 37.5% (~24px)
     lv_obj_set_style_img_recolor(img, lv_color_hex(color), 0);
     lv_obj_set_style_img_recolor_opa(img, LV_OPA_COVER, 0);
-    lv_obj_align(img, LV_ALIGN_TOP_RIGHT, 0, -2);
+    lv_obj_align(img, LV_ALIGN_TOP_RIGHT, 0, 0);
   };
 
   // Row 1 — TEMP
@@ -970,8 +964,6 @@ static void buildNavbar(lv_obj_t *parent) {
     // Icone Lucide tintado
     lv_obj_t *ic = lv_img_create(btn);
     lv_img_set_src(ic, NAV_ICONS_IMG[i]);
-    lv_img_set_pivot(ic, 0, 0);
-    lv_img_set_zoom(ic, 112);   // 64px * 112/256 = ~28px
     lv_obj_set_style_img_recolor_opa(ic, LV_OPA_COVER, 0);
     lv_obj_center(ic);
     navIcons[i] = ic;

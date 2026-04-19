@@ -34,11 +34,13 @@ ICONS = {
 SRC_DIR = Path("esp32-display/assets/icons/64px")
 OUT_C   = Path("esp32-display/src/cultivo_icons.c")
 OUT_H   = Path("esp32-display/src/cultivo_icons.h")
+TARGET_SIZE = 32   # tamanho final em pixels (resize do 64px original)
 
 def convert(png_path: Path):
     img = Image.open(png_path).convert("RGBA")
+    # Redimensiona com LANCZOS pra qualidade no line-art
+    img = img.resize((TARGET_SIZE, TARGET_SIZE), Image.LANCZOS)
     w, h = img.size
-    # Extrai só o canal alpha
     alpha_bytes = img.split()[3].tobytes()
     return w, h, alpha_bytes
 
