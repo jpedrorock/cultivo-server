@@ -11,6 +11,13 @@
 #include <ArduinoJson.h>
 #include <lvgl.h>
 #include "cultivo_icons.h"
+#include "fonts/cultivo_fonts.h"
+
+// Aliases pros tamanhos — troca Montserrat default por Manrope Bold/SemiBold
+#define FONT_VALUE   (&manrope_bold_28)    // antes: lv_font_montserrat_24
+#define FONT_TITLE   (&manrope_bold_18)    // antes: lv_font_montserrat_16
+#define FONT_BODY    (&manrope_sb_14)      // antes: lv_font_montserrat_14
+#define FONT_CAPTION (&manrope_sb_12)      // novo tamanho menor pra labels
 
 // ════════════════════════════════════════════════════════════════════════════════
 // CONFIGURACAO — preencha antes de compilar
@@ -220,11 +227,11 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_img_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 0, -4);
 
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 32, 2);
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, 32, 2);
 
   char subBuf[48];
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  lblSub = makeLabel(tab, subBuf, COL_PRP, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 4, 22);
+  lblSub = makeLabel(tab, subBuf, COL_PRP, FONT_BODY, LV_ALIGN_TOP_LEFT, 4, 22);
 
   // WiFi com icone Lucide (tint dinamico verde/cinza)
   lv_obj_t *wifiIcon = lv_img_create(tab);
@@ -275,9 +282,9 @@ static void buildHome(lv_obj_t *tab) {
 
   // Row 1 — TEMP
   lv_obj_t *cardT = makeCard(tab, 4, contentY, colW, rowH);
-  makeLabel(cardT, "TEMP", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardT, "TEMP", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
   addCardIcon(cardT, &ic_thermometer, COL_GRN);
-  lblTemp = makeLabel(cardT, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 14);
+  lblTemp = makeLabel(cardT, "--", COL_GRN, FONT_VALUE, LV_ALIGN_TOP_LEFT, 0, 14);
   applyNeonGlow(lblTemp, COL_GRN);
   chartTemp = makeSparkline(cardT, colW - 20, rowH - 54, COL_GRN, &serTempLive);
   lv_chart_set_point_count(chartTemp, 12);
@@ -285,9 +292,9 @@ static void buildHome(lv_obj_t *tab) {
 
   // Row 1 — UMIDADE
   lv_obj_t *cardR = makeCard(tab, 8 + colW, contentY, colW, rowH);
-  makeLabel(cardR, "UMIDADE", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardR, "UMIDADE", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
   addCardIcon(cardR, &ic_droplet, COL_CYN);
-  lblRh = makeLabel(cardR, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 14);
+  lblRh = makeLabel(cardR, "--", COL_CYN, FONT_VALUE, LV_ALIGN_TOP_LEFT, 0, 14);
   applyNeonGlow(lblRh, COL_CYN);
   chartRh = makeSparkline(cardR, colW - 20, rowH - 54, COL_CYN, &serRhLive);
   lv_chart_set_point_count(chartRh, 12);
@@ -296,16 +303,16 @@ static void buildHome(lv_obj_t *tab) {
   // Row 2 — pH
   int row2Y = contentY + rowH + 6;
   lv_obj_t *cardPh = makeCard(tab, 4, row2Y, colW, rowH);
-  makeLabel(cardPh, "pH", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardPh, "pH", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
   addCardIcon(cardPh, &ic_beaker, COL_GRN);
-  lblPh = makeLabel(cardPh, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
+  lblPh = makeLabel(cardPh, "--", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, 6);
   applyNeonGlow(lblPh, COL_GRN);
 
   // Row 2 — EC
   lv_obj_t *cardEc = makeCard(tab, 8 + colW, row2Y, colW, rowH);
-  makeLabel(cardEc, "EC mS/cm", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardEc, "EC mS/cm", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
   addCardIcon(cardEc, &ic_test_tube, COL_CYN);
-  lblEc = makeLabel(cardEc, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
+  lblEc = makeLabel(cardEc, "--", COL_CYN, FONT_VALUE, LV_ALIGN_CENTER, 0, 6);
   applyNeonGlow(lblEc, COL_CYN);
 }
 
@@ -356,14 +363,14 @@ static void buildRegar(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 8, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
-  makeLabel(tab, "REGA", COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 0);
-  makeLabel(tab, "Quantos litros voce regou?", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 22);
+  makeLabel(tab, "REGA", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_MID, 0, 0);
+  makeLabel(tab, "Quantos litros voce regou?", COL_DIM, FONT_BODY, LV_ALIGN_TOP_MID, 0, 22);
 
   // Card central com valor
   int cardW = SCREEN_W - 32;
   int cardH = 60;
   lv_obj_t *card = makeCard(tab, 16, 46, cardW, cardH);
-  lblLitros = makeLabel(card, "1.0 L", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 0);
+  lblLitros = makeLabel(card, "1.0 L", COL_CYN, FONT_VALUE, LV_ALIGN_CENTER, 0, 0);
 
   // Botoes - / +
   int btnY = 46 + cardH + 10;
@@ -372,14 +379,14 @@ static void buildRegar(lv_obj_t *tab) {
   lv_obj_set_pos(btnMinus, 16, btnY);
   lv_obj_set_style_bg_color(btnMinus, lv_color_hex(COL_BORDER), 0);
   lv_obj_add_event_cb(btnMinus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)-1);
-  makeLabel(btnMinus, "-", COL_RED, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, -2);
+  makeLabel(btnMinus, "-", COL_RED, FONT_VALUE, LV_ALIGN_CENTER, 0, -2);
 
   lv_obj_t *btnPlus = lv_btn_create(tab);
   lv_obj_set_size(btnPlus, 48, 36);
   lv_obj_set_pos(btnPlus, SCREEN_W - 16 - 48, btnY);
   lv_obj_set_style_bg_color(btnPlus, lv_color_hex(COL_BORDER), 0);
   lv_obj_add_event_cb(btnPlus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)+1);
-  makeLabel(btnPlus, "+", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, -2);
+  makeLabel(btnPlus, "+", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, -2);
 
   // Slider entre os botoes
   sliderRegar = lv_slider_create(tab);
@@ -397,7 +404,7 @@ static void buildRegar(lv_obj_t *tab) {
   lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_border_width(btnSave, 1, 0);
   lv_obj_add_event_cb(btnSave, regarSalvarCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnSave, "SALVAR", COL_GRN, &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(btnSave, "SALVAR", COL_GRN, FONT_TITLE, LV_ALIGN_CENTER, 0, 0);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -446,7 +453,7 @@ static void buildPhEc(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 6, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
-  makeLabel(tab, "MEDICAO pH / EC", COL_TEXT, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+  makeLabel(tab, "MEDICAO pH / EC", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
 
   int fieldW = (SCREEN_W - 24) / 2;
   int fieldH = 38;
@@ -460,7 +467,7 @@ static void buildPhEc(lv_obj_t *tab) {
   lv_textarea_set_placeholder_text(taPh, "pH");
   lv_obj_set_style_bg_color(taPh, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_text_color(taPh, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_text_font(taPh, &lv_font_montserrat_16, 0);
+  lv_obj_set_style_text_font(taPh, FONT_TITLE, 0);
   lv_obj_add_event_cb(taPh, phEcFocusCb, LV_EVENT_CLICKED, NULL);
 
   taEc = lv_textarea_create(tab);
@@ -472,7 +479,7 @@ static void buildPhEc(lv_obj_t *tab) {
   lv_textarea_set_placeholder_text(taEc, "EC");
   lv_obj_set_style_bg_color(taEc, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_text_color(taEc, lv_color_hex(COL_CYN), 0);
-  lv_obj_set_style_text_font(taEc, &lv_font_montserrat_16, 0);
+  lv_obj_set_style_text_font(taEc, FONT_TITLE, 0);
   lv_obj_add_event_cb(taEc, phEcFocusCb, LV_EVENT_CLICKED, NULL);
 
   // Botao SALVAR
@@ -483,7 +490,7 @@ static void buildPhEc(lv_obj_t *tab) {
   lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_border_width(btnSave, 1, 0);
   lv_obj_add_event_cb(btnSave, phEcSalvarCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnSave, "SALVAR", COL_GRN, &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(btnSave, "SALVAR", COL_GRN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   // Keyboard numerico (ocupa o resto da tela)
   kbNumero = lv_keyboard_create(tab);
@@ -556,7 +563,7 @@ static void buildTarefas(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 6, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
-  makeLabel(tab, "TAREFAS DO DIA", COL_TEXT, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+  makeLabel(tab, "TAREFAS DO DIA", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
 
   tarefasList = lv_obj_create(tab);
   lv_obj_set_size(tarefasList, SCREEN_W - 12, TAB_H - 34);
@@ -622,7 +629,7 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 6, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
-  makeLabel(tab, "HISTORICO", COL_TEXT, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+  makeLabel(tab, "HISTORICO", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
 
   // Btnmatrix metrica (4 botoes no topo)
   static const char *metricBtns[] = {"TEMP", "UMID", "pH", "EC", ""};
@@ -634,7 +641,7 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_size(mtxMetric, SCREEN_W - 12, 24);
   lv_obj_align(mtxMetric, LV_ALIGN_TOP_MID, 0, 20);
   lv_obj_set_style_bg_color(mtxMetric, lv_color_hex(COL_BG), 0);
-  lv_obj_set_style_text_font(mtxMetric, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_font(mtxMetric, FONT_BODY, 0);
   lv_obj_add_event_cb(mtxMetric, mtxMetricCb, LV_EVENT_VALUE_CHANGED, NULL);
 
   // Chart no meio
@@ -662,7 +669,7 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_size(mtxPeriod, SCREEN_W - 12, 24);
   lv_obj_align(mtxPeriod, LV_ALIGN_BOTTOM_MID, 0, -4);
   lv_obj_set_style_bg_color(mtxPeriod, lv_color_hex(COL_BG), 0);
-  lv_obj_set_style_text_font(mtxPeriod, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_font(mtxPeriod, FONT_BODY, 0);
   lv_obj_add_event_cb(mtxPeriod, mtxPeriodCb, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
@@ -892,7 +899,7 @@ static void buildUI() {
   lv_obj_set_style_border_color(tabBtns, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(tabBtns, 1, LV_PART_MAIN);
   lv_obj_set_style_border_side(tabBtns, LV_BORDER_SIDE_TOP, LV_PART_MAIN);
-  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_24, LV_PART_ITEMS);  // icones grandes
+  lv_obj_set_style_text_font(tabBtns, FONT_VALUE, LV_PART_ITEMS);  // icones grandes
   lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_GRN), LV_PART_ITEMS | LV_STATE_CHECKED);
   // Sem fundo destacado — visual limpo, so a cor do icone muda
