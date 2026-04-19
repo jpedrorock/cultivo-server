@@ -612,6 +612,39 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
+  // GET /api/device/history-all/:tentId?period=24h — bulk para sparklines (4 metricas)
+  app.get('/api/device/history-all/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const tentId = parseInt(req.params.tentId);
+      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
+      const period = String(req.query.period ?? '24h');
+      const hoursMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
+      const hours = hoursMap[period] ?? 24;
+
+      const [rows]: any = await pool.execute(
+        `SELECT tempC, rhPct, ph, ec
+         FROM dailyLogs
+         WHERE tentId = ? AND logDate >= NOW() - INTERVAL ? HOUR
+         ORDER BY logDate ASC
+         LIMIT 60`,
+        [tentId, hours]
+      );
+      const out: Record<string, number[]> = { temp: [], rh: [], ph: [], ec: [] };
+      for (const r of rows) {
+        if (r.tempC != null) out.temp.push(parseFloat(r.tempC));
+        if (r.rhPct != null) out.rh.push(parseFloat(r.rhPct));
+        if (r.ph    != null) out.ph.push(parseFloat(r.ph));
+        if (r.ec    != null) out.ec.push(parseFloat(r.ec));
+      }
+      res.json(out);
+    } catch (err: any) {
+      console.error('[Device] history-all error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
   // GET /api/device/tokens — lista tokens (admin via app, protegido por cookie JWT)
   // Esta rota é usada apenas internamente; gestão real via tRPC device.*
   app.post('/api/device/generate-token', async (req, res) => {

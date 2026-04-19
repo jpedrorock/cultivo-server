@@ -108,7 +108,7 @@ void drawHome();
 void onHistoricoTouch(int tx, int ty);
 void onHomeTouch(int tx, int ty);
 
-// ── Buffer de historico ─────────────────────────────────────────────────────────
+// ── Buffer de historico (tela GRAFICOS) ─────────────────────────────────────────
 const int HIST_MAX = 60;
 float histValues[HIST_MAX];
 int   histCount = 0;
@@ -117,6 +117,13 @@ int   histPeriod = 0;     // 0=24h, 1=7d, 2=30d
 const char* METRIC_KEYS[4]   = { "temp", "rh", "ph", "ec" };
 const char* METRIC_LABELS[4] = { "TEMP",  "UMIDADE",  "pH", "EC" };
 const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
+
+// ── Buffer de sparklines (HOME — 24h de cada metrica) ──────────────────────────
+const int SPARK_MAX = 24;
+float sparkTemp[SPARK_MAX], sparkRh[SPARK_MAX], sparkPh[SPARK_MAX], sparkEc[SPARK_MAX];
+int   sparkTempN = 0, sparkRhN = 0, sparkPhN = 0, sparkEcN = 0;
+
+void fetchHistoryAll();
 
 // ── Estado da tela pH/EC ───────────────────────────────────────────────────────
 char inputPh[8] = "";
@@ -204,6 +211,25 @@ void drawWifiDot() {
   tft.fillCircle(W - 10, 10, 5, wifiOk ? C_GRN : C_BORD);
 }
 
+// ── Sparkline: mini grafico dentro de card ─────────────────────────────────────
+void drawSparkline(int x, int y, int w, int h, float* vals, int n, uint16_t color) {
+  if (n < 2) return;
+  float vmin = vals[0], vmax = vals[0];
+  for (int i = 1; i < n; i++) {
+    if (vals[i] < vmin) vmin = vals[i];
+    if (vals[i] > vmax) vmax = vals[i];
+  }
+  if (vmax - vmin < 0.01f) { vmin -= 0.5f; vmax += 0.5f; }
+  float range = vmax - vmin;
+  int prevX = 0, prevY = 0;
+  for (int i = 0; i < n; i++) {
+    int px = x + (i * w) / (n - 1);
+    int py = y + h - (int)(((vals[i] - vmin) / range) * h);
+    if (i > 0) tft.drawLine(prevX, prevY, px, py, color);
+    prevX = px; prevY = py;
+  }
+}
+
 // ── Zonas touch HOME (para refresh Tuya em TEMP/RH) ────────────────────────────
 int HOME_TEMP_X, HOME_TEMP_Y, HOME_TEMP_W, HOME_TEMP_H;
 int HOME_RH_X,   HOME_RH_Y,   HOME_RH_W,   HOME_RH_H;
@@ -227,12 +253,16 @@ void drawHome() {
   card(HOME_TEMP_X, HOME_TEMP_Y, HOME_TEMP_W, HOME_TEMP_H);
   textL(12, R1_Y + 14, "TEMP", &FreeSans9pt7b, C_DIM);
   dtostrf(tempC, 4, 1, buf); strcat(buf, "o");
-  textC(4 + c1w / 2, R1_Y + R1_H / 2 + 8, buf, &FreeSansBold24pt7b, cTemp(tempC));
+  textC(4 + c1w / 2, R1_Y + R1_H / 2 + 4, buf, &FreeSansBold24pt7b, cTemp(tempC));
+  drawSparkline(HOME_TEMP_X + 6, HOME_TEMP_Y + HOME_TEMP_H - 14,
+                HOME_TEMP_W - 12, 10, sparkTemp, sparkTempN, cTemp(tempC));
 
   card(HOME_RH_X, HOME_RH_Y, HOME_RH_W, HOME_RH_H);
   textL(16 + c1w, R1_Y + 14, "UMIDADE", &FreeSans9pt7b, C_DIM);
   dtostrf(rh, 4, 0, buf); strcat(buf, "%");
-  textC(8 + c1w + c1w / 2, R1_Y + R1_H / 2 + 8, buf, &FreeSansBold24pt7b, cRH(rh));
+  textC(8 + c1w + c1w / 2, R1_Y + R1_H / 2 + 4, buf, &FreeSansBold24pt7b, cRH(rh));
+  drawSparkline(HOME_RH_X + 6, HOME_RH_Y + HOME_RH_H - 14,
+                HOME_RH_W - 12, 10, sparkRh, sparkRhN, cRH(rh));
 
   // Row 2 — VPD + pH + EC (medios)
   int c2w = (W - 16) / 3;               // 3 cards
@@ -243,16 +273,19 @@ void drawHome() {
   textC(x + c2w / 2, R2_Y + R2_H / 2 + 8, buf, &FreeSansBold12pt7b, cVPD(vpd));
 
   x += c2w + 4;
-  card(x, R2_Y, c2w, R2_H);
-  textL(x + 6, R2_Y + 13, "pH", &FreeSans9pt7b, C_DIM);
+  int phX = x;
+  card(phX, R2_Y, c2w, R2_H);
+  textL(phX + 6, R2_Y + 13, "pH", &FreeSans9pt7b, C_DIM);
   dtostrf(ph, 3, 1, buf);
-  textC(x + c2w / 2, R2_Y + R2_H / 2 + 8, buf, &FreeSansBold12pt7b, C_GRN);
+  textC(phX + c2w / 2, R2_Y + R2_H / 2 + 4, buf, &FreeSansBold12pt7b, C_GRN);
+  drawSparkline(phX + 4, R2_Y + R2_H - 10, c2w - 8, 7, sparkPh, sparkPhN, C_GRN);
 
   x += c2w + 4;
   card(x, R2_Y, c2w, R2_H);
   textL(x + 6, R2_Y + 13, "EC mS/cm", &FreeSans9pt7b, C_DIM);
   dtostrf(ec, 3, 1, buf);
-  textC(x + c2w / 2, R2_Y + R2_H / 2 + 8, buf, &FreeSansBold12pt7b, C_CYN);
+  textC(x + c2w / 2, R2_Y + R2_H / 2 + 4, buf, &FreeSansBold12pt7b, C_CYN);
+  drawSparkline(x + 4, R2_Y + R2_H - 10, c2w - 8, 7, sparkEc, sparkEcN, C_CYN);
 
   // Barra de progresso do ciclo
   tft.fillRoundRect(4, BAR_Y, W - 8, 5, 2, C_BORD);
@@ -666,6 +699,7 @@ void setup() {
   connectWifi();
   if (wifiOk) {
     fetchDisplayData();
+    fetchHistoryAll();
     fetchTasks();
     lastFetch = millis();
   }
@@ -677,7 +711,9 @@ void loop() {
   // Atualizacao periodica via WiFi
   if (wifiOk && millis() - lastFetch >= FETCH_INTERVAL) {
     lastFetch = millis();
-    if (fetchDisplayData() && telaAtual == S_HOME) drawHome();
+    bool updated = fetchDisplayData();
+    fetchHistoryAll();
+    if (updated && telaAtual == S_HOME) drawHome();
   }
 
   int rx, ry;
@@ -822,6 +858,35 @@ bool postRefreshTuya() {
   if (!doc["rh"].isNull())    rh    = doc["rh"].as<float>();
   if (!doc["vpd"].isNull())   vpd   = doc["vpd"].as<float>();
   return true;
+}
+
+void fetchHistoryAll() {
+  if (!wifiOk) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/history-all/" + String(TENT_ID) + "?period=24h");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); Serial.printf("historyAll: %d\n", code); return; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return;
+
+  auto fill = [&](const char* key, float* buf, int& n) {
+    JsonArray arr = doc[key].as<JsonArray>();
+    n = 0;
+    for (JsonVariant v : arr) {
+      if (n >= SPARK_MAX) break;
+      buf[n++] = v.as<float>();
+    }
+  };
+  fill("temp", sparkTemp, sparkTempN);
+  fill("rh",   sparkRh,   sparkRhN);
+  fill("ph",   sparkPh,   sparkPhN);
+  fill("ec",   sparkEc,   sparkEcN);
+  Serial.printf("sparklines: temp=%d rh=%d ph=%d ec=%d\n", sparkTempN, sparkRhN, sparkPhN, sparkEcN);
 }
 
 bool fetchHistory(const char* metric, const char* period) {
