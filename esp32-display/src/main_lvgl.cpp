@@ -10,6 +10,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <lvgl.h>
+#include "cultivo_icons.h"
 
 // ════════════════════════════════════════════════════════════════════════════════
 // CONFIGURACAO — preencha antes de compilar
@@ -211,27 +212,27 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 4, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Header com icone de planta + nome estufa + status wifi
-  lv_obj_t *hdrIcon = lv_label_create(tab);
-  lv_label_set_text(hdrIcon, LV_SYMBOL_OK);   // placeholder leaf-like, designer pode trocar
-  lv_obj_set_style_text_color(hdrIcon, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_text_font(hdrIcon, &lv_font_montserrat_16, 0);
-  applyNeonGlow(hdrIcon, COL_GRN);
-  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 4, 2);
+  // Header com icone broto (Lucide) + nome estufa + wifi (Lucide)
+  lv_obj_t *hdrIcon = lv_img_create(tab);
+  lv_img_set_src(hdrIcon, &ic_sprout);
+  lv_img_set_zoom(hdrIcon, 128);  // 128 = 50% (ic é 64px, fica 32px)
+  lv_obj_set_style_img_recolor(hdrIcon, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_img_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 0, -4);
 
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 24, 0);
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 32, 2);
 
   char subBuf[48];
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
   lblSub = makeLabel(tab, subBuf, COL_PRP, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 4, 22);
 
-  // WiFi: icone + LED indicador
-  lv_obj_t *wifiIcon = lv_label_create(tab);
-  lv_label_set_text(wifiIcon, LV_SYMBOL_WIFI);
-  lv_obj_set_style_text_color(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
-  lv_obj_set_style_text_font(wifiIcon, &lv_font_montserrat_14, 0);
-  if (wifiOk) applyNeonGlow(wifiIcon, COL_GRN);
-  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -6, 4);
+  // WiFi com icone Lucide (tint dinamico verde/cinza)
+  lv_obj_t *wifiIcon = lv_img_create(tab);
+  lv_img_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
+  lv_img_set_zoom(wifiIcon, 96);  // 96 = 37.5% (fica ~24px)
+  lv_obj_set_style_img_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
+  lv_obj_set_style_img_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
+  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, 0, 0);
   lblWifi = wifiIcon;
 
   // Layout grid 2x2 — cards TEMP/RH (row 1), pH/EC (row 2)
@@ -262,9 +263,20 @@ static void buildHome(lv_obj_t *tab) {
   static int32_t demoTemp[] = {238, 242, 245, 243, 244, 247, 245, 241, 244, 246, 248, 245};
   static int32_t demoRh[]   = {620, 625, 630, 628, 625, 620, 615, 610, 615, 620, 622, 620};
 
+  // Helper local: icone Lucide no canto superior direito do card
+  auto addCardIcon = [](lv_obj_t *card, const lv_img_dsc_t *ic, uint32_t color) {
+    lv_obj_t *img = lv_img_create(card);
+    lv_img_set_src(img, ic);
+    lv_img_set_zoom(img, 96);     // 37.5% (~24px)
+    lv_obj_set_style_img_recolor(img, lv_color_hex(color), 0);
+    lv_obj_set_style_img_recolor_opa(img, LV_OPA_COVER, 0);
+    lv_obj_align(img, LV_ALIGN_TOP_RIGHT, 0, -2);
+  };
+
   // Row 1 — TEMP
   lv_obj_t *cardT = makeCard(tab, 4, contentY, colW, rowH);
   makeLabel(cardT, "TEMP", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  addCardIcon(cardT, &ic_thermometer, COL_GRN);
   lblTemp = makeLabel(cardT, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 14);
   applyNeonGlow(lblTemp, COL_GRN);
   chartTemp = makeSparkline(cardT, colW - 20, rowH - 54, COL_GRN, &serTempLive);
@@ -274,6 +286,7 @@ static void buildHome(lv_obj_t *tab) {
   // Row 1 — UMIDADE
   lv_obj_t *cardR = makeCard(tab, 8 + colW, contentY, colW, rowH);
   makeLabel(cardR, "UMIDADE", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  addCardIcon(cardR, &ic_droplet, COL_CYN);
   lblRh = makeLabel(cardR, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 14);
   applyNeonGlow(lblRh, COL_CYN);
   chartRh = makeSparkline(cardR, colW - 20, rowH - 54, COL_CYN, &serRhLive);
@@ -284,12 +297,14 @@ static void buildHome(lv_obj_t *tab) {
   int row2Y = contentY + rowH + 6;
   lv_obj_t *cardPh = makeCard(tab, 4, row2Y, colW, rowH);
   makeLabel(cardPh, "pH", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  addCardIcon(cardPh, &ic_beaker, COL_GRN);
   lblPh = makeLabel(cardPh, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
   applyNeonGlow(lblPh, COL_GRN);
 
   // Row 2 — EC
   lv_obj_t *cardEc = makeCard(tab, 8 + colW, row2Y, colW, rowH);
   makeLabel(cardEc, "EC mS/cm", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
+  addCardIcon(cardEc, &ic_test_tube, COL_CYN);
   lblEc = makeLabel(cardEc, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
   applyNeonGlow(lblEc, COL_CYN);
 }
@@ -684,7 +699,8 @@ static void refreshHomeValues() {
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
   lv_label_set_text(lblSub, subBuf);
   lv_label_set_text(lblTitle, TENT_NAME);
-  lv_obj_set_style_text_color(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
+  lv_img_set_src(lblWifi, wifiOk ? &ic_wifi : &ic_wifi_off);
+  lv_obj_set_style_img_recolor(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
 }
 
 static void pushSeries(lv_obj_t *chart, lv_chart_series_t *ser, float *vals, int n) {
