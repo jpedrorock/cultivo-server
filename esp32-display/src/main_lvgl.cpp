@@ -9,6 +9,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <math.h>
 #include <lvgl.h>
 #include "cultivo_icons.h"
 #include "fonts/cultivo_fonts.h"
@@ -102,7 +103,10 @@ static const lv_img_dsc_t *NAV_ICONS_IMG[5] = { &ic_home, &ic_droplets, &ic_flas
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
-static lv_obj_t *arcTemp;   // arc no centro tipo velocímetro Ebike
+static lv_obj_t *arcTemp;                   // arc central estilo Ebike
+static lv_obj_t *sparkRh, *sparkPh, *sparkEc;  // mini-charts pulsantes
+static lv_chart_series_t *serRhS, *serPhS, *serEcS;
+static lv_timer_t *pulseTimer = nullptr;
 
 // ── Widgets REGAR ───────────────────────────────────────────────────────────────
 static lv_obj_t *lblLitros, *sliderRegar;
@@ -299,7 +303,8 @@ static void buildHome(lv_obj_t *tab) {
   int cardH = (bodyH - 2 * cardGap) / 3;
 
   auto makeMiniCard = [&](int yOffset, const char *label, const char *initVal,
-                          uint32_t color, const lv_img_dsc_t *icon) -> lv_obj_t* {
+                          uint32_t color, const lv_img_dsc_t *icon,
+                          lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
     lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
     lv_obj_set_style_pad_all(c, 4, 0);
 
@@ -317,6 +322,24 @@ static void buildHome(lv_obj_t *tab) {
     lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
     lv_obj_align(lb, LV_ALIGN_TOP_RIGHT, 0, 0);
 
+    // mini sparkline pulsante no meio (entre icone e valor)
+    int chartW = cardW - 44;
+    int chartH = 14;
+    lv_obj_t *ch = lv_chart_create(c);
+    lv_obj_set_size(ch, chartW, chartH);
+    lv_obj_align(ch, LV_ALIGN_RIGHT_MID, 0, -1);
+    lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
+    lv_chart_set_point_count(ch, 20);
+    lv_chart_set_div_line_count(ch, 0, 0);
+    lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ch, 0, 0);
+    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);   // sem marcadores
+    lv_obj_set_style_line_width(ch, 2, LV_PART_ITEMS);
+    lv_obj_set_style_line_color(ch, lv_color_hex(color), LV_PART_ITEMS);
+    lv_obj_set_style_pad_all(ch, 0, 0);
+    *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
+    *sparkOut = ch;
+
     // valor grande no bottom-direito
     lv_obj_t *v = lv_label_create(c);
     lv_label_set_text(v, initVal);
@@ -327,9 +350,48 @@ static void buildHome(lv_obj_t *tab) {
     return v;
   };
 
-  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet);
-  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker);
-  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube);
+  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,   &sparkRh, &serRhS);
+  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker,    &sparkPh, &serPhS);
+  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube, &sparkEc, &serEcS);
+
+  // Inicializa sparklines com valores iniciais + ajusta range
+  lv_chart_set_range(sparkRh, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
+  lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);   // pH 4.0 a 9.0 (x10)
+  lv_chart_set_range(sparkEc, LV_CHART_AXIS_PRIMARY_Y, 0, 40);    // EC 0 a 4.0 (x10)
+  for (int i = 0; i < 20; i++) {
+    lv_chart_set_next_value(sparkRh, serRhS, (int32_t)rh);
+    lv_chart_set_next_value(sparkPh, serPhS, (int32_t)(phv * 10));
+    lv_chart_set_next_value(sparkEc, serEcS, (int32_t)(ecv * 10));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Timer de pulso: anima sparklines + pulsa o arc TEMP (efeito ECG/monitor)
+// ════════════════════════════════════════════════════════════════════════════════
+static void pulseTimerCb(lv_timer_t *t) {
+  // Variação senoidal pequena em torno do valor atual (ilusão de "vivo")
+  static uint32_t tick = 0;
+  tick++;
+  float wave = sinf(tick * 0.4f);        // -1..1
+  float jitter = ((rand() % 100) - 50) / 100.0f;  // -0.5..0.5
+
+  if (sparkRh && serRhS) {
+    int32_t v = (int32_t)(rh + wave * 1.5f + jitter);
+    lv_chart_set_next_value(sparkRh, serRhS, v);
+  }
+  if (sparkPh && serPhS) {
+    int32_t v = (int32_t)((phv + wave * 0.1f + jitter * 0.1f) * 10);
+    lv_chart_set_next_value(sparkPh, serPhS, v);
+  }
+  if (sparkEc && serEcS) {
+    int32_t v = (int32_t)((ecv + wave * 0.1f + jitter * 0.05f) * 10);
+    lv_chart_set_next_value(sparkEc, serEcS, v);
+  }
+}
+
+static void startPulseTimer() {
+  if (pulseTimer) return;
+  pulseTimer = lv_timer_create(pulseTimerCb, 300, NULL);  // 300ms = ~3Hz de pulso
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -1009,6 +1071,7 @@ static void buildUI() {
 
   buildNavbar(scr);
   refreshHomeValues();
+  startPulseTimer();   // anima sparklines dos mini-cards a cada 300ms
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
