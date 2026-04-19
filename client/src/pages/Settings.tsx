@@ -1,5 +1,5 @@
 import { Link } from 'wouter';
-import { Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette, Wifi } from 'lucide-react';
+import { Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette, Wifi, Cpu } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { PageTransition } from '@/components/PageTransition';
 import { useAuth } from '@/_core/hooks/useAuth';
@@ -52,6 +52,7 @@ export default function Settings() {
           {/* Seção: Integrações */}
           <SettingsSection title="Integrações">
             <SettingsRow href="/settings/sensors" icon={<Wifi className="w-4 h-4" />} label="Sensores SmartLife / Tuya" description="Temperatura e umidade automáticos" />
+            <SettingsRow href="/settings/dispositivos" icon={<Cpu className="w-4 h-4" />} label="Dispositivos ESP32" description="Terminais de display nas estufas" />
           </SettingsSection>
 
           {/* Seção: Dados */}
