@@ -4,6 +4,7 @@ import path from "path";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import crypto from "node:crypto";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
 import { appRouter } from "../routers";
@@ -11,6 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import uploadRouter from "../uploadRouter";
 import { initializeStorageDirectories } from "../storageLocal";
+import { getMysqlPool } from "../mysql-pool";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -330,6 +332,216 @@ async function ensureStrainOriginColumn() {
   }
 }
 
+async function ensureDeviceTokensTable() {
+  try {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) return;
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.default.createConnection(connectionString);
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`deviceTokens\` (
+        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+        \`token\`     VARCHAR(64) NOT NULL UNIQUE,
+        \`name\`      VARCHAR(100) NOT NULL,
+        \`tentId\`    INT NOT NULL,
+        \`groupId\`   INT NOT NULL,
+        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    await conn.end();
+    console.log("[DB] Tabela deviceTokens OK");
+  } catch (err: any) {
+    console.warn("[DB] Erro ao criar deviceTokens:", err?.message);
+  }
+}
+
+async function validateDeviceToken(req: express.Request): Promise<{ tentId: number; groupId: number } | null> {
+  const token = req.headers['x-device-token'] as string | undefined;
+  if (!token) return null;
+  try {
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT tentId, groupId FROM deviceTokens WHERE token = ? LIMIT 1`,
+      [token]
+    );
+    return rows.length > 0 ? { tentId: rows[0].tentId, groupId: rows[0].groupId } : null;
+  } catch {
+    return null;
+  }
+}
+
+function registerDeviceRoutes(app: express.Application) {
+  const pool = getMysqlPool();
+
+  // GET /api/device/display/:tentId — dados para o display ESP32
+  app.get('/api/device/display/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const tentId = parseInt(req.params.tentId);
+      if (device.tentId !== tentId) return res.status(403).json({ error: 'Token não autorizado para esta estufa' });
+
+      const [tentRows]: any = await pool.execute(`SELECT name FROM tents WHERE id = ? LIMIT 1`, [tentId]);
+      const tentName: string = tentRows[0]?.name ?? 'ESTUFA';
+
+      const [cycleRows]: any = await pool.execute(
+        `SELECT c.startDate, c.floraStartDate, s.floraWeeks, s.vegaWeeks
+         FROM cycles c
+         LEFT JOIN strains s ON s.id = c.strainId
+         WHERE c.tentId = ? AND c.status = 'ACTIVE'
+         LIMIT 1`,
+        [tentId]
+      );
+
+      let fase = 'VEGA', semana = 1, totalSem = 8;
+      if (cycleRows.length > 0) {
+        const cy = cycleRows[0];
+        const now = Date.now();
+        if (cy.floraStartDate) {
+          fase = 'FLORA';
+          semana = Math.max(1, Math.ceil((now - new Date(cy.floraStartDate).getTime()) / 604800000));
+          totalSem = cy.floraWeeks ?? 8;
+        } else {
+          fase = 'VEGA';
+          semana = Math.max(1, Math.ceil((now - new Date(cy.startDate).getTime()) / 604800000));
+          totalSem = cy.vegaWeeks ?? 4;
+        }
+      }
+
+      const [logRows]: any = await pool.execute(
+        `SELECT tempC, rhPct, ph, ec FROM dailyLogs WHERE tentId = ? ORDER BY logDate DESC LIMIT 1`,
+        [tentId]
+      );
+
+      let tempC: number | null = null, rh: number | null = null, vpd: number | null = null;
+      let ph: number | null = null, ec: number | null = null;
+      if (logRows.length > 0) {
+        const l = logRows[0];
+        tempC = l.tempC != null ? parseFloat(l.tempC) : null;
+        rh    = l.rhPct != null ? parseFloat(l.rhPct) : null;
+        ph    = l.ph   != null ? parseFloat(l.ph)   : null;
+        ec    = l.ec   != null ? parseFloat(l.ec)   : null;
+        if (tempC !== null && rh !== null) {
+          const svp = 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));
+          vpd = parseFloat((svp * (1 - rh / 100)).toFixed(2));
+        }
+      }
+
+      res.json({ tentName, tempC, rh, vpd, ph, ec, fase, semana, totalSem });
+    } catch (err: any) {
+      console.error('[Device] display error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // POST /api/device/readings — salva medição de pH/EC do display
+  app.post('/api/device/readings', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const { tentId, tempC, rh, ph, ec, turn = 'AM' } = req.body;
+      if (!tentId || device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
+      const dateOnly = new Date(); dateOnly.setHours(0, 0, 0, 0);
+      await pool.execute(
+        `INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, ph, ec, source, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'ESP32', NOW())
+         ON DUPLICATE KEY UPDATE tempC=VALUES(tempC), rhPct=VALUES(rhPct), ph=VALUES(ph), ec=VALUES(ec), source='ESP32'`,
+        [tentId, dateOnly, turn, tempC ?? null, rh ?? null, ph ?? null, ec ?? null]
+      );
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[Device] readings error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // POST /api/device/watering — registra rega
+  app.post('/api/device/watering', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const { tentId, litros } = req.body;
+      if (!tentId || device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
+      const now = new Date(); const turn = now.getHours() < 14 ? 'AM' : 'PM';
+      const dateOnly = new Date(now); dateOnly.setHours(0, 0, 0, 0);
+      const volumeMl = Math.round((parseFloat(litros) || 0) * 1000);
+      await pool.execute(
+        `INSERT INTO dailyLogs (tentId, logDate, turn, wateringVolume, source, createdAt)
+         VALUES (?, ?, ?, ?, 'ESP32', NOW())
+         ON DUPLICATE KEY UPDATE wateringVolume=VALUES(wateringVolume), source='ESP32'`,
+        [tentId, dateOnly, turn, volumeMl]
+      );
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[Device] watering error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // GET /api/device/tasks/:tentId — lista tarefas da estufa
+  app.get('/api/device/tasks/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const tentId = parseInt(req.params.tentId);
+      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
+      const [rows]: any = await pool.execute(
+        `SELECT id, title, isDone FROM standaloneTasks WHERE tentId = ? ORDER BY createdAt DESC LIMIT 10`,
+        [tentId]
+      );
+      res.json(rows.map((r: any) => ({ id: r.id, texto: r.title, feito: !!r.isDone })));
+    } catch (err: any) {
+      console.error('[Device] tasks error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // POST /api/device/task-complete — alterna estado de conclusão de tarefa
+  app.post('/api/device/task-complete', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const { taskId } = req.body;
+      if (!taskId) return res.status(400).json({ error: 'taskId obrigatório' });
+      const [rows]: any = await pool.execute(
+        `SELECT id, isDone FROM standaloneTasks WHERE id = ? AND tentId = ?`,
+        [taskId, device.tentId]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Tarefa não encontrada' });
+      const newState = rows[0].isDone ? 0 : 1;
+      await pool.execute(
+        `UPDATE standaloneTasks SET isDone = ?, completedAt = ? WHERE id = ?`,
+        [newState, newState ? new Date() : null, taskId]
+      );
+      res.json({ success: true, feito: !!newState });
+    } catch (err: any) {
+      console.error('[Device] task-complete error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // GET /api/device/tokens — lista tokens (admin via app, protegido por cookie JWT)
+  // Esta rota é usada apenas internamente; gestão real via tRPC device.*
+  app.post('/api/device/generate-token', async (req, res) => {
+    try {
+      const { authenticateRequest } = await import('./auth');
+      const user = await authenticateRequest(req);
+      if (!user) return res.status(401).json({ error: 'Não autenticado' });
+      const { tentId, name } = req.body;
+      if (!tentId || !name) return res.status(400).json({ error: 'tentId e name obrigatórios' });
+      const token = crypto.randomBytes(32).toString('hex');
+      await pool.execute(
+        `INSERT INTO deviceTokens (token, name, tentId, groupId) VALUES (?, ?, ?, ?)`,
+        [token, name, tentId, user.groupId ?? 0]
+      );
+      res.json({ token });
+    } catch (err: any) {
+      console.error('[Device] generate-token error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -363,6 +575,9 @@ async function startServer() {
 
   // Garantir que a coluna source existe na tabela dailyLogs
   await ensureSourceColumn();
+
+  // Garantir que a tabela deviceTokens existe (Fase D — terminais ESP32)
+  await ensureDeviceTokensTable();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();
@@ -442,6 +657,9 @@ async function startServer() {
 
   // Rotas de autenticação JWT (registro, login, logout, me)
   registerAuthRoutes(app);
+
+  // Rotas REST para terminais ESP32 (/api/device/*)
+  registerDeviceRoutes(app);
 
   // Upload de imagens (multipart/form-data) — antes do tRPC
   app.use("/api/upload", uploadRouter);

@@ -1,17 +1,52 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_ILI9341.h>
+
+// ── Driver de display: Wokwi (ILI9341) ou hardware real (AXS15231B) ────────────
+#ifdef REAL_HARDWARE
+  // ESP32-S3 + JC4832W535 (480x320, AXS15231B). Verifique pinos no esquema.
+  #include <Arduino_GFX_Library.h>
+  #define TFT_CS    10
+  #define TFT_DC     8
+  #define TFT_RST   14
+  #define TFT_SCK   12
+  #define TFT_MOSI  11
+  #define TFT_MISO  13
+  #define TOUCH_SDA  4
+  #define TOUCH_SCL  5
+  #define FT_ADDR   0x38      // tente 0x3B se nao detectar toque
+  static Arduino_DataBus *bus = nullptr;
+  static Arduino_GFX     *gfx = nullptr;
+  #define tft (*gfx)
+#else
+  // Wokwi: ESP32 + ILI9341 + FT6206
+  #include <Adafruit_GFX.h>
+  #include <Adafruit_ILI9341.h>
+  #define TFT_DC     2
+  #define TFT_CS    15
+  #define TOUCH_SDA 21
+  #define TOUCH_SCL 22
+  #define FT_ADDR  0x38
+  Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
+#endif
+
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 #include <Fonts/FreeSansBold24pt7b.h>
 
-// ── Pinos ──────────────────────────────────────────────────────────────────────
-#define TFT_DC 2
-#define TFT_CS 15
-#define FT_ADDR 0x38        // endereco I2C do FT6206 (touch)
+// ── WiFi + HTTP (Fase D) ───────────────────────────────────────────────────────
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 
-Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
+// ════════════════════════════════════════════════════════════════════════════════
+// CONFIGURACAO — preencha antes de compilar
+// ════════════════════════════════════════════════════════════════════════════════
+#define WIFI_SSID    ""                                  // sua rede WiFi
+#define WIFI_PASS    ""                                  // sua senha
+#define SERVER_URL   "http://192.168.1.100:3000"         // URL do servidor cultivo
+#define DEVICE_TOKEN ""                                  // token gerado em Configuracoes > Dispositivos
+#define TENT_ID      1                                   // ID da estufa no banco
+// ════════════════════════════════════════════════════════════════════════════════
 
 // ── Cores RGB565 (espelha DisplayMode.tsx) ─────────────────────────────────────
 #define BLACK  0x0000
@@ -45,28 +80,49 @@ int BAR_Y    = 177;  // barra de progresso
 enum Tela { S_HOME, S_REGUEI, S_PHEC, S_TAREFAS };
 Tela telaAtual = S_HOME;
 
-// ── Dados mock (substituidos por fetch WiFi na Fase D) ─────────────────────────
-const char* TENT = "ESTUFA 1";
+// ── Dados (mock inicial, atualizados via WiFi quando configurado) ──────────────
+char TENT[50] = "ESTUFA 1";
+char FASE[20] = "FLORACAO";
 float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, ph = 6.2f, ec = 1.8f;
-const char* FASE = "FLORACAO";
 int semana = 4, totalSem = 16;
 float litros = 1.0f;
+
+// ── WiFi ───────────────────────────────────────────────────────────────────────
+bool wifiOk = false;
+unsigned long lastFetch = 0;
+const unsigned long FETCH_INTERVAL = 30000;  // 30 s
+
+// Prototipos WiFi (definidos no fim do arquivo)
+void connectWifi();
+bool fetchDisplayData();
+void fetchTasks();
+void postWatering(float l);
+void postReading(float newPh, float newEc);
+void postTaskComplete(int taskId);
 
 // ── Estado da tela pH/EC ───────────────────────────────────────────────────────
 char inputPh[8] = "";
 char inputEc[8] = "";
 int  activeField = 0;   // 0=pH, 1=EC
 
-// ── Lista de tarefas (mock — substituida por fetch na Fase D) ──────────────────
-struct Tarefa { const char* texto; bool feito; };
-Tarefa tarefas[] = {
-  {"Regar planta 1",       false},
-  {"Medir pH da agua",     false},
-  {"Verificar temperatura",false},
-  {"Trocar filtro",        false},
-  {"Limpar reservatorio",  false}
-};
-const int NUM_TAREFAS = sizeof(tarefas) / sizeof(tarefas[0]);
+// ── Lista de tarefas (mock se sem WiFi, do servidor com WiFi) ──────────────────
+struct Tarefa { char texto[80]; bool feito; int serverId; };
+Tarefa tarefas[10];
+int NUM_TAREFAS = 0;
+
+void initMockTarefas() {
+  const char* mock[] = {
+    "Regar planta 1", "Medir pH da agua",
+    "Verificar temperatura", "Trocar filtro", "Limpar reservatorio"
+  };
+  NUM_TAREFAS = 5;
+  for (int i = 0; i < 5; i++) {
+    strncpy(tarefas[i].texto, mock[i], 79);
+    tarefas[i].texto[79] = '\0';
+    tarefas[i].feito = false;
+    tarefas[i].serverId = -1;
+  }
+}
 
 // ── Cores por valor ────────────────────────────────────────────────────────────
 uint16_t cTemp(float t) { return (t < 18 || t > 32) ? C_RED : (t > 28) ? C_YEL : C_GRN; }
@@ -124,6 +180,11 @@ void drawNav(Tela ativa) {
   }
 }
 
+// ── Indicador WiFi (canto superior direito) ────────────────────────────────────
+void drawWifiDot() {
+  tft.fillCircle(W - 10, 10, 5, wifiOk ? C_GRN : C_BORD);
+}
+
 // ── Tela HOME ──────────────────────────────────────────────────────────────────
 void drawHome() {
   tft.fillRect(0, 0, W, NAV_Y, BLACK);
@@ -133,6 +194,7 @@ void drawHome() {
   textL(6, 16, TENT, &FreeSansBold12pt7b, WHITE);
   snprintf(buf, sizeof(buf), "Sem %d/%d  %s", semana, totalSem, FASE);
   textL(6, 30, buf, &FreeSans9pt7b, C_PRP);
+  drawWifiDot();
 
   // Row 1 — TEMP + UMIDADE (grandes)
   int c1w = (W - 12) / 2;               // 2 cards com 4px de margem cada
@@ -291,6 +353,10 @@ void onPhEcTouch(int tx, int ty) {
     if (ty >= PE_PH_Y && ty <= PE_PH_Y + PE_FIELD_H) { activeField = 0; drawPhEc(); return; }
     if (ty >= PE_EC_Y && ty <= PE_EC_Y + PE_FIELD_H) { activeField = 1; drawPhEc(); return; }
     if (ty >= PE_SAVE_Y && ty <= PE_SAVE_Y + PE_SAVE_H) {
+      float newPh = atof(inputPh), newEc = atof(inputEc);
+      if (strlen(inputPh)) ph = newPh;
+      if (strlen(inputEc)) ec = newEc;
+      postReading(newPh, newEc);
       tft.fillRect(0, 0, W, NAV_Y, BLACK);
       textC(W / 2, H / 3, "MEDICAO SALVA!", &FreeSansBold12pt7b, C_GRN);
       char buf[40];
@@ -325,6 +391,12 @@ void drawTarefas() {
   tft.fillRect(0, 0, W, NAV_Y, BLACK);
   textC(W / 2, 14, "TAREFAS DO DIA", &FreeSansBold12pt7b, WHITE);
 
+  if (NUM_TAREFAS == 0) {
+    textC(W / 2, H / 2, "Sem tarefas", &FreeSans9pt7b, C_DIM);
+    drawNav(S_TAREFAS);
+    return;
+  }
+
   int avail = NAV_Y - TK_Y0 - 6;
   TK_ROW_H = avail / NUM_TAREFAS;
 
@@ -349,6 +421,7 @@ void onTarefasTouch(int tx, int ty) {
     int y = TK_Y0 + i * TK_ROW_H;
     if (ty >= y && ty <= y + TK_ROW_H) {
       tarefas[i].feito = !tarefas[i].feito;
+      if (tarefas[i].serverId > 0) postTaskComplete(tarefas[i].serverId);
       drawTarefas();
       return;
     }
@@ -369,7 +442,7 @@ void onTouch(int tx, int ty) {
       case S_HOME:    drawHome(); break;
       case S_REGUEI:  litros = 1.0f; drawReguei(); break;
       case S_PHEC:    drawPhEc(); break;
-      case S_TAREFAS: drawTarefas(); break;
+      case S_TAREFAS: fetchTasks(); drawTarefas(); break;
     }
     return;
   }
@@ -388,6 +461,7 @@ void onTouch(int tx, int ty) {
       drawReguei();
     } else if (tx >= RG_SAVE_X && tx <= RG_SAVE_X + RG_SAVE_W &&
                ty >= RG_SAVE_Y && ty <= RG_SAVE_Y + RG_SAVE_H) {
+      postWatering(litros);
       tft.fillRect(0, 0, W, NAV_Y, BLACK);
       textC(W / 2, H / 4,     "REGA SALVA!", &FreeSansBold12pt7b, C_GRN);
       char buf[20]; dtostrf(litros, 4, 1, buf); strcat(buf, " L");
@@ -404,9 +478,16 @@ void onTouch(int tx, int ty) {
 // ── Arduino entry points ───────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
-  Wire.begin(21, 22);          // SDA=D21, SCL=D22
+
+#ifdef REAL_HARDWARE
+  bus = new Arduino_HWSPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, TFT_MISO);
+  gfx = new Arduino_AXS15231B(bus, TFT_RST, 1 /* landscape */);
+  gfx->begin();
+#else
   tft.begin();
   tft.setRotation(1);          // landscape
+#endif
+  Wire.begin(TOUCH_SDA, TOUCH_SCL);
   tft.fillScreen(BLACK);
 
   // Ajusta layout conforme dimensoes reais
@@ -427,15 +508,144 @@ void setup() {
   Serial.printf("R1_Y=%d R1_H=%d  R2_Y=%d R2_H=%d  BAR_Y=%d\n",
                 R1_Y, R1_H, R2_Y, R2_H, BAR_Y);
 
+  initMockTarefas();
+  connectWifi();
+  if (wifiOk) {
+    fetchDisplayData();
+    fetchTasks();
+    lastFetch = millis();
+  }
+
   drawHome();
 }
 
 void loop() {
+  // Atualizacao periodica via WiFi
+  if (wifiOk && millis() - lastFetch >= FETCH_INTERVAL) {
+    lastFetch = millis();
+    if (fetchDisplayData() && telaAtual == S_HOME) drawHome();
+  }
+
   int rx, ry;
   if (!ftLer(rx, ry)) return;
-  // Rotation=1 (landscape): mapeia coords portrait do FT6206 -> coords da tela
+
+#ifdef REAL_HARDWARE
+  // AXS15231B em landscape: coordenadas ja vem orientadas (verifique na pratica)
+  int tx = rx, ty = ry;
+#else
+  // Wokwi ILI9341 rotation=1: FT6206 retorna portrait, mapeia para landscape
   int tx = map(ry, 0, 320, 0, W);
   int ty = map(rx, 0, 240, H, 0);
+#endif
+
   onTouch(tx, ty);
   delay(180);                  // debounce
+}
+
+// ── WiFi + HTTP (Fase D) ───────────────────────────────────────────────────────
+void connectWifi() {
+  if (strlen(WIFI_SSID) == 0) { Serial.println("WiFi nao configurado (mock mode)"); return; }
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("WiFi");
+  for (int i = 0; i < 20 && WiFi.status() != WL_CONNECTED; i++) {
+    delay(500); Serial.print('.');
+  }
+  wifiOk = (WiFi.status() == WL_CONNECTED);
+  Serial.println(wifiOk ? " OK" : " FALHOU");
+  if (wifiOk) Serial.println(WiFi.localIP());
+}
+
+bool fetchDisplayData() {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  String url = String(SERVER_URL) + "/api/device/display/" + String(TENT_ID);
+  http.begin(url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); Serial.printf("display: %d\n", code); return false; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+
+  if (!doc["tempC"].isNull())    tempC    = doc["tempC"].as<float>();
+  if (!doc["rh"].isNull())       rh       = doc["rh"].as<float>();
+  if (!doc["vpd"].isNull())      vpd      = doc["vpd"].as<float>();
+  if (!doc["ph"].isNull())       ph       = doc["ph"].as<float>();
+  if (!doc["ec"].isNull())       ec       = doc["ec"].as<float>();
+  if (!doc["semana"].isNull())   semana   = doc["semana"].as<int>();
+  if (!doc["totalSem"].isNull()) totalSem = doc["totalSem"].as<int>();
+  const char* f = doc["fase"];      if (f) { strncpy(FASE, f, sizeof(FASE)-1); FASE[sizeof(FASE)-1]='\0'; }
+  const char* t = doc["tentName"];  if (t) { strncpy(TENT, t, sizeof(TENT)-1); TENT[sizeof(TENT)-1]='\0'; }
+  return true;
+}
+
+void fetchTasks() {
+  if (!wifiOk) return;
+  HTTPClient http;
+  String url = String(SERVER_URL) + "/api/device/tasks/" + String(TENT_ID);
+  http.begin(url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); Serial.printf("tasks: %d\n", code); return; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return;
+  JsonArray arr = doc.as<JsonArray>();
+  NUM_TAREFAS = 0;
+  for (JsonObject t : arr) {
+    if (NUM_TAREFAS >= 10) break;
+    const char* tx = t["texto"] | "...";
+    strncpy(tarefas[NUM_TAREFAS].texto, tx, 79);
+    tarefas[NUM_TAREFAS].texto[79] = '\0';
+    tarefas[NUM_TAREFAS].feito    = t["feito"] | false;
+    tarefas[NUM_TAREFAS].serverId = t["id"]    | -1;
+    NUM_TAREFAS++;
+  }
+}
+
+void postWatering(float l) {
+  if (!wifiOk) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/watering");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  String body = "{\"tentId\":" + String(TENT_ID) + ",\"litros\":" + String(l, 1) + "}";
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("postWatering: %d\n", code);
+}
+
+void postReading(float newPh, float newEc) {
+  if (!wifiOk) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/readings");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  String body = "{\"tentId\":" + String(TENT_ID) +
+                ",\"ph\":" + String(newPh, 1) +
+                ",\"ec\":" + String(newEc, 2) + "}";
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("postReading: %d\n", code);
+}
+
+void postTaskComplete(int taskId) {
+  if (!wifiOk || taskId <= 0) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/task-complete");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  String body = "{\"taskId\":" + String(taskId) + "}";
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("postTaskComplete(%d): %d\n", taskId, code);
 }

@@ -44,6 +44,7 @@ import {
   groups,
 } from "../drizzle/schema";
 import { nanoid } from "nanoid";
+import crypto from "node:crypto";
 
 /**
  * Valida que uma estufa pertence ao grupo do usuário.
@@ -7034,6 +7035,51 @@ export const appRouter = router({
         }
 
         return { reply };
+      }),
+  }),
+
+  // ── Terminais ESP32 — gestão de tokens ─────────────────────────────────────────
+  device: router({
+    listTokens: protectedProcedure.query(async ({ ctx }) => {
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT dt.id, dt.token, dt.name, dt.tentId, dt.createdAt, t.name AS tentName
+         FROM deviceTokens dt
+         LEFT JOIN tents t ON t.id = dt.tentId
+         WHERE dt.groupId = ?
+         ORDER BY dt.createdAt DESC`,
+        [ctx.user.groupId ?? 0]
+      );
+      return rows as Array<{
+        id: number; token: string; name: string;
+        tentId: number; tentName: string; createdAt: Date;
+      }>;
+    }),
+
+    createToken: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(100),
+        tentId: z.number().int().positive(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const pool = getMysqlPool();
+        const token = crypto.randomBytes(32).toString('hex');
+        await pool.execute(
+          `INSERT INTO deviceTokens (token, name, tentId, groupId) VALUES (?, ?, ?, ?)`,
+          [token, input.name, input.tentId, ctx.user.groupId ?? 0]
+        );
+        return { token };
+      }),
+
+    deleteToken: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input, ctx }) => {
+        const pool = getMysqlPool();
+        await pool.execute(
+          `DELETE FROM deviceTokens WHERE id = ? AND groupId = ?`,
+          [input.id, ctx.user.groupId ?? 0]
+        );
+        return { success: true };
       }),
   }),
 });
