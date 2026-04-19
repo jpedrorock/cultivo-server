@@ -51,7 +51,7 @@
 #endif
 
 // Altura da barra do lv_tabview + altura util da area de cada aba
-static const int TABBAR_H = 42;   // ajustado para caber icone + texto
+static const int TABBAR_H = 38;   // so icones, sem texto
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
 // ── Cores do tema (espelham DisplayMode.tsx) ───────────────────────────────────
@@ -866,29 +866,30 @@ static void buildUI() {
   lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-  tabview = lv_tabview_create(scr, LV_DIR_BOTTOM, 42);
+  tabview = lv_tabview_create(scr, LV_DIR_BOTTOM, TABBAR_H);
   lv_obj_set_style_bg_opa(tabview, LV_OPA_TRANSP, 0);
 
-  // Estilo da barra de tabs (icones + texto, iOS-like)
+  // Estilo da barra de tabs (so icones, iOS-like)
   lv_obj_t *tabBtns = lv_tabview_get_tab_btns(tabview);
   lv_obj_set_style_bg_color(tabBtns, lv_color_hex(0x0A0F17), 0);
   lv_obj_set_style_bg_opa(tabBtns, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(tabBtns, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(tabBtns, 1, LV_PART_MAIN);
   lv_obj_set_style_border_side(tabBtns, LV_BORDER_SIDE_TOP, LV_PART_MAIN);
-  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_24, LV_PART_ITEMS);  // icones grandes
   lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_color(tabBtns, lv_color_hex(0xFFFFFF), LV_PART_ITEMS | LV_STATE_CHECKED);
-  // Indicador da tab ativa (linha colorida em cima)
-  lv_obj_set_style_bg_color(tabBtns, lv_color_hex(COL_GRN), LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_GRN), LV_PART_ITEMS | LV_STATE_CHECKED);
+  // Sem fundo destacado — visual limpo, so a cor do icone muda
+  lv_obj_set_style_bg_opa(tabBtns, LV_OPA_TRANSP, LV_PART_ITEMS);
+  lv_obj_set_style_bg_opa(tabBtns, LV_OPA_TRANSP, LV_PART_ITEMS | LV_STATE_CHECKED);
   lv_obj_set_style_border_opa(tabBtns, LV_OPA_TRANSP, LV_PART_ITEMS);
 
-  // Tabs com icone (LV_SYMBOL) + texto pequeno
-  tabHome   = lv_tabview_add_tab(tabview, LV_SYMBOL_HOME    "  Inicio");
-  tabRegar  = lv_tabview_add_tab(tabview, LV_SYMBOL_TINT    "  Regar");
-  tabPhEc   = lv_tabview_add_tab(tabview, LV_SYMBOL_GPS     "  pH/EC");
-  tabTarefa = lv_tabview_add_tab(tabview, LV_SYMBOL_LIST    "  Tarefa");
-  tabGrafic = lv_tabview_add_tab(tabview, LV_SYMBOL_BARS    "  Grafico");
+  // Tabs so com icone (sem texto, estilo iOS)
+  tabHome   = lv_tabview_add_tab(tabview, LV_SYMBOL_HOME);
+  tabRegar  = lv_tabview_add_tab(tabview, LV_SYMBOL_TINT);
+  tabPhEc   = lv_tabview_add_tab(tabview, LV_SYMBOL_GPS);
+  tabTarefa = lv_tabview_add_tab(tabview, LV_SYMBOL_LIST);
+  tabGrafic = lv_tabview_add_tab(tabview, LV_SYMBOL_BARS);
 
   buildHome(tabHome);
   buildRegar(tabRegar);
