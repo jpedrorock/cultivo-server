@@ -52,6 +52,22 @@ const char* FASE = "FLORACAO";
 int semana = 4, totalSem = 16;
 float litros = 1.0f;
 
+// ── Estado da tela pH/EC ───────────────────────────────────────────────────────
+char inputPh[8] = "";
+char inputEc[8] = "";
+int  activeField = 0;   // 0=pH, 1=EC
+
+// ── Lista de tarefas (mock — substituida por fetch na Fase D) ──────────────────
+struct Tarefa { const char* texto; bool feito; };
+Tarefa tarefas[] = {
+  {"Regar planta 1",       false},
+  {"Medir pH da agua",     false},
+  {"Verificar temperatura",false},
+  {"Trocar filtro",        false},
+  {"Limpar reservatorio",  false}
+};
+const int NUM_TAREFAS = sizeof(tarefas) / sizeof(tarefas[0]);
+
 // ── Cores por valor ────────────────────────────────────────────────────────────
 uint16_t cTemp(float t) { return (t < 18 || t > 32) ? C_RED : (t > 28) ? C_YEL : C_GRN; }
 uint16_t cRH(float r)   { return (r < 40 || r > 80) ? C_RED : (r > 70) ? C_YEL : C_CYN; }
@@ -200,12 +216,143 @@ void drawReguei() {
   drawNav(S_REGUEI);
 }
 
-// ── Placeholder (Fase C) ───────────────────────────────────────────────────────
-void drawPlaceholder(const char* titulo, Tela s) {
+// ── Tela pH / EC (teclado numerico) ────────────────────────────────────────────
+int PE_FIELD_W, PE_FIELD_H = 46, PE_FIELD_X = 8;
+int PE_PH_Y, PE_EC_Y, PE_SAVE_Y, PE_SAVE_H = 30;
+int PE_KEY_X0, PE_KEY_Y0, PE_KEY_W, PE_KEY_H, PE_KEY_GAP = 3;
+
+const char* KEYS[12] = {"7","8","9","4","5","6","1","2","3",".","0","<"};
+
+void drawField(int x, int y, int w, int h, const char* label, const char* value,
+               uint16_t color, bool selected) {
+  card(x, y, w, h);
+  if (selected) tft.drawRoundRect(x, y, w, h, 6, color);
+  textL(x + 6, y + 12, label, &FreeSans9pt7b, C_DIM);
+  const char* v = (strlen(value) > 0) ? value : "---";
+  textC(x + w / 2, y + h / 2 + 8, v, &FreeSansBold12pt7b, color);
+}
+
+void drawPhEc() {
   tft.fillRect(0, 0, W, NAV_Y, BLACK);
-  textC(W / 2, NAV_Y / 2 - 15, titulo,        &FreeSansBold12pt7b, WHITE);
-  textC(W / 2, NAV_Y / 2 + 15, "Em breve...", &FreeSans9pt7b,      C_DIM);
-  drawNav(s);
+  textC(W / 2, 14, "MEDICAO pH / EC", &FreeSansBold12pt7b, WHITE);
+
+  PE_FIELD_W = W / 2 - 12;
+  PE_PH_Y    = 28;
+  PE_EC_Y    = PE_PH_Y + PE_FIELD_H + 6;
+  PE_SAVE_Y  = PE_EC_Y + PE_FIELD_H + 8;
+
+  drawField(PE_FIELD_X, PE_PH_Y, PE_FIELD_W, PE_FIELD_H, "pH", inputPh, C_GRN, activeField == 0);
+  drawField(PE_FIELD_X, PE_EC_Y, PE_FIELD_W, PE_FIELD_H, "EC mS/cm", inputEc, C_CYN, activeField == 1);
+
+  card(PE_FIELD_X, PE_SAVE_Y, PE_FIELD_W, PE_SAVE_H, 0x0180);
+  tft.drawRoundRect(PE_FIELD_X, PE_SAVE_Y, PE_FIELD_W, PE_SAVE_H, 6, C_GRN);
+  textC(PE_FIELD_X + PE_FIELD_W / 2, PE_SAVE_Y + PE_SAVE_H / 2 + 5, "SALVAR",
+        &FreeSansBold12pt7b, C_GRN);
+
+  PE_KEY_X0 = W / 2 + 4;
+  PE_KEY_Y0 = 28;
+  int avail_w = W - PE_KEY_X0 - 8;
+  int avail_h = NAV_Y - PE_KEY_Y0 - 8;
+  PE_KEY_W = (avail_w - 2 * PE_KEY_GAP) / 3;
+  PE_KEY_H = (avail_h - 3 * PE_KEY_GAP) / 4;
+
+  for (int i = 0; i < 12; i++) {
+    int col = i % 3, row = i / 3;
+    int x = PE_KEY_X0 + col * (PE_KEY_W + PE_KEY_GAP);
+    int y = PE_KEY_Y0 + row * (PE_KEY_H + PE_KEY_GAP);
+    card(x, y, PE_KEY_W, PE_KEY_H, C_BORD);
+    uint16_t col_txt = (i == 11) ? C_RED : WHITE;
+    textC(x + PE_KEY_W / 2, y + PE_KEY_H / 2 + 6, KEYS[i], &FreeSansBold12pt7b, col_txt);
+  }
+
+  drawNav(S_PHEC);
+}
+
+void phEcAppend(char c) {
+  char* target = (activeField == 0) ? inputPh : inputEc;
+  int len = strlen(target);
+  if (c == '<') {
+    if (len > 0) target[len - 1] = '\0';
+  } else if (c == '.') {
+    if (len > 0 && len < 6 && !strchr(target, '.')) {
+      target[len] = '.';
+      target[len + 1] = '\0';
+    }
+  } else {
+    if (len < 6) {
+      target[len] = c;
+      target[len + 1] = '\0';
+    }
+  }
+}
+
+void onPhEcTouch(int tx, int ty) {
+  if (tx >= PE_FIELD_X && tx <= PE_FIELD_X + PE_FIELD_W) {
+    if (ty >= PE_PH_Y && ty <= PE_PH_Y + PE_FIELD_H) { activeField = 0; drawPhEc(); return; }
+    if (ty >= PE_EC_Y && ty <= PE_EC_Y + PE_FIELD_H) { activeField = 1; drawPhEc(); return; }
+    if (ty >= PE_SAVE_Y && ty <= PE_SAVE_Y + PE_SAVE_H) {
+      tft.fillRect(0, 0, W, NAV_Y, BLACK);
+      textC(W / 2, H / 3, "MEDICAO SALVA!", &FreeSansBold12pt7b, C_GRN);
+      char buf[40];
+      snprintf(buf, sizeof(buf), "pH %s  EC %s",
+               strlen(inputPh) ? inputPh : "-",
+               strlen(inputEc) ? inputEc : "-");
+      textC(W / 2, H / 2, buf, &FreeSansBold12pt7b, C_CYN);
+      drawNav(S_HOME);
+      delay(1800);
+      inputPh[0] = '\0'; inputEc[0] = '\0'; activeField = 0;
+      telaAtual = S_HOME;
+      drawHome();
+      return;
+    }
+  }
+  for (int i = 0; i < 12; i++) {
+    int col = i % 3, row = i / 3;
+    int x = PE_KEY_X0 + col * (PE_KEY_W + PE_KEY_GAP);
+    int y = PE_KEY_Y0 + row * (PE_KEY_H + PE_KEY_GAP);
+    if (tx >= x && tx <= x + PE_KEY_W && ty >= y && ty <= y + PE_KEY_H) {
+      phEcAppend(KEYS[i][0]);
+      drawPhEc();
+      return;
+    }
+  }
+}
+
+// ── Tela TAREFAS (checklist) ───────────────────────────────────────────────────
+int TK_ROW_H, TK_Y0 = 32;
+
+void drawTarefas() {
+  tft.fillRect(0, 0, W, NAV_Y, BLACK);
+  textC(W / 2, 14, "TAREFAS DO DIA", &FreeSansBold12pt7b, WHITE);
+
+  int avail = NAV_Y - TK_Y0 - 6;
+  TK_ROW_H = avail / NUM_TAREFAS;
+
+  int cbSize = 20;
+  for (int i = 0; i < NUM_TAREFAS; i++) {
+    int y = TK_Y0 + i * TK_ROW_H;
+    if (i > 0) tft.drawFastHLine(8, y, W - 16, 0x1082);
+    int cbY = y + (TK_ROW_H - cbSize) / 2;
+    tft.drawRoundRect(10, cbY, cbSize, cbSize, 3, C_BORD);
+    if (tarefas[i].feito) {
+      tft.fillRoundRect(13, cbY + 3, cbSize - 6, cbSize - 6, 2, C_GRN);
+    }
+    uint16_t col = tarefas[i].feito ? C_DIM : WHITE;
+    textL(10 + cbSize + 10, y + TK_ROW_H / 2 + 6, tarefas[i].texto, &FreeSans9pt7b, col);
+  }
+
+  drawNav(S_TAREFAS);
+}
+
+void onTarefasTouch(int tx, int ty) {
+  for (int i = 0; i < NUM_TAREFAS; i++) {
+    int y = TK_Y0 + i * TK_ROW_H;
+    if (ty >= y && ty <= y + TK_ROW_H) {
+      tarefas[i].feito = !tarefas[i].feito;
+      drawTarefas();
+      return;
+    }
+  }
 }
 
 // ── Roteamento de toque ────────────────────────────────────────────────────────
@@ -221,11 +368,14 @@ void onTouch(int tx, int ty) {
     switch (telaAtual) {
       case S_HOME:    drawHome(); break;
       case S_REGUEI:  litros = 1.0f; drawReguei(); break;
-      case S_PHEC:    drawPlaceholder("pH / EC", S_PHEC); break;
-      case S_TAREFAS: drawPlaceholder("TAREFAS", S_TAREFAS); break;
+      case S_PHEC:    drawPhEc(); break;
+      case S_TAREFAS: drawTarefas(); break;
     }
     return;
   }
+
+  if (telaAtual == S_PHEC)    { onPhEcTouch(tx, ty);    return; }
+  if (telaAtual == S_TAREFAS) { onTarefasTouch(tx, ty); return; }
 
   if (telaAtual == S_REGUEI) {
     if (tx >= RG_MINUS_X && tx <= RG_MINUS_X + RG_MINUS_W &&
@@ -276,9 +426,6 @@ void setup() {
   Serial.printf("Display: %dx%d  NAV_Y=%d NAV_H=%d\n", W, H, NAV_Y, NAV_H);
   Serial.printf("R1_Y=%d R1_H=%d  R2_Y=%d R2_H=%d  BAR_Y=%d\n",
                 R1_Y, R1_H, R2_Y, R2_H, BAR_Y);
-
-  // Contorno de diagnostico (remover depois)
-  tft.drawRect(0, 0, W, H, C_RED);
 
   drawHome();
 }
