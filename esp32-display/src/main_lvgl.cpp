@@ -50,6 +50,10 @@
   static const int SCREEN_H = 240;
 #endif
 
+// Altura da barra do lv_tabview + altura util da area de cada aba
+static const int TABBAR_H = 34;
+static const int TAB_H    = SCREEN_H - TABBAR_H;
+
 // ── Cores do tema (espelham DisplayMode.tsx) ───────────────────────────────────
 #define COL_BG      0x0B0F14
 #define COL_CARD    0x111827
@@ -201,7 +205,7 @@ static void buildHome(lv_obj_t *tab) {
 
   // Layout grid 2x2 — cards TEMP/RH (row 1), pH/EC (row 2)
   int contentY = 42;
-  int contentH = SCREEN_H - contentY - 4;   // espaço antes da nav (tabview já conta)
+  int contentH = TAB_H - contentY - 6;      // desconta area da tabbar
   int rowH = contentH / 2 - 3;
   int colW = (SCREEN_W - 12) / 2;
 
@@ -433,7 +437,7 @@ static void buildPhEc(lv_obj_t *tab) {
   lv_keyboard_set_mode(kbNumero, LV_KEYBOARD_MODE_NUMBER);
   lv_keyboard_set_textarea(kbNumero, taPh);
   lv_keyboard_set_popovers(kbNumero, false);
-  lv_obj_set_size(kbNumero, SCREEN_W - 12, SCREEN_H - 130);
+  lv_obj_set_size(kbNumero, SCREEN_W - 12, TAB_H - 100);
   lv_obj_align(kbNumero, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_obj_set_style_bg_color(kbNumero, lv_color_hex(COL_BG), 0);
 
@@ -502,7 +506,7 @@ static void buildTarefas(lv_obj_t *tab) {
   makeLabel(tab, "TAREFAS DO DIA", COL_TEXT, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
 
   tarefasList = lv_obj_create(tab);
-  lv_obj_set_size(tarefasList, SCREEN_W - 12, SCREEN_H - 70);
+  lv_obj_set_size(tarefasList, SCREEN_W - 12, TAB_H - 34);
   lv_obj_align(tarefasList, LV_ALIGN_TOP_MID, 0, 22);
   lv_obj_set_style_bg_opa(tarefasList, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(tarefasList, 0, 0);
@@ -590,7 +594,7 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_bg_color(chartHist, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(chartHist, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_line_color(chartHist, lv_color_hex(COL_BORDER), LV_PART_MAIN);
-  int chartY = 50, chartH = SCREEN_H - chartY - 38;
+  int chartY = 50, chartH = TAB_H - chartY - 34;
   lv_obj_set_size(chartHist, SCREEN_W - 12, chartH);
   lv_obj_align(chartHist, LV_ALIGN_TOP_MID, 0, chartY);
   serHist = lv_chart_add_series(chartHist, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
