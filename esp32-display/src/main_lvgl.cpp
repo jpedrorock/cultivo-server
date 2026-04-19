@@ -1,13 +1,25 @@
 // ════════════════════════════════════════════════════════════════════════════════
-//  Cultivo ESP32 Display — versão LVGL (Fase F, em construção)
-//  Visual polido com widgets nativos do LVGL, charts suaves, dark theme.
-//  Este arquivo é compilado nos envs [env:esp32dev] e [env:real].
-//  A versão classic (Adafruit_GFX) permanece em src/main.cpp (envs -classic).
+//  Cultivo ESP32 Display — versão LVGL (Fase F)
+//  Dashboard polido com lv_tabview + widgets nativos + dark theme.
+//  Compilado em [env:esp32dev] (Wokwi) e [env:real] (JC4832W535).
 // ════════════════════════════════════════════════════════════════════════════════
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 #include <lvgl.h>
+
+// ════════════════════════════════════════════════════════════════════════════════
+// CONFIGURACAO — preencha antes de compilar
+// ════════════════════════════════════════════════════════════════════════════════
+#define WIFI_SSID    ""
+#define WIFI_PASS    ""
+#define SERVER_URL   "http://192.168.1.100:3000"
+#define DEVICE_TOKEN ""
+#define TENT_ID      1
+// ════════════════════════════════════════════════════════════════════════════════
 
 // ── Driver de display ───────────────────────────────────────────────────────────
 #ifdef REAL_HARDWARE
@@ -38,17 +50,49 @@
   static const int SCREEN_H = 240;
 #endif
 
+// ── Cores do tema (espelham DisplayMode.tsx) ───────────────────────────────────
+#define COL_BG      0x0B0F14
+#define COL_CARD    0x111827
+#define COL_BORDER  0x1F2937
+#define COL_TEXT    0xFFFFFF
+#define COL_DIM     0x6B7280
+#define COL_GRN     0x4ADE80
+#define COL_YEL     0xFBBF24
+#define COL_RED     0xF87171
+#define COL_CYN     0x2DD4BF
+#define COL_PRP     0xA78BFA
+#define COL_BLU     0x60A5FA
+
 // ── LVGL buffers ────────────────────────────────────────────────────────────────
 static lv_disp_draw_buf_t draw_buf;
 static const uint32_t BUF_LINES = 20;
-static lv_color_t buf1[480 * BUF_LINES];   // dimensionado para pior caso (480)
+static lv_color_t buf1[480 * BUF_LINES];
 static lv_color_t buf2[480 * BUF_LINES];
 
-// ── Callback de flush para o display ────────────────────────────────────────────
+// ── Estado dos dados ────────────────────────────────────────────────────────────
+static char TENT_NAME[50] = "ESTUFA 1";
+static char FASE[20]      = "FLORACAO";
+static float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, phv = 6.2f, ecv = 1.8f;
+static int semana = 4, totalSem = 16;
+
+static bool wifiOk = false;
+static unsigned long lastFetch = 0;
+static const unsigned long FETCH_INTERVAL = 30000;
+
+// ── Widgets HOME ────────────────────────────────────────────────────────────────
+static lv_obj_t *tabview;
+static lv_obj_t *tabHome, *tabRegar, *tabPhEc, *tabTarefa, *tabGrafic;
+static lv_obj_t *lblTitle, *lblSub, *lblWifi;
+static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
+static lv_obj_t *chartTemp, *chartRh;
+static lv_chart_series_t *serTempLive, *serRhLive;
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Display + touch callbacks
+// ════════════════════════════════════════════════════════════════════════════════
 static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *px_map) {
   uint32_t w = area->x2 - area->x1 + 1;
   uint32_t h = area->y2 - area->y1 + 1;
-
 #ifdef REAL_HARDWARE
   gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
 #else
@@ -57,21 +101,19 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *p
   tft.writePixels((uint16_t*)px_map, w * h);
   tft.endWrite();
 #endif
-
   lv_disp_flush_ready(disp);
 }
 
-// ── Touch via I2C FT6206 ────────────────────────────────────────────────────────
 static bool ftRead(int &rx, int &ry) {
   Wire.beginTransmission(FT_ADDR);
   Wire.write(0x02);
   if (Wire.endTransmission(false) != 0) return false;
   Wire.requestFrom((int)FT_ADDR, 5);
   if (Wire.available() < 5) return false;
-  uint8_t toques = Wire.read();
+  uint8_t n = Wire.read();
   uint8_t xh = Wire.read(), xl = Wire.read();
   uint8_t yh = Wire.read(), yl = Wire.read();
-  if (toques == 0 || toques > 2) return false;
+  if (n == 0 || n > 2) return false;
   rx = ((xh & 0x0F) << 8) | xl;
   ry = ((yh & 0x0F) << 8) | yl;
   return true;
@@ -79,126 +121,268 @@ static bool ftRead(int &rx, int &ry) {
 
 static void touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
   int rx, ry;
-  if (!ftRead(rx, ry)) {
-    data->state = LV_INDEV_STATE_REL;
-    return;
-  }
+  if (!ftRead(rx, ry)) { data->state = LV_INDEV_STATE_REL; return; }
 #ifdef REAL_HARDWARE
-  // AXS15231B em landscape — coords direto (verificar na prática)
-  data->point.x = rx;
-  data->point.y = ry;
+  data->point.x = rx; data->point.y = ry;
 #else
-  // ILI9341 landscape (rotation=1): mapeia portrait -> landscape
   data->point.x = map(ry, 0, 320, 0, SCREEN_W);
   data->point.y = map(rx, 0, 240, SCREEN_H, 0);
 #endif
   data->state = LV_INDEV_STATE_PR;
 }
 
-// ── HOME screen ─────────────────────────────────────────────────────────────────
-static lv_obj_t *scrHome;
-static lv_obj_t *lblTemp;
-static lv_obj_t *lblRh;
-static lv_obj_t *chart;
-static lv_chart_series_t *serTemp;
-
-static void buildHome() {
-  scrHome = lv_obj_create(NULL);
-  lv_obj_set_style_bg_color(scrHome, lv_color_hex(0x0B0F14), 0);
-  lv_obj_set_style_bg_opa(scrHome, LV_OPA_COVER, 0);
-
-  // Título
-  lv_obj_t *title = lv_label_create(scrHome);
-  lv_label_set_text(title, "ESTUFA 1");
-  lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_set_style_text_font(title, &lv_font_montserrat_16, 0);
-  lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 6);
-
-  lv_obj_t *sub = lv_label_create(scrHome);
-  lv_label_set_text(sub, "Sem 4/16  FLORACAO");
-  lv_obj_set_style_text_color(sub, lv_color_hex(0xA78BFA), 0);
-  lv_obj_set_style_text_font(sub, &lv_font_montserrat_14, 0);
-  lv_obj_align(sub, LV_ALIGN_TOP_LEFT, 8, 26);
-
-  // Card TEMP
-  lv_obj_t *cardT = lv_obj_create(scrHome);
-  int cardW = SCREEN_W / 2 - 12;
-  lv_obj_set_size(cardT, cardW, 80);
-  lv_obj_align(cardT, LV_ALIGN_TOP_LEFT, 6, 48);
-  lv_obj_set_style_bg_color(cardT, lv_color_hex(0x111827), 0);
-  lv_obj_set_style_border_color(cardT, lv_color_hex(0x1F2937), 0);
-  lv_obj_set_style_radius(cardT, 8, 0);
-
-  lv_obj_t *lT = lv_label_create(cardT);
-  lv_label_set_text(lT, "TEMP");
-  lv_obj_set_style_text_color(lT, lv_color_hex(0x6B7280), 0);
-  lv_obj_align(lT, LV_ALIGN_TOP_LEFT, 2, 2);
-
-  lblTemp = lv_label_create(cardT);
-  lv_label_set_text(lblTemp, "24.5°");
-  lv_obj_set_style_text_font(lblTemp, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(0x4ADE80), 0);
-  lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 4);
-
-  // Card RH
-  lv_obj_t *cardR = lv_obj_create(scrHome);
-  lv_obj_set_size(cardR, cardW, 80);
-  lv_obj_align(cardR, LV_ALIGN_TOP_RIGHT, -6, 48);
-  lv_obj_set_style_bg_color(cardR, lv_color_hex(0x111827), 0);
-  lv_obj_set_style_border_color(cardR, lv_color_hex(0x1F2937), 0);
-  lv_obj_set_style_radius(cardR, 8, 0);
-
-  lv_obj_t *lR = lv_label_create(cardR);
-  lv_label_set_text(lR, "UMIDADE");
-  lv_obj_set_style_text_color(lR, lv_color_hex(0x6B7280), 0);
-  lv_obj_align(lR, LV_ALIGN_TOP_LEFT, 2, 2);
-
-  lblRh = lv_label_create(cardR);
-  lv_label_set_text(lblRh, "62%");
-  lv_obj_set_style_text_font(lblRh, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_color(lblRh, lv_color_hex(0x2DD4BF), 0);
-  lv_obj_align(lblRh, LV_ALIGN_CENTER, 0, 4);
-
-  // Chart (placeholder — substituído por dados reais depois)
-  chart = lv_chart_create(scrHome);
-  lv_obj_set_size(chart, SCREEN_W - 16, SCREEN_H - 180);
-  lv_obj_align(chart, LV_ALIGN_BOTTOM_MID, 0, -44);
-  lv_obj_set_style_bg_color(chart, lv_color_hex(0x111827), 0);
-  lv_obj_set_style_border_color(chart, lv_color_hex(0x1F2937), 0);
-  lv_chart_set_type(chart, LV_CHART_TYPE_LINE);
-  lv_chart_set_point_count(chart, 12);
-  lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 20, 30);
-  lv_chart_set_div_line_count(chart, 3, 0);
-
-  serTemp = lv_chart_add_series(chart, lv_color_hex(0x4ADE80), LV_CHART_AXIS_PRIMARY_Y);
-  int32_t demo[12] = { 24, 25, 24, 23, 25, 26, 25, 24, 25, 26, 27, 26 };
-  for (int i = 0; i < 12; i++) lv_chart_set_next_value(chart, serTemp, demo[i]);
-  lv_chart_refresh(chart);
-
-  // Barra de navegação (placeholder — será substituída por lv_tabview depois)
-  lv_obj_t *nav = lv_obj_create(scrHome);
-  lv_obj_set_size(nav, SCREEN_W, 36);
-  lv_obj_align(nav, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_set_style_bg_color(nav, lv_color_hex(0x0B0F14), 0);
-  lv_obj_set_style_border_color(nav, lv_color_hex(0x1F2937), 0);
-  lv_obj_set_style_radius(nav, 0, 0);
-
-  lv_obj_t *navLbl = lv_label_create(nav);
-  lv_label_set_text(navLbl, "INICIO  REGAR  pH/EC  TAREFA  GRAFIC");
-  lv_obj_set_style_text_color(navLbl, lv_color_hex(0x6B7280), 0);
-  lv_obj_center(navLbl);
-
-  lv_scr_load(scrHome);
+// ════════════════════════════════════════════════════════════════════════════════
+// Helper: card estilizado
+// ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
+  lv_obj_t *c = lv_obj_create(parent);
+  lv_obj_set_size(c, w, h);
+  lv_obj_set_pos(c, x, y);
+  lv_obj_set_style_bg_color(c, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(c, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(c, 1, 0);
+  lv_obj_set_style_radius(c, 8, 0);
+  lv_obj_set_style_pad_all(c, 6, 0);
+  lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
+  return c;
 }
 
-// ── Arduino entry points ────────────────────────────────────────────────────────
+static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
+                            const lv_font_t *font, lv_align_t align, int x, int y) {
+  lv_obj_t *l = lv_label_create(parent);
+  lv_label_set_text(l, text);
+  lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
+  if (font) lv_obj_set_style_text_font(l, font, 0);
+  lv_obj_align(l, align, x, y);
+  return l;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Aba HOME — 4 cards (TEMP, RH, pH, EC) + 2 mini-charts
+// ════════════════════════════════════════════════════════════════════════════════
+static void buildHome(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, 4, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Header (título + subtítulo + wifi)
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 4, 0);
+
+  char subBuf[48];
+  snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
+  lblSub = makeLabel(tab, subBuf, COL_PRP, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 4, 20);
+
+  lblWifi = lv_led_create(tab);
+  lv_obj_set_size(lblWifi, 8, 8);
+  lv_obj_align(lblWifi, LV_ALIGN_TOP_RIGHT, -6, 8);
+  lv_led_set_color(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM));
+  lv_led_on(lblWifi);
+
+  // Layout grid 2x2 — cards TEMP/RH (row 1), pH/EC (row 2)
+  int contentY = 42;
+  int contentH = SCREEN_H - contentY - 4;   // espaço antes da nav (tabview já conta)
+  int rowH = contentH / 2 - 3;
+  int colW = (SCREEN_W - 12) / 2;
+
+  // Row 1 — TEMP (maior)
+  lv_obj_t *cardT = makeCard(tab, 4, contentY, colW, rowH);
+  makeLabel(cardT, "TEMP", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  lblTemp = makeLabel(cardT, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 16);
+
+  // Mini-chart TEMP no rodapé do card
+  chartTemp = lv_chart_create(cardT);
+  lv_obj_set_size(chartTemp, colW - 20, rowH - 50);
+  lv_obj_align(chartTemp, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  lv_chart_set_type(chartTemp, LV_CHART_TYPE_LINE);
+  lv_chart_set_point_count(chartTemp, 24);
+  lv_chart_set_div_line_count(chartTemp, 0, 0);
+  lv_obj_set_style_bg_opa(chartTemp, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(chartTemp, 0, 0);
+  lv_obj_set_style_size(chartTemp, 0, LV_PART_INDICATOR);  // sem pontos
+  lv_obj_set_style_line_width(chartTemp, 2, LV_PART_ITEMS);
+  serTempLive = lv_chart_add_series(chartTemp, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
+
+  // Row 1 — RH
+  lv_obj_t *cardR = makeCard(tab, 8 + colW, contentY, colW, rowH);
+  makeLabel(cardR, "UMIDADE", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  lblRh = makeLabel(cardR, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 16);
+
+  chartRh = lv_chart_create(cardR);
+  lv_obj_set_size(chartRh, colW - 20, rowH - 50);
+  lv_obj_align(chartRh, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  lv_chart_set_type(chartRh, LV_CHART_TYPE_LINE);
+  lv_chart_set_point_count(chartRh, 24);
+  lv_chart_set_div_line_count(chartRh, 0, 0);
+  lv_obj_set_style_bg_opa(chartRh, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(chartRh, 0, 0);
+  lv_obj_set_style_size(chartRh, 0, LV_PART_INDICATOR);
+  lv_obj_set_style_line_width(chartRh, 2, LV_PART_ITEMS);
+  serRhLive = lv_chart_add_series(chartRh, lv_color_hex(COL_CYN), LV_CHART_AXIS_PRIMARY_Y);
+
+  // Row 2 — pH
+  int row2Y = contentY + rowH + 6;
+  lv_obj_t *cardPh = makeCard(tab, 4, row2Y, colW, rowH);
+  makeLabel(cardPh, "pH", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  lblPh = makeLabel(cardPh, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
+
+  // Row 2 — EC
+  lv_obj_t *cardEc = makeCard(tab, 8 + colW, row2Y, colW, rowH);
+  makeLabel(cardEc, "EC mS/cm", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  lblEc = makeLabel(cardEc, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Abas placeholder (próximos commits)
+// ════════════════════════════════════════════════════════════════════════════════
+static void buildPlaceholder(lv_obj_t *tab, const char *text) {
+  lv_obj_t *l = lv_label_create(tab);
+  lv_label_set_text(l, text);
+  lv_obj_set_style_text_color(l, lv_color_hex(COL_DIM), 0);
+  lv_obj_center(l);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// UI redraw (valores)
+// ════════════════════════════════════════════════════════════════════════════════
+static uint32_t cTemp(float t)  { return (t < 18 || t > 32) ? COL_RED : (t > 28) ? COL_YEL : COL_GRN; }
+static uint32_t cRH(float r)    { return (r < 40 || r > 80) ? COL_RED : (r > 70) ? COL_YEL : COL_CYN; }
+
+static void refreshHomeValues() {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.1f°", tempC);
+  lv_label_set_text(lblTemp, buf);
+  lv_obj_set_style_text_color(lblTemp, lv_color_hex(cTemp(tempC)), 0);
+
+  snprintf(buf, sizeof(buf), "%.0f%%", rh);
+  lv_label_set_text(lblRh, buf);
+  lv_obj_set_style_text_color(lblRh, lv_color_hex(cRH(rh)), 0);
+
+  snprintf(buf, sizeof(buf), "%.1f", phv);  lv_label_set_text(lblPh, buf);
+  snprintf(buf, sizeof(buf), "%.1f", ecv);  lv_label_set_text(lblEc, buf);
+
+  char subBuf[48];
+  snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
+  lv_label_set_text(lblSub, subBuf);
+  lv_label_set_text(lblTitle, TENT_NAME);
+  lv_led_set_color(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM));
+}
+
+static void pushSeries(lv_obj_t *chart, lv_chart_series_t *ser, float *vals, int n) {
+  if (n < 2) return;
+  float vmin = vals[0], vmax = vals[0];
+  for (int i = 1; i < n; i++) {
+    if (vals[i] < vmin) vmin = vals[i];
+    if (vals[i] > vmax) vmax = vals[i];
+  }
+  if (vmax - vmin < 0.5f) { vmin -= 0.5f; vmax += 0.5f; }
+  lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, (int32_t)(vmin*10), (int32_t)(vmax*10));
+  lv_chart_set_point_count(chart, n);
+  lv_chart_set_all_value(chart, ser, LV_CHART_POINT_NONE);
+  for (int i = 0; i < n; i++) lv_chart_set_next_value(chart, ser, (int32_t)(vals[i]*10));
+  lv_chart_refresh(chart);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// WiFi + HTTP
+// ════════════════════════════════════════════════════════════════════════════════
+static void connectWifi() {
+  if (strlen(WIFI_SSID) == 0) { Serial.println("WiFi nao configurado"); return; }
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("WiFi");
+  for (int i = 0; i < 20 && WiFi.status() != WL_CONNECTED; i++) { delay(500); Serial.print('.'); }
+  wifiOk = (WiFi.status() == WL_CONNECTED);
+  Serial.println(wifiOk ? " OK" : " FALHOU");
+}
+
+static bool fetchDisplayData() {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  String url = String(SERVER_URL) + "/api/device/display/" + String(TENT_ID);
+  http.begin(url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); return false; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+  if (!doc["tempC"].isNull())    tempC    = doc["tempC"].as<float>();
+  if (!doc["rh"].isNull())       rh       = doc["rh"].as<float>();
+  if (!doc["vpd"].isNull())      vpd      = doc["vpd"].as<float>();
+  if (!doc["ph"].isNull())       phv      = doc["ph"].as<float>();
+  if (!doc["ec"].isNull())       ecv      = doc["ec"].as<float>();
+  if (!doc["semana"].isNull())   semana   = doc["semana"].as<int>();
+  if (!doc["totalSem"].isNull()) totalSem = doc["totalSem"].as<int>();
+  const char* f = doc["fase"];     if (f) { strncpy(FASE, f, sizeof(FASE)-1); FASE[sizeof(FASE)-1]='\0'; }
+  const char* t = doc["tentName"]; if (t) { strncpy(TENT_NAME, t, sizeof(TENT_NAME)-1); TENT_NAME[sizeof(TENT_NAME)-1]='\0'; }
+  return true;
+}
+
+static void fetchHistoryAll() {
+  if (!wifiOk) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/history-all/" + String(TENT_ID) + "?period=24h");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); return; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return;
+
+  static float tb[24], rb[24];
+  int tN = 0, rN = 0;
+  JsonArray tArr = doc["temp"].as<JsonArray>();
+  for (JsonVariant v : tArr) { if (tN < 24) tb[tN++] = v.as<float>(); }
+  JsonArray rArr = doc["rh"].as<JsonArray>();
+  for (JsonVariant v : rArr) { if (rN < 24) rb[rN++] = v.as<float>(); }
+  pushSeries(chartTemp, serTempLive, tb, tN);
+  pushSeries(chartRh,   serRhLive,   rb, rN);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Tema dark + tabview
+// ════════════════════════════════════════════════════════════════════════════════
+static void buildUI() {
+  lv_obj_t *scr = lv_scr_act();
+  lv_obj_set_style_bg_color(scr, lv_color_hex(COL_BG), 0);
+
+  tabview = lv_tabview_create(scr, LV_DIR_BOTTOM, 34);
+  lv_obj_set_style_bg_color(tabview, lv_color_hex(COL_BG), 0);
+
+  lv_obj_t *tabBtns = lv_tabview_get_tab_btns(tabview);
+  lv_obj_set_style_bg_color(tabBtns, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_border_color(tabBtns, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_12, 0);
+
+  tabHome   = lv_tabview_add_tab(tabview, "INICIO");
+  tabRegar  = lv_tabview_add_tab(tabview, "REGAR");
+  tabPhEc   = lv_tabview_add_tab(tabview, "pH/EC");
+  tabTarefa = lv_tabview_add_tab(tabview, "TAREFA");
+  tabGrafic = lv_tabview_add_tab(tabview, "GRAFIC");
+
+  buildHome(tabHome);
+  buildPlaceholder(tabRegar,  "Tela REGAR (em breve)");
+  buildPlaceholder(tabPhEc,   "Tela pH/EC (em breve)");
+  buildPlaceholder(tabTarefa, "Tela TAREFAS (em breve)");
+  buildPlaceholder(tabGrafic, "Tela GRAFICOS (em breve)");
+
+  refreshHomeValues();
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Arduino entry points
+// ════════════════════════════════════════════════════════════════════════════════
 void setup() {
   Serial.begin(115200);
   Serial.println("\n[LVGL] boot");
 
 #ifdef REAL_HARDWARE
   bus = new Arduino_HWSPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, TFT_MISO);
-  gfx = new Arduino_AXS15231B(bus, TFT_RST, 1 /* landscape */);
+  gfx = new Arduino_AXS15231B(bus, TFT_RST, 1);
   gfx->begin();
   gfx->fillScreen(0);
 #else
@@ -208,31 +392,42 @@ void setup() {
 #endif
 
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
-
   lv_init();
 
   lv_disp_draw_buf_init(&draw_buf, buf1, buf2, SCREEN_W * BUF_LINES);
 
   static lv_disp_drv_t disp_drv;
   lv_disp_drv_init(&disp_drv);
-  disp_drv.hor_res = SCREEN_W;
-  disp_drv.ver_res = SCREEN_H;
+  disp_drv.hor_res  = SCREEN_W;
+  disp_drv.ver_res  = SCREEN_H;
   disp_drv.flush_cb = disp_flush;
   disp_drv.draw_buf = &draw_buf;
   lv_disp_drv_register(&disp_drv);
 
   static lv_indev_drv_t indev_drv;
   lv_indev_drv_init(&indev_drv);
-  indev_drv.type = LV_INDEV_TYPE_POINTER;
+  indev_drv.type    = LV_INDEV_TYPE_POINTER;
   indev_drv.read_cb = touchpad_read;
   lv_indev_drv_register(&indev_drv);
 
-  buildHome();
+  buildUI();
 
+  connectWifi();
+  if (wifiOk) {
+    fetchDisplayData();
+    fetchHistoryAll();
+    lastFetch = millis();
+    refreshHomeValues();
+  }
   Serial.println("[LVGL] UI pronta");
 }
 
 void loop() {
+  if (wifiOk && millis() - lastFetch >= FETCH_INTERVAL) {
+    lastFetch = millis();
+    if (fetchDisplayData()) refreshHomeValues();
+    fetchHistoryAll();
+  }
   lv_timer_handler();
   delay(5);
 }
