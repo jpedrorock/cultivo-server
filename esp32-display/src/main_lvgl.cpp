@@ -95,6 +95,12 @@ static float litros = 1.0f;
 static lv_obj_t *taPh, *taEc, *kbNumero;
 static int activePhEcField = 0;  // 0=pH, 1=EC
 
+// ── Widgets TAREFAS ─────────────────────────────────────────────────────────────
+static lv_obj_t *tarefasList;
+struct Tarefa { char texto[80]; bool feito; int serverId; };
+static Tarefa tarefas[10];
+static int numTarefas = 0;
+
 // ════════════════════════════════════════════════════════════════════════════════
 // Display + touch callbacks
 // ════════════════════════════════════════════════════════════════════════════════
@@ -427,6 +433,77 @@ static void buildPhEc(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Aba TAREFAS — checklist com lv_checkbox
+// ════════════════════════════════════════════════════════════════════════════════
+static void fetchTasks();
+static void postTaskComplete(int taskId);
+static void initMockTarefas() {
+  const char* mock[] = {
+    "Regar planta 1", "Medir pH da agua", "Verificar temperatura",
+    "Trocar filtro", "Limpar reservatorio"
+  };
+  numTarefas = 5;
+  for (int i = 0; i < 5; i++) {
+    strncpy(tarefas[i].texto, mock[i], 79);
+    tarefas[i].texto[79] = '\0';
+    tarefas[i].feito = false;
+    tarefas[i].serverId = -1;
+  }
+}
+
+static void tarefaToggleCb(lv_event_t *e) {
+  lv_obj_t *cb = (lv_obj_t*)lv_event_get_target(e);
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  if (idx < 0 || idx >= numTarefas) return;
+  tarefas[idx].feito = lv_obj_has_state(cb, LV_STATE_CHECKED);
+  if (tarefas[idx].serverId > 0) postTaskComplete(tarefas[idx].serverId);
+}
+
+static void rebuildTarefasList() {
+  lv_obj_clean(tarefasList);
+  if (numTarefas == 0) {
+    lv_obj_t *l = lv_label_create(tarefasList);
+    lv_label_set_text(l, "Sem tarefas");
+    lv_obj_set_style_text_color(l, lv_color_hex(COL_DIM), 0);
+    lv_obj_center(l);
+    return;
+  }
+  for (int i = 0; i < numTarefas; i++) {
+    lv_obj_t *item = lv_obj_create(tarefasList);
+    lv_obj_set_width(item, LV_PCT(100));
+    lv_obj_set_height(item, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(item, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(item, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(item, 1, 0);
+    lv_obj_set_style_pad_all(item, 6, 0);
+    lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *cb = lv_checkbox_create(item);
+    lv_checkbox_set_text(cb, tarefas[i].texto);
+    lv_obj_set_style_text_color(cb, lv_color_hex(tarefas[i].feito ? COL_DIM : COL_TEXT), 0);
+    if (tarefas[i].feito) lv_obj_add_state(cb, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(cb, tarefaToggleCb, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)i);
+  }
+}
+
+static void buildTarefas(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, 6, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(tab, "TAREFAS DO DIA", COL_TEXT, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+  tarefasList = lv_obj_create(tab);
+  lv_obj_set_size(tarefasList, SCREEN_W - 12, SCREEN_H - 70);
+  lv_obj_align(tarefasList, LV_ALIGN_TOP_MID, 0, 22);
+  lv_obj_set_style_bg_opa(tarefasList, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(tarefasList, 0, 0);
+  lv_obj_set_flex_flow(tarefasList, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(tarefasList, 4, 0);
+
+  rebuildTarefasList();
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Abas placeholder (próximos commits)
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildPlaceholder(lv_obj_t *tab, const char *text) {
@@ -515,6 +592,45 @@ static bool fetchDisplayData() {
   return true;
 }
 
+static void fetchTasks() {
+  if (!wifiOk) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/tasks/" + String(TENT_ID));
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); return; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return;
+  JsonArray arr = doc.as<JsonArray>();
+  numTarefas = 0;
+  for (JsonObject t : arr) {
+    if (numTarefas >= 10) break;
+    const char *tx = t["texto"] | "...";
+    strncpy(tarefas[numTarefas].texto, tx, 79);
+    tarefas[numTarefas].texto[79] = '\0';
+    tarefas[numTarefas].feito    = t["feito"] | false;
+    tarefas[numTarefas].serverId = t["id"]    | -1;
+    numTarefas++;
+  }
+}
+
+static void postTaskComplete(int taskId) {
+  if (!wifiOk || taskId <= 0) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/task-complete");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  String body = "{\"taskId\":" + String(taskId) + "}";
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("postTaskComplete(%d): %d\n", taskId, code);
+}
+
 static void postReading(float newPh, float newEc) {
   if (!wifiOk) return;
   HTTPClient http;
@@ -591,8 +707,17 @@ static void buildUI() {
   buildHome(tabHome);
   buildRegar(tabRegar);
   buildPhEc(tabPhEc);
-  buildPlaceholder(tabTarefa, "Tela TAREFAS (em breve)");
+  buildTarefas(tabTarefa);
   buildPlaceholder(tabGrafic, "Tela GRAFICOS (em breve)");
+
+  // Re-fetch dados quando muda de aba
+  lv_obj_add_event_cb(tabview, [](lv_event_t *e) {
+    uint16_t idx = lv_tabview_get_tab_act((lv_obj_t*)lv_event_get_target(e));
+    if (idx == 3 && wifiOk) {    // TAREFA
+      fetchTasks();
+      rebuildTarefasList();
+    }
+  }, LV_EVENT_VALUE_CHANGED, NULL);
 
   refreshHomeValues();
 }
@@ -636,10 +761,15 @@ void setup() {
 
   buildUI();
 
+  initMockTarefas();
+  rebuildTarefasList();
+
   connectWifi();
   if (wifiOk) {
     fetchDisplayData();
     fetchHistoryAll();
+    fetchTasks();
+    rebuildTarefasList();
     lastFetch = millis();
     refreshHomeValues();
   }
