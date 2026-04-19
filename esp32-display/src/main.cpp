@@ -77,7 +77,7 @@ int R2_H     = 52;   // altura row 2 (VPD + pH + EC)
 int BAR_Y    = 177;  // barra de progresso
 
 // ── Telas ──────────────────────────────────────────────────────────────────────
-enum Tela { S_HOME, S_REGUEI, S_PHEC, S_TAREFAS };
+enum Tela { S_HOME, S_REGUEI, S_PHEC, S_TAREFAS, S_HISTORICO };
 Tela telaAtual = S_HOME;
 
 // ── Dados (mock inicial, atualizados via WiFi quando configurado) ──────────────
@@ -99,6 +99,24 @@ void fetchTasks();
 void postWatering(float l);
 void postReading(float newPh, float newEc);
 void postTaskComplete(int taskId);
+bool postRefreshTuya();
+bool fetchHistory(const char* metric, const char* period);
+
+// Prototipos de desenho
+void drawHistorico();
+void drawHome();
+void onHistoricoTouch(int tx, int ty);
+void onHomeTouch(int tx, int ty);
+
+// ── Buffer de historico ─────────────────────────────────────────────────────────
+const int HIST_MAX = 60;
+float histValues[HIST_MAX];
+int   histCount = 0;
+int   histMetric = 0;     // 0=temp, 1=rh, 2=ph, 3=ec
+int   histPeriod = 0;     // 0=24h, 1=7d, 2=30d
+const char* METRIC_KEYS[4]   = { "temp", "rh", "ph", "ec" };
+const char* METRIC_LABELS[4] = { "TEMP",  "UMIDADE",  "pH", "EC" };
+const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
 
 // ── Estado da tela pH/EC ───────────────────────────────────────────────────────
 char inputPh[8] = "";
@@ -164,13 +182,14 @@ bool ftLer(int &rx, int &ry) {
 }
 
 // ── Barra de navegacao ─────────────────────────────────────────────────────────
-const char*    NAV_NOMES[] = { "INICIO", "REGUEI", "pH/EC", "TAREFAS" };
-const uint16_t NAV_CORES[] = { C_DIM, C_BLU, C_CYN, C_GRN };
+#define NAV_COUNT 5
+const char*    NAV_NOMES[NAV_COUNT] = { "INICIO", "REGAR", "pH/EC", "TAREFA", "GRAFIC" };
+const uint16_t NAV_CORES[NAV_COUNT] = { C_DIM, C_BLU, C_CYN, C_GRN, C_PRP };
 
 void drawNav(Tela ativa) {
   tft.fillRect(0, NAV_Y, W, NAV_H, 0x0821);
   tft.drawFastHLine(0, NAV_Y, W, C_BORD);
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < NAV_COUNT; i++) {
     int bx = i * BTN_W;
     bool sel = (i == (int)ativa);
     tft.fillRect(bx + 1, NAV_Y + 1, BTN_W - 2, NAV_H - 2, sel ? 0x2104 : BLACK);
@@ -185,6 +204,10 @@ void drawWifiDot() {
   tft.fillCircle(W - 10, 10, 5, wifiOk ? C_GRN : C_BORD);
 }
 
+// ── Zonas touch HOME (para refresh Tuya em TEMP/RH) ────────────────────────────
+int HOME_TEMP_X, HOME_TEMP_Y, HOME_TEMP_W, HOME_TEMP_H;
+int HOME_RH_X,   HOME_RH_Y,   HOME_RH_W,   HOME_RH_H;
+
 // ── Tela HOME ──────────────────────────────────────────────────────────────────
 void drawHome() {
   tft.fillRect(0, 0, W, NAV_Y, BLACK);
@@ -196,14 +219,17 @@ void drawHome() {
   textL(6, 30, buf, &FreeSans9pt7b, C_PRP);
   drawWifiDot();
 
-  // Row 1 — TEMP + UMIDADE (grandes)
+  // Row 1 — TEMP + UMIDADE (grandes, tocaveis para refresh Tuya)
   int c1w = (W - 12) / 2;               // 2 cards com 4px de margem cada
-  card(4, R1_Y, c1w, R1_H);
+  HOME_TEMP_X = 4;     HOME_TEMP_Y = R1_Y; HOME_TEMP_W = c1w; HOME_TEMP_H = R1_H;
+  HOME_RH_X   = 8+c1w; HOME_RH_Y   = R1_Y; HOME_RH_W   = c1w; HOME_RH_H   = R1_H;
+
+  card(HOME_TEMP_X, HOME_TEMP_Y, HOME_TEMP_W, HOME_TEMP_H);
   textL(12, R1_Y + 14, "TEMP", &FreeSans9pt7b, C_DIM);
   dtostrf(tempC, 4, 1, buf); strcat(buf, "o");
   textC(4 + c1w / 2, R1_Y + R1_H / 2 + 8, buf, &FreeSansBold24pt7b, cTemp(tempC));
 
-  card(8 + c1w, R1_Y, c1w, R1_H);
+  card(HOME_RH_X, HOME_RH_Y, HOME_RH_W, HOME_RH_H);
   textL(16 + c1w, R1_Y + 14, "UMIDADE", &FreeSans9pt7b, C_DIM);
   dtostrf(rh, 4, 0, buf); strcat(buf, "%");
   textC(8 + c1w + c1w / 2, R1_Y + R1_H / 2 + 8, buf, &FreeSansBold24pt7b, cRH(rh));
@@ -434,18 +460,22 @@ void onTouch(int tx, int ty) {
 
   if (ty >= NAV_Y) {
     int btn = tx / BTN_W;
-    if (btn < 0 || btn > 3) return;
+    if (btn < 0 || btn >= NAV_COUNT) return;
     Tela prox = (Tela)btn;
     if (prox == telaAtual) return;
     telaAtual = prox;
     switch (telaAtual) {
-      case S_HOME:    drawHome(); break;
-      case S_REGUEI:  litros = 1.0f; drawReguei(); break;
-      case S_PHEC:    drawPhEc(); break;
-      case S_TAREFAS: fetchTasks(); drawTarefas(); break;
+      case S_HOME:      drawHome(); break;
+      case S_REGUEI:    litros = 1.0f; drawReguei(); break;
+      case S_PHEC:      drawPhEc(); break;
+      case S_TAREFAS:   fetchTasks(); drawTarefas(); break;
+      case S_HISTORICO: fetchHistory(METRIC_KEYS[histMetric], PERIOD_KEYS[histPeriod]); drawHistorico(); break;
     }
     return;
   }
+
+  if (telaAtual == S_HOME)      { onHomeTouch(tx, ty);      return; }
+  if (telaAtual == S_HISTORICO) { onHistoricoTouch(tx, ty); return; }
 
   if (telaAtual == S_PHEC)    { onPhEcTouch(tx, ty);    return; }
   if (telaAtual == S_TAREFAS) { onTarefasTouch(tx, ty); return; }
@@ -475,6 +505,130 @@ void onTouch(int tx, int ty) {
   }
 }
 
+// ── Touch HOME — toque em TEMP/RH refaz leitura Tuya ────────────────────────────
+void onHomeTouch(int tx, int ty) {
+  bool inTemp = tx >= HOME_TEMP_X && tx <= HOME_TEMP_X + HOME_TEMP_W &&
+                ty >= HOME_TEMP_Y && ty <= HOME_TEMP_Y + HOME_TEMP_H;
+  bool inRh   = tx >= HOME_RH_X   && tx <= HOME_RH_X   + HOME_RH_W   &&
+                ty >= HOME_RH_Y   && ty <= HOME_RH_Y   + HOME_RH_H;
+  if (!inTemp && !inRh) return;
+
+  // Feedback visual "atualizando..."
+  int cx = inTemp ? (HOME_TEMP_X + HOME_TEMP_W/2) : (HOME_RH_X + HOME_RH_W/2);
+  int cy = inTemp ? (HOME_TEMP_Y + HOME_TEMP_H/2) : (HOME_RH_Y   + HOME_RH_H/2);
+  card(inTemp?HOME_TEMP_X:HOME_RH_X, inTemp?HOME_TEMP_Y:HOME_RH_Y,
+       inTemp?HOME_TEMP_W:HOME_RH_W, inTemp?HOME_TEMP_H:HOME_RH_H, C_BORD);
+  textC(cx, cy, "...", &FreeSansBold12pt7b, WHITE);
+
+  if (postRefreshTuya()) {
+    drawHome();
+  } else {
+    textC(cx, cy+12, "erro", &FreeSans9pt7b, C_RED);
+    delay(1200);
+    drawHome();
+  }
+}
+
+// ── Helper: desenhar grafico de linha ──────────────────────────────────────────
+void drawLineChart(int cx, int cy, int cw, int ch, uint16_t color) {
+  // Moldura
+  tft.drawRect(cx, cy, cw, ch, C_BORD);
+  if (histCount < 2) {
+    textC(cx + cw/2, cy + ch/2, "sem dados", &FreeSans9pt7b, C_DIM);
+    return;
+  }
+  // Min/max
+  float vmin = histValues[0], vmax = histValues[0];
+  for (int i = 1; i < histCount; i++) {
+    if (histValues[i] < vmin) vmin = histValues[i];
+    if (histValues[i] > vmax) vmax = histValues[i];
+  }
+  if (vmax - vmin < 0.1f) { vmin -= 0.5f; vmax += 0.5f; }  // evita divisao por zero
+  float range = vmax - vmin;
+
+  // Eixos (min/max labels)
+  char buf[10];
+  dtostrf(vmax, 4, 1, buf); textL(cx + 2, cy + 10, buf, &FreeSans9pt7b, C_DIM);
+  dtostrf(vmin, 4, 1, buf); textL(cx + 2, cy + ch - 4, buf, &FreeSans9pt7b, C_DIM);
+
+  // Linha de dados (plot area e um retangulo interno, com margem esquerda para labels)
+  int px0 = cx + 36, py0 = cy + 4, pxW = cw - 40, pyH = ch - 14;
+  tft.drawFastHLine(px0, py0 + pyH/2, pxW, 0x10A2);  // linha media cinza
+
+  int prevX = 0, prevY = 0;
+  for (int i = 0; i < histCount; i++) {
+    int x = px0 + (i * pxW) / (histCount - 1);
+    int y = py0 + pyH - (int)(((histValues[i] - vmin) / range) * pyH);
+    if (i > 0) tft.drawLine(prevX, prevY, x, y, color);
+    prevX = x; prevY = y;
+  }
+}
+
+// ── Tela HISTORICO ─────────────────────────────────────────────────────────────
+int HX_TAB_Y = 26, HX_TAB_H = 22, HX_TAB_W;
+int HX_PER_Y, HX_PER_H = 20, HX_PER_W;
+
+uint16_t metricColor(int m) {
+  return m == 0 ? C_GRN : m == 1 ? C_CYN : m == 2 ? C_GRN : C_CYN;
+}
+
+void drawHistorico() {
+  tft.fillRect(0, 0, W, NAV_Y, BLACK);
+  textC(W/2, 12, "HISTORICO", &FreeSansBold12pt7b, WHITE);
+
+  // Tabs de metricas (4 botoes em cima)
+  HX_TAB_W = W / 4;
+  for (int i = 0; i < 4; i++) {
+    int x = i * HX_TAB_W;
+    bool sel = (i == histMetric);
+    tft.fillRect(x+1, HX_TAB_Y, HX_TAB_W-2, HX_TAB_H, sel ? 0x2104 : BLACK);
+    tft.drawRect(x+1, HX_TAB_Y, HX_TAB_W-2, HX_TAB_H, sel ? metricColor(i) : C_BORD);
+    textC(x + HX_TAB_W/2, HX_TAB_Y + HX_TAB_H/2 + 5, METRIC_LABELS[i],
+          &FreeSans9pt7b, sel ? metricColor(i) : C_DIM);
+  }
+
+  // Periodo (3 botoes embaixo do grafico)
+  int chartY = HX_TAB_Y + HX_TAB_H + 6;
+  HX_PER_Y = NAV_Y - HX_PER_H - 4;
+  int chartH = HX_PER_Y - chartY - 6;
+
+  drawLineChart(6, chartY, W - 12, chartH, metricColor(histMetric));
+
+  HX_PER_W = W / 3;
+  for (int i = 0; i < 3; i++) {
+    int x = i * HX_PER_W;
+    bool sel = (i == histPeriod);
+    tft.fillRect(x+1, HX_PER_Y, HX_PER_W-2, HX_PER_H, sel ? 0x2104 : BLACK);
+    tft.drawRect(x+1, HX_PER_Y, HX_PER_W-2, HX_PER_H, sel ? C_PRP : C_BORD);
+    textC(x + HX_PER_W/2, HX_PER_Y + HX_PER_H/2 + 5, PERIOD_KEYS[i],
+          &FreeSans9pt7b, sel ? C_PRP : C_DIM);
+  }
+
+  drawNav(S_HISTORICO);
+}
+
+void onHistoricoTouch(int tx, int ty) {
+  // Tab de metrica
+  if (ty >= HX_TAB_Y && ty <= HX_TAB_Y + HX_TAB_H) {
+    int m = tx / HX_TAB_W;
+    if (m >= 0 && m < 4 && m != histMetric) {
+      histMetric = m;
+      fetchHistory(METRIC_KEYS[histMetric], PERIOD_KEYS[histPeriod]);
+      drawHistorico();
+    }
+    return;
+  }
+  // Tab de periodo
+  if (ty >= HX_PER_Y && ty <= HX_PER_Y + HX_PER_H) {
+    int p = tx / HX_PER_W;
+    if (p >= 0 && p < 3 && p != histPeriod) {
+      histPeriod = p;
+      fetchHistory(METRIC_KEYS[histMetric], PERIOD_KEYS[histPeriod]);
+      drawHistorico();
+    }
+  }
+}
+
 // ── Arduino entry points ───────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
@@ -495,7 +649,7 @@ void setup() {
   H = tft.height();
   NAV_H  = max(36, H / 6);             // barra inferior ~1/6 da tela
   NAV_Y  = H - NAV_H;
-  BTN_W  = W / 4;
+  BTN_W  = W / NAV_COUNT;
   HDR_H  = 34;
   R1_Y   = HDR_H + 4;
   int contentH = NAV_Y - R1_Y - 12;    // espaco entre header e nav
@@ -648,4 +802,48 @@ void postTaskComplete(int taskId) {
   int code = http.POST(body);
   http.end();
   Serial.printf("postTaskComplete(%d): %d\n", taskId, code);
+}
+
+bool postRefreshTuya() {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/refresh-tuya/" + String(TENT_ID));
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(10000);  // Tuya pode demorar
+  int code = http.POST("");
+  if (code != 200) { http.end(); Serial.printf("refreshTuya: %d\n", code); return false; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+  if (!doc["tempC"].isNull()) tempC = doc["tempC"].as<float>();
+  if (!doc["rh"].isNull())    rh    = doc["rh"].as<float>();
+  if (!doc["vpd"].isNull())   vpd   = doc["vpd"].as<float>();
+  return true;
+}
+
+bool fetchHistory(const char* metric, const char* period) {
+  if (!wifiOk) { histCount = 0; return false; }
+  HTTPClient http;
+  String url = String(SERVER_URL) + "/api/device/history/" + String(TENT_ID)
+               + "?metric=" + metric + "&period=" + period;
+  http.begin(url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); histCount = 0; Serial.printf("history: %d\n", code); return false; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) { histCount = 0; return false; }
+  JsonArray arr = doc.as<JsonArray>();
+  histCount = 0;
+  for (JsonObject pt : arr) {
+    if (histCount >= HIST_MAX) break;
+    histValues[histCount++] = pt["v"] | 0.0f;
+  }
+  return true;
 }

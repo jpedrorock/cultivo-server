@@ -520,6 +520,98 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
+  // POST /api/device/refresh-tuya/:tentId — forca leitura imediata do sensor Tuya
+  app.post('/api/device/refresh-tuya/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const tentId = parseInt(req.params.tentId);
+      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
+
+      // Busca config Tuya de qualquer usuário do grupo com mapeamento para esta estufa
+      const [cfgRows]: any = await pool.execute(
+        `SELECT tc.accessId, tc.accessSecret, tc.region, tsm.deviceId, tc.userId
+         FROM tuyaConfig tc
+         INNER JOIN tuyaSensorMappings tsm ON tsm.userId = tc.userId AND tsm.tentId = ? AND tsm.enabled = 1
+         INNER JOIN users u ON u.id = tc.userId
+         WHERE tc.enabled = 1 AND u.groupId = ?
+         LIMIT 1`,
+        [tentId, device.groupId]
+      );
+      if (cfgRows.length === 0) {
+        return res.status(404).json({ error: 'Nenhum sensor Tuya ativo para esta estufa' });
+      }
+      const cfg = cfgRows[0];
+
+      const { readTuyaDeviceStatus } = await import("../lib/tuya");
+      const reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+
+      // Atualiza cache de leituras
+      await pool.execute(
+        `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
+         VALUES (?, ?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE tempC=VALUES(tempC), rhPct=VALUES(rhPct), readAt=NOW()`,
+        [cfg.userId, cfg.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
+      );
+
+      // Atualiza dailyLogs (AUTO) para a hora atual
+      const turn = new Date().getHours() < 18 ? 'AM' : 'PM';
+      await pool.execute(
+        `INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, source)
+         VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), ?, ?, ?, 'AUTO')
+         ON DUPLICATE KEY UPDATE tempC=VALUES(tempC), rhPct=VALUES(rhPct), source='AUTO'`,
+        [tentId, turn, reading.tempC ?? null, reading.rhPct ?? null]
+      );
+
+      let vpd: number | null = null;
+      if (reading.tempC !== null && reading.rhPct !== null) {
+        const svp = 0.6108 * Math.exp((17.27 * reading.tempC) / (reading.tempC + 237.3));
+        vpd = parseFloat((svp * (1 - reading.rhPct / 100)).toFixed(2));
+      }
+      res.json({ tempC: reading.tempC, rh: reading.rhPct, vpd });
+    } catch (err: any) {
+      console.error('[Device] refresh-tuya error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao ler sensor' });
+    }
+  });
+
+  // GET /api/device/history/:tentId?metric=temp&period=24h — historico p/ graficos
+  app.get('/api/device/history/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const tentId = parseInt(req.params.tentId);
+      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
+
+      const metric = String(req.query.metric ?? 'temp');
+      const period = String(req.query.period ?? '24h');
+
+      const colMap: Record<string, string> = {
+        temp: 'tempC', rh: 'rhPct', ph: 'ph', ec: 'ec', watering: 'wateringVolume',
+      };
+      const col = colMap[metric];
+      if (!col) return res.status(400).json({ error: 'metric inválido' });
+
+      // Janela de tempo + limite de pontos
+      const hoursMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
+      const hours = hoursMap[period] ?? 24;
+      const limit = period === '24h' ? 48 : period === '7d' ? 56 : 60;
+
+      const [rows]: any = await pool.execute(
+        `SELECT UNIX_TIMESTAMP(logDate) AS t, ${col} AS v
+         FROM dailyLogs
+         WHERE tentId = ? AND logDate >= NOW() - INTERVAL ? HOUR AND ${col} IS NOT NULL
+         ORDER BY logDate ASC
+         LIMIT ?`,
+        [tentId, hours, limit]
+      );
+      res.json(rows.map((r: any) => ({ t: Number(r.t), v: r.v != null ? parseFloat(r.v) : null })));
+    } catch (err: any) {
+      console.error('[Device] history error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
   // GET /api/device/tokens — lista tokens (admin via app, protegido por cookie JWT)
   // Esta rota é usada apenas internamente; gestão real via tRPC device.*
   app.post('/api/device/generate-token', async (req, res) => {
