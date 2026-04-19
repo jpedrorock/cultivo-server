@@ -103,9 +103,9 @@ static const lv_img_dsc_t *NAV_ICONS_IMG[5] = { &ic_home, &ic_droplets, &ic_flas
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
-static lv_obj_t *arcTemp;                   // arc central estilo Ebike
-static lv_obj_t *sparkRh, *sparkPh, *sparkEc;  // mini-charts pulsantes
-static lv_chart_series_t *serRhS, *serPhS, *serEcS;
+// Mini-sparklines pulsantes em cada card (TEMP, UMIDADE, pH, EC)
+static lv_obj_t *sparkTemp, *sparkRh, *sparkPh, *sparkEc;
+static lv_chart_series_t *serTempS, *serRhS, *serPhS, *serEcS;
 static lv_timer_t *pulseTimer = nullptr;
 
 // ── Widgets REGAR ───────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Aba HOME — estilo Ebike demo: arc gigante (TEMP) + coluna de mini-cards
+// Aba HOME — grid 2x2 compacto: 4 cards (TEMP/UMIDADE/pH/EC) com sparkline pulsante
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
@@ -250,118 +250,79 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -4, 4);
   lblWifi = wifiIcon;
 
-  // ═══ Corpo: arc gigante à esquerda + 3 mini-cards à direita ═══
-  int bodyY = 42;
+  // ═══ Grid 2x2 de cards ═══
+  int bodyY = 40;
   int bodyH = TAB_H - bodyY - 4;
-  int halfW = SCREEN_W / 2;
+  int gap = 4;
+  int cardW = (SCREEN_W - 3 * gap) / 2;
+  int cardH = (bodyH - gap) / 2;
 
-  // ─── ARC TEMP (estilo velocímetro Ebike) ────────────────────────────
-  int arcSize = (bodyH < halfW - 8) ? bodyH : halfW - 8;
-  arcTemp = lv_arc_create(tab);
-  lv_obj_set_size(arcTemp, arcSize, arcSize);
-  lv_obj_set_pos(arcTemp, (halfW - arcSize) / 2, bodyY + (bodyH - arcSize) / 2);
-  lv_arc_set_range(arcTemp, 0, 40);          // 0°C a 40°C
-  lv_arc_set_value(arcTemp, (int)tempC);
-  lv_arc_set_bg_angles(arcTemp, 135, 45);    // semicircular aberto embaixo
-  lv_arc_set_rotation(arcTemp, 0);
-  lv_obj_remove_style(arcTemp, NULL, LV_PART_KNOB);
-  lv_obj_clear_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
-  // background do arc (faixa do range completo)
-  lv_obj_set_style_arc_width(arcTemp, 8, LV_PART_MAIN);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(0x1F2937), LV_PART_MAIN);
-  lv_obj_set_style_arc_opa(arcTemp, LV_OPA_80, LV_PART_MAIN);
-  // indicador (cor da temperatura, glow)
-  lv_obj_set_style_arc_width(arcTemp, 10, LV_PART_INDICATOR);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+  // Helper pra criar card uniforme (valor grande + sparkline + icone)
+  auto makeMetricCard = [&](int x, int y, const char *label, const char *initVal,
+                            uint32_t color, const lv_img_dsc_t *icon,
+                            lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
+    lv_obj_t *c = makeCard(tab, x, y, cardW, cardH);
+    lv_obj_set_style_pad_all(c, 5, 0);
 
-  // Label "TEMP" pequeno no topo do arc
-  lv_obj_t *lblTempHdr = lv_label_create(arcTemp);
-  lv_label_set_text(lblTempHdr, "TEMP");
-  lv_obj_set_style_text_color(lblTempHdr, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblTempHdr, FONT_CAPTION, 0);
-  lv_obj_align(lblTempHdr, LV_ALIGN_CENTER, 0, -arcSize / 4);
-
-  // Valor grande central — TEMP
-  lblTemp = lv_label_create(arcTemp);
-  lv_label_set_text(lblTemp, "--");
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_text_font(lblTemp, FONT_VALUE, 0);
-  lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
-  applyNeonGlow(lblTemp, COL_GRN);
-
-  // Unidade "°C" embaixo do valor
-  lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
-  lv_label_set_text(lblTempUnit, "°C");
-  lv_obj_set_style_text_color(lblTempUnit, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblTempUnit, FONT_CAPTION, 0);
-  lv_obj_align(lblTempUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
-
-  // ─── 3 mini-cards à direita (UMIDADE, pH, EC) ─────────────────────────
-  int rightX = halfW + 2;
-  int cardW = SCREEN_W - rightX - 4;
-  int cardGap = 4;
-  int cardH = (bodyH - 2 * cardGap) / 3;
-
-  auto makeMiniCard = [&](int yOffset, const char *label, const char *initVal,
-                          uint32_t color, const lv_img_dsc_t *icon,
-                          lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
-    lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
-    lv_obj_set_style_pad_all(c, 4, 0);
-
-    // ícone Lucide à esquerda do card
-    lv_obj_t *ico = lv_img_create(c);
-    lv_img_set_src(ico, icon);
-    lv_obj_set_style_img_recolor(ico, lv_color_hex(color), 0);
-    lv_obj_set_style_img_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
-
-    // label (UMIDADE, pH, EC) no topo-direito
+    // label top-left pequeno (TEMP, UMIDADE, pH, EC)
     lv_obj_t *lb = lv_label_create(c);
     lv_label_set_text(lb, label);
     lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
     lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
-    lv_obj_align(lb, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(lb, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    // mini sparkline pulsante no meio (entre icone e valor)
-    int chartW = cardW - 44;
-    int chartH = 14;
+    // icone Lucide top-right
+    lv_obj_t *ico = lv_img_create(c);
+    lv_img_set_src(ico, icon);
+    lv_obj_set_style_img_recolor(ico, lv_color_hex(color), 0);
+    lv_obj_set_style_img_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_RIGHT, 0, -4);
+
+    // valor grande no meio-esquerda
+    lv_obj_t *v = lv_label_create(c);
+    lv_label_set_text(v, initVal);
+    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
+    lv_obj_set_style_text_font(v, FONT_VALUE, 0);
+    lv_obj_align(v, LV_ALIGN_LEFT_MID, 0, 4);
+    applyNeonGlow(v, color);
+
+    // sparkline pulsante na base
     lv_obj_t *ch = lv_chart_create(c);
-    lv_obj_set_size(ch, chartW, chartH);
-    lv_obj_align(ch, LV_ALIGN_RIGHT_MID, 0, -1);
+    lv_obj_set_size(ch, cardW - 10, 14);
+    lv_obj_align(ch, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ch, 20);
     lv_chart_set_div_line_count(ch, 0, 0);
     lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ch, 0, 0);
-    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);   // sem marcadores
+    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);
     lv_obj_set_style_line_width(ch, 2, LV_PART_ITEMS);
     lv_obj_set_style_line_color(ch, lv_color_hex(color), LV_PART_ITEMS);
     lv_obj_set_style_pad_all(ch, 0, 0);
     *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
     *sparkOut = ch;
 
-    // valor grande no bottom-direito
-    lv_obj_t *v = lv_label_create(c);
-    lv_label_set_text(v, initVal);
-    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
-    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
-    lv_obj_align(v, LV_ALIGN_BOTTOM_RIGHT, 0, 2);
-    applyNeonGlow(v, color);
     return v;
   };
 
-  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,   &sparkRh, &serRhS);
-  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker,    &sparkPh, &serPhS);
-  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube, &sparkEc, &serEcS);
+  // Row 1: TEMP + UMIDADE
+  lblTemp = makeMetricCard(gap,             bodyY,            "TEMP",    "--", COL_GRN, &ic_thermometer, &sparkTemp, &serTempS);
+  lblRh   = makeMetricCard(gap*2 + cardW,   bodyY,            "UMIDADE", "--", COL_CYN, &ic_droplet,     &sparkRh,   &serRhS);
+  // Row 2: pH + EC
+  lblPh   = makeMetricCard(gap,             bodyY + cardH+gap, "pH",      "--", COL_GRN, &ic_beaker,      &sparkPh,   &serPhS);
+  lblEc   = makeMetricCard(gap*2 + cardW,   bodyY + cardH+gap, "EC",      "--", COL_PRP, &ic_test_tube,   &sparkEc,   &serEcS);
 
-  // Inicializa sparklines com valores iniciais + ajusta range
-  lv_chart_set_range(sparkRh, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
-  lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);   // pH 4.0 a 9.0 (x10)
-  lv_chart_set_range(sparkEc, LV_CHART_AXIS_PRIMARY_Y, 0, 40);    // EC 0 a 4.0 (x10)
+  // Ranges fixos por metrica (valores x10 pra precisao sem float nos charts)
+  lv_chart_set_range(sparkTemp, LV_CHART_AXIS_PRIMARY_Y, 100, 400);    // 10-40 °C
+  lv_chart_set_range(sparkRh,   LV_CHART_AXIS_PRIMARY_Y, 0,   100);    // 0-100 %
+  lv_chart_set_range(sparkPh,   LV_CHART_AXIS_PRIMARY_Y, 40,  90);     // 4.0-9.0
+  lv_chart_set_range(sparkEc,   LV_CHART_AXIS_PRIMARY_Y, 0,   40);     // 0-4.0
+
   for (int i = 0; i < 20; i++) {
-    lv_chart_set_next_value(sparkRh, serRhS, (int32_t)rh);
-    lv_chart_set_next_value(sparkPh, serPhS, (int32_t)(phv * 10));
-    lv_chart_set_next_value(sparkEc, serEcS, (int32_t)(ecv * 10));
+    lv_chart_set_next_value(sparkTemp, serTempS, (int32_t)(tempC * 10));
+    lv_chart_set_next_value(sparkRh,   serRhS,   (int32_t)rh);
+    lv_chart_set_next_value(sparkPh,   serPhS,   (int32_t)(phv * 10));
+    lv_chart_set_next_value(sparkEc,   serEcS,   (int32_t)(ecv * 10));
   }
 }
 
@@ -375,6 +336,10 @@ static void pulseTimerCb(lv_timer_t *t) {
   float wave = sinf(tick * 0.4f);        // -1..1
   float jitter = ((rand() % 100) - 50) / 100.0f;  // -0.5..0.5
 
+  if (sparkTemp && serTempS) {
+    int32_t v = (int32_t)((tempC + wave * 0.2f + jitter * 0.1f) * 10);
+    lv_chart_set_next_value(sparkTemp, serTempS, v);
+  }
   if (sparkRh && serRhS) {
     int32_t v = (int32_t)(rh + wave * 1.5f + jitter);
     lv_chart_set_next_value(sparkRh, serRhS, v);
@@ -769,15 +734,9 @@ static uint32_t cRH(float r)    { return (r < 40 || r > 80) ? COL_RED : (r > 70)
 
 static void refreshHomeValues() {
   char buf[16];
-  // TEMP — atualiza label central + cor + posição do arc
-  snprintf(buf, sizeof(buf), "%.1f", tempC);
+  snprintf(buf, sizeof(buf), "%.1f°", tempC);
   lv_label_set_text(lblTemp, buf);
-  uint32_t tc = cTemp(tempC);
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(tc), 0);
-  if (arcTemp) {
-    lv_arc_set_value(arcTemp, (int)tempC);
-    lv_obj_set_style_arc_color(arcTemp, lv_color_hex(tc), LV_PART_INDICATOR);
-  }
+  lv_obj_set_style_text_color(lblTemp, lv_color_hex(cTemp(tempC)), 0);
 
   snprintf(buf, sizeof(buf), "%.0f%%", rh);
   lv_label_set_text(lblRh, buf);
