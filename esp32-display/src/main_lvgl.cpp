@@ -91,6 +91,10 @@ static lv_chart_series_t *serTempLive, *serRhLive;
 static lv_obj_t *lblLitros, *sliderRegar;
 static float litros = 1.0f;
 
+// ── Widgets pH/EC ───────────────────────────────────────────────────────────────
+static lv_obj_t *taPh, *taEc, *kbNumero;
+static int activePhEcField = 0;  // 0=pH, 1=EC
+
 // ════════════════════════════════════════════════════════════════════════════════
 // Display + touch callbacks
 // ════════════════════════════════════════════════════════════════════════════════
@@ -326,6 +330,103 @@ static void buildRegar(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Aba pH/EC — dois campos + keyboard numerico nativo + salvar
+// ════════════════════════════════════════════════════════════════════════════════
+static void postReading(float newPh, float newEc);  // fwd
+
+static void updatePhEcHighlights() {
+  lv_obj_set_style_border_color(taPh, lv_color_hex(activePhEcField==0 ? COL_GRN : COL_BORDER), 0);
+  lv_obj_set_style_border_color(taEc, lv_color_hex(activePhEcField==1 ? COL_CYN : COL_BORDER), 0);
+  lv_obj_set_style_border_width(taPh, 2, 0);
+  lv_obj_set_style_border_width(taEc, 2, 0);
+}
+
+static void phEcFocusCb(lv_event_t *e) {
+  lv_obj_t *ta = (lv_obj_t*)lv_event_get_target(e);
+  activePhEcField = (ta == taPh) ? 0 : 1;
+  lv_keyboard_set_textarea(kbNumero, ta);
+  updatePhEcHighlights();
+}
+
+static void phEcSalvarCb(lv_event_t *e) {
+  const char *sPh = lv_textarea_get_text(taPh);
+  const char *sEc = lv_textarea_get_text(taEc);
+  float newPh = atof(sPh);
+  float newEc = atof(sEc);
+  if (strlen(sPh)) phv = newPh;
+  if (strlen(sEc)) ecv = newEc;
+  postReading(newPh, newEc);
+  refreshHomeValues();
+  lv_textarea_set_text(taPh, "");
+  lv_textarea_set_text(taEc, "");
+
+  lv_obj_t *msg = lv_msgbox_create(NULL, "Medicao salva", "pH/EC registrados.", NULL, false);
+  lv_obj_center(msg);
+  lv_timer_t *t = lv_timer_create([](lv_timer_t *t) {
+    lv_obj_t *m = (lv_obj_t*)t->user_data;
+    lv_msgbox_close(m);
+    lv_timer_del(t);
+  }, 1500, msg);
+  (void)t;
+}
+
+static void buildPhEc(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, 6, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(tab, "MEDICAO pH / EC", COL_TEXT, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+  int fieldW = (SCREEN_W - 24) / 2;
+  int fieldH = 38;
+
+  taPh = lv_textarea_create(tab);
+  lv_obj_set_size(taPh, fieldW, fieldH);
+  lv_obj_set_pos(taPh, 6, 18);
+  lv_textarea_set_accepted_chars(taPh, "0123456789.");
+  lv_textarea_set_max_length(taPh, 5);
+  lv_textarea_set_one_line(taPh, true);
+  lv_textarea_set_placeholder_text(taPh, "pH");
+  lv_obj_set_style_bg_color(taPh, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_text_color(taPh, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_text_font(taPh, &lv_font_montserrat_16, 0);
+  lv_obj_add_event_cb(taPh, phEcFocusCb, LV_EVENT_CLICKED, NULL);
+
+  taEc = lv_textarea_create(tab);
+  lv_obj_set_size(taEc, fieldW, fieldH);
+  lv_obj_set_pos(taEc, 12 + fieldW, 18);
+  lv_textarea_set_accepted_chars(taEc, "0123456789.");
+  lv_textarea_set_max_length(taEc, 5);
+  lv_textarea_set_one_line(taEc, true);
+  lv_textarea_set_placeholder_text(taEc, "EC");
+  lv_obj_set_style_bg_color(taEc, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_text_color(taEc, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_text_font(taEc, &lv_font_montserrat_16, 0);
+  lv_obj_add_event_cb(taEc, phEcFocusCb, LV_EVENT_CLICKED, NULL);
+
+  // Botao SALVAR
+  lv_obj_t *btnSave = lv_btn_create(tab);
+  lv_obj_set_size(btnSave, SCREEN_W - 24, 30);
+  lv_obj_set_pos(btnSave, 12, 62);
+  lv_obj_set_style_bg_color(btnSave, lv_color_hex(0x064E3B), 0);
+  lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_border_width(btnSave, 1, 0);
+  lv_obj_add_event_cb(btnSave, phEcSalvarCb, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnSave, "SALVAR", COL_GRN, &lv_font_montserrat_14, LV_ALIGN_CENTER, 0, 0);
+
+  // Keyboard numerico (ocupa o resto da tela)
+  kbNumero = lv_keyboard_create(tab);
+  lv_keyboard_set_mode(kbNumero, LV_KEYBOARD_MODE_NUMBER);
+  lv_keyboard_set_textarea(kbNumero, taPh);
+  lv_keyboard_set_popovers(kbNumero, false);
+  lv_obj_set_size(kbNumero, SCREEN_W - 12, SCREEN_H - 130);
+  lv_obj_align(kbNumero, LV_ALIGN_BOTTOM_MID, 0, 0);
+  lv_obj_set_style_bg_color(kbNumero, lv_color_hex(COL_BG), 0);
+
+  activePhEcField = 0;
+  updatePhEcHighlights();
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Abas placeholder (próximos commits)
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildPlaceholder(lv_obj_t *tab, const char *text) {
@@ -414,6 +515,21 @@ static bool fetchDisplayData() {
   return true;
 }
 
+static void postReading(float newPh, float newEc) {
+  if (!wifiOk) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/readings");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  String body = "{\"tentId\":" + String(TENT_ID) +
+                ",\"ph\":" + String(newPh, 1) +
+                ",\"ec\":" + String(newEc, 2) + "}";
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("postReading: %d\n", code);
+}
+
 static void postWatering(float l) {
   if (!wifiOk) return;
   HTTPClient http;
@@ -474,7 +590,7 @@ static void buildUI() {
 
   buildHome(tabHome);
   buildRegar(tabRegar);
-  buildPlaceholder(tabPhEc,   "Tela pH/EC (em breve)");
+  buildPhEc(tabPhEc);
   buildPlaceholder(tabTarefa, "Tela TAREFAS (em breve)");
   buildPlaceholder(tabGrafic, "Tela GRAFICOS (em breve)");
 
