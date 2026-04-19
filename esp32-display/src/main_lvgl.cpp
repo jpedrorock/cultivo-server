@@ -101,6 +101,14 @@ struct Tarefa { char texto[80]; bool feito; int serverId; };
 static Tarefa tarefas[10];
 static int numTarefas = 0;
 
+// ── Widgets HISTORICO ───────────────────────────────────────────────────────────
+static lv_obj_t *chartHist, *mtxMetric, *mtxPeriod;
+static lv_chart_series_t *serHist;
+static int histMetric = 0;    // 0=temp, 1=rh, 2=ph, 3=ec
+static int histPeriod = 0;    // 0=24h, 1=7d, 2=30d
+static const char* METRIC_KEYS[4]   = { "temp", "rh", "ph", "ec" };
+static const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
+
 // ════════════════════════════════════════════════════════════════════════════════
 // Display + touch callbacks
 // ════════════════════════════════════════════════════════════════════════════════
@@ -504,6 +512,103 @@ static void buildTarefas(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Aba HISTORICO — grafico de linha + btnmatrix metrica/periodo
+// ════════════════════════════════════════════════════════════════════════════════
+static bool fetchHistory(const char* metric, const char* period, float *buf, int &n, int maxN);
+
+static uint32_t metricHistColor(int m) {
+  return m == 0 ? COL_GRN : m == 1 ? COL_CYN : m == 2 ? COL_GRN : COL_CYN;
+}
+
+static void applyHistToChart() {
+  static float buf[60];
+  int n = 0;
+  fetchHistory(METRIC_KEYS[histMetric], PERIOD_KEYS[histPeriod], buf, n, 60);
+  if (n < 2) {
+    lv_chart_set_point_count(chartHist, 2);
+    lv_chart_set_all_value(chartHist, serHist, LV_CHART_POINT_NONE);
+    lv_chart_refresh(chartHist);
+    return;
+  }
+  float vmin = buf[0], vmax = buf[0];
+  for (int i = 1; i < n; i++) {
+    if (buf[i] < vmin) vmin = buf[i];
+    if (buf[i] > vmax) vmax = buf[i];
+  }
+  if (vmax - vmin < 0.5f) { vmin -= 0.5f; vmax += 0.5f; }
+  lv_chart_set_range(chartHist, LV_CHART_AXIS_PRIMARY_Y, (int32_t)(vmin*10), (int32_t)(vmax*10));
+  lv_chart_set_point_count(chartHist, n);
+  lv_chart_set_all_value(chartHist, serHist, LV_CHART_POINT_NONE);
+  for (int i = 0; i < n; i++) lv_chart_set_next_value(chartHist, serHist, (int32_t)(buf[i]*10));
+  lv_obj_set_style_line_color(chartHist, lv_color_hex(metricHistColor(histMetric)), LV_PART_ITEMS);
+  lv_chart_refresh(chartHist);
+}
+
+static void mtxMetricCb(lv_event_t *e) {
+  uint16_t idx = lv_btnmatrix_get_selected_btn((lv_obj_t*)lv_event_get_target(e));
+  if (idx < 4 && (int)idx != histMetric) {
+    histMetric = idx;
+    applyHistToChart();
+  }
+}
+
+static void mtxPeriodCb(lv_event_t *e) {
+  uint16_t idx = lv_btnmatrix_get_selected_btn((lv_obj_t*)lv_event_get_target(e));
+  if (idx < 3 && (int)idx != histPeriod) {
+    histPeriod = idx;
+    applyHistToChart();
+  }
+}
+
+static void buildHistorico(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, 6, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(tab, "HISTORICO", COL_TEXT, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 0);
+
+  // Btnmatrix metrica (4 botoes no topo)
+  static const char *metricBtns[] = {"TEMP", "UMID", "pH", "EC", ""};
+  mtxMetric = lv_btnmatrix_create(tab);
+  lv_btnmatrix_set_map(mtxMetric, metricBtns);
+  lv_btnmatrix_set_one_checked(mtxMetric, true);
+  for (int i = 0; i < 4; i++) lv_btnmatrix_set_btn_ctrl(mtxMetric, i, LV_BTNMATRIX_CTRL_CHECKABLE);
+  lv_btnmatrix_set_btn_ctrl(mtxMetric, 0, LV_BTNMATRIX_CTRL_CHECKED);
+  lv_obj_set_size(mtxMetric, SCREEN_W - 12, 24);
+  lv_obj_align(mtxMetric, LV_ALIGN_TOP_MID, 0, 20);
+  lv_obj_set_style_bg_color(mtxMetric, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_text_font(mtxMetric, &lv_font_montserrat_12, 0);
+  lv_obj_add_event_cb(mtxMetric, mtxMetricCb, LV_EVENT_VALUE_CHANGED, NULL);
+
+  // Chart no meio
+  chartHist = lv_chart_create(tab);
+  lv_chart_set_type(chartHist, LV_CHART_TYPE_LINE);
+  lv_chart_set_point_count(chartHist, 24);
+  lv_chart_set_div_line_count(chartHist, 4, 6);
+  lv_obj_set_style_size(chartHist, 0, LV_PART_INDICATOR);
+  lv_obj_set_style_line_width(chartHist, 2, LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(chartHist, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(chartHist, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_line_color(chartHist, lv_color_hex(COL_BORDER), LV_PART_MAIN);
+  int chartY = 50, chartH = SCREEN_H - chartY - 38;
+  lv_obj_set_size(chartHist, SCREEN_W - 12, chartH);
+  lv_obj_align(chartHist, LV_ALIGN_TOP_MID, 0, chartY);
+  serHist = lv_chart_add_series(chartHist, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
+
+  // Btnmatrix periodo (3 botoes embaixo)
+  static const char *periodBtns[] = {"24h", "7d", "30d", ""};
+  mtxPeriod = lv_btnmatrix_create(tab);
+  lv_btnmatrix_set_map(mtxPeriod, periodBtns);
+  lv_btnmatrix_set_one_checked(mtxPeriod, true);
+  for (int i = 0; i < 3; i++) lv_btnmatrix_set_btn_ctrl(mtxPeriod, i, LV_BTNMATRIX_CTRL_CHECKABLE);
+  lv_btnmatrix_set_btn_ctrl(mtxPeriod, 0, LV_BTNMATRIX_CTRL_CHECKED);
+  lv_obj_set_size(mtxPeriod, SCREEN_W - 12, 24);
+  lv_obj_align(mtxPeriod, LV_ALIGN_BOTTOM_MID, 0, -4);
+  lv_obj_set_style_bg_color(mtxPeriod, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_text_font(mtxPeriod, &lv_font_montserrat_12, 0);
+  lv_obj_add_event_cb(mtxPeriod, mtxPeriodCb, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Abas placeholder (próximos commits)
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildPlaceholder(lv_obj_t *tab, const char *text) {
@@ -589,6 +694,30 @@ static bool fetchDisplayData() {
   if (!doc["totalSem"].isNull()) totalSem = doc["totalSem"].as<int>();
   const char* f = doc["fase"];     if (f) { strncpy(FASE, f, sizeof(FASE)-1); FASE[sizeof(FASE)-1]='\0'; }
   const char* t = doc["tentName"]; if (t) { strncpy(TENT_NAME, t, sizeof(TENT_NAME)-1); TENT_NAME[sizeof(TENT_NAME)-1]='\0'; }
+  return true;
+}
+
+static bool fetchHistory(const char* metric, const char* period, float *buf, int &n, int maxN) {
+  n = 0;
+  if (!wifiOk) return false;
+  HTTPClient http;
+  String url = String(SERVER_URL) + "/api/device/history/" + String(TENT_ID)
+               + "?metric=" + metric + "&period=" + period;
+  http.begin(url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) { http.end(); return false; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+  JsonArray arr = doc.as<JsonArray>();
+  for (JsonObject pt : arr) {
+    if (n >= maxN) break;
+    buf[n++] = pt["v"] | 0.0f;
+  }
   return true;
 }
 
@@ -708,14 +837,16 @@ static void buildUI() {
   buildRegar(tabRegar);
   buildPhEc(tabPhEc);
   buildTarefas(tabTarefa);
-  buildPlaceholder(tabGrafic, "Tela GRAFICOS (em breve)");
+  buildHistorico(tabGrafic);
 
   // Re-fetch dados quando muda de aba
   lv_obj_add_event_cb(tabview, [](lv_event_t *e) {
     uint16_t idx = lv_tabview_get_tab_act((lv_obj_t*)lv_event_get_target(e));
-    if (idx == 3 && wifiOk) {    // TAREFA
+    if (idx == 3 && wifiOk) {           // TAREFA
       fetchTasks();
       rebuildTarefasList();
+    } else if (idx == 4 && wifiOk) {    // GRAFIC
+      applyHistToChart();
     }
   }, LV_EVENT_VALUE_CHANGED, NULL);
 
