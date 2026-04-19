@@ -87,6 +87,10 @@ static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
 static lv_obj_t *chartTemp, *chartRh;
 static lv_chart_series_t *serTempLive, *serRhLive;
 
+// ── Widgets REGAR ───────────────────────────────────────────────────────────────
+static lv_obj_t *lblLitros, *sliderRegar;
+static float litros = 1.0f;
+
 // ════════════════════════════════════════════════════════════════════════════════
 // Display + touch callbacks
 // ════════════════════════════════════════════════════════════════════════════════
@@ -231,6 +235,97 @@ static void buildHome(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Aba REGAR — volume de rega com slider + botoes +/- + salvar
+// ════════════════════════════════════════════════════════════════════════════════
+static void postWatering(float l);   // fwd declaration
+
+static void updateLitrosLabel() {
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%.1f L", litros);
+  lv_label_set_text(lblLitros, buf);
+}
+
+static void regarSliderCb(lv_event_t *e) {
+  int32_t v = lv_slider_get_value((lv_obj_t*)lv_event_get_target(e));
+  litros = v / 10.0f;
+  updateLitrosLabel();
+}
+
+static void regarBtnCb(lv_event_t *e) {
+  int delta = (int)(intptr_t)lv_event_get_user_data(e);
+  litros += delta * 0.5f;
+  if (litros < 0.5f) litros = 0.5f;
+  if (litros > 20.0f) litros = 20.0f;
+  lv_slider_set_value(sliderRegar, (int32_t)(litros * 10), LV_ANIM_ON);
+  updateLitrosLabel();
+}
+
+static void regarSalvarCb(lv_event_t *e) {
+  postWatering(litros);
+  // feedback toast
+  lv_obj_t *msg = lv_msgbox_create(NULL, "Rega salva", "Volume registrado.", NULL, false);
+  lv_obj_center(msg);
+  lv_obj_t *bg = lv_msgbox_get_content(msg);
+  lv_obj_set_style_bg_color(bg, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_text_color(bg, lv_color_hex(COL_GRN), 0);
+  // fecha automaticamente em 1.5s
+  lv_timer_t *t = lv_timer_create([](lv_timer_t *t) {
+    lv_obj_t *m = (lv_obj_t*)t->user_data;
+    lv_msgbox_close(m);
+    lv_timer_del(t);
+  }, 1500, msg);
+  (void)t;
+}
+
+static void buildRegar(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, 8, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(tab, "REGA", COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_MID, 0, 0);
+  makeLabel(tab, "Quantos litros voce regou?", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_MID, 0, 22);
+
+  // Card central com valor
+  int cardW = SCREEN_W - 32;
+  int cardH = 60;
+  lv_obj_t *card = makeCard(tab, 16, 46, cardW, cardH);
+  lblLitros = makeLabel(card, "1.0 L", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 0);
+
+  // Botoes - / +
+  int btnY = 46 + cardH + 10;
+  lv_obj_t *btnMinus = lv_btn_create(tab);
+  lv_obj_set_size(btnMinus, 48, 36);
+  lv_obj_set_pos(btnMinus, 16, btnY);
+  lv_obj_set_style_bg_color(btnMinus, lv_color_hex(COL_BORDER), 0);
+  lv_obj_add_event_cb(btnMinus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)-1);
+  makeLabel(btnMinus, "-", COL_RED, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, -2);
+
+  lv_obj_t *btnPlus = lv_btn_create(tab);
+  lv_obj_set_size(btnPlus, 48, 36);
+  lv_obj_set_pos(btnPlus, SCREEN_W - 16 - 48, btnY);
+  lv_obj_set_style_bg_color(btnPlus, lv_color_hex(COL_BORDER), 0);
+  lv_obj_add_event_cb(btnPlus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)+1);
+  makeLabel(btnPlus, "+", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, -2);
+
+  // Slider entre os botoes
+  sliderRegar = lv_slider_create(tab);
+  lv_obj_set_size(sliderRegar, SCREEN_W - 32 - 48*2 - 20, 8);
+  lv_obj_set_pos(sliderRegar, 16 + 48 + 10, btnY + 14);
+  lv_slider_set_range(sliderRegar, 5, 200);  // 0.5 a 20.0 (x10)
+  lv_slider_set_value(sliderRegar, 10, LV_ANIM_OFF);
+  lv_obj_add_event_cb(sliderRegar, regarSliderCb, LV_EVENT_VALUE_CHANGED, NULL);
+
+  // Botao SALVAR
+  lv_obj_t *btnSave = lv_btn_create(tab);
+  lv_obj_set_size(btnSave, SCREEN_W - 32, 36);
+  lv_obj_align(btnSave, LV_ALIGN_BOTTOM_MID, 0, -8);
+  lv_obj_set_style_bg_color(btnSave, lv_color_hex(0x064E3B), 0);
+  lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_border_width(btnSave, 1, 0);
+  lv_obj_add_event_cb(btnSave, regarSalvarCb, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnSave, "SALVAR", COL_GRN, &lv_font_montserrat_16, LV_ALIGN_CENTER, 0, 0);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Abas placeholder (próximos commits)
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildPlaceholder(lv_obj_t *tab, const char *text) {
@@ -319,6 +414,19 @@ static bool fetchDisplayData() {
   return true;
 }
 
+static void postWatering(float l) {
+  if (!wifiOk) return;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/watering");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  String body = "{\"tentId\":" + String(TENT_ID) + ",\"litros\":" + String(l, 1) + "}";
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("postWatering: %d\n", code);
+}
+
 static void fetchHistoryAll() {
   if (!wifiOk) return;
   HTTPClient http;
@@ -365,7 +473,7 @@ static void buildUI() {
   tabGrafic = lv_tabview_add_tab(tabview, "GRAFIC");
 
   buildHome(tabHome);
-  buildPlaceholder(tabRegar,  "Tela REGAR (em breve)");
+  buildRegar(tabRegar);
   buildPlaceholder(tabPhEc,   "Tela pH/EC (em breve)");
   buildPlaceholder(tabTarefa, "Tela TAREFAS (em breve)");
   buildPlaceholder(tabGrafic, "Tela GRAFICOS (em breve)");
