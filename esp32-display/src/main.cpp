@@ -65,7 +65,7 @@ void card(int x, int y, int w, int h, uint16_t bg = C_CARD) {
 void textC(int cx, int cy, const char* s, const GFXfont* f, uint16_t col) {
   tft.setFont(f); tft.setTextColor(col, BLACK);
   int16_t x1, y1; uint16_t tw, th;
-  tft.getTextBounds(s, 0, 100, &x1, &y1, &tw, &th);
+  tft.getTextBounds(s, 0, 0, &x1, &y1, &tw, &th);  // baseline em 0 (nao 100)
   tft.setCursor(cx - tw / 2 - x1, cy - th / 2 - y1);
   tft.print(s);
 }
