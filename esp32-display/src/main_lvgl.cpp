@@ -158,19 +158,40 @@ static void touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Helper: card estilizado
+// Helper: card estilizado com gradient + sombra sutil
 // ════════════════════════════════════════════════════════════════════════════════
 static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
   lv_obj_t *c = lv_obj_create(parent);
   lv_obj_set_size(c, w, h);
   lv_obj_set_pos(c, x, y);
-  lv_obj_set_style_bg_color(c, lv_color_hex(COL_CARD), 0);
+  // gradient vertical: topo mais claro, base mais escura (efeito glassmorphism)
+  lv_obj_set_style_bg_color(c, lv_color_hex(0x1A2332), 0);
+  lv_obj_set_style_bg_grad_color(c, lv_color_hex(0x0A0F17), 0);
+  lv_obj_set_style_bg_grad_dir(c, LV_GRAD_DIR_VER, 0);
+  lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(c, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(c, 1, 0);
-  lv_obj_set_style_radius(c, 8, 0);
+  lv_obj_set_style_radius(c, 10, 0);
   lv_obj_set_style_pad_all(c, 6, 0);
+  // sombra interna sutil
+  lv_obj_set_style_shadow_color(c, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_shadow_width(c, 8, 0);
+  lv_obj_set_style_shadow_opa(c, LV_OPA_40, 0);
+  lv_obj_set_style_shadow_spread(c, 0, 0);
+  lv_obj_set_style_shadow_ofs_x(c, 0, 0);
+  lv_obj_set_style_shadow_ofs_y(c, 2, 0);
   lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
   return c;
+}
+
+// Helper: aplica efeito neon glow em um label
+static void applyNeonGlow(lv_obj_t *label, uint32_t color) {
+  lv_obj_set_style_shadow_color(label, lv_color_hex(color), 0);
+  lv_obj_set_style_shadow_width(label, 18, 0);
+  lv_obj_set_style_shadow_opa(label, LV_OPA_60, 0);
+  lv_obj_set_style_shadow_spread(label, 0, 0);
+  lv_obj_set_style_shadow_ofs_x(label, 0, 0);
+  lv_obj_set_style_shadow_ofs_y(label, 0, 0);
 }
 
 static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
@@ -209,51 +230,58 @@ static void buildHome(lv_obj_t *tab) {
   int rowH = contentH / 2 - 3;
   int colW = (SCREEN_W - 12) / 2;
 
-  // Row 1 — TEMP (maior)
+  // ── Helper local: mini-chart transparente dentro de card ────────────────────
+  auto makeSparkline = [&](lv_obj_t *parent, int w, int h, uint32_t color,
+                            lv_chart_series_t **serOut) {
+    lv_obj_t *ch = lv_chart_create(parent);
+    lv_obj_set_size(ch, w, h);
+    lv_obj_align(ch, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+    lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
+    lv_chart_set_point_count(ch, 24);
+    lv_chart_set_div_line_count(ch, 0, 0);
+    lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ch, 0, 0);
+    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_line_width(ch, 2, LV_PART_ITEMS);
+    lv_obj_set_style_pad_all(ch, 0, 0);
+    *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
+    return ch;
+  };
+
+  // Dados demo para os sparklines aparecerem no boot (substituidos pelo fetch real)
+  static int32_t demoTemp[] = {238, 242, 245, 243, 244, 247, 245, 241, 244, 246, 248, 245};
+  static int32_t demoRh[]   = {620, 625, 630, 628, 625, 620, 615, 610, 615, 620, 622, 620};
+
+  // Row 1 — TEMP
   lv_obj_t *cardT = makeCard(tab, 4, contentY, colW, rowH);
   makeLabel(cardT, "TEMP", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
-  lblTemp = makeLabel(cardT, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 16);
+  lblTemp = makeLabel(cardT, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 14);
+  applyNeonGlow(lblTemp, COL_GRN);
+  chartTemp = makeSparkline(cardT, colW - 20, rowH - 54, COL_GRN, &serTempLive);
+  lv_chart_set_point_count(chartTemp, 12);
+  for (int i = 0; i < 12; i++) lv_chart_set_next_value(chartTemp, serTempLive, demoTemp[i]);
 
-  // Mini-chart TEMP no rodapé do card
-  chartTemp = lv_chart_create(cardT);
-  lv_obj_set_size(chartTemp, colW - 20, rowH - 50);
-  lv_obj_align(chartTemp, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-  lv_chart_set_type(chartTemp, LV_CHART_TYPE_LINE);
-  lv_chart_set_point_count(chartTemp, 24);
-  lv_chart_set_div_line_count(chartTemp, 0, 0);
-  lv_obj_set_style_bg_opa(chartTemp, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(chartTemp, 0, 0);
-  lv_obj_set_style_size(chartTemp, 0, LV_PART_INDICATOR);  // sem pontos
-  lv_obj_set_style_line_width(chartTemp, 2, LV_PART_ITEMS);
-  serTempLive = lv_chart_add_series(chartTemp, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
-
-  // Row 1 — RH
+  // Row 1 — UMIDADE
   lv_obj_t *cardR = makeCard(tab, 8 + colW, contentY, colW, rowH);
   makeLabel(cardR, "UMIDADE", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
-  lblRh = makeLabel(cardR, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 16);
-
-  chartRh = lv_chart_create(cardR);
-  lv_obj_set_size(chartRh, colW - 20, rowH - 50);
-  lv_obj_align(chartRh, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-  lv_chart_set_type(chartRh, LV_CHART_TYPE_LINE);
-  lv_chart_set_point_count(chartRh, 24);
-  lv_chart_set_div_line_count(chartRh, 0, 0);
-  lv_obj_set_style_bg_opa(chartRh, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(chartRh, 0, 0);
-  lv_obj_set_style_size(chartRh, 0, LV_PART_INDICATOR);
-  lv_obj_set_style_line_width(chartRh, 2, LV_PART_ITEMS);
-  serRhLive = lv_chart_add_series(chartRh, lv_color_hex(COL_CYN), LV_CHART_AXIS_PRIMARY_Y);
+  lblRh = makeLabel(cardR, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 14);
+  applyNeonGlow(lblRh, COL_CYN);
+  chartRh = makeSparkline(cardR, colW - 20, rowH - 54, COL_CYN, &serRhLive);
+  lv_chart_set_point_count(chartRh, 12);
+  for (int i = 0; i < 12; i++) lv_chart_set_next_value(chartRh, serRhLive, demoRh[i]);
 
   // Row 2 — pH
   int row2Y = contentY + rowH + 6;
   lv_obj_t *cardPh = makeCard(tab, 4, row2Y, colW, rowH);
   makeLabel(cardPh, "pH", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
   lblPh = makeLabel(cardPh, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
+  applyNeonGlow(lblPh, COL_GRN);
 
   // Row 2 — EC
   lv_obj_t *cardEc = makeCard(tab, 8 + colW, row2Y, colW, rowH);
   makeLabel(cardEc, "EC mS/cm", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
   lblEc = makeLabel(cardEc, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
+  applyNeonGlow(lblEc, COL_CYN);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
