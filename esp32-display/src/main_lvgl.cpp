@@ -51,7 +51,7 @@
 #endif
 
 // Altura da barra do lv_tabview + altura util da area de cada aba
-static const int TABBAR_H = 34;
+static const int TABBAR_H = 42;   // ajustado para caber icone + texto
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
 // ── Cores do tema (espelham DisplayMode.tsx) ───────────────────────────────────
@@ -211,18 +211,28 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 4, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Header (título + subtítulo + wifi)
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 4, 0);
+  // Header com icone de planta + nome estufa + status wifi
+  lv_obj_t *hdrIcon = lv_label_create(tab);
+  lv_label_set_text(hdrIcon, LV_SYMBOL_OK);   // placeholder leaf-like, designer pode trocar
+  lv_obj_set_style_text_color(hdrIcon, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_text_font(hdrIcon, &lv_font_montserrat_16, 0);
+  applyNeonGlow(hdrIcon, COL_GRN);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 4, 2);
+
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, &lv_font_montserrat_16, LV_ALIGN_TOP_LEFT, 24, 0);
 
   char subBuf[48];
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  lblSub = makeLabel(tab, subBuf, COL_PRP, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 4, 20);
+  lblSub = makeLabel(tab, subBuf, COL_PRP, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 4, 22);
 
-  lblWifi = lv_led_create(tab);
-  lv_obj_set_size(lblWifi, 8, 8);
-  lv_obj_align(lblWifi, LV_ALIGN_TOP_RIGHT, -6, 8);
-  lv_led_set_color(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM));
-  lv_led_on(lblWifi);
+  // WiFi: icone + LED indicador
+  lv_obj_t *wifiIcon = lv_label_create(tab);
+  lv_label_set_text(wifiIcon, LV_SYMBOL_WIFI);
+  lv_obj_set_style_text_color(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
+  lv_obj_set_style_text_font(wifiIcon, &lv_font_montserrat_14, 0);
+  if (wifiOk) applyNeonGlow(wifiIcon, COL_GRN);
+  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -6, 4);
+  lblWifi = wifiIcon;
 
   // Layout grid 2x2 — cards TEMP/RH (row 1), pH/EC (row 2)
   int contentY = 42;
@@ -674,7 +684,7 @@ static void refreshHomeValues() {
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
   lv_label_set_text(lblSub, subBuf);
   lv_label_set_text(lblTitle, TENT_NAME);
-  lv_led_set_color(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM));
+  lv_obj_set_style_text_color(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
 }
 
 static void pushSeries(lv_obj_t *chart, lv_chart_series_t *ser, float *vals, int n) {
@@ -846,25 +856,39 @@ static void fetchHistoryAll() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Tema dark + tabview
+// Tema dark + tabview com background gradient
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildUI() {
   lv_obj_t *scr = lv_scr_act();
-  lv_obj_set_style_bg_color(scr, lv_color_hex(COL_BG), 0);
+  // Background gradient diagonal (azul escuro -> preto puro)
+  lv_obj_set_style_bg_color(scr, lv_color_hex(0x0F1729), 0);
+  lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, 0);
+  lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-  tabview = lv_tabview_create(scr, LV_DIR_BOTTOM, 34);
-  lv_obj_set_style_bg_color(tabview, lv_color_hex(COL_BG), 0);
+  tabview = lv_tabview_create(scr, LV_DIR_BOTTOM, 42);
+  lv_obj_set_style_bg_opa(tabview, LV_OPA_TRANSP, 0);
 
+  // Estilo da barra de tabs (icones + texto, iOS-like)
   lv_obj_t *tabBtns = lv_tabview_get_tab_btns(tabview);
-  lv_obj_set_style_bg_color(tabBtns, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_color(tabBtns, lv_color_hex(0x0A0F17), 0);
+  lv_obj_set_style_bg_opa(tabBtns, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(tabBtns, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(tabBtns, 1, LV_PART_MAIN);
+  lv_obj_set_style_border_side(tabBtns, LV_BORDER_SIDE_TOP, LV_PART_MAIN);
   lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_color(tabBtns, lv_color_hex(0xFFFFFF), LV_PART_ITEMS | LV_STATE_CHECKED);
+  // Indicador da tab ativa (linha colorida em cima)
+  lv_obj_set_style_bg_color(tabBtns, lv_color_hex(COL_GRN), LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_border_opa(tabBtns, LV_OPA_TRANSP, LV_PART_ITEMS);
 
-  tabHome   = lv_tabview_add_tab(tabview, "INICIO");
-  tabRegar  = lv_tabview_add_tab(tabview, "REGAR");
-  tabPhEc   = lv_tabview_add_tab(tabview, "pH/EC");
-  tabTarefa = lv_tabview_add_tab(tabview, "TAREFA");
-  tabGrafic = lv_tabview_add_tab(tabview, "GRAFIC");
+  // Tabs com icone (LV_SYMBOL) + texto pequeno
+  tabHome   = lv_tabview_add_tab(tabview, LV_SYMBOL_HOME    "  Inicio");
+  tabRegar  = lv_tabview_add_tab(tabview, LV_SYMBOL_TINT    "  Regar");
+  tabPhEc   = lv_tabview_add_tab(tabview, LV_SYMBOL_GPS     "  pH/EC");
+  tabTarefa = lv_tabview_add_tab(tabview, LV_SYMBOL_LIST    "  Tarefa");
+  tabGrafic = lv_tabview_add_tab(tabview, LV_SYMBOL_BARS    "  Grafico");
 
   buildHome(tabHome);
   buildRegar(tabRegar);
