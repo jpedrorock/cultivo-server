@@ -102,8 +102,7 @@ static const lv_img_dsc_t *NAV_ICONS_IMG[5] = { &ic_home, &ic_droplets, &ic_flas
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
-static lv_obj_t *chartTemp, *chartRh;
-static lv_chart_series_t *serTempLive, *serRhLive;
+static lv_obj_t *arcTemp;   // arc no centro tipo velocímetro Ebike
 
 // ── Widgets REGAR ───────────────────────────────────────────────────────────────
 static lv_obj_t *lblLitros, *sliderRegar;
@@ -219,104 +218,118 @@ static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Aba HOME — 4 cards (TEMP, RH, pH, EC) + 2 mini-charts
+// Aba HOME — estilo Ebike demo: arc gigante (TEMP) + coluna de mini-cards
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildHome(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, 4, 0);
+  lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  // Header com icone broto (Lucide) + nome estufa + wifi (Lucide)
+  // ═══ Header compacto ═══
   lv_obj_t *hdrIcon = lv_img_create(tab);
   lv_img_set_src(hdrIcon, &ic_sprout);
   lv_obj_set_style_img_recolor(hdrIcon, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_img_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
-  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 2, 0);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 4, 2);
 
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, 32, 2);
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, 38, 4);
 
   char subBuf[48];
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  lblSub = makeLabel(tab, subBuf, COL_PRP, FONT_BODY, LV_ALIGN_TOP_LEFT, 4, 22);
+  lblSub = makeLabel(tab, subBuf, COL_PRP, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 38, 22);
 
-  // WiFi com icone Lucide (tint dinamico verde/cinza)
   lv_obj_t *wifiIcon = lv_img_create(tab);
   lv_img_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
   lv_obj_set_style_img_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
   lv_obj_set_style_img_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
-  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -2, 2);
+  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -4, 4);
   lblWifi = wifiIcon;
 
-  // Layout grid 2x2 — cards TEMP/RH (row 1), pH/EC (row 2)
-  int contentY = 42;
-  int contentH = TAB_H - contentY - 6;      // desconta area da tabbar
-  int rowH = contentH / 2 - 3;
-  int colW = (SCREEN_W - 12) / 2;
+  // ═══ Corpo: arc gigante à esquerda + 3 mini-cards à direita ═══
+  int bodyY = 42;
+  int bodyH = TAB_H - bodyY - 4;
+  int halfW = SCREEN_W / 2;
 
-  // ── Helper local: mini-chart transparente dentro de card ────────────────────
-  auto makeSparkline = [&](lv_obj_t *parent, int w, int h, uint32_t color,
-                            lv_chart_series_t **serOut) {
-    lv_obj_t *ch = lv_chart_create(parent);
-    lv_obj_set_size(ch, w, h);
-    lv_obj_align(ch, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-    lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
-    lv_chart_set_point_count(ch, 24);
-    lv_chart_set_div_line_count(ch, 0, 0);
-    lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(ch, 0, 0);
-    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);
-    lv_obj_set_style_line_width(ch, 2, LV_PART_ITEMS);
-    lv_obj_set_style_pad_all(ch, 0, 0);
-    *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
-    return ch;
-  };
+  // ─── ARC TEMP (estilo velocímetro Ebike) ────────────────────────────
+  int arcSize = (bodyH < halfW - 8) ? bodyH : halfW - 8;
+  arcTemp = lv_arc_create(tab);
+  lv_obj_set_size(arcTemp, arcSize, arcSize);
+  lv_obj_set_pos(arcTemp, (halfW - arcSize) / 2, bodyY + (bodyH - arcSize) / 2);
+  lv_arc_set_range(arcTemp, 0, 40);          // 0°C a 40°C
+  lv_arc_set_value(arcTemp, (int)tempC);
+  lv_arc_set_bg_angles(arcTemp, 135, 45);    // semicircular aberto embaixo
+  lv_arc_set_rotation(arcTemp, 0);
+  lv_obj_remove_style(arcTemp, NULL, LV_PART_KNOB);
+  lv_obj_clear_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
+  // background do arc (faixa do range completo)
+  lv_obj_set_style_arc_width(arcTemp, 8, LV_PART_MAIN);
+  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(0x1F2937), LV_PART_MAIN);
+  lv_obj_set_style_arc_opa(arcTemp, LV_OPA_80, LV_PART_MAIN);
+  // indicador (cor da temperatura, glow)
+  lv_obj_set_style_arc_width(arcTemp, 10, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
 
-  // Dados demo para os sparklines aparecerem no boot (substituidos pelo fetch real)
-  static int32_t demoTemp[] = {238, 242, 245, 243, 244, 247, 245, 241, 244, 246, 248, 245};
-  static int32_t demoRh[]   = {620, 625, 630, 628, 625, 620, 615, 610, 615, 620, 622, 620};
+  // Label "TEMP" pequeno no topo do arc
+  lv_obj_t *lblTempHdr = lv_label_create(arcTemp);
+  lv_label_set_text(lblTempHdr, "TEMP");
+  lv_obj_set_style_text_color(lblTempHdr, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(lblTempHdr, FONT_CAPTION, 0);
+  lv_obj_align(lblTempHdr, LV_ALIGN_CENTER, 0, -arcSize / 4);
 
-  // Helper local: icone Lucide no canto superior direito do card
-  auto addCardIcon = [](lv_obj_t *card, const lv_img_dsc_t *ic, uint32_t color) {
-    lv_obj_t *img = lv_img_create(card);
-    lv_img_set_src(img, ic);
-    lv_obj_set_style_img_recolor(img, lv_color_hex(color), 0);
-    lv_obj_set_style_img_recolor_opa(img, LV_OPA_COVER, 0);
-    lv_obj_align(img, LV_ALIGN_TOP_RIGHT, 0, 0);
-  };
-
-  // Row 1 — TEMP
-  lv_obj_t *cardT = makeCard(tab, 4, contentY, colW, rowH);
-  makeLabel(cardT, "TEMP", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
-  addCardIcon(cardT, &ic_thermometer, COL_GRN);
-  lblTemp = makeLabel(cardT, "--", COL_GRN, FONT_VALUE, LV_ALIGN_TOP_LEFT, 0, 14);
+  // Valor grande central — TEMP
+  lblTemp = lv_label_create(arcTemp);
+  lv_label_set_text(lblTemp, "--");
+  lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_text_font(lblTemp, FONT_VALUE, 0);
+  lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
   applyNeonGlow(lblTemp, COL_GRN);
-  chartTemp = makeSparkline(cardT, colW - 20, rowH - 54, COL_GRN, &serTempLive);
-  lv_chart_set_point_count(chartTemp, 12);
-  for (int i = 0; i < 12; i++) lv_chart_set_next_value(chartTemp, serTempLive, demoTemp[i]);
 
-  // Row 1 — UMIDADE
-  lv_obj_t *cardR = makeCard(tab, 8 + colW, contentY, colW, rowH);
-  makeLabel(cardR, "UMIDADE", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
-  addCardIcon(cardR, &ic_droplet, COL_CYN);
-  lblRh = makeLabel(cardR, "--", COL_CYN, FONT_VALUE, LV_ALIGN_TOP_LEFT, 0, 14);
-  applyNeonGlow(lblRh, COL_CYN);
-  chartRh = makeSparkline(cardR, colW - 20, rowH - 54, COL_CYN, &serRhLive);
-  lv_chart_set_point_count(chartRh, 12);
-  for (int i = 0; i < 12; i++) lv_chart_set_next_value(chartRh, serRhLive, demoRh[i]);
+  // Unidade "°C" embaixo do valor
+  lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
+  lv_label_set_text(lblTempUnit, "°C");
+  lv_obj_set_style_text_color(lblTempUnit, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(lblTempUnit, FONT_CAPTION, 0);
+  lv_obj_align(lblTempUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
 
-  // Row 2 — pH
-  int row2Y = contentY + rowH + 6;
-  lv_obj_t *cardPh = makeCard(tab, 4, row2Y, colW, rowH);
-  makeLabel(cardPh, "pH", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
-  addCardIcon(cardPh, &ic_beaker, COL_GRN);
-  lblPh = makeLabel(cardPh, "--", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, 6);
-  applyNeonGlow(lblPh, COL_GRN);
+  // ─── 3 mini-cards à direita (UMIDADE, pH, EC) ─────────────────────────
+  int rightX = halfW + 2;
+  int cardW = SCREEN_W - rightX - 4;
+  int cardGap = 4;
+  int cardH = (bodyH - 2 * cardGap) / 3;
 
-  // Row 2 — EC
-  lv_obj_t *cardEc = makeCard(tab, 8 + colW, row2Y, colW, rowH);
-  makeLabel(cardEc, "EC mS/cm", COL_DIM, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
-  addCardIcon(cardEc, &ic_test_tube, COL_CYN);
-  lblEc = makeLabel(cardEc, "--", COL_CYN, FONT_VALUE, LV_ALIGN_CENTER, 0, 6);
-  applyNeonGlow(lblEc, COL_CYN);
+  auto makeMiniCard = [&](int yOffset, const char *label, const char *initVal,
+                          uint32_t color, const lv_img_dsc_t *icon) -> lv_obj_t* {
+    lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
+    lv_obj_set_style_pad_all(c, 4, 0);
+
+    // ícone Lucide à esquerda do card
+    lv_obj_t *ico = lv_img_create(c);
+    lv_img_set_src(ico, icon);
+    lv_obj_set_style_img_recolor(ico, lv_color_hex(color), 0);
+    lv_obj_set_style_img_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
+
+    // label (UMIDADE, pH, EC) no topo-direito
+    lv_obj_t *lb = lv_label_create(c);
+    lv_label_set_text(lb, label);
+    lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
+    lv_obj_align(lb, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    // valor grande no bottom-direito
+    lv_obj_t *v = lv_label_create(c);
+    lv_label_set_text(v, initVal);
+    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
+    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
+    lv_obj_align(v, LV_ALIGN_BOTTOM_RIGHT, 0, 2);
+    applyNeonGlow(v, color);
+    return v;
+  };
+
+  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet);
+  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker);
+  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -694,9 +707,15 @@ static uint32_t cRH(float r)    { return (r < 40 || r > 80) ? COL_RED : (r > 70)
 
 static void refreshHomeValues() {
   char buf[16];
-  snprintf(buf, sizeof(buf), "%.1f°", tempC);
+  // TEMP — atualiza label central + cor + posição do arc
+  snprintf(buf, sizeof(buf), "%.1f", tempC);
   lv_label_set_text(lblTemp, buf);
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(cTemp(tempC)), 0);
+  uint32_t tc = cTemp(tempC);
+  lv_obj_set_style_text_color(lblTemp, lv_color_hex(tc), 0);
+  if (arcTemp) {
+    lv_arc_set_value(arcTemp, (int)tempC);
+    lv_obj_set_style_arc_color(arcTemp, lv_color_hex(tc), LV_PART_INDICATOR);
+  }
 
   snprintf(buf, sizeof(buf), "%.0f%%", rh);
   lv_label_set_text(lblRh, buf);
@@ -711,21 +730,6 @@ static void refreshHomeValues() {
   lv_label_set_text(lblTitle, TENT_NAME);
   lv_img_set_src(lblWifi, wifiOk ? &ic_wifi : &ic_wifi_off);
   lv_obj_set_style_img_recolor(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
-}
-
-static void pushSeries(lv_obj_t *chart, lv_chart_series_t *ser, float *vals, int n) {
-  if (n < 2) return;
-  float vmin = vals[0], vmax = vals[0];
-  for (int i = 1; i < n; i++) {
-    if (vals[i] < vmin) vmin = vals[i];
-    if (vals[i] > vmax) vmax = vals[i];
-  }
-  if (vmax - vmin < 0.5f) { vmin -= 0.5f; vmax += 0.5f; }
-  lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, (int32_t)(vmin*10), (int32_t)(vmax*10));
-  lv_chart_set_point_count(chart, n);
-  lv_chart_set_all_value(chart, ser, LV_CHART_POINT_NONE);
-  for (int i = 0; i < n; i++) lv_chart_set_next_value(chart, ser, (int32_t)(vals[i]*10));
-  lv_chart_refresh(chart);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -857,28 +861,10 @@ static void postWatering(float l) {
   Serial.printf("postWatering: %d\n", code);
 }
 
+// HOME nao usa mais sparklines (historico esta na aba GRAFIC)
+// fetchHistoryAll vira no-op para manter compatibilidade de chamadas existentes
 static void fetchHistoryAll() {
-  if (!wifiOk) return;
-  HTTPClient http;
-  http.begin(String(SERVER_URL) + "/api/device/history-all/" + String(TENT_ID) + "?period=24h");
-  http.addHeader("X-Device-Token", DEVICE_TOKEN);
-  http.setTimeout(5000);
-  int code = http.GET();
-  if (code != 200) { http.end(); return; }
-  String body = http.getString();
-  http.end();
-
-  JsonDocument doc;
-  if (deserializeJson(doc, body) != DeserializationError::Ok) return;
-
-  static float tb[24], rb[24];
-  int tN = 0, rN = 0;
-  JsonArray tArr = doc["temp"].as<JsonArray>();
-  for (JsonVariant v : tArr) { if (tN < 24) tb[tN++] = v.as<float>(); }
-  JsonArray rArr = doc["rh"].as<JsonArray>();
-  for (JsonVariant v : rArr) { if (rN < 24) rb[rN++] = v.as<float>(); }
-  pushSeries(chartTemp, serTempLive, tb, tN);
-  pushSeries(chartRh,   serRhLive,   rb, rN);
+  // intencionalmente vazio — historico agora so na aba GRAFIC via applyHistToChart
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
