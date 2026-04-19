@@ -26,12 +26,20 @@ Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
 #define C_PRP  0xA475   // #A78BFA
 #define C_BLU  0x4B5F
 
-// ── Layout ─────────────────────────────────────────────────────────────────────
-#define W      320
-#define H      240
-#define NAV_Y  196
-#define NAV_H  44
-#define BTN_W  80
+// ── Layout (calculado dinamicamente a partir de tft.width()/height()) ──────────
+int W = 320;
+int H = 240;
+int NAV_Y = 196;
+int NAV_H = 44;
+int BTN_W = 80;
+
+// Posicoes derivadas (calculadas em setup apos conhecer W/H)
+int HDR_H    = 34;   // altura do cabecalho
+int R1_Y     = 38;   // inicio row 1
+int R1_H     = 78;   // altura row 1 (TEMP + UMIDADE)
+int R2_Y     = 120;  // inicio row 2
+int R2_H     = 52;   // altura row 2 (VPD + pH + EC)
+int BAR_Y    = 177;  // barra de progresso
 
 // ── Telas ──────────────────────────────────────────────────────────────────────
 enum Tela { S_HOME, S_REGUEI, S_PHEC, S_TAREFAS };
@@ -105,67 +113,89 @@ void drawHome() {
   tft.fillRect(0, 0, W, NAV_Y, BLACK);
   char buf[24];
 
-  textL(6, 17, TENT, &FreeSansBold12pt7b, WHITE);
+  // Cabecalho
+  textL(6, 16, TENT, &FreeSansBold12pt7b, WHITE);
   snprintf(buf, sizeof(buf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  textL(6, 32, buf, &FreeSans9pt7b, C_PRP);
+  textL(6, 30, buf, &FreeSans9pt7b, C_PRP);
 
-  const int R1Y = 38, R1H = 78;
-  card(4, R1Y, 154, R1H);
-  textL(12, R1Y + 14, "TEMP", &FreeSans9pt7b, C_DIM);
+  // Row 1 — TEMP + UMIDADE (grandes)
+  int c1w = (W - 12) / 2;               // 2 cards com 4px de margem cada
+  card(4, R1_Y, c1w, R1_H);
+  textL(12, R1_Y + 14, "TEMP", &FreeSans9pt7b, C_DIM);
   dtostrf(tempC, 4, 1, buf); strcat(buf, "o");
-  textC(81, R1Y + 56, buf, &FreeSansBold24pt7b, cTemp(tempC));
+  textC(4 + c1w / 2, R1_Y + R1_H / 2 + 8, buf, &FreeSansBold24pt7b, cTemp(tempC));
 
-  card(162, R1Y, 154, R1H);
-  textL(170, R1Y + 14, "UMIDADE", &FreeSans9pt7b, C_DIM);
+  card(8 + c1w, R1_Y, c1w, R1_H);
+  textL(16 + c1w, R1_Y + 14, "UMIDADE", &FreeSans9pt7b, C_DIM);
   dtostrf(rh, 4, 0, buf); strcat(buf, "%");
-  textC(239, R1Y + 56, buf, &FreeSansBold24pt7b, cRH(rh));
+  textC(8 + c1w + c1w / 2, R1_Y + R1_H / 2 + 8, buf, &FreeSansBold24pt7b, cRH(rh));
 
-  const int R2Y = R1Y + R1H + 4, R2H = 52, CW = 100;
-  card(4, R2Y, CW, R2H);
-  textL(10, R2Y + 13, "VPD kPa", &FreeSans9pt7b, C_DIM);
+  // Row 2 — VPD + pH + EC (medios)
+  int c2w = (W - 16) / 3;               // 3 cards
+  int x = 4;
+  card(x, R2_Y, c2w, R2_H);
+  textL(x + 6, R2_Y + 13, "VPD kPa", &FreeSans9pt7b, C_DIM);
   dtostrf(vpd, 3, 2, buf);
-  textC(54, R2Y + 38, buf, &FreeSansBold12pt7b, cVPD(vpd));
+  textC(x + c2w / 2, R2_Y + R2_H / 2 + 8, buf, &FreeSansBold12pt7b, cVPD(vpd));
 
-  card(108, R2Y, CW, R2H);
-  textL(114, R2Y + 13, "pH", &FreeSans9pt7b, C_DIM);
+  x += c2w + 4;
+  card(x, R2_Y, c2w, R2_H);
+  textL(x + 6, R2_Y + 13, "pH", &FreeSans9pt7b, C_DIM);
   dtostrf(ph, 3, 1, buf);
-  textC(158, R2Y + 38, buf, &FreeSansBold12pt7b, C_GRN);
+  textC(x + c2w / 2, R2_Y + R2_H / 2 + 8, buf, &FreeSansBold12pt7b, C_GRN);
 
-  card(212, R2Y, CW, R2H);
-  textL(218, R2Y + 13, "EC mS/cm", &FreeSans9pt7b, C_DIM);
+  x += c2w + 4;
+  card(x, R2_Y, c2w, R2_H);
+  textL(x + 6, R2_Y + 13, "EC mS/cm", &FreeSans9pt7b, C_DIM);
   dtostrf(ec, 3, 1, buf);
-  textC(262, R2Y + 38, buf, &FreeSansBold12pt7b, C_CYN);
+  textC(x + c2w / 2, R2_Y + R2_H / 2 + 8, buf, &FreeSansBold12pt7b, C_CYN);
 
-  int barY = R2Y + R2H + 5;
-  tft.fillRoundRect(4, barY, 312, 5, 2, C_BORD);
-  tft.fillRoundRect(4, barY, (int)((float)semana / totalSem * 312), 5, 2, C_PRP);
+  // Barra de progresso do ciclo
+  tft.fillRoundRect(4, BAR_Y, W - 8, 5, 2, C_BORD);
+  tft.fillRoundRect(4, BAR_Y, (int)((float)semana / totalSem * (W - 8)), 5, 2, C_PRP);
 
   drawNav(S_HOME);
 }
+
+// ── Zonas touch da tela REGUEI (calculadas em drawReguei, usadas em onTouch) ───
+int RG_MINUS_X, RG_MINUS_Y, RG_MINUS_W = 65, RG_MINUS_H = 44;
+int RG_PLUS_X,  RG_PLUS_Y;
+int RG_SAVE_X,  RG_SAVE_Y,  RG_SAVE_W  = 140, RG_SAVE_H  = 24;
 
 // ── Tela REGUEI ────────────────────────────────────────────────────────────────
 void drawReguei() {
   tft.fillRect(0, 0, W, NAV_Y, BLACK);
   char buf[24];
 
-  textC(W / 2, 22, "REGA",                       &FreeSansBold12pt7b, WHITE);
-  textC(W / 2, 42, "Quantos litros voce regou?", &FreeSans9pt7b,      C_DIM);
+  textC(W / 2, 20, "REGA",                       &FreeSansBold12pt7b, WHITE);
+  textC(W / 2, 40, "Quantos litros voce regou?", &FreeSans9pt7b,      C_DIM);
 
-  card(80, 52, 160, 60);
+  // Card com volume
+  int volW = 160, volH = 58, volX = (W - volW) / 2, volY = 50;
+  card(volX, volY, volW, volH);
   dtostrf(litros, 4, 1, buf); strcat(buf, " L");
-  textC(160, 88, buf, &FreeSansBold24pt7b, C_CYN);
+  textC(W / 2, volY + volH / 2 + 6, buf, &FreeSansBold24pt7b, C_CYN);
 
-  card(20, 120, 65, 44, C_BORD);
-  textC(52, 144, "-", &FreeSansBold24pt7b, C_RED);
+  // Botoes - / +
+  RG_MINUS_Y = volY + volH + 10;
+  RG_MINUS_X = 16;
+  RG_PLUS_X  = W - 16 - RG_MINUS_W;
+  RG_PLUS_Y  = RG_MINUS_Y;
 
-  card(235, 120, 65, 44, C_BORD);
-  textC(267, 144, "+", &FreeSansBold24pt7b, C_GRN);
+  card(RG_MINUS_X, RG_MINUS_Y, RG_MINUS_W, RG_MINUS_H, C_BORD);
+  textC(RG_MINUS_X + RG_MINUS_W / 2, RG_MINUS_Y + RG_MINUS_H / 2 + 6, "-", &FreeSansBold24pt7b, C_RED);
 
-  textC(W / 2, 144, "passo 0.5 L", &FreeSans9pt7b, C_DIM);
+  card(RG_PLUS_X, RG_PLUS_Y, RG_MINUS_W, RG_MINUS_H, C_BORD);
+  textC(RG_PLUS_X + RG_MINUS_W / 2, RG_PLUS_Y + RG_MINUS_H / 2 + 6, "+", &FreeSansBold24pt7b, C_GRN);
 
-  card(90, 170, 140, 22, 0x0180);
-  tft.drawRoundRect(90, 170, 140, 22, 6, C_GRN);
-  textC(W / 2, 183, "SALVAR", &FreeSans9pt7b, C_GRN);
+  textC(W / 2, RG_MINUS_Y + RG_MINUS_H / 2, "passo 0.5 L", &FreeSans9pt7b, C_DIM);
+
+  // Botao SALVAR
+  RG_SAVE_X = (W - RG_SAVE_W) / 2;
+  RG_SAVE_Y = NAV_Y - RG_SAVE_H - 4;
+  card(RG_SAVE_X, RG_SAVE_Y, RG_SAVE_W, RG_SAVE_H, 0x0180);
+  tft.drawRoundRect(RG_SAVE_X, RG_SAVE_Y, RG_SAVE_W, RG_SAVE_H, 6, C_GRN);
+  textC(W / 2, RG_SAVE_Y + RG_SAVE_H / 2 + 4, "SALVAR", &FreeSans9pt7b, C_GRN);
 
   drawNav(S_REGUEI);
 }
@@ -173,8 +203,8 @@ void drawReguei() {
 // ── Placeholder (Fase C) ───────────────────────────────────────────────────────
 void drawPlaceholder(const char* titulo, Tela s) {
   tft.fillRect(0, 0, W, NAV_Y, BLACK);
-  textC(W / 2, 80,  titulo,        &FreeSansBold12pt7b, WHITE);
-  textC(W / 2, 120, "Em breve...", &FreeSans9pt7b,      C_DIM);
+  textC(W / 2, NAV_Y / 2 - 15, titulo,        &FreeSansBold12pt7b, WHITE);
+  textC(W / 2, NAV_Y / 2 + 15, "Em breve...", &FreeSans9pt7b,      C_DIM);
   drawNav(s);
 }
 
@@ -198,18 +228,21 @@ void onTouch(int tx, int ty) {
   }
 
   if (telaAtual == S_REGUEI) {
-    if (tx >= 20 && tx <= 85 && ty >= 120 && ty <= 164) {
+    if (tx >= RG_MINUS_X && tx <= RG_MINUS_X + RG_MINUS_W &&
+        ty >= RG_MINUS_Y && ty <= RG_MINUS_Y + RG_MINUS_H) {
       litros = max(0.5f, litros - 0.5f);
       drawReguei();
-    } else if (tx >= 235 && tx <= 300 && ty >= 120 && ty <= 164) {
+    } else if (tx >= RG_PLUS_X && tx <= RG_PLUS_X + RG_MINUS_W &&
+               ty >= RG_PLUS_Y && ty <= RG_PLUS_Y + RG_MINUS_H) {
       litros = min(20.0f, litros + 0.5f);
       drawReguei();
-    } else if (tx >= 90 && tx <= 230 && ty >= 170 && ty <= 192) {
+    } else if (tx >= RG_SAVE_X && tx <= RG_SAVE_X + RG_SAVE_W &&
+               ty >= RG_SAVE_Y && ty <= RG_SAVE_Y + RG_SAVE_H) {
       tft.fillRect(0, 0, W, NAV_Y, BLACK);
-      textC(W / 2, 70, "REGA SALVA!", &FreeSansBold12pt7b, C_GRN);
+      textC(W / 2, H / 4,     "REGA SALVA!", &FreeSansBold12pt7b, C_GRN);
       char buf[20]; dtostrf(litros, 4, 1, buf); strcat(buf, " L");
-      textC(W / 2, 120, buf, &FreeSansBold24pt7b, C_CYN);
-      textC(W / 2, 160, "voltando...", &FreeSans9pt7b, C_DIM);
+      textC(W / 2, H / 2,     buf,           &FreeSansBold24pt7b, C_CYN);
+      textC(W / 2, H * 3 / 4, "voltando...", &FreeSans9pt7b,      C_DIM);
       drawNav(S_HOME);
       delay(2000);
       telaAtual = S_HOME;
@@ -223,9 +256,30 @@ void setup() {
   Serial.begin(115200);
   Wire.begin(21, 22);          // SDA=D21, SCL=D22
   tft.begin();
-  tft.setRotation(1);          // landscape 320x240
+  tft.setRotation(1);          // landscape
   tft.fillScreen(BLACK);
-  Serial.println("Cultivo ESP32 pronto");
+
+  // Ajusta layout conforme dimensoes reais
+  W = tft.width();
+  H = tft.height();
+  NAV_H  = max(36, H / 6);             // barra inferior ~1/6 da tela
+  NAV_Y  = H - NAV_H;
+  BTN_W  = W / 4;
+  HDR_H  = 34;
+  R1_Y   = HDR_H + 4;
+  int contentH = NAV_Y - R1_Y - 12;    // espaco entre header e nav
+  R1_H   = (int)(contentH * 0.52);
+  R2_Y   = R1_Y + R1_H + 4;
+  R2_H   = (int)(contentH * 0.36);
+  BAR_Y  = R2_Y + R2_H + 4;
+
+  Serial.printf("Display: %dx%d  NAV_Y=%d NAV_H=%d\n", W, H, NAV_Y, NAV_H);
+  Serial.printf("R1_Y=%d R1_H=%d  R2_Y=%d R2_H=%d  BAR_Y=%d\n",
+                R1_Y, R1_H, R2_Y, R2_H, BAR_Y);
+
+  // Contorno de diagnostico (remover depois)
+  tft.drawRect(0, 0, W, H, C_RED);
+
   drawHome();
 }
 
