@@ -222,6 +222,7 @@ static void buildHome(lv_obj_t *tab) {
   // Header com icone broto (Lucide) + nome estufa + wifi (Lucide)
   lv_obj_t *hdrIcon = lv_img_create(tab);
   lv_img_set_src(hdrIcon, &ic_sprout);
+  lv_img_set_pivot(hdrIcon, 0, 0);
   lv_img_set_zoom(hdrIcon, 128);  // 128 = 50% (ic é 64px, fica 32px)
   lv_obj_set_style_img_recolor(hdrIcon, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_img_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
@@ -236,6 +237,7 @@ static void buildHome(lv_obj_t *tab) {
   // WiFi com icone Lucide (tint dinamico verde/cinza)
   lv_obj_t *wifiIcon = lv_img_create(tab);
   lv_img_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
+  lv_img_set_pivot(wifiIcon, 0, 0);
   lv_img_set_zoom(wifiIcon, 96);  // 96 = 37.5% (fica ~24px)
   lv_obj_set_style_img_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
   lv_obj_set_style_img_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
@@ -274,6 +276,7 @@ static void buildHome(lv_obj_t *tab) {
   auto addCardIcon = [](lv_obj_t *card, const lv_img_dsc_t *ic, uint32_t color) {
     lv_obj_t *img = lv_img_create(card);
     lv_img_set_src(img, ic);
+    lv_img_set_pivot(img, 0, 0);
     lv_img_set_zoom(img, 96);     // 37.5% (~24px)
     lv_obj_set_style_img_recolor(img, lv_color_hex(color), 0);
     lv_obj_set_style_img_recolor_opa(img, LV_OPA_COVER, 0);
@@ -899,7 +902,9 @@ static void buildUI() {
   lv_obj_set_style_border_color(tabBtns, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(tabBtns, 1, LV_PART_MAIN);
   lv_obj_set_style_border_side(tabBtns, LV_BORDER_SIDE_TOP, LV_PART_MAIN);
-  lv_obj_set_style_text_font(tabBtns, FONT_VALUE, LV_PART_ITEMS);  // icones grandes
+  // Simbolos LV_SYMBOL_* sao chars unicode da fonte Montserrat default do LVGL.
+  // Manrope nao tem esses glifos — manter Montserrat_24 aqui pra icones visiveis.
+  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_24, LV_PART_ITEMS);
   lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_text_color(tabBtns, lv_color_hex(COL_GRN), LV_PART_ITEMS | LV_STATE_CHECKED);
   // Sem fundo destacado — visual limpo, so a cor do icone muda
