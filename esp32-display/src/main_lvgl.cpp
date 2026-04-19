@@ -207,7 +207,7 @@ static void buildHome(lv_obj_t *tab) {
 
   // Row 1 — TEMP (maior)
   lv_obj_t *cardT = makeCard(tab, 4, contentY, colW, rowH);
-  makeLabel(cardT, "TEMP", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardT, "TEMP", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
   lblTemp = makeLabel(cardT, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 16);
 
   // Mini-chart TEMP no rodapé do card
@@ -225,7 +225,7 @@ static void buildHome(lv_obj_t *tab) {
 
   // Row 1 — RH
   lv_obj_t *cardR = makeCard(tab, 8 + colW, contentY, colW, rowH);
-  makeLabel(cardR, "UMIDADE", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardR, "UMIDADE", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
   lblRh = makeLabel(cardR, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_TOP_LEFT, 0, 16);
 
   chartRh = lv_chart_create(cardR);
@@ -243,12 +243,12 @@ static void buildHome(lv_obj_t *tab) {
   // Row 2 — pH
   int row2Y = contentY + rowH + 6;
   lv_obj_t *cardPh = makeCard(tab, 4, row2Y, colW, rowH);
-  makeLabel(cardPh, "pH", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardPh, "pH", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
   lblPh = makeLabel(cardPh, "--", COL_GRN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
 
   // Row 2 — EC
   lv_obj_t *cardEc = makeCard(tab, 8 + colW, row2Y, colW, rowH);
-  makeLabel(cardEc, "EC mS/cm", COL_DIM, &lv_font_montserrat_12, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(cardEc, "EC mS/cm", COL_DIM, &lv_font_montserrat_14, LV_ALIGN_TOP_LEFT, 0, 0);
   lblEc = makeLabel(cardEc, "--", COL_CYN, &lv_font_montserrat_24, LV_ALIGN_CENTER, 0, 6);
 }
 
@@ -347,6 +347,7 @@ static void buildRegar(lv_obj_t *tab) {
 // Aba pH/EC — dois campos + keyboard numerico nativo + salvar
 // ════════════════════════════════════════════════════════════════════════════════
 static void postReading(float newPh, float newEc);  // fwd
+static void refreshHomeValues();                    // fwd
 
 static void updatePhEcHighlights() {
   lv_obj_set_style_border_color(taPh, lv_color_hex(activePhEcField==0 ? COL_GRN : COL_BORDER), 0);
@@ -576,7 +577,7 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_size(mtxMetric, SCREEN_W - 12, 24);
   lv_obj_align(mtxMetric, LV_ALIGN_TOP_MID, 0, 20);
   lv_obj_set_style_bg_color(mtxMetric, lv_color_hex(COL_BG), 0);
-  lv_obj_set_style_text_font(mtxMetric, &lv_font_montserrat_12, 0);
+  lv_obj_set_style_text_font(mtxMetric, &lv_font_montserrat_14, 0);
   lv_obj_add_event_cb(mtxMetric, mtxMetricCb, LV_EVENT_VALUE_CHANGED, NULL);
 
   // Chart no meio
@@ -604,7 +605,7 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_size(mtxPeriod, SCREEN_W - 12, 24);
   lv_obj_align(mtxPeriod, LV_ALIGN_BOTTOM_MID, 0, -4);
   lv_obj_set_style_bg_color(mtxPeriod, lv_color_hex(COL_BG), 0);
-  lv_obj_set_style_text_font(mtxPeriod, &lv_font_montserrat_12, 0);
+  lv_obj_set_style_text_font(mtxPeriod, &lv_font_montserrat_14, 0);
   lv_obj_add_event_cb(mtxPeriod, mtxPeriodCb, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
@@ -825,7 +826,7 @@ static void buildUI() {
   lv_obj_t *tabBtns = lv_tabview_get_tab_btns(tabview);
   lv_obj_set_style_bg_color(tabBtns, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_border_color(tabBtns, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_12, 0);
+  lv_obj_set_style_text_font(tabBtns, &lv_font_montserrat_14, 0);
 
   tabHome   = lv_tabview_add_tab(tabview, "INICIO");
   tabRegar  = lv_tabview_add_tab(tabview, "REGAR");
