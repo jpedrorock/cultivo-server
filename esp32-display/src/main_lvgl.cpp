@@ -278,6 +278,146 @@ static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// FASE C — Efeitos ambientes (particles, scan line, ring wave / radar ping)
+// ════════════════════════════════════════════════════════════════════════════════
+static void fx_anim_y_cb(void *obj, int32_t v) {
+  lv_obj_set_y((lv_obj_t*)obj, v);
+}
+static void fx_anim_bg_opa_cb(void *obj, int32_t v) {
+  lv_obj_set_style_bg_opa((lv_obj_t*)obj, v, 0);
+}
+static void fx_anim_border_opa_cb(void *obj, int32_t v) {
+  lv_obj_set_style_border_opa((lv_obj_t*)obj, v, 0);
+}
+static void fx_anim_ring_size_cb(void *obj, int32_t v) {
+  lv_obj_set_size((lv_obj_t*)obj, v, v);
+  lv_obj_align((lv_obj_t*)obj, LV_ALIGN_CENTER, 0, 0);
+}
+
+// Particles — pontinhos flutuando no fundo (vibe HUD / estrelas)
+static void spawnParticle(lv_obj_t *parent, int xPos, int yStart, uint32_t color,
+                          uint32_t duration, uint32_t delay) {
+  lv_obj_t *p = lv_obj_create(parent);
+  int size = 2 + (rand() % 2);
+  lv_obj_set_size(p, size, size);
+  lv_obj_set_pos(p, xPos, yStart);
+  lv_obj_set_style_bg_color(p, lv_color_hex(color), 0);
+  lv_obj_set_style_bg_opa(p, LV_OPA_0, 0);
+  lv_obj_set_style_border_width(p, 0, 0);
+  lv_obj_set_style_radius(p, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_pad_all(p, 0, 0);
+  lv_obj_remove_flag(p, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(p, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Drift vertical ascendente (sobe devagar, volta pro inicio)
+  lv_anim_t ay;
+  lv_anim_init(&ay);
+  lv_anim_set_var(&ay, p);
+  lv_anim_set_values(&ay, yStart, -8);
+  lv_anim_set_time(&ay, duration);
+  lv_anim_set_delay(&ay, delay);
+  lv_anim_set_repeat_count(&ay, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_set_exec_cb(&ay, fx_anim_y_cb);
+  lv_anim_start(&ay);
+
+  // Opacidade pulsa (aparece, desaparece) — sincronizada com o drift
+  lv_anim_t ao;
+  lv_anim_init(&ao);
+  lv_anim_set_var(&ao, p);
+  lv_anim_set_values(&ao, LV_OPA_0, LV_OPA_40);
+  lv_anim_set_time(&ao, duration / 2);
+  lv_anim_set_playback_time(&ao, duration / 2);
+  lv_anim_set_delay(&ao, delay);
+  lv_anim_set_repeat_count(&ao, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_set_exec_cb(&ao, fx_anim_bg_opa_cb);
+  lv_anim_start(&ao);
+}
+
+static void spawnParticleField(lv_obj_t *parent) {
+  // 10 particulas com posicoes/delays/cores variados
+  static const uint32_t colors[] = { COL_GRN, COL_CYN, COL_PRP, COL_GRN, COL_CYN };
+  for (int i = 0; i < 10; i++) {
+    int x = rand() % SCREEN_W;
+    int yStart = SCREEN_H + (rand() % sh(40));
+    uint32_t dur = 6000 + (rand() % 6000);
+    uint32_t delay = rand() % 4000;
+    uint32_t col = colors[i % 5];
+    spawnParticle(parent, x, yStart, col, dur, delay);
+  }
+}
+
+// Scan line — linha horizontal varrendo top->bottom (CRT / Tesla HUD)
+static void buildScanLine(lv_obj_t *parent) {
+  lv_obj_t *line = lv_obj_create(parent);
+  lv_obj_set_size(line, SCREEN_W, 2);
+  lv_obj_set_pos(line, 0, 0);
+  lv_obj_set_style_bg_color(line, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_bg_opa(line, LV_OPA_20, 0);
+  lv_obj_set_style_border_width(line, 0, 0);
+  lv_obj_set_style_radius(line, 0, 0);
+  lv_obj_set_style_pad_all(line, 0, 0);
+  lv_obj_remove_flag(line, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(line, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, line);
+  lv_anim_set_values(&a, -4, SCREEN_H + 4);
+  lv_anim_set_time(&a, 5000);
+  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_set_exec_cb(&a, fx_anim_y_cb);
+  lv_anim_start(&a);
+}
+
+// Ring wave — anel expandindo a partir do arco (radar / ping)
+// O "ring" e' child de um wrapper invisivel centrado em (cx, cy) com tamanho maxSize.
+// Conforme o ring cresce, fx_anim_ring_size_cb realinha no centro do wrapper.
+static void applyRingWave(lv_obj_t *parent, int cx, int cy, int maxSize, uint32_t color) {
+  for (int i = 0; i < 2; i++) {
+    lv_obj_t *wrap = lv_obj_create(parent);
+    lv_obj_set_size(wrap, maxSize, maxSize);
+    lv_obj_set_pos(wrap, cx - maxSize / 2, cy - maxSize / 2);
+    lv_obj_set_style_bg_opa(wrap, LV_OPA_0, 0);
+    lv_obj_set_style_border_width(wrap, 0, 0);
+    lv_obj_set_style_pad_all(wrap, 0, 0);
+    lv_obj_remove_flag(wrap, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(wrap, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *ring = lv_obj_create(wrap);
+    lv_obj_set_size(ring, 12, 12);
+    lv_obj_center(ring);
+    lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(ring, LV_OPA_0, 0);
+    lv_obj_set_style_border_color(ring, lv_color_hex(color), 0);
+    lv_obj_set_style_border_width(ring, 2, 0);
+    lv_obj_set_style_border_opa(ring, LV_OPA_60, 0);
+    lv_obj_set_style_pad_all(ring, 0, 0);
+    lv_obj_remove_flag(ring, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_anim_t as;
+    lv_anim_init(&as);
+    lv_anim_set_var(&as, ring);
+    lv_anim_set_values(&as, 12, maxSize);
+    lv_anim_set_time(&as, 2600);
+    lv_anim_set_delay(&as, i * 1300);
+    lv_anim_set_repeat_count(&as, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&as, fx_anim_ring_size_cb);
+    lv_anim_start(&as);
+
+    lv_anim_t ao;
+    lv_anim_init(&ao);
+    lv_anim_set_var(&ao, ring);
+    lv_anim_set_values(&ao, LV_OPA_60, LV_OPA_0);
+    lv_anim_set_time(&ao, 2600);
+    lv_anim_set_delay(&ao, i * 1300);
+    lv_anim_set_repeat_count(&ao, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&ao, fx_anim_border_opa_cb);
+    lv_anim_start(&ao);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Aba HOME — estilo Ebike demo: arc gigante (TEMP) + coluna de mini-cards
 // Layout responsivo via sw()/sh() — escala proporcional no hardware real
 // ════════════════════════════════════════════════════════════════════════════════
@@ -345,6 +485,11 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
   lv_obj_set_style_shadow_width(arcTemp, 16, LV_PART_INDICATOR);
   lv_obj_set_style_shadow_opa(arcTemp, LV_OPA_60, LV_PART_INDICATOR);
+
+  // Ring wave — radar ping emanando do centro do arco (duas ondas offset)
+  int arcCx = (halfW - arcSize) / 2 + arcSize / 2;
+  int arcCy = bodyY + (bodyH - arcSize) / 2 + arcSize / 2;
+  applyRingWave(tab, arcCx, arcCy, (int)(arcSize * 1.35f), COL_GRN);
 
   lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
   lv_label_set_text(lblTempUnit, "°C");
@@ -1092,6 +1237,9 @@ static void buildUI() {
   lv_obj_remove_flag(glow2, LV_OBJ_FLAG_SCROLLABLE);
 
   // Area de conteudo (ocupa a tela inteira menos a navbar)
+  // FASE C — Particles flutuando no fundo (atras do conteudo, na frente dos glows)
+  spawnParticleField(scr);
+
   contentArea = lv_obj_create(scr);
   lv_obj_set_size(contentArea, SCREEN_W, TAB_H);
   lv_obj_set_pos(contentArea, 0, 0);
@@ -1129,6 +1277,10 @@ static void buildUI() {
   lv_obj_clear_flag(screenHome, LV_OBJ_FLAG_HIDDEN);
 
   buildNavbar(scr);
+
+  // FASE C — Scan line no topo de tudo (varre por cima do conteudo + navbar)
+  buildScanLine(scr);
+
   refreshHomeValues();
   startPulseTimer();   // anima sparklines dos mini-cards a cada 300ms
 }
