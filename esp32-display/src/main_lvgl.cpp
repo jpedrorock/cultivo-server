@@ -87,10 +87,13 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
 #define COL_PRP     0xA78BFA
 #define COL_BLU     0x60A5FA
 
-// ── LVGL v9 buffers (uint8_t pra suportar varios formats) ───────────────────────
+// ── LVGL v9 buffers (RGB565 = 2 bytes/pixel, alinhados a 8 bytes) ───────────────
+// Em v9, LV_DRAW_BUF_ALIGN (default 4) exige alinhamento. Usar uint16_t garante
+// pelo menos 2-byte alignment; __attribute__((aligned(8))) subir pra 8-byte.
+// 480 largura cobre tanto Wokwi (320) quanto hardware real (480).
 static const uint32_t BUF_LINES = 20;
-static uint8_t buf1[480 * BUF_LINES * sizeof(lv_color_t)];
-static uint8_t buf2[480 * BUF_LINES * sizeof(lv_color_t)];
+static LV_ATTRIBUTE_MEM_ALIGN uint16_t buf1[480 * BUF_LINES];
+static LV_ATTRIBUTE_MEM_ALIGN uint16_t buf2[480 * BUF_LINES];
 
 // ── Estado dos dados ────────────────────────────────────────────────────────────
 static char TENT_NAME[50] = "ESTUFA 1";
@@ -1349,35 +1352,40 @@ void setup() {
   gfx->begin();
   gfx->fillScreen(0);
 #else
-  Serial.println("[boot] SPI+TFT init");
+  Serial.println("[boot] SPI+TFT init"); Serial.flush();
   SPI.begin(TFT_SCK, TFT_MISO, TFT_MOSI, TFT_CS);
   tft.begin();
   tft.setRotation(1);
   tft.fillScreen(0);
 #endif
 
-  Serial.println("[boot] Wire init");
+  Serial.println("[boot] Wire init"); Serial.flush();
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
-  Serial.println("[boot] lv_init");
+  Serial.println("[boot] lv_init"); Serial.flush();
   lv_init();
 
   // LVGL v9: tick a partir de millis() (nao precisa de timer manual)
   lv_tick_set_cb([]() -> uint32_t { return millis(); });
 
   // LVGL v9: criar display + setar buffers + flush callback
-  Serial.println("[boot] lv_display_create");
+  Serial.println("[boot] lv_display_create"); Serial.flush();
   lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);
+  Serial.println("[boot] display_set_color_format"); Serial.flush();
+  lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
+  Serial.println("[boot] display_set_buffers"); Serial.flush();
   lv_display_set_buffers(disp, buf1, buf2, sizeof(buf1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+  Serial.println("[boot] display_set_flush_cb"); Serial.flush();
   lv_display_set_flush_cb(disp, disp_flush);
 
   // LVGL v9: criar input device (touch)
+  Serial.println("[boot] indev_create"); Serial.flush();
   lv_indev_t *indev = lv_indev_create();
   lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(indev, touchpad_read);
 
-  Serial.println("[boot] buildUI");
+  Serial.println("[boot] buildUI"); Serial.flush();
   buildUI();
-  Serial.println("[boot] buildUI ok");
+  Serial.println("[boot] buildUI ok"); Serial.flush();
 
   initMockTarefas();
   rebuildTarefasList();
