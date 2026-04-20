@@ -933,11 +933,11 @@ export default function Home() {
 }
 
 
-// Mini sparkline — linha suave seguindo os dados da semana, scanner pulsante lento
+// Mini sparkline — onda de brilho deslizando sobre a linha dos dados da semana
 function MiniSparkline({ values, color, w = 72, h = 26 }: { values: number[]; color: string; w?: number; h?: number }) {
   if (values.length < 2) return null;
 
-  // Linha suave conectando os pontos de dados reais (não spikes)
+  // Linha suave pelos dados reais
   const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
   const pts = values.map((v, i) =>
     `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.78 - h * 0.11).toFixed(1)}`
@@ -945,65 +945,57 @@ function MiniSparkline({ values, color, w = 72, h = 26 }: { values: number[]; co
   const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
 
   const uid = `spark-${color.replace(/[^a-z0-9]/gi, "")}`;
-  const dur = "4.5s"; // lento — percorre a semana inteira devagar
+  // Onda ocupa ~45% da largura total — entra pela esquerda e sai pela direita
+  const waveW = Math.round(w * 0.55);
+  const dur = "4s";
 
   return (
     <svg
       width={w} height={h}
       viewBox={`0 0 ${w} ${h}`}
-      style={{ overflow: "visible", opacity: 0.9, display: "block" }}
+      style={{ overflow: "visible", opacity: 0.92, display: "block" }}
     >
       <defs>
-        <filter id={`${uid}-glow`} x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="blur" />
+        {/* Glow para o traço iluminado */}
+        <filter id={`${uid}-glow`} x="-60%" y="-100%" width="220%" height="300%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+
+        {/* Gradiente da onda: apagado → brilhante → apagado */}
+        <linearGradient id={`${uid}-wgrad`} gradientUnits="userSpaceOnUse"
+          x1="0" y1="0" x2={waveW} y2="0">
+          <stop offset="0%"   stopColor="white" stopOpacity="0"   />
+          <stop offset="25%"  stopColor="white" stopOpacity="0.5" />
+          <stop offset="55%"  stopColor="white" stopOpacity="1"   />
+          <stop offset="80%"  stopColor="white" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="white" stopOpacity="0"   />
+        </linearGradient>
+
+        {/* Máscara que desliza da esquerda para a direita */}
+        <mask id={`${uid}-mask`}>
+          <rect x="0" y="-4" width={waveW} height={h + 8} fill={`url(#${uid}-wgrad)`}>
+            <animateTransform
+              attributeName="transform" type="translate"
+              values={`${-waveW},0; ${w + 4},0`}
+              dur={dur} repeatCount="indefinite" calcMode="linear"
+            />
+          </rect>
+        </mask>
       </defs>
 
-      {/* Traço fantasma — linha completa, bem apagada */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1"
-        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.10" />
+      {/* Linha base — sempre visível, mostra a forma da semana */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5"
+        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.18" />
 
-      {/* Trail longo tênue — rastro que vai sumindo atrás */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.22"
+      {/* Linha iluminada — brilha só onde a onda passa */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5"
         strokeLinecap="round" strokeLinejoin="round"
-        pathLength="1" strokeDasharray="0.40 0.60">
-        <animate attributeName="stroke-dashoffset"
-          values="0.40;-0.60" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Trail médio */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.55"
-        strokeLinecap="round" strokeLinejoin="round"
-        pathLength="1" strokeDasharray="0.13 0.87">
-        <animate attributeName="stroke-dashoffset"
-          values="0.13;-0.87" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Traço nítido — recém desenhado */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeOpacity="0.90"
-        strokeLinecap="round" strokeLinejoin="round"
-        pathLength="1" strokeDasharray="0.04 0.96">
-        <animate attributeName="stroke-dashoffset"
-          values="0.04;-0.96" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Ponta brilhante com glow */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="3" strokeOpacity="1"
-        strokeLinecap="round" strokeLinejoin="round"
-        pathLength="1" strokeDasharray="0.015 0.985"
-        filter={`url(#${uid}-glow)`}>
-        <animate attributeName="stroke-dashoffset"
-          values="0.015;-0.985" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-
-      {/* Ponto de luz percorrendo a linha */}
-      <circle r="2.5" fill={color} filter={`url(#${uid}-glow)`} opacity="1">
-        <animateMotion path={pathD} dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </circle>
+        filter={`url(#${uid}-glow)`}
+        mask={`url(#${uid}-mask)`} />
     </svg>
   );
 }
