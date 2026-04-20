@@ -43,13 +43,25 @@ export default function Dispositivos() {
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTentId, setNewTentId] = useState<string>("");
-  const [newTokenReveal, setNewTokenReveal] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState<{
+    token: string;
+    tentId: number;
+    tentName: string;
+  } | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+
+  const serverUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const createToken = trpc.device.createToken.useMutation({
     onSuccess: ({ token }) => {
-      setNewTokenReveal(token);
+      const tentId = parseInt(newTentId);
+      const tent = tents.find((t) => t.id === tentId);
+      setRevealed({
+        token,
+        tentId,
+        tentName: tent?.name ?? `Estufa ${tentId}`,
+      });
       setAddOpen(false);
       setNewName("");
       setNewTentId("");
@@ -74,12 +86,12 @@ export default function Dispositivos() {
     createToken.mutate({ name: newName.trim(), tentId: parseInt(newTentId) });
   }
 
-  async function copyToken(token: string) {
+  async function copyValue(value: string, key: string) {
     try {
-      await navigator.clipboard.writeText(token);
-      setCopied(true);
-      toast.success("Token copiado!");
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      toast.success("Copiado!");
+      setTimeout(() => setCopied(null), 1500);
     } catch {
       toast.error("Falha ao copiar");
     }
@@ -102,6 +114,30 @@ export default function Dispositivos() {
                 Cada token fica vinculado a uma estufa.
               </div>
             </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                  Server URL
+                </p>
+                <p className="text-sm font-mono truncate">{serverUrl}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyValue(serverUrl, "server")}
+                className="gap-1 shrink-0"
+              >
+                {copied === "server" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copied === "server" ? "Copiado" : "Copiar"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Cole este valor no campo <strong>Server URL</strong> do portal de setup do ESP32
+              (rede WiFi <code className="text-xs bg-muted px-1 rounded">Cultivo-Setup-XXXX</code>).
+            </p>
           </div>
 
           <div className="flex items-center justify-between">
@@ -146,7 +182,11 @@ export default function Dispositivos() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{t.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {t.tentName ?? `Estufa ${t.tentId}`} · criado{" "}
+                      {t.tentName ?? `Estufa ${t.tentId}`}
+                      <span className="ml-1 px-1.5 py-0.5 rounded bg-muted font-mono text-[10px]">
+                        ID: {t.tentId}
+                      </span>{" "}
+                      · criado{" "}
                       {format(new Date(t.createdAt), "dd MMM yyyy", { locale: ptBR })}
                     </p>
                     <p className="text-[10px] font-mono text-muted-foreground mt-0.5">
@@ -216,28 +256,67 @@ export default function Dispositivos() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: revelar token recém-criado (só mostra uma vez) */}
-      <Dialog open={!!newTokenReveal} onOpenChange={(o) => !o && setNewTokenReveal(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Dialog: revelar token recém-criado (só mostra uma vez) + guia de setup */}
+      <Dialog open={!!revealed} onOpenChange={(o) => !o && setRevealed(null)}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Token gerado</DialogTitle>
+            <DialogTitle>Token gerado — configure seu ESP32</DialogTitle>
             <DialogDescription>
-              Copie agora — o token completo só é exibido uma vez. Use-o no firmware do ESP32
-              na constante <code className="text-xs bg-muted px-1 rounded">DEVICE_TOKEN</code>.
+              O token completo só é exibido uma vez. Siga os passos abaixo pra parear o terminal.
             </DialogDescription>
           </DialogHeader>
-          <div className="bg-muted rounded-lg p-3 font-mono text-xs break-all select-all">
-            {newTokenReveal}
-          </div>
+
+          {revealed && (
+            <div className="space-y-4 py-2">
+              <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
+                <li>Ligue o ESP32 — ele vai subir a rede <code className="text-xs bg-muted px-1 rounded">Cultivo-Setup-XXXX</code></li>
+                <li>Conecte seu celular nessa rede</li>
+                <li>Abra <code className="text-xs bg-muted px-1 rounded">http://192.168.4.1</code> no navegador</li>
+                <li>Preencha os 3 valores abaixo + SSID/senha do seu WiFi</li>
+              </ol>
+
+              <div className="space-y-2.5">
+                {[
+                  { key: "server", label: "Server URL", value: serverUrl, mono: true },
+                  { key: "token", label: "Device Token", value: revealed.token, mono: true, wrap: true },
+                  { key: "tent", label: `Tent ID  (${revealed.tentName})`, value: String(revealed.tentId), mono: true },
+                ].map((field) => (
+                  <div key={field.key} className="border border-border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        {field.label}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1"
+                        onClick={() => copyValue(field.value, field.key)}
+                      >
+                        {copied === field.key ? (
+                          <Check className="w-3.5 h-3.5" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                        <span className="text-xs">
+                          {copied === field.key ? "Copiado" : "Copiar"}
+                        </span>
+                      </Button>
+                    </div>
+                    <p
+                      className={`text-xs select-all ${field.mono ? "font-mono" : ""} ${
+                        field.wrap ? "break-all" : "truncate"
+                      }`}
+                    >
+                      {field.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
-            <Button
-              onClick={() => newTokenReveal && copyToken(newTokenReveal)}
-              className="gap-2"
-            >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? "Copiado" : "Copiar"}
-            </Button>
-            <Button variant="outline" onClick={() => setNewTokenReveal(null)}>
+            <Button variant="outline" onClick={() => setRevealed(null)}>
               Fechar
             </Button>
           </DialogFooter>
