@@ -89,11 +89,10 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
 #define COL_PRP     0xA78BFA
 #define COL_BLU     0x60A5FA
 
-// ── LVGL buffers ────────────────────────────────────────────────────────────────
-static lv_disp_draw_buf_t draw_buf;
+// ── LVGL v9 buffers (uint8_t pra suportar varios formats) ───────────────────────
 static const uint32_t BUF_LINES = 20;
-static lv_color_t buf1[480 * BUF_LINES];
-static lv_color_t buf2[480 * BUF_LINES];
+static uint8_t buf1[480 * BUF_LINES * sizeof(lv_color_t)];
+static uint8_t buf2[480 * BUF_LINES * sizeof(lv_color_t)];
 
 // ── Estado dos dados ────────────────────────────────────────────────────────────
 static char TENT_NAME[50] = "ESTUFA 1";
@@ -144,9 +143,9 @@ static const char* METRIC_KEYS[4]   = { "temp", "rh", "ph", "ec" };
 static const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Display + touch callbacks
+// Display + touch callbacks (LVGL v9 API)
 // ════════════════════════════════════════════════════════════════════════════════
-static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *px_map) {
+static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
   uint32_t w = area->x2 - area->x1 + 1;
   uint32_t h = area->y2 - area->y1 + 1;
 #ifdef REAL_HARDWARE
@@ -157,7 +156,7 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *p
   tft.writePixels((uint16_t*)px_map, w * h);
   tft.endWrite();
 #endif
-  lv_disp_flush_ready(disp);
+  lv_display_flush_ready(disp);
 }
 
 static bool ftRead(int &rx, int &ry) {
@@ -175,16 +174,16 @@ static bool ftRead(int &rx, int &ry) {
   return true;
 }
 
-static void touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data) {
+static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
   int rx, ry;
-  if (!ftRead(rx, ry)) { data->state = LV_INDEV_STATE_REL; return; }
+  if (!ftRead(rx, ry)) { data->state = LV_INDEV_STATE_RELEASED; return; }
 #ifdef REAL_HARDWARE
   data->point.x = rx; data->point.y = ry;
 #else
   data->point.x = map(ry, 0, 320, 0, SCREEN_W);
   data->point.y = map(rx, 0, 240, SCREEN_H, 0);
 #endif
-  data->state = LV_INDEV_STATE_PR;
+  data->state = LV_INDEV_STATE_PRESSED;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -339,7 +338,8 @@ static void buildHome(lv_obj_t *tab) {
     lv_chart_set_div_line_count(ch, 0, 0);
     lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ch, 0, 0);
-    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_width(ch,  0, LV_PART_INDICATOR);   // v9: size separado em w/h
+    lv_obj_set_style_height(ch, 0, LV_PART_INDICATOR);
     lv_obj_set_style_line_width(ch, sw(2), LV_PART_ITEMS);
     lv_obj_set_style_line_color(ch, lv_color_hex(color), LV_PART_ITEMS);
     lv_obj_set_style_pad_all(ch, 0, 0);
@@ -427,17 +427,18 @@ static void regarBtnCb(lv_event_t *e) {
 
 static void regarSalvarCb(lv_event_t *e) {
   postWatering(litros);
-  // feedback toast
-  lv_obj_t *msg = lv_msgbox_create(NULL, "Rega salva", "Volume registrado.", NULL, false);
+  // feedback toast (LVGL v9 API)
+  lv_obj_t *msg = lv_msgbox_create(NULL);
+  lv_msgbox_add_title(msg, "Rega salva");
+  lv_msgbox_add_text(msg, "Volume registrado.");
+  lv_obj_set_style_bg_color(msg, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_text_color(msg, lv_color_hex(COL_GRN), 0);
   lv_obj_center(msg);
-  lv_obj_t *bg = lv_msgbox_get_content(msg);
-  lv_obj_set_style_bg_color(bg, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_text_color(bg, lv_color_hex(COL_GRN), 0);
   // fecha automaticamente em 1.5s
   lv_timer_t *t = lv_timer_create([](lv_timer_t *t) {
-    lv_obj_t *m = (lv_obj_t*)t->user_data;
+    lv_obj_t *m = (lv_obj_t*)lv_timer_get_user_data(t);
     lv_msgbox_close(m);
-    lv_timer_del(t);
+    lv_timer_delete(t);
   }, 1500, msg);
   (void)t;
 }
@@ -523,12 +524,14 @@ static void phEcSalvarCb(lv_event_t *e) {
   lv_textarea_set_text(taPh, "");
   lv_textarea_set_text(taEc, "");
 
-  lv_obj_t *msg = lv_msgbox_create(NULL, "Medicao salva", "pH/EC registrados.", NULL, false);
+  lv_obj_t *msg = lv_msgbox_create(NULL);
+  lv_msgbox_add_title(msg, "Medicao salva");
+  lv_msgbox_add_text(msg, "pH/EC registrados.");
   lv_obj_center(msg);
   lv_timer_t *t = lv_timer_create([](lv_timer_t *t) {
-    lv_obj_t *m = (lv_obj_t*)t->user_data;
+    lv_obj_t *m = (lv_obj_t*)lv_timer_get_user_data(t);
     lv_msgbox_close(m);
-    lv_timer_del(t);
+    lv_timer_delete(t);
   }, 1500, msg);
   (void)t;
 }
@@ -675,7 +678,7 @@ static void applyHistToChart() {
   fetchHistory(METRIC_KEYS[histMetric], PERIOD_KEYS[histPeriod], buf, n, 60);
   if (n < 2) {
     lv_chart_set_point_count(chartHist, 2);
-    lv_chart_set_all_value(chartHist, serHist, LV_CHART_POINT_NONE);
+    lv_chart_set_all_values(chartHist, serHist, LV_CHART_POINT_NONE);
     lv_chart_refresh(chartHist);
     return;
   }
@@ -687,7 +690,7 @@ static void applyHistToChart() {
   if (vmax - vmin < 0.5f) { vmin -= 0.5f; vmax += 0.5f; }
   lv_chart_set_range(chartHist, LV_CHART_AXIS_PRIMARY_Y, (int32_t)(vmin*10), (int32_t)(vmax*10));
   lv_chart_set_point_count(chartHist, n);
-  lv_chart_set_all_value(chartHist, serHist, LV_CHART_POINT_NONE);
+  lv_chart_set_all_values(chartHist, serHist, LV_CHART_POINT_NONE);
   for (int i = 0; i < n; i++) lv_chart_set_next_value(chartHist, serHist, (int32_t)(buf[i]*10));
   lv_obj_set_style_line_color(chartHist, lv_color_hex(metricHistColor(histMetric)), LV_PART_ITEMS);
   lv_chart_refresh(chartHist);
@@ -733,7 +736,8 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_chart_set_type(chartHist, LV_CHART_TYPE_LINE);
   lv_chart_set_point_count(chartHist, 24);
   lv_chart_set_div_line_count(chartHist, 4, 6);
-  lv_obj_set_style_size(chartHist, 0, LV_PART_INDICATOR);
+  lv_obj_set_style_width(chartHist,  0, LV_PART_INDICATOR);
+  lv_obj_set_style_height(chartHist, 0, LV_PART_INDICATOR);
   lv_obj_set_style_line_width(chartHist, sw(2), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(chartHist, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(chartHist, lv_color_hex(COL_BORDER), 0);
@@ -1101,21 +1105,18 @@ void setup() {
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
   lv_init();
 
-  lv_disp_draw_buf_init(&draw_buf, buf1, buf2, SCREEN_W * BUF_LINES);
+  // LVGL v9: tick a partir de millis() (nao precisa de timer manual)
+  lv_tick_set_cb([]() -> uint32_t { return millis(); });
 
-  static lv_disp_drv_t disp_drv;
-  lv_disp_drv_init(&disp_drv);
-  disp_drv.hor_res  = SCREEN_W;
-  disp_drv.ver_res  = SCREEN_H;
-  disp_drv.flush_cb = disp_flush;
-  disp_drv.draw_buf = &draw_buf;
-  lv_disp_drv_register(&disp_drv);
+  // LVGL v9: criar display + setar buffers + flush callback
+  lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);
+  lv_display_set_buffers(disp, buf1, buf2, sizeof(buf1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+  lv_display_set_flush_cb(disp, disp_flush);
 
-  static lv_indev_drv_t indev_drv;
-  lv_indev_drv_init(&indev_drv);
-  indev_drv.type    = LV_INDEV_TYPE_POINTER;
-  indev_drv.read_cb = touchpad_read;
-  lv_indev_drv_register(&indev_drv);
+  // LVGL v9: criar input device (touch)
+  lv_indev_t *indev = lv_indev_create();
+  lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(indev, touchpad_read);
 
   buildUI();
 
