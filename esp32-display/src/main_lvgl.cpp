@@ -1349,19 +1349,23 @@ void setup() {
   gfx->begin();
   gfx->fillScreen(0);
 #else
+  Serial.println("[boot] SPI+TFT init");
   SPI.begin(TFT_SCK, TFT_MISO, TFT_MOSI, TFT_CS);
   tft.begin();
   tft.setRotation(1);
   tft.fillScreen(0);
 #endif
 
+  Serial.println("[boot] Wire init");
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
+  Serial.println("[boot] lv_init");
   lv_init();
 
   // LVGL v9: tick a partir de millis() (nao precisa de timer manual)
   lv_tick_set_cb([]() -> uint32_t { return millis(); });
 
   // LVGL v9: criar display + setar buffers + flush callback
+  Serial.println("[boot] lv_display_create");
   lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);
   lv_display_set_buffers(disp, buf1, buf2, sizeof(buf1), LV_DISPLAY_RENDER_MODE_PARTIAL);
   lv_display_set_flush_cb(disp, disp_flush);
@@ -1371,7 +1375,9 @@ void setup() {
   lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(indev, touchpad_read);
 
+  Serial.println("[boot] buildUI");
   buildUI();
+  Serial.println("[boot] buildUI ok");
 
   initMockTarefas();
   rebuildTarefasList();
