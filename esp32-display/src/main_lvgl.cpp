@@ -236,6 +236,7 @@ static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
 
 // ════════════════════════════════════════════════════════════════════════════════
 // Aba HOME — estilo Ebike demo: arc gigante (TEMP) + coluna de mini-cards
+// Layout responsivo via sw()/sh() — escala proporcional no hardware real
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
@@ -248,53 +249,49 @@ static void buildHome(lv_obj_t *tab) {
   lv_img_set_src(hdrIcon, &ic_sprout);
   lv_obj_set_style_img_recolor(hdrIcon, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_img_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
-  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, 4, 2);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
 
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, 38, 4);
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
 
   char subBuf[48];
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  lblSub = makeLabel(tab, subBuf, COL_PRP, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 38, 22);
+  lblSub = makeLabel(tab, subBuf, COL_PRP, FONT_CAPTION, LV_ALIGN_TOP_LEFT, sw(38), sh(22));
 
   lv_obj_t *wifiIcon = lv_img_create(tab);
   lv_img_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
   lv_obj_set_style_img_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
   lv_obj_set_style_img_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
-  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -4, 4);
+  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
   lblWifi = wifiIcon;
 
   // ═══ Corpo: arc gigante à esquerda + 3 mini-cards à direita ═══
-  int bodyY = 42;
-  int bodyH = TAB_H - bodyY - 4;
+  int bodyY = sh(42);
+  int bodyH = TAB_H - bodyY - sh(4);
   int halfW = SCREEN_W / 2;
 
   // ─── ARC TEMP (estilo velocímetro Ebike) ────────────────────────────
-  int arcSize = (bodyH < halfW - 8) ? bodyH : halfW - 8;
+  int arcSize = (bodyH < halfW - sw(8)) ? bodyH : halfW - sw(8);
   arcTemp = lv_arc_create(tab);
   lv_obj_set_size(arcTemp, arcSize, arcSize);
   lv_obj_set_pos(arcTemp, (halfW - arcSize) / 2, bodyY + (bodyH - arcSize) / 2);
-  lv_arc_set_range(arcTemp, 0, 40);          // 0°C a 40°C
+  lv_arc_set_range(arcTemp, 0, 40);
   lv_arc_set_value(arcTemp, (int)tempC);
-  lv_arc_set_bg_angles(arcTemp, 135, 45);    // semicircular aberto embaixo
+  lv_arc_set_bg_angles(arcTemp, 135, 45);
   lv_arc_set_rotation(arcTemp, 0);
   lv_obj_remove_style(arcTemp, NULL, LV_PART_KNOB);
   lv_obj_clear_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
-  // background do arc (faixa do range completo)
-  lv_obj_set_style_arc_width(arcTemp, 8, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(arcTemp, sw(8),  LV_PART_MAIN);
   lv_obj_set_style_arc_color(arcTemp, lv_color_hex(0x1F2937), LV_PART_MAIN);
   lv_obj_set_style_arc_opa(arcTemp, LV_OPA_80, LV_PART_MAIN);
-  // indicador (cor da temperatura, glow)
-  lv_obj_set_style_arc_width(arcTemp, 10, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_width(arcTemp, sw(10), LV_PART_INDICATOR);
   lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
 
-  // Label "TEMP" pequeno no topo do arc
   lv_obj_t *lblTempHdr = lv_label_create(arcTemp);
   lv_label_set_text(lblTempHdr, "TEMP");
   lv_obj_set_style_text_color(lblTempHdr, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_text_font(lblTempHdr, FONT_CAPTION, 0);
   lv_obj_align(lblTempHdr, LV_ALIGN_CENTER, 0, -arcSize / 4);
 
-  // Valor grande central — TEMP
   lblTemp = lv_label_create(arcTemp);
   lv_label_set_text(lblTemp, "--");
   lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
@@ -302,7 +299,6 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
   applyNeonGlow(lblTemp, COL_GRN);
 
-  // Unidade "°C" embaixo do valor
   lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
   lv_label_set_text(lblTempUnit, "°C");
   lv_obj_set_style_text_color(lblTempUnit, lv_color_hex(COL_DIM), 0);
@@ -310,55 +306,51 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_align(lblTempUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
 
   // ─── 3 mini-cards à direita (UMIDADE, pH, EC) ─────────────────────────
-  int rightX = halfW + 2;
-  int cardW = SCREEN_W - rightX - 4;
-  int cardGap = 4;
+  int rightX = halfW + sw(2);
+  int cardW = SCREEN_W - rightX - sw(4);
+  int cardGap = sh(4);
   int cardH = (bodyH - 2 * cardGap) / 3;
 
   auto makeMiniCard = [&](int yOffset, const char *label, const char *initVal,
                           uint32_t color, const lv_img_dsc_t *icon,
                           lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
     lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
-    lv_obj_set_style_pad_all(c, 4, 0);
+    lv_obj_set_style_pad_all(c, sw(4), 0);
 
-    // ícone Lucide à esquerda do card
     lv_obj_t *ico = lv_img_create(c);
     lv_img_set_src(ico, icon);
     lv_obj_set_style_img_recolor(ico, lv_color_hex(color), 0);
     lv_obj_set_style_img_recolor_opa(ico, LV_OPA_COVER, 0);
     lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
 
-    // label (UMIDADE, pH, EC) no topo-direito
     lv_obj_t *lb = lv_label_create(c);
     lv_label_set_text(lb, label);
     lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
     lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
     lv_obj_align(lb, LV_ALIGN_TOP_RIGHT, 0, 0);
 
-    // mini sparkline pulsante no meio (entre icone e valor)
-    int chartW = cardW - 44;
-    int chartH = 14;
+    int chartW = cardW - sw(44);
+    int chartH = sh(14);
     lv_obj_t *ch = lv_chart_create(c);
     lv_obj_set_size(ch, chartW, chartH);
-    lv_obj_align(ch, LV_ALIGN_RIGHT_MID, 0, -1);
+    lv_obj_align(ch, LV_ALIGN_RIGHT_MID, 0, -sh(1));
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ch, 20);
     lv_chart_set_div_line_count(ch, 0, 0);
     lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ch, 0, 0);
-    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);   // sem marcadores
-    lv_obj_set_style_line_width(ch, 2, LV_PART_ITEMS);
+    lv_obj_set_style_size(ch, 0, LV_PART_INDICATOR);
+    lv_obj_set_style_line_width(ch, sw(2), LV_PART_ITEMS);
     lv_obj_set_style_line_color(ch, lv_color_hex(color), LV_PART_ITEMS);
     lv_obj_set_style_pad_all(ch, 0, 0);
     *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
     *sparkOut = ch;
 
-    // valor grande no bottom-direito
     lv_obj_t *v = lv_label_create(c);
     lv_label_set_text(v, initVal);
     lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
     lv_obj_set_style_text_font(v, FONT_TITLE, 0);
-    lv_obj_align(v, LV_ALIGN_BOTTOM_RIGHT, 0, 2);
+    lv_obj_align(v, LV_ALIGN_BOTTOM_RIGHT, 0, sh(2));
     applyNeonGlow(v, color);
     return v;
   };
@@ -369,8 +361,8 @@ static void buildHome(lv_obj_t *tab) {
 
   // Inicializa sparklines com valores iniciais + ajusta range
   lv_chart_set_range(sparkRh, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
-  lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);   // pH 4.0 a 9.0 (x10)
-  lv_chart_set_range(sparkEc, LV_CHART_AXIS_PRIMARY_Y, 0, 40);    // EC 0 a 4.0 (x10)
+  lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);
+  lv_chart_set_range(sparkEc, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
   for (int i = 0; i < 20; i++) {
     lv_chart_set_next_value(sparkRh, serRhS, (int32_t)rh);
     lv_chart_set_next_value(sparkPh, serPhS, (int32_t)(phv * 10));
@@ -451,46 +443,47 @@ static void regarSalvarCb(lv_event_t *e) {
 }
 
 static void buildRegar(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, 8, 0);
+  lv_obj_set_style_pad_all(tab, sw(8), 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
   makeLabel(tab, "REGA", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_MID, 0, 0);
-  makeLabel(tab, "Quantos litros voce regou?", COL_DIM, FONT_BODY, LV_ALIGN_TOP_MID, 0, 22);
+  makeLabel(tab, "Quantos litros voce regou?", COL_DIM, FONT_BODY, LV_ALIGN_TOP_MID, 0, sh(22));
 
   // Card central com valor
-  int cardW = SCREEN_W - 32;
-  int cardH = 60;
-  lv_obj_t *card = makeCard(tab, 16, 46, cardW, cardH);
+  int cardW = SCREEN_W - sw(32);
+  int cardH = sh(60);
+  lv_obj_t *card = makeCard(tab, sw(16), sh(46), cardW, cardH);
   lblLitros = makeLabel(card, "1.0 L", COL_CYN, FONT_VALUE, LV_ALIGN_CENTER, 0, 0);
 
   // Botoes - / +
-  int btnY = 46 + cardH + 10;
+  int btnW = sw(48), btnH = sh(36);
+  int btnY = sh(46) + cardH + sh(10);
   lv_obj_t *btnMinus = lv_btn_create(tab);
-  lv_obj_set_size(btnMinus, 48, 36);
-  lv_obj_set_pos(btnMinus, 16, btnY);
+  lv_obj_set_size(btnMinus, btnW, btnH);
+  lv_obj_set_pos(btnMinus, sw(16), btnY);
   lv_obj_set_style_bg_color(btnMinus, lv_color_hex(COL_BORDER), 0);
   lv_obj_add_event_cb(btnMinus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)-1);
-  makeLabel(btnMinus, "-", COL_RED, FONT_VALUE, LV_ALIGN_CENTER, 0, -2);
+  makeLabel(btnMinus, "-", COL_RED, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(2));
 
   lv_obj_t *btnPlus = lv_btn_create(tab);
-  lv_obj_set_size(btnPlus, 48, 36);
-  lv_obj_set_pos(btnPlus, SCREEN_W - 16 - 48, btnY);
+  lv_obj_set_size(btnPlus, btnW, btnH);
+  lv_obj_set_pos(btnPlus, SCREEN_W - sw(16) - btnW, btnY);
   lv_obj_set_style_bg_color(btnPlus, lv_color_hex(COL_BORDER), 0);
   lv_obj_add_event_cb(btnPlus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)+1);
-  makeLabel(btnPlus, "+", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, -2);
+  makeLabel(btnPlus, "+", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(2));
 
   // Slider entre os botoes
   sliderRegar = lv_slider_create(tab);
-  lv_obj_set_size(sliderRegar, SCREEN_W - 32 - 48*2 - 20, 8);
-  lv_obj_set_pos(sliderRegar, 16 + 48 + 10, btnY + 14);
-  lv_slider_set_range(sliderRegar, 5, 200);  // 0.5 a 20.0 (x10)
+  lv_obj_set_size(sliderRegar, SCREEN_W - sw(32) - btnW*2 - sw(20), sh(8));
+  lv_obj_set_pos(sliderRegar, sw(16) + btnW + sw(10), btnY + sh(14));
+  lv_slider_set_range(sliderRegar, 5, 200);
   lv_slider_set_value(sliderRegar, 10, LV_ANIM_OFF);
   lv_obj_add_event_cb(sliderRegar, regarSliderCb, LV_EVENT_VALUE_CHANGED, NULL);
 
   // Botao SALVAR
   lv_obj_t *btnSave = lv_btn_create(tab);
-  lv_obj_set_size(btnSave, SCREEN_W - 32, 36);
-  lv_obj_align(btnSave, LV_ALIGN_BOTTOM_MID, 0, -8);
+  lv_obj_set_size(btnSave, SCREEN_W - sw(32), sh(36));
+  lv_obj_align(btnSave, LV_ALIGN_BOTTOM_MID, 0, -sh(8));
   lv_obj_set_style_bg_color(btnSave, lv_color_hex(0x064E3B), 0);
   lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_border_width(btnSave, 1, 0);
@@ -541,17 +534,17 @@ static void phEcSalvarCb(lv_event_t *e) {
 }
 
 static void buildPhEc(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, 6, 0);
+  lv_obj_set_style_pad_all(tab, sw(6), 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
   makeLabel(tab, "MEDICAO pH / EC", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
 
-  int fieldW = (SCREEN_W - 24) / 2;
-  int fieldH = 38;
+  int fieldW = (SCREEN_W - sw(24)) / 2;
+  int fieldH = sh(38);
 
   taPh = lv_textarea_create(tab);
   lv_obj_set_size(taPh, fieldW, fieldH);
-  lv_obj_set_pos(taPh, 6, 18);
+  lv_obj_set_pos(taPh, sw(6), sh(18));
   lv_textarea_set_accepted_chars(taPh, "0123456789.");
   lv_textarea_set_max_length(taPh, 5);
   lv_textarea_set_one_line(taPh, true);
@@ -563,7 +556,7 @@ static void buildPhEc(lv_obj_t *tab) {
 
   taEc = lv_textarea_create(tab);
   lv_obj_set_size(taEc, fieldW, fieldH);
-  lv_obj_set_pos(taEc, 12 + fieldW, 18);
+  lv_obj_set_pos(taEc, sw(12) + fieldW, sh(18));
   lv_textarea_set_accepted_chars(taEc, "0123456789.");
   lv_textarea_set_max_length(taEc, 5);
   lv_textarea_set_one_line(taEc, true);
@@ -575,8 +568,8 @@ static void buildPhEc(lv_obj_t *tab) {
 
   // Botao SALVAR
   lv_obj_t *btnSave = lv_btn_create(tab);
-  lv_obj_set_size(btnSave, SCREEN_W - 24, 30);
-  lv_obj_set_pos(btnSave, 12, 62);
+  lv_obj_set_size(btnSave, SCREEN_W - sw(24), sh(30));
+  lv_obj_set_pos(btnSave, sw(12), sh(62));
   lv_obj_set_style_bg_color(btnSave, lv_color_hex(0x064E3B), 0);
   lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_border_width(btnSave, 1, 0);
@@ -588,7 +581,7 @@ static void buildPhEc(lv_obj_t *tab) {
   lv_keyboard_set_mode(kbNumero, LV_KEYBOARD_MODE_NUMBER);
   lv_keyboard_set_textarea(kbNumero, taPh);
   lv_keyboard_set_popovers(kbNumero, false);
-  lv_obj_set_size(kbNumero, SCREEN_W - 12, TAB_H - 100);
+  lv_obj_set_size(kbNumero, SCREEN_W - sw(12), TAB_H - sh(100));
   lv_obj_align(kbNumero, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_obj_set_style_bg_color(kbNumero, lv_color_hex(COL_BG), 0);
 
@@ -651,18 +644,18 @@ static void rebuildTarefasList() {
 }
 
 static void buildTarefas(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, 6, 0);
+  lv_obj_set_style_pad_all(tab, sw(6), 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
   makeLabel(tab, "TAREFAS DO DIA", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
 
   tarefasList = lv_obj_create(tab);
-  lv_obj_set_size(tarefasList, SCREEN_W - 12, TAB_H - 34);
-  lv_obj_align(tarefasList, LV_ALIGN_TOP_MID, 0, 22);
+  lv_obj_set_size(tarefasList, SCREEN_W - sw(12), TAB_H - sh(34));
+  lv_obj_align(tarefasList, LV_ALIGN_TOP_MID, 0, sh(22));
   lv_obj_set_style_bg_opa(tarefasList, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(tarefasList, 0, 0);
   lv_obj_set_flex_flow(tarefasList, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_style_pad_row(tarefasList, 4, 0);
+  lv_obj_set_style_pad_row(tarefasList, sh(4), 0);
 
   rebuildTarefasList();
 }
@@ -717,7 +710,7 @@ static void mtxPeriodCb(lv_event_t *e) {
 }
 
 static void buildHistorico(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, 6, 0);
+  lv_obj_set_style_pad_all(tab, sw(6), 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
 
   makeLabel(tab, "HISTORICO", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
@@ -729,8 +722,8 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_btnmatrix_set_one_checked(mtxMetric, true);
   for (int i = 0; i < 4; i++) lv_btnmatrix_set_btn_ctrl(mtxMetric, i, LV_BTNMATRIX_CTRL_CHECKABLE);
   lv_btnmatrix_set_btn_ctrl(mtxMetric, 0, LV_BTNMATRIX_CTRL_CHECKED);
-  lv_obj_set_size(mtxMetric, SCREEN_W - 12, 24);
-  lv_obj_align(mtxMetric, LV_ALIGN_TOP_MID, 0, 20);
+  lv_obj_set_size(mtxMetric, SCREEN_W - sw(12), sh(24));
+  lv_obj_align(mtxMetric, LV_ALIGN_TOP_MID, 0, sh(20));
   lv_obj_set_style_bg_color(mtxMetric, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_text_font(mtxMetric, FONT_BODY, 0);
   lv_obj_add_event_cb(mtxMetric, mtxMetricCb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -741,12 +734,12 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_chart_set_point_count(chartHist, 24);
   lv_chart_set_div_line_count(chartHist, 4, 6);
   lv_obj_set_style_size(chartHist, 0, LV_PART_INDICATOR);
-  lv_obj_set_style_line_width(chartHist, 2, LV_PART_ITEMS);
+  lv_obj_set_style_line_width(chartHist, sw(2), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(chartHist, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(chartHist, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_line_color(chartHist, lv_color_hex(COL_BORDER), LV_PART_MAIN);
-  int chartY = 50, chartH = TAB_H - chartY - 34;
-  lv_obj_set_size(chartHist, SCREEN_W - 12, chartH);
+  int chartY = sh(50), chartH = TAB_H - chartY - sh(34);
+  lv_obj_set_size(chartHist, SCREEN_W - sw(12), chartH);
   lv_obj_align(chartHist, LV_ALIGN_TOP_MID, 0, chartY);
   serHist = lv_chart_add_series(chartHist, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
 
@@ -757,8 +750,8 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_btnmatrix_set_one_checked(mtxPeriod, true);
   for (int i = 0; i < 3; i++) lv_btnmatrix_set_btn_ctrl(mtxPeriod, i, LV_BTNMATRIX_CTRL_CHECKABLE);
   lv_btnmatrix_set_btn_ctrl(mtxPeriod, 0, LV_BTNMATRIX_CTRL_CHECKED);
-  lv_obj_set_size(mtxPeriod, SCREEN_W - 12, 24);
-  lv_obj_align(mtxPeriod, LV_ALIGN_BOTTOM_MID, 0, -4);
+  lv_obj_set_size(mtxPeriod, SCREEN_W - sw(12), sh(24));
+  lv_obj_align(mtxPeriod, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
   lv_obj_set_style_bg_color(mtxPeriod, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_text_font(mtxPeriod, FONT_BODY, 0);
   lv_obj_add_event_cb(mtxPeriod, mtxPeriodCb, LV_EVENT_VALUE_CHANGED, NULL);
