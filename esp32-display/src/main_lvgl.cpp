@@ -8,6 +8,7 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <WiFi.h>
+#include <WebServer.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
@@ -59,6 +60,12 @@ static void saveConfigToNVS(const char* ssid, const char* pass, const char* url,
   prefs.putString("server", url);
   prefs.putString("token",  token);
   prefs.putInt   ("tent",   tent);
+  prefs.end();
+}
+
+static void clearConfigNVS() {
+  prefs.begin("cultivo", false);
+  prefs.clear();
   prefs.end();
 }
 // ════════════════════════════════════════════════════════════════════════════════
@@ -693,6 +700,20 @@ static void openConfigModal() {
   lv_obj_add_event_cb(btnCancel, cfgCancelCb, LV_EVENT_CLICKED, NULL);
   makeLabel(btnCancel, "Cancelar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
+  lv_obj_t *btnReset = lv_btn_create(configModal);
+  lv_obj_set_size(btnReset, sw(70), sh(28));
+  lv_obj_align(btnReset, LV_ALIGN_BOTTOM_MID, 0, -sh(6));
+  lv_obj_set_style_bg_color(btnReset, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_RED), 0);
+  lv_obj_set_style_border_width(btnReset, 1, 0);
+  lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
+    Serial.println("[cfg] reset WiFi -> AP portal");
+    clearConfigNVS();
+    delay(300);
+    ESP.restart();
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnReset, "Reset WiFi", COL_RED, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+
   lv_obj_t *btnSave = lv_btn_create(configModal);
   lv_obj_set_size(btnSave, sw(100), sh(28));
   lv_obj_align(btnSave, LV_ALIGN_BOTTOM_RIGHT, -sw(6), -sh(6));
@@ -715,6 +736,162 @@ static void openConfigModal() {
     lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
   }, LV_EVENT_CANCEL, NULL);
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// AP PORTAL — modo onboarding quando nao tem WiFi salvo.
+// Sobe rede "Cultivo-Setup-XXXX" + webserver em 192.168.4.1 servindo form
+// dark-theme pra preencher WiFi/Server/Token. Salva em NVS e reboota.
+// ════════════════════════════════════════════════════════════════════════════════
+static WebServer *apServer = nullptr;
+static bool apPortalActive = false;
+static char apSsid[24] = "";
+static lv_obj_t *apScreen = nullptr;
+
+static const char PORTAL_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
+<html lang="pt-br"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cultivo Setup</title><style>
+*{box-sizing:border-box}
+body{background:#0B0F14;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  max-width:460px;margin:0 auto;padding:24px}
+h1{color:#4ADE80;text-align:center;font-weight:300;letter-spacing:3px;margin:20px 0 28px;
+  text-shadow:0 0 12px rgba(74,222,128,.4)}
+label{display:block;margin-top:18px;color:#6B7280;font-size:11px;
+  text-transform:uppercase;letter-spacing:1px}
+input,select{width:100%;padding:12px;background:#111827;border:1px solid #1F2937;
+  color:#fff;border-radius:8px;font-size:16px;margin-top:6px;outline:none;transition:border .2s}
+input:focus,select:focus{border-color:#4ADE80}
+button{width:100%;padding:14px;background:#4ADE80;color:#0B0F14;border:none;
+  border-radius:8px;font-size:14px;font-weight:700;margin-top:28px;cursor:pointer;
+  letter-spacing:1px;text-transform:uppercase;box-shadow:0 0 16px rgba(74,222,128,.3)}
+button:active{transform:translateY(1px)}
+.status{margin-top:14px;color:#6B7280;font-size:12px;text-align:center}
+.logo{text-align:center;color:#4ADE80;font-size:32px;margin-bottom:-6px}
+</style></head><body>
+<div class="logo">&#127793;</div>
+<h1>CULTIVO SETUP</h1>
+<form action="/save" method="POST">
+<label>Rede WiFi</label>
+<select name="ssid" id="ssid"><option>Escaneando...</option></select>
+<label>Senha WiFi</label>
+<input type="password" name="pass" autocomplete="off">
+<label>Server URL</label>
+<input type="text" name="url" value="http://192.168.1.100:3000">
+<label>Device Token</label>
+<input type="text" name="token" autocomplete="off">
+<label>Tent ID</label>
+<input type="number" name="tent" value="1" min="1">
+<button type="submit">Salvar e Reiniciar</button>
+<div class="status" id="status">Escaneando redes WiFi...</div>
+</form>
+<script>
+fetch('/scan').then(r=>r.json()).then(d=>{
+  const s=document.getElementById('ssid');s.innerHTML='';
+  (d.networks||[]).forEach(n=>{const o=document.createElement('option');
+    o.textContent=n;s.appendChild(o)});
+  document.getElementById('status').textContent=(d.networks||[]).length+' redes encontradas';
+}).catch(()=>{document.getElementById('status').textContent='Erro ao escanear'});
+</script></body></html>)HTML";
+
+static const char PORTAL_DONE_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="3">
+<style>body{background:#0B0F14;color:#4ADE80;font-family:sans-serif;
+text-align:center;padding:80px 20px}h1{letter-spacing:3px}</style></head><body>
+<h1>SALVO!</h1><p style="color:#6B7280">Reiniciando...</p></body></html>)HTML";
+
+static void handlePortalRoot() {
+  apServer->send_P(200, "text/html", PORTAL_HTML);
+}
+
+static void handlePortalScan() {
+  int n = WiFi.scanNetworks();
+  String j = "{\"networks\":[";
+  for (int i = 0; i < n; i++) {
+    if (i > 0) j += ",";
+    String s = WiFi.SSID(i);
+    s.replace("\"", "\\\"");
+    j += "\"" + s + "\"";
+  }
+  j += "]}";
+  apServer->send(200, "application/json", j);
+}
+
+static void handlePortalSave() {
+  String ssid  = apServer->arg("ssid");
+  String pass  = apServer->arg("pass");
+  String url   = apServer->arg("url");
+  String token = apServer->arg("token");
+  int    tent  = apServer->arg("tent").toInt();
+  if (tent <= 0) tent = 1;
+
+  Serial.printf("[ap] save ssid=%s tent=%d\n", ssid.c_str(), tent);
+  saveConfigToNVS(ssid.c_str(), pass.c_str(), url.c_str(), token.c_str(), tent);
+
+  apServer->send_P(200, "text/html", PORTAL_DONE_HTML);
+  delay(800);
+  ESP.restart();
+}
+
+static void buildApScreen(const char *ssid, const char *ip) {
+  if (apScreen) { lv_obj_del(apScreen); apScreen = nullptr; }
+  apScreen = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(apScreen, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(apScreen, 0, 0);
+  lv_obj_set_style_bg_color(apScreen, lv_color_hex(0x060A10), 0);
+  lv_obj_set_style_bg_opa(apScreen, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(apScreen, 0, 0);
+  lv_obj_set_style_radius(apScreen, 0, 0);
+  lv_obj_set_style_pad_all(apScreen, 0, 0);
+  lv_obj_clear_flag(apScreen, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(apScreen, "MODO SETUP", COL_YEL, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(14));
+  makeLabel(apScreen, "Conecte seu celular na rede:", COL_DIM, FONT_CAPTION,
+            LV_ALIGN_TOP_MID, 0, sh(46));
+
+  lv_obj_t *lblSsid = lv_label_create(apScreen);
+  lv_label_set_text(lblSsid, ssid);
+  lv_obj_set_style_text_font(lblSsid, FONT_TITLE, 0);
+  lv_obj_set_style_text_color(lblSsid, lv_color_hex(COL_GRN), 0);
+  lv_obj_align(lblSsid, LV_ALIGN_TOP_MID, 0, sh(62));
+  applyBloom(lblSsid, COL_GRN);
+
+  makeLabel(apScreen, "Abra no navegador:", COL_DIM, FONT_CAPTION,
+            LV_ALIGN_TOP_MID, 0, sh(104));
+
+  lv_obj_t *lblIp = lv_label_create(apScreen);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "http://%s", ip);
+  lv_label_set_text(lblIp, buf);
+  lv_obj_set_style_text_font(lblIp, FONT_BODY, 0);
+  lv_obj_set_style_text_color(lblIp, lv_color_hex(COL_CYN), 0);
+  lv_obj_align(lblIp, LV_ALIGN_TOP_MID, 0, sh(120));
+
+  makeLabel(apScreen, "Aguardando configuracao...", COL_DIM, FONT_CAPTION,
+            LV_ALIGN_BOTTOM_MID, 0, -sh(10));
+}
+
+static void startApPortal() {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  snprintf(apSsid, sizeof(apSsid), "Cultivo-Setup-%02X%02X", mac[4], mac[5]);
+
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apSsid);
+  delay(300);
+  IPAddress ip = WiFi.softAPIP();
+
+  apServer = new WebServer(80);
+  apServer->on("/",      HTTP_GET,  handlePortalRoot);
+  apServer->on("/scan",  HTTP_GET,  handlePortalScan);
+  apServer->on("/save",  HTTP_POST, handlePortalSave);
+  apServer->onNotFound([]() { apServer->send_P(200, "text/html", PORTAL_HTML); });
+  apServer->begin();
+
+  apPortalActive = true;
+  buildApScreen(apSsid, ip.toString().c_str());
+  Serial.printf("[ap] portal ativo: %s @ %s\n", apSsid, ip.toString().c_str());
+}
+// ════════════════════════════════════════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════════════════════════
 // Aba HOME — estilo Ebike demo: arc gigante (TEMP) + coluna de mini-cards
@@ -1815,6 +1992,13 @@ void setup() {
   initMockTarefas();
   rebuildTarefasList();
 
+  // Sem WiFi salvo → abre AP portal e fica nele ate' o usuario configurar
+  if (strlen(WIFI_SSID) == 0) {
+    Serial.println("[boot] sem WiFi salvo, subindo AP portal");
+    startApPortal();
+    return;
+  }
+
   connectWifi();
   if (wifiOk) {
     fetchDisplayData();
@@ -1828,6 +2012,14 @@ void setup() {
 }
 
 void loop() {
+  // Modo AP portal: so' processa requests HTTP + UI (overlay "MODO SETUP")
+  if (apPortalActive) {
+    if (apServer) apServer->handleClient();
+    lv_timer_handler();
+    delay(5);
+    return;
+  }
+
   if (refreshPending) {
     refreshPending = false;
     if (refreshTuyaNow()) refreshHomeValues();
