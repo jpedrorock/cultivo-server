@@ -657,7 +657,9 @@ static void buildHome(lv_obj_t *tab) {
   // Ring wave — radar ping emanando do centro do arco (duas ondas offset)
   int arcCx = (halfW - arcSize) / 2 + arcSize / 2;
   int arcCy = bodyY + (bodyH - arcSize) / 2 + arcSize / 2;
-  applyRingWave(tab, arcCx, arcCy, (int)(arcSize * 1.35f), COL_GRN);
+  // Ring wave desabilitado temporariamente — o wrapper extrapolava TAB_H
+  // e parecia confundir o hit-test do LVGL v9 sobre a navbar.
+  // applyRingWave(tab, arcCx, arcCy, (int)(arcSize * 1.35f), COL_GRN);
 
   lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
   lv_label_set_text(lblTempUnit, "°C");
@@ -1550,7 +1552,8 @@ static void buildUI() {
 
   // Area de conteudo (ocupa a tela inteira menos a navbar)
   // FASE C — Particles flutuando no fundo (atras do conteudo, na frente dos glows)
-  spawnParticleField(scr);
+  // Temporariamente off enquanto investigo o hit-test da navbar
+  // spawnParticleField(scr);
 
   contentArea = lv_obj_create(scr);
   lv_obj_set_size(contentArea, SCREEN_W, TAB_H);
