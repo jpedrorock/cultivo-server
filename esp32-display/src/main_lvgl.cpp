@@ -14,11 +14,18 @@
 #include "cultivo_icons.h"
 #include "fonts/cultivo_fonts.h"
 
-// Aliases pros tamanhos — troca Montserrat default por Manrope Bold/SemiBold
-#define FONT_VALUE   (&manrope_bold_28)    // antes: lv_font_montserrat_24
-#define FONT_TITLE   (&manrope_bold_18)    // antes: lv_font_montserrat_16
-#define FONT_BODY    (&manrope_sb_14)      // antes: lv_font_montserrat_14
-#define FONT_CAPTION (&manrope_sb_12)      // novo tamanho menor pra labels
+// Fontes responsivas — escalam automaticamente conforme hardware alvo
+#ifdef REAL_HARDWARE
+  #define FONT_VALUE   (&manrope_bold_40)    // 480x320: valores GIGANTES
+  #define FONT_TITLE   (&manrope_bold_24)
+  #define FONT_BODY    (&manrope_sb_18)
+  #define FONT_CAPTION (&manrope_sb_14)
+#else
+  #define FONT_VALUE   (&manrope_bold_28)    // 320x240: valores compactos
+  #define FONT_TITLE   (&manrope_bold_18)
+  #define FONT_BODY    (&manrope_sb_14)
+  #define FONT_CAPTION (&manrope_sb_12)
+#endif
 
 // ════════════════════════════════════════════════════════════════════════════════
 // CONFIGURACAO — preencha antes de compilar
@@ -59,8 +66,14 @@
   static const int SCREEN_H = 240;
 #endif
 
+// Helpers de escala — base 320x240 (Wokwi). No real (480x320) multiplica por 1.5 / 1.33
+// Use pra todas dimensões de layout (posições, paddings, tamanhos de container).
+// NÃO use pra fontes — as fontes já são por hardware via FONT_* macros.
+static inline int sw(int v) { return (v * SCREEN_W) / 320; }
+static inline int sh(int v) { return (v * SCREEN_H) / 240; }
+
 // Altura da navbar custom + altura util de cada screen
-static const int TABBAR_H = 48;   // icones Lucide 28px + padding
+static const int TABBAR_H = (SCREEN_H >= 320) ? 64 : 48;   // nav maior no hardware real
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
 // ── Cores do tema (espelham DisplayMode.tsx) ───────────────────────────────────
