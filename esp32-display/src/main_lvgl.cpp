@@ -10,6 +10,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <math.h>
@@ -37,7 +38,7 @@
 static Preferences prefs;
 static char    WIFI_SSID[33]    = "";
 static char    WIFI_PASS[65]    = "";
-static char    SERVER_URL[96]   = "http://192.168.1.100:3000";
+static char    SERVER_URL[96]   = "https://cultivo.x.andy.plus";
 static char    DEVICE_TOKEN[65] = "";
 static int     TENT_ID          = 1;
 
@@ -776,7 +777,7 @@ button:active{transform:translateY(1px)}
 <label>Senha WiFi</label>
 <input type="password" name="pass" autocomplete="off">
 <label>Server URL</label>
-<input type="text" name="url" value="http://192.168.1.100:3000">
+<input type="text" name="url" value="https://cultivo.x.andy.plus">
 <label>Device Token</label>
 <input type="text" name="token" autocomplete="off">
 <label>Tent ID</label>
@@ -1576,6 +1577,24 @@ static void connectWifi() {
   Serial.println(wifiOk ? " OK" : " FALHOU");
 }
 
+// Helper que escolhe WiFiClient (http) ou WiFiClientSecure (https) automaticamente.
+// Usa setInsecure() — nao validamos CA pra economizar flash e pq o ESP32 nao tem
+// a cadeia de certificados do Let's Encrypt embutida. Adequado pra IoT privado.
+static WiFiClient       httpPlainClient;
+static WiFiClientSecure httpSecureClient;
+static bool httpClientsInited = false;
+
+static bool httpBegin(HTTPClient &http, const String &url) {
+  if (!httpClientsInited) {
+    httpSecureClient.setInsecure();
+    httpClientsInited = true;
+  }
+  if (url.startsWith("https://")) {
+    return http.begin(httpSecureClient, url);
+  }
+  return http.begin(httpPlainClient, url);
+}
+
 // POST /api/device/refresh-tuya/:tentId — forca poll imediato no servidor
 // Retorna tempC/rh/vpd frescos (pH/EC nao vem do Tuya).
 // Flag refreshPending declarada no topo do arquivo; setada via tap handlers.
@@ -1583,7 +1602,7 @@ static bool refreshTuyaNow() {
   if (!wifiOk) return false;
   HTTPClient http;
   String url = String(SERVER_URL) + "/api/device/refresh-tuya/" + String(TENT_ID);
-  http.begin(url);
+  httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(8000);  // Tuya cloud as vezes e lento
@@ -1604,7 +1623,7 @@ static bool fetchDisplayData() {
   if (!wifiOk) return false;
   HTTPClient http;
   String url = String(SERVER_URL) + "/api/device/display/" + String(TENT_ID);
-  http.begin(url);
+  httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
   int code = http.GET();
@@ -1638,7 +1657,7 @@ static bool fetchHistory(const char* metric, const char* period, float *buf, int
   HTTPClient http;
   String url = String(SERVER_URL) + "/api/device/history/" + String(TENT_ID)
                + "?metric=" + metric + "&period=" + period;
-  http.begin(url);
+  httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
   int code = http.GET();
@@ -1659,7 +1678,7 @@ static bool fetchHistory(const char* metric, const char* period, float *buf, int
 static void fetchTasks() {
   if (!wifiOk) return;
   HTTPClient http;
-  http.begin(String(SERVER_URL) + "/api/device/tasks/" + String(TENT_ID));
+  httpBegin(http, String(SERVER_URL) + "/api/device/tasks/" + String(TENT_ID));
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
   int code = http.GET();
@@ -1685,7 +1704,7 @@ static void fetchTasks() {
 static void postTaskComplete(int taskId) {
   if (!wifiOk || taskId <= 0) return;
   HTTPClient http;
-  http.begin(String(SERVER_URL) + "/api/device/task-complete");
+  httpBegin(http, String(SERVER_URL) + "/api/device/task-complete");
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
@@ -1698,7 +1717,7 @@ static void postTaskComplete(int taskId) {
 static void postReading(float newPh, float newEc) {
   if (!wifiOk) return;
   HTTPClient http;
-  http.begin(String(SERVER_URL) + "/api/device/readings");
+  httpBegin(http, String(SERVER_URL) + "/api/device/readings");
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
@@ -1713,7 +1732,7 @@ static void postReading(float newPh, float newEc) {
 static bool postPpfd(int ppfd) {
   if (!wifiOk) return false;
   HTTPClient http;
-  http.begin(String(SERVER_URL) + "/api/device/readings");
+  httpBegin(http, String(SERVER_URL) + "/api/device/readings");
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
