@@ -215,14 +215,56 @@ static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
   return c;
 }
 
-// Helper: aplica efeito neon glow em um label
-static void applyNeonGlow(lv_obj_t *label, uint32_t color) {
-  lv_obj_set_style_shadow_color(label, lv_color_hex(color), 0);
-  lv_obj_set_style_shadow_width(label, 18, 0);
-  lv_obj_set_style_shadow_opa(label, LV_OPA_60, 0);
-  lv_obj_set_style_shadow_spread(label, 0, 0);
-  lv_obj_set_style_shadow_ofs_x(label, 0, 0);
-  lv_obj_set_style_shadow_ofs_y(label, 0, 0);
+// Helper: animação de "respiração" no shadow opa (pulsa o halo)
+// Usado em conjunto com applyBloom pra dar vibe "vivo" estilo dashboard aviação
+static void anim_shadow_opa_cb(void *obj, int32_t v) {
+  lv_obj_set_style_shadow_opa((lv_obj_t*)obj, v, 0);
+}
+
+static void startBreathe(lv_obj_t *obj, uint32_t minOpa, uint32_t maxOpa, uint32_t periodMs) {
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, obj);
+  lv_anim_set_values(&a, minOpa, maxOpa);
+  lv_anim_set_time(&a, periodMs);
+  lv_anim_set_playback_time(&a, periodMs);
+  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_set_exec_cb(&a, anim_shadow_opa_cb);
+  lv_anim_start(&a);
+}
+
+// Helper: aplica bloom (glow mais intenso + outline animado) — estilo Tesla/HUD
+static void applyBloom(lv_obj_t *obj, uint32_t color) {
+  // Camada 1: shadow grande (o "glow radiante")
+  lv_obj_set_style_shadow_color(obj, lv_color_hex(color), 0);
+  lv_obj_set_style_shadow_width(obj, 28, 0);
+  lv_obj_set_style_shadow_opa(obj, LV_OPA_70, 0);
+  lv_obj_set_style_shadow_spread(obj, 2, 0);
+  lv_obj_set_style_shadow_ofs_x(obj, 0, 0);
+  lv_obj_set_style_shadow_ofs_y(obj, 0, 0);
+  // Respiração sutil — pulsa entre 40% e 80% em 2.2s
+  startBreathe(obj, LV_OPA_40, LV_OPA_80, 2200);
+}
+
+// Helper: outline pulsante nos cards (ring glow animado ao redor da borda)
+static void anim_outline_opa_cb(void *obj, int32_t v) {
+  lv_obj_set_style_outline_opa((lv_obj_t*)obj, v, 0);
+}
+
+static void applyRingPulse(lv_obj_t *card, uint32_t color, uint32_t periodMs = 2800) {
+  lv_obj_set_style_outline_color(card, lv_color_hex(color), 0);
+  lv_obj_set_style_outline_width(card, 2, 0);
+  lv_obj_set_style_outline_pad(card, 0, 0);
+  lv_obj_set_style_outline_opa(card, LV_OPA_0, 0);
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, card);
+  lv_anim_set_values(&a, LV_OPA_0, LV_OPA_60);
+  lv_anim_set_time(&a, periodMs);
+  lv_anim_set_playback_time(&a, periodMs);
+  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_set_exec_cb(&a, anim_outline_opa_cb);
+  lv_anim_start(&a);
 }
 
 static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
@@ -298,7 +340,11 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_text_font(lblTemp, FONT_VALUE, 0);
   lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
-  applyNeonGlow(lblTemp, COL_GRN);
+  applyBloom(lblTemp, COL_GRN);
+  // Arc TEMP tambem ganha bloom no stroke (efeito velocimetro "vivo")
+  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_width(arcTemp, 16, LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_opa(arcTemp, LV_OPA_60, LV_PART_INDICATOR);
 
   lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
   lv_label_set_text(lblTempUnit, "°C");
@@ -317,6 +363,7 @@ static void buildHome(lv_obj_t *tab) {
                           lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
     lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
     lv_obj_set_style_pad_all(c, sw(4), 0);
+    applyRingPulse(c, color);  // outline colorido pulsando — vibe monitor cardiaco
 
     lv_obj_t *ico = lv_img_create(c);
     lv_img_set_src(ico, icon);
@@ -353,7 +400,7 @@ static void buildHome(lv_obj_t *tab) {
     lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
     lv_obj_set_style_text_font(v, FONT_TITLE, 0);
     lv_obj_align(v, LV_ALIGN_BOTTOM_RIGHT, 0, sh(2));
-    applyNeonGlow(v, color);
+    applyBloom(v, color);
     return v;
   };
 
@@ -429,13 +476,13 @@ static void buildLux(lv_obj_t *tab) {
   lv_obj_t *cardLux = makeCard(tab, gap, cardY, cardW, cardH);
   makeLabel(cardLux, "LUX", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
   lblLux = makeLabel(cardLux, "--", COL_YEL, FONT_VALUE, LV_ALIGN_CENTER, 0, sh(4));
-  applyNeonGlow(lblLux, COL_YEL);
+  applyBloom(lblLux, COL_YEL);
 
   // Card PPFD
   lv_obj_t *cardPpfd = makeCard(tab, gap * 2 + cardW, cardY, cardW, cardH);
   makeLabel(cardPpfd, "PPFD umol/s.m²", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
   lblPpfd = makeLabel(cardPpfd, "--", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, sh(4));
-  applyNeonGlow(lblPpfd, COL_GRN);
+  applyBloom(lblPpfd, COL_GRN);
 
   // Barra de visualizacao da lux (0 a 70000)
   int barY = cardY + cardH + sh(20);
