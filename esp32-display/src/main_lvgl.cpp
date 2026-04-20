@@ -103,6 +103,9 @@ static bool wifiOk = false;
 static unsigned long lastFetch = 0;
 static const unsigned long FETCH_INTERVAL = 30000;
 
+// Flag setada por handlers de tap (TEMP/UMIDADE) — loop() processa fora do click
+static volatile bool refreshPending = false;
+
 // ── Widgets HOME ────────────────────────────────────────────────────────────────
 static lv_obj_t *contentArea;
 static lv_obj_t *screenHome, *screenLux, *screenPhEc, *screenTarefa, *screenGrafic;
@@ -556,6 +559,28 @@ static void buildHome(lv_obj_t *tab) {
   lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker,    &sparkPh, &serPhS);
   lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube, &sparkEc, &serEcS);
 
+  // Tap no arco TEMP ou no card UMIDADE -> forca refresh Tuya no servidor
+  // pH/EC ficam de fora (nao vem do Tuya — sao entrada manual).
+  auto refreshTapCb = [](lv_event_t *e) {
+    refreshPending = true;
+    // Flash visual imediato — realca shadow do target em 180ms e volta
+    lv_obj_t *t = (lv_obj_t*)lv_event_get_target(e);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, t);
+    lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_60);
+    lv_anim_set_time(&a, 180);
+    lv_anim_set_playback_time(&a, 180);
+    lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+      lv_obj_set_style_shadow_opa((lv_obj_t*)obj, v, 0);
+    });
+    lv_anim_start(&a);
+  };
+  lv_obj_add_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(arcTemp, refreshTapCb, LV_EVENT_CLICKED, NULL);
+  lv_obj_t *cardRh = lv_obj_get_parent(lblRh);
+  lv_obj_add_event_cb(cardRh, refreshTapCb, LV_EVENT_CLICKED, NULL);
+
   // Inicializa sparklines com valores iniciais + ajusta range
   lv_chart_set_range(sparkRh, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
   lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);
@@ -986,6 +1011,30 @@ static void connectWifi() {
   Serial.println(wifiOk ? " OK" : " FALHOU");
 }
 
+// POST /api/device/refresh-tuya/:tentId — forca poll imediato no servidor
+// Retorna tempC/rh/vpd frescos (pH/EC nao vem do Tuya).
+// Flag refreshPending declarada no topo do arquivo; setada via tap handlers.
+static bool refreshTuyaNow() {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  String url = String(SERVER_URL) + "/api/device/refresh-tuya/" + String(TENT_ID);
+  http.begin(url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(8000);  // Tuya cloud as vezes e lento
+  int code = http.POST("{}");
+  if (code != 200) { http.end(); return false; }
+  String body = http.getString();
+  http.end();
+
+  JsonDocument doc;
+  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+  if (!doc["tempC"].isNull()) tempC = doc["tempC"].as<float>();
+  if (!doc["rh"].isNull())    rh    = doc["rh"].as<float>();
+  if (!doc["vpd"].isNull())   vpd   = doc["vpd"].as<float>();
+  return true;
+}
+
 static bool fetchDisplayData() {
   if (!wifiOk) return false;
   HTTPClient http;
@@ -1340,6 +1389,10 @@ void setup() {
 }
 
 void loop() {
+  if (refreshPending) {
+    refreshPending = false;
+    if (refreshTuyaNow()) refreshHomeValues();
+  }
   if (wifiOk && millis() - lastFetch >= FETCH_INTERVAL) {
     lastFetch = millis();
     if (fetchDisplayData()) refreshHomeValues();
