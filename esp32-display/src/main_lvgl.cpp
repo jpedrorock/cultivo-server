@@ -844,6 +844,8 @@ static void buildApScreen(const char *ssid, const char *ip) {
   lv_obj_set_style_radius(apScreen, 0, 0);
   lv_obj_set_style_pad_all(apScreen, 0, 0);
   lv_obj_clear_flag(apScreen, LV_OBJ_FLAG_SCROLLABLE);
+  // nao interceptar cliques no proprio overlay — so os filhos (botao) clicaveis
+  lv_obj_clear_flag(apScreen, LV_OBJ_FLAG_CLICKABLE);
 
   makeLabel(apScreen, "MODO SETUP", COL_YEL, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(14));
   makeLabel(apScreen, "Conecte seu celular na rede:", COL_DIM, FONT_CAPTION,
@@ -870,14 +872,19 @@ static void buildApScreen(const char *ssid, const char *ip) {
   // Botao fallback — abre o modal de config direto no display (teclado LVGL).
   // Util quando nao da' pra usar o portal via WiFi (ex: Wokwi sem simulacao de AP).
   lv_obj_t *btnManual = lv_btn_create(apScreen);
-  lv_obj_set_size(btnManual, sw(180), sh(28));
-  lv_obj_align(btnManual, LV_ALIGN_BOTTOM_MID, 0, -sh(32));
+  lv_obj_set_size(btnManual, sw(200), sh(36));
+  lv_obj_align(btnManual, LV_ALIGN_BOTTOM_MID, 0, -sh(38));
   lv_obj_set_style_bg_color(btnManual, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(btnManual, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(btnManual, 1, 0);
-  lv_obj_add_event_cb(btnManual, [](lv_event_t *e) { openConfigModal(); },
-                      LV_EVENT_CLICKED, NULL);
-  makeLabel(btnManual, "Configurar no display", COL_GRN, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_style_border_width(btnManual, 2, 0);
+  lv_obj_set_ext_click_area(btnManual, sw(12));
+  applyBloom(btnManual, COL_GRN);
+  lv_obj_add_event_cb(btnManual, [](lv_event_t *e) {
+    Serial.println("[ap] abrindo modal manual de config");
+    openConfigModal();
+    if (configModal) lv_obj_move_foreground(configModal);
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnManual, "Configurar no display", COL_GRN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   makeLabel(apScreen, "Aguardando configuracao...", COL_DIM, FONT_CAPTION,
             LV_ALIGN_BOTTOM_MID, 0, -sh(10));
