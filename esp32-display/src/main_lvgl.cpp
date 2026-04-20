@@ -463,6 +463,149 @@ static void applyRingWave(lv_obj_t *parent, int cx, int cy, int maxSize, uint32_
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Matrix boot splash — chuva de chars verdes + mensagens de boot (estilo terminal)
+// Criado em cima do UI principal, fade out ao final ou no tap.
+// ════════════════════════════════════════════════════════════════════════════════
+#define MATRIX_COLS 8
+static lv_obj_t *matrixScreen = nullptr;
+static lv_obj_t *matrixColumns[MATRIX_COLS];
+static lv_obj_t *matrixMsg = nullptr;
+static lv_timer_t *matrixTimer = nullptr;
+static int matrixStep = 0;
+
+static const char* BOOT_MSGS[] = {
+  "INITIALIZING...",
+  "LVGL: READY",
+  "TOUCH: OK",
+  "CHLOROPHYLL: 98.2%",
+  "> ACESSO CONCEDIDO"
+};
+#define MATRIX_STEPS (int)(sizeof(BOOT_MSGS) / sizeof(BOOT_MSGS[0]))
+
+static void matrixFillColumn(lv_obj_t *col) {
+  char buf[96];
+  int k = 0;
+  for (int j = 0; j < 10; j++) {
+    // Chars imprimiveis, enviesado pra digitos e letras (mais vibe "terminal")
+    char c;
+    int r = rand() % 100;
+    if      (r < 40) c = '0' + (rand() % 10);
+    else if (r < 75) c = 'A' + (rand() % 26);
+    else             c = "!@#$%&*+/\\<>:;"[rand() % 14];
+    buf[k++] = c;
+    buf[k++] = '\n';
+  }
+  buf[k] = '\0';
+  lv_label_set_text(col, buf);
+}
+
+static void matrixFinish();
+
+static void matrixTick(lv_timer_t *t) {
+  // Reembaralha chars de todas as colunas
+  for (int i = 0; i < MATRIX_COLS; i++) {
+    if (matrixColumns[i]) matrixFillColumn(matrixColumns[i]);
+  }
+  // Avanca mensagem central
+  matrixStep++;
+  if (matrixStep < MATRIX_STEPS) {
+    if (matrixMsg) lv_label_set_text(matrixMsg, BOOT_MSGS[matrixStep]);
+  } else if (matrixStep >= MATRIX_STEPS + 1) {
+    matrixFinish();
+  }
+}
+
+static void buildMatrixSplash() {
+  matrixStep = 0;
+  matrixScreen = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(matrixScreen, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(matrixScreen, 0, 0);
+  lv_obj_set_style_bg_color(matrixScreen, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(matrixScreen, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(matrixScreen, 0, 0);
+  lv_obj_set_style_radius(matrixScreen, 0, 0);
+  lv_obj_set_style_pad_all(matrixScreen, 0, 0);
+  lv_obj_clear_flag(matrixScreen, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Colunas de chars caindo
+  int colW = SCREEN_W / MATRIX_COLS;
+  for (int i = 0; i < MATRIX_COLS; i++) {
+    lv_obj_t *col = lv_label_create(matrixScreen);
+    matrixColumns[i] = col;
+    matrixFillColumn(col);
+    lv_obj_set_style_text_font(col, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(col, lv_color_hex(0x4ADE80), 0);
+    lv_obj_set_style_text_opa(col, LV_OPA_80, 0);
+    lv_obj_set_style_text_line_space(col, 2, 0);
+    int startY = -(SCREEN_H / 2) - (rand() % (SCREEN_H / 2));
+    lv_obj_set_pos(col, i * colW + 2, startY);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, col);
+    lv_anim_set_values(&a, startY, SCREEN_H + 40);
+    lv_anim_set_time(&a, 1800 + (rand() % 1800));
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_exec_cb(&a, fx_anim_y_cb);
+    lv_anim_start(&a);
+  }
+
+  // Caixa central com mensagem (background preto pra isolar do rain)
+  lv_obj_t *msgBg = lv_obj_create(matrixScreen);
+  lv_obj_set_size(msgBg, SCREEN_W - sw(20), sh(48));
+  lv_obj_align(msgBg, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_style_bg_color(msgBg, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(msgBg, LV_OPA_80, 0);
+  lv_obj_set_style_border_color(msgBg, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_border_width(msgBg, 1, 0);
+  lv_obj_set_style_radius(msgBg, 4, 0);
+  lv_obj_set_style_pad_all(msgBg, 0, 0);
+  lv_obj_remove_flag(msgBg, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(msgBg, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_shadow_color(msgBg, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_shadow_width(msgBg, 16, 0);
+  lv_obj_set_style_shadow_opa(msgBg, LV_OPA_60, 0);
+
+  matrixMsg = lv_label_create(msgBg);
+  lv_label_set_text(matrixMsg, BOOT_MSGS[0]);
+  lv_obj_set_style_text_font(matrixMsg, FONT_BODY, 0);
+  lv_obj_set_style_text_color(matrixMsg, lv_color_hex(COL_GRN), 0);
+  lv_obj_center(matrixMsg);
+
+  // Tap em qualquer lugar pula
+  lv_obj_add_flag(matrixScreen, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(matrixScreen, [](lv_event_t *e) {
+    matrixFinish();
+  }, LV_EVENT_CLICKED, NULL);
+
+  matrixTimer = lv_timer_create(matrixTick, 650, NULL);
+}
+
+static void matrixFinish() {
+  if (!matrixScreen) return;
+  if (matrixTimer) { lv_timer_del(matrixTimer); matrixTimer = nullptr; }
+
+  // Fade out via opacidade do container inteiro
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, matrixScreen);
+  lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_0);
+  lv_anim_set_time(&a, 450);
+  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+    lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
+  });
+  lv_anim_set_completed_cb(&a, [](lv_anim_t *an) {
+    if (matrixScreen) {
+      lv_obj_del(matrixScreen);
+      matrixScreen = nullptr;
+      for (int i = 0; i < MATRIX_COLS; i++) matrixColumns[i] = nullptr;
+      matrixMsg = nullptr;
+    }
+  });
+  lv_anim_start(&a);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Modal de configuracao (WiFi, Server, Token, TentId) — abre via gear icon
 // Salva em NVS e reboota. Usado tambem como tela de setup inicial se NVS vazio.
 // ════════════════════════════════════════════════════════════════════════════════
@@ -1652,6 +1795,22 @@ void setup() {
   Serial.println("[boot] buildUI"); Serial.flush();
   buildUI();
   Serial.println("[boot] buildUI ok"); Serial.flush();
+
+  // Matrix splash — overlay em cima do UI ja montado
+  Serial.println("[boot] matrix splash"); Serial.flush();
+  buildMatrixSplash();
+  unsigned long splashStart = millis();
+  while (matrixScreen && millis() - splashStart < 4200) {
+    lv_timer_handler();
+    delay(5);
+  }
+  matrixFinish();
+  // Deixa o fade completar
+  unsigned long fadeStart = millis();
+  while (matrixScreen && millis() - fadeStart < 600) {
+    lv_timer_handler();
+    delay(5);
+  }
 
   initMockTarefas();
   rebuildTarefasList();
