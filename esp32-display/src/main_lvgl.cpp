@@ -2030,11 +2030,24 @@ void setup() {
   initMockTarefas();
   rebuildTarefasList();
 
-  // Sem WiFi salvo → abre AP portal e fica nele ate' o usuario configurar
+  // Sem WiFi salvo → primeiro boot. Comportamento muda por alvo:
+  //  • Hardware real: sobe AP portal (user configura via celular no 192.168.4.1)
+  //  • Wokwi (esp32dev): nao tem AP real + o softAP trava o I2C do touch.
+  //    Entao abre direto o modal de config com teclado no display.
   if (strlen(WIFI_SSID) == 0) {
+#ifdef REAL_HARDWARE
     Serial.println("[boot] sem WiFi salvo, subindo AP portal");
     startApPortal();
     return;
+#else
+    Serial.println("[boot] sem WiFi (Wokwi) -> modal de config direto");
+    // Reabre o modal sempre que fechar — sem salvar, sem saida. Save -> reboot.
+    while (true) {
+      if (!configModal) openConfigModal();
+      lv_timer_handler();
+      delay(5);
+    }
+#endif
   }
 
   connectWifi();
