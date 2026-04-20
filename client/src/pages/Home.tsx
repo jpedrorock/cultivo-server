@@ -987,10 +987,6 @@ function MiniSparkline({ values, color, w = 72, h = 26 }: { values: number[]; co
         </mask>
       </defs>
 
-      {/* Linha base — sempre visível, mostra a forma da semana */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5"
-        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.18" />
-
       {/* Linha iluminada — brilha só onde a onda passa */}
       <path d={pathD} fill="none" stroke={color} strokeWidth="2.5"
         strokeLinecap="round" strokeLinejoin="round"
