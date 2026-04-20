@@ -98,6 +98,7 @@ static uint8_t buf2[480 * BUF_LINES * sizeof(lv_color_t)];
 static char TENT_NAME[50] = "ESTUFA 1";
 static char FASE[20]      = "FLORACAO";
 static float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, phv = 6.2f, ecv = 1.8f;
+// (currentLux e currentPpfd ficam na secao LUX/PPFD)
 static int semana = 4, totalSem = 16;
 
 static bool wifiOk = false;
@@ -106,12 +107,12 @@ static const unsigned long FETCH_INTERVAL = 30000;
 
 // ── Widgets HOME ────────────────────────────────────────────────────────────────
 static lv_obj_t *contentArea;
-static lv_obj_t *screenHome, *screenRegar, *screenPhEc, *screenTarefa, *screenGrafic;
+static lv_obj_t *screenHome, *screenLux, *screenPhEc, *screenTarefa, *screenGrafic;
 static lv_obj_t *navbar;
 static lv_obj_t *navIcons[5];
 static int activeScreen = 0;
-static const uint32_t NAV_COLORS[5] = { COL_GRN, 0x60A5FA, COL_PRP, COL_YEL, COL_CYN };
-static const lv_img_dsc_t *NAV_ICONS_IMG[5] = { &ic_home, &ic_droplets, &ic_flask, &ic_tasks, &ic_activity };
+static const uint32_t NAV_COLORS[5] = { COL_GRN, COL_YEL, COL_PRP, 0xFBBF24, COL_CYN };
+static const lv_img_dsc_t *NAV_ICONS_IMG[5] = { &ic_home, &ic_lightbulb, &ic_flask, &ic_tasks, &ic_activity };
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
@@ -121,8 +122,9 @@ static lv_chart_series_t *serRhS, *serPhS, *serEcS;
 static lv_timer_t *pulseTimer = nullptr;
 
 // ── Widgets REGAR ───────────────────────────────────────────────────────────────
-static lv_obj_t *lblLitros, *sliderRegar;
-static float litros = 1.0f;
+// ── Widgets LUX/PPFD ────────────────────────────────────────────────────────────
+static lv_obj_t *lblLux, *lblPpfd, *luxBar;
+static int currentLux = 0, currentPpfd = 0;
 
 // ── Widgets pH/EC ───────────────────────────────────────────────────────────────
 static lv_obj_t *taPh, *taEc, *kbNumero;
@@ -400,96 +402,58 @@ static void startPulseTimer() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Aba REGAR — volume de rega com slider + botoes +/- + salvar
+// Aba LUX / PPFD — leitura do sensor de luz (rega agora é automática)
 // ════════════════════════════════════════════════════════════════════════════════
-static void postWatering(float l);   // fwd declaration
-
-static void updateLitrosLabel() {
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%.1f L", litros);
-  lv_label_set_text(lblLitros, buf);
-}
-
-static void regarSliderCb(lv_event_t *e) {
-  int32_t v = lv_slider_get_value((lv_obj_t*)lv_event_get_target(e));
-  litros = v / 10.0f;
-  updateLitrosLabel();
-}
-
-static void regarBtnCb(lv_event_t *e) {
-  int delta = (int)(intptr_t)lv_event_get_user_data(e);
-  litros += delta * 0.5f;
-  if (litros < 0.5f) litros = 0.5f;
-  if (litros > 20.0f) litros = 20.0f;
-  lv_slider_set_value(sliderRegar, (int32_t)(litros * 10), LV_ANIM_ON);
-  updateLitrosLabel();
-}
-
-static void regarSalvarCb(lv_event_t *e) {
-  postWatering(litros);
-  // feedback toast (LVGL v9 API)
-  lv_obj_t *msg = lv_msgbox_create(NULL);
-  lv_msgbox_add_title(msg, "Rega salva");
-  lv_msgbox_add_text(msg, "Volume registrado.");
-  lv_obj_set_style_bg_color(msg, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_text_color(msg, lv_color_hex(COL_GRN), 0);
-  lv_obj_center(msg);
-  // fecha automaticamente em 1.5s
-  lv_timer_t *t = lv_timer_create([](lv_timer_t *t) {
-    lv_obj_t *m = (lv_obj_t*)lv_timer_get_user_data(t);
-    lv_msgbox_close(m);
-    lv_timer_delete(t);
-  }, 1500, msg);
-  (void)t;
-}
-
-static void buildRegar(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, sw(8), 0);
+static void buildLux(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, sw(6), 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  makeLabel(tab, "REGA", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_MID, 0, 0);
-  makeLabel(tab, "Quantos litros voce regou?", COL_DIM, FONT_BODY, LV_ALIGN_TOP_MID, 0, sh(22));
+  // Header: lampada + titulo + wifi
+  lv_obj_t *iconBulb = lv_img_create(tab);
+  lv_img_set_src(iconBulb, &ic_lightbulb);
+  lv_obj_set_style_img_recolor(iconBulb, lv_color_hex(COL_YEL), 0);
+  lv_obj_set_style_img_recolor_opa(iconBulb, LV_OPA_COVER, 0);
+  lv_obj_align(iconBulb, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
 
-  // Card central com valor
-  int cardW = SCREEN_W - sw(32);
-  int cardH = sh(60);
-  lv_obj_t *card = makeCard(tab, sw(16), sh(46), cardW, cardH);
-  lblLitros = makeLabel(card, "1.0 L", COL_CYN, FONT_VALUE, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(tab, "LUX / PPFD", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
 
-  // Botoes - / +
-  int btnW = sw(48), btnH = sh(36);
-  int btnY = sh(46) + cardH + sh(10);
-  lv_obj_t *btnMinus = lv_btn_create(tab);
-  lv_obj_set_size(btnMinus, btnW, btnH);
-  lv_obj_set_pos(btnMinus, sw(16), btnY);
-  lv_obj_set_style_bg_color(btnMinus, lv_color_hex(COL_BORDER), 0);
-  lv_obj_add_event_cb(btnMinus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)-1);
-  makeLabel(btnMinus, "-", COL_RED, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(2));
+  // 2 cards grandes (LUX + PPFD)
+  int cardY = sh(38);
+  int cardH = sh(70);
+  int gap = sw(6);
+  int cardW = (SCREEN_W - 3 * gap) / 2;
 
-  lv_obj_t *btnPlus = lv_btn_create(tab);
-  lv_obj_set_size(btnPlus, btnW, btnH);
-  lv_obj_set_pos(btnPlus, SCREEN_W - sw(16) - btnW, btnY);
-  lv_obj_set_style_bg_color(btnPlus, lv_color_hex(COL_BORDER), 0);
-  lv_obj_add_event_cb(btnPlus, regarBtnCb, LV_EVENT_CLICKED, (void*)(intptr_t)+1);
-  makeLabel(btnPlus, "+", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(2));
+  // Card LUX
+  lv_obj_t *cardLux = makeCard(tab, gap, cardY, cardW, cardH);
+  makeLabel(cardLux, "LUX", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+  lblLux = makeLabel(cardLux, "--", COL_YEL, FONT_VALUE, LV_ALIGN_CENTER, 0, sh(4));
+  applyNeonGlow(lblLux, COL_YEL);
 
-  // Slider entre os botoes
-  sliderRegar = lv_slider_create(tab);
-  lv_obj_set_size(sliderRegar, SCREEN_W - sw(32) - btnW*2 - sw(20), sh(8));
-  lv_obj_set_pos(sliderRegar, sw(16) + btnW + sw(10), btnY + sh(14));
-  lv_slider_set_range(sliderRegar, 5, 200);
-  lv_slider_set_value(sliderRegar, 10, LV_ANIM_OFF);
-  lv_obj_add_event_cb(sliderRegar, regarSliderCb, LV_EVENT_VALUE_CHANGED, NULL);
+  // Card PPFD
+  lv_obj_t *cardPpfd = makeCard(tab, gap * 2 + cardW, cardY, cardW, cardH);
+  makeLabel(cardPpfd, "PPFD umol/s.m²", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+  lblPpfd = makeLabel(cardPpfd, "--", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, sh(4));
+  applyNeonGlow(lblPpfd, COL_GRN);
 
-  // Botao SALVAR
-  lv_obj_t *btnSave = lv_btn_create(tab);
-  lv_obj_set_size(btnSave, SCREEN_W - sw(32), sh(36));
-  lv_obj_align(btnSave, LV_ALIGN_BOTTOM_MID, 0, -sh(8));
-  lv_obj_set_style_bg_color(btnSave, lv_color_hex(0x064E3B), 0);
-  lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(btnSave, 1, 0);
-  lv_obj_add_event_cb(btnSave, regarSalvarCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnSave, "SALVAR", COL_GRN, FONT_TITLE, LV_ALIGN_CENTER, 0, 0);
+  // Barra de visualizacao da lux (0 a 70000)
+  int barY = cardY + cardH + sh(20);
+  makeLabel(tab, "0", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, sw(6), barY - sh(14));
+  makeLabel(tab, "70000 LUX", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), barY - sh(14));
+
+  luxBar = lv_bar_create(tab);
+  lv_obj_set_size(luxBar, SCREEN_W - sw(12), sh(14));
+  lv_obj_set_pos(luxBar, sw(6), barY);
+  lv_bar_set_range(luxBar, 0, 70000);
+  lv_bar_set_value(luxBar, currentLux, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(luxBar, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(luxBar, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(luxBar, 1, 0);
+  lv_obj_set_style_bg_color(luxBar, lv_color_hex(COL_YEL), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_color(luxBar, lv_color_hex(COL_YEL), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_width(luxBar, 16, LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_opa(luxBar, LV_OPA_70, LV_PART_INDICATOR);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -796,6 +760,17 @@ static void refreshHomeValues() {
   snprintf(buf, sizeof(buf), "%.1f", phv);  lv_label_set_text(lblPh, buf);
   snprintf(buf, sizeof(buf), "%.1f", ecv);  lv_label_set_text(lblEc, buf);
 
+  // LUX / PPFD (aba nova)
+  if (lblLux) {
+    snprintf(buf, sizeof(buf), "%d", currentLux);
+    lv_label_set_text(lblLux, buf);
+  }
+  if (lblPpfd) {
+    snprintf(buf, sizeof(buf), "%d", currentPpfd);
+    lv_label_set_text(lblPpfd, buf);
+  }
+  if (luxBar) lv_bar_set_value(luxBar, currentLux, LV_ANIM_ON);
+
   char subBuf[48];
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
   lv_label_set_text(lblSub, subBuf);
@@ -837,6 +812,8 @@ static bool fetchDisplayData() {
   if (!doc["ec"].isNull())       ecv      = doc["ec"].as<float>();
   if (!doc["semana"].isNull())   semana   = doc["semana"].as<int>();
   if (!doc["totalSem"].isNull()) totalSem = doc["totalSem"].as<int>();
+  if (!doc["lux"].isNull())      currentLux  = doc["lux"].as<int>();
+  if (!doc["ppfd"].isNull())     currentPpfd = doc["ppfd"].as<int>();
   const char* f = doc["fase"];     if (f) { strncpy(FASE, f, sizeof(FASE)-1); FASE[sizeof(FASE)-1]='\0'; }
   const char* t = doc["tentName"]; if (t) { strncpy(TENT_NAME, t, sizeof(TENT_NAME)-1); TENT_NAME[sizeof(TENT_NAME)-1]='\0'; }
   return true;
@@ -920,18 +897,7 @@ static void postReading(float newPh, float newEc) {
   Serial.printf("postReading: %d\n", code);
 }
 
-static void postWatering(float l) {
-  if (!wifiOk) return;
-  HTTPClient http;
-  http.begin(String(SERVER_URL) + "/api/device/watering");
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Device-Token", DEVICE_TOKEN);
-  http.setTimeout(5000);
-  String body = "{\"tentId\":" + String(TENT_ID) + ",\"litros\":" + String(l, 1) + "}";
-  int code = http.POST(body);
-  http.end();
-  Serial.printf("postWatering: %d\n", code);
-}
+// postWatering removido — rega agora e automatica (bomba do hardware real)
 
 // HOME nao usa mais sparklines (historico esta na aba GRAFIC)
 // fetchHistoryAll vira no-op para manter compatibilidade de chamadas existentes
@@ -956,7 +922,7 @@ static void navSetActive(int idx) {
 // Fade out do screen atual + fade in do novo
 static void switchScreen(int idx) {
   if (idx == activeScreen) return;
-  lv_obj_t *screens[5] = { screenHome, screenRegar, screenPhEc, screenTarefa, screenGrafic };
+  lv_obj_t *screens[5] = { screenHome, screenLux, screenPhEc, screenTarefa, screenGrafic };
   if (idx < 0 || idx >= 5) return;
 
   lv_obj_add_flag(screens[activeScreen], LV_OBJ_FLAG_HIDDEN);
@@ -1065,13 +1031,13 @@ static void buildUI() {
   };
 
   screenHome   = makeScreen();
-  screenRegar  = makeScreen();
+  screenLux  = makeScreen();
   screenPhEc   = makeScreen();
   screenTarefa = makeScreen();
   screenGrafic = makeScreen();
 
   buildHome(screenHome);
-  buildRegar(screenRegar);
+  buildLux(screenLux);
   buildPhEc(screenPhEc);
   buildTarefas(screenTarefa);
   buildHistorico(screenGrafic);

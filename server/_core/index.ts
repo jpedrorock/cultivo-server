@@ -409,25 +409,29 @@ function registerDeviceRoutes(app: express.Application) {
       }
 
       const [logRows]: any = await pool.execute(
-        `SELECT tempC, rhPct, ph, ec FROM dailyLogs WHERE tentId = ? ORDER BY logDate DESC LIMIT 1`,
+        `SELECT tempC, rhPct, ph, ec, ppfd FROM dailyLogs WHERE tentId = ? ORDER BY logDate DESC LIMIT 1`,
         [tentId]
       );
 
       let tempC: number | null = null, rh: number | null = null, vpd: number | null = null;
       let ph: number | null = null, ec: number | null = null;
+      let ppfd: number | null = null, lux: number | null = null;
       if (logRows.length > 0) {
         const l = logRows[0];
         tempC = l.tempC != null ? parseFloat(l.tempC) : null;
         rh    = l.rhPct != null ? parseFloat(l.rhPct) : null;
         ph    = l.ph   != null ? parseFloat(l.ph)   : null;
         ec    = l.ec   != null ? parseFloat(l.ec)   : null;
+        ppfd  = l.ppfd != null ? parseInt(l.ppfd)   : null;
+        // LUX ~ PPFD * 54 (aprox. pra LED cultivo full-spectrum)
+        lux   = ppfd !== null ? Math.round(ppfd * 54) : null;
         if (tempC !== null && rh !== null) {
           const svp = 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));
           vpd = parseFloat((svp * (1 - rh / 100)).toFixed(2));
         }
       }
 
-      res.json({ tentName, tempC, rh, vpd, ph, ec, fase, semana, totalSem });
+      res.json({ tentName, tempC, rh, vpd, ph, ec, lux, ppfd, fase, semana, totalSem });
     } catch (err: any) {
       console.error('[Device] display error:', err?.message);
       res.status(500).json({ error: 'Erro interno' });

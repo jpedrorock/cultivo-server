@@ -16,7 +16,7 @@ from pathlib import Path
 ICONS = {
     # Bottom nav
     "home":          "ic_home",
-    "droplets":      "ic_droplets",
+    "lightbulb":     "ic_lightbulb",    # substitui droplets (rega agora é automática)
     "flask-conical": "ic_flask",
     "list-checks":   "ic_tasks",
     "activity":      "ic_activity",
@@ -29,6 +29,8 @@ ICONS = {
     "droplet":       "ic_droplet",
     "beaker":        "ic_beaker",
     "test-tube":     "ic_test_tube",
+    # Mantemos droplets disponivel pra caso o usuario queira a tela de rega manual de volta
+    "droplets":      "ic_droplets",
 }
 
 SRC_DIR = Path("esp32-display/assets/icons/64px")
