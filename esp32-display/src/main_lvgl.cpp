@@ -867,6 +867,18 @@ static void buildApScreen(const char *ssid, const char *ip) {
   lv_obj_set_style_text_color(lblIp, lv_color_hex(COL_CYN), 0);
   lv_obj_align(lblIp, LV_ALIGN_TOP_MID, 0, sh(120));
 
+  // Botao fallback — abre o modal de config direto no display (teclado LVGL).
+  // Util quando nao da' pra usar o portal via WiFi (ex: Wokwi sem simulacao de AP).
+  lv_obj_t *btnManual = lv_btn_create(apScreen);
+  lv_obj_set_size(btnManual, sw(180), sh(28));
+  lv_obj_align(btnManual, LV_ALIGN_BOTTOM_MID, 0, -sh(32));
+  lv_obj_set_style_bg_color(btnManual, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(btnManual, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_border_width(btnManual, 1, 0);
+  lv_obj_add_event_cb(btnManual, [](lv_event_t *e) { openConfigModal(); },
+                      LV_EVENT_CLICKED, NULL);
+  makeLabel(btnManual, "Configurar no display", COL_GRN, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+
   makeLabel(apScreen, "Aguardando configuracao...", COL_DIM, FONT_CAPTION,
             LV_ALIGN_BOTTOM_MID, 0, -sh(10));
 }
