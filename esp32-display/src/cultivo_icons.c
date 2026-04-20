@@ -68,12 +68,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_home_map[] = {
   0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_home = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_home = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_home_map,
 };
@@ -145,12 +146,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_lightbulb_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_lightbulb = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_lightbulb = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_lightbulb_map,
 };
@@ -222,12 +224,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_flask_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_flask = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_flask = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_flask_map,
 };
@@ -299,12 +302,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_tasks_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_tasks = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_tasks = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_tasks_map,
 };
@@ -376,12 +380,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_activity_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_activity = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_activity = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_activity_map,
 };
@@ -453,12 +458,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_sprout_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_sprout = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_sprout = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_sprout_map,
 };
@@ -530,12 +536,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_wifi_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_wifi = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_wifi = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_wifi_map,
 };
@@ -607,12 +614,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_wifi_off_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_wifi_off = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_wifi_off = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_wifi_off_map,
 };
@@ -684,12 +692,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_thermometer_map[] = {
   0x00, 0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_thermometer = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_thermometer = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_thermometer_map,
 };
@@ -761,12 +770,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_droplet_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_droplet = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_droplet = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_droplet_map,
 };
@@ -838,12 +848,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_beaker_map[] = {
   0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_beaker = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_beaker = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_beaker_map,
 };
@@ -915,12 +926,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_test_tube_map[] = {
   0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_test_tube = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_test_tube = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_test_tube_map,
 };
@@ -992,12 +1004,13 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ic_droplets_map[] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t ic_droplets = {
-  .header.cf = LV_IMG_CF_ALPHA_8BIT,
-  .header.always_zero = 0,
-  .header.reserved = 0,
+const lv_image_dsc_t ic_droplets = {
+  .header.magic = LV_IMAGE_HEADER_MAGIC,
+  .header.cf = LV_COLOR_FORMAT_A8,
+  .header.flags = 0,
   .header.w = 32,
   .header.h = 32,
+  .header.stride = 32,
   .data_size = 1024,
   .data = ic_droplets_map,
 };
