@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <SPI.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
@@ -38,17 +39,19 @@
 // ════════════════════════════════════════════════════════════════════════════════
 
 // ── Driver de display ───────────────────────────────────────────────────────────
+// Pinos S3 unificados (Wokwi e hardware real ambos rodam em esp32-s3-devkitc-1)
+#define TFT_CS    10
+#define TFT_DC     8
+#define TFT_RST   14
+#define TFT_SCK   12
+#define TFT_MOSI  11
+#define TFT_MISO  13
+#define TOUCH_SDA  4
+#define TOUCH_SCL  5
+#define FT_ADDR   0x38
+
 #ifdef REAL_HARDWARE
   #include <Arduino_GFX_Library.h>
-  #define TFT_CS    10
-  #define TFT_DC     8
-  #define TFT_RST   14
-  #define TFT_SCK   12
-  #define TFT_MOSI  11
-  #define TFT_MISO  13
-  #define TOUCH_SDA  4
-  #define TOUCH_SCL  5
-  #define FT_ADDR   0x38
   static Arduino_DataBus *bus = nullptr;
   static Arduino_GFX     *gfx = nullptr;
   static const int SCREEN_W = 480;
@@ -56,12 +59,7 @@
 #else
   #include <Adafruit_GFX.h>
   #include <Adafruit_ILI9341.h>
-  #define TFT_DC     2
-  #define TFT_CS    15
-  #define TOUCH_SDA 21
-  #define TOUCH_SCL 22
-  #define FT_ADDR  0x38
-  static Adafruit_ILI9341 tft(TFT_CS, TFT_DC);
+  static Adafruit_ILI9341 tft(TFT_CS, TFT_DC, TFT_RST);
   static const int SCREEN_W = 320;
   static const int SCREEN_H = 240;
 #endif
@@ -1148,6 +1146,7 @@ void setup() {
   gfx->begin();
   gfx->fillScreen(0);
 #else
+  SPI.begin(TFT_SCK, TFT_MISO, TFT_MOSI, TFT_CS);
   tft.begin();
   tft.setRotation(1);
   tft.fillScreen(0);
