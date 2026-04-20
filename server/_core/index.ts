@@ -438,19 +438,25 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
-  // POST /api/device/readings — salva medição de pH/EC do display
+  // POST /api/device/readings — salva medição de pH/EC/PPFD do display
   app.post('/api/device/readings', async (req, res) => {
     try {
       const device = await validateDeviceToken(req);
       if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const { tentId, tempC, rh, ph, ec, turn = 'AM' } = req.body;
+      const { tentId, tempC, rh, ph, ec, ppfd, turn = 'AM' } = req.body;
       if (!tentId || device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
       const dateOnly = new Date(); dateOnly.setHours(0, 0, 0, 0);
       await pool.execute(
-        `INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, ph, ec, source, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'ESP32', NOW())
-         ON DUPLICATE KEY UPDATE tempC=VALUES(tempC), rhPct=VALUES(rhPct), ph=VALUES(ph), ec=VALUES(ec), source='ESP32'`,
-        [tentId, dateOnly, turn, tempC ?? null, rh ?? null, ph ?? null, ec ?? null]
+        `INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd, source, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ESP32', NOW())
+         ON DUPLICATE KEY UPDATE
+            tempC = COALESCE(VALUES(tempC), tempC),
+            rhPct = COALESCE(VALUES(rhPct), rhPct),
+            ph    = COALESCE(VALUES(ph), ph),
+            ec    = COALESCE(VALUES(ec), ec),
+            ppfd  = COALESCE(VALUES(ppfd), ppfd),
+            source = 'ESP32'`,
+        [tentId, dateOnly, turn, tempC ?? null, rh ?? null, ph ?? null, ec ?? null, ppfd ?? null]
       );
       res.json({ success: true });
     } catch (err: any) {

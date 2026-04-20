@@ -31,6 +31,11 @@ ICONS = {
     "test-tube":     "ic_test_tube",
     # Mantemos droplets disponivel pra caso o usuario queira a tela de rega manual de volta
     "droplets":      "ic_droplets",
+    # Header HOME — gear pra abrir modal de configuracao
+    "settings":      "ic_settings",
+    # LUX/PPFD — botoes + e - pra ajustar
+    "plus":          "ic_plus",
+    "minus":         "ic_minus",
 }
 
 SRC_DIR = Path("esp32-display/assets/icons/64px")

@@ -10,6 +10,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 #include <math.h>
 #include <lvgl.h>
 #include "cultivo_icons.h"
@@ -29,13 +30,37 @@
 #endif
 
 // ════════════════════════════════════════════════════════════════════════════════
-// CONFIGURACAO — preencha antes de compilar
+// CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
+// Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define WIFI_SSID    ""
-#define WIFI_PASS    ""
-#define SERVER_URL   "http://192.168.1.100:3000"
-#define DEVICE_TOKEN ""
-#define TENT_ID      1
+static Preferences prefs;
+static char    WIFI_SSID[33]    = "";
+static char    WIFI_PASS[65]    = "";
+static char    SERVER_URL[96]   = "http://192.168.1.100:3000";
+static char    DEVICE_TOKEN[65] = "";
+static int     TENT_ID          = 1;
+
+static void loadConfigFromNVS() {
+  prefs.begin("cultivo", true);
+  prefs.getString("ssid",   WIFI_SSID,    sizeof(WIFI_SSID));
+  prefs.getString("pass",   WIFI_PASS,    sizeof(WIFI_PASS));
+  prefs.getString("server", SERVER_URL,   sizeof(SERVER_URL));
+  prefs.getString("token",  DEVICE_TOKEN, sizeof(DEVICE_TOKEN));
+  TENT_ID = prefs.getInt("tent", TENT_ID);
+  prefs.end();
+  Serial.printf("[cfg] ssid=%s url=%s tent=%d\n", WIFI_SSID, SERVER_URL, TENT_ID);
+}
+
+static void saveConfigToNVS(const char* ssid, const char* pass, const char* url,
+                             const char* token, int tent) {
+  prefs.begin("cultivo", false);
+  prefs.putString("ssid",   ssid);
+  prefs.putString("pass",   pass);
+  prefs.putString("server", url);
+  prefs.putString("token",  token);
+  prefs.putInt   ("tent",   tent);
+  prefs.end();
+}
 // ════════════════════════════════════════════════════════════════════════════════
 
 // ── Driver de display ───────────────────────────────────────────────────────────
@@ -127,8 +152,17 @@ static lv_timer_t *pulseTimer = nullptr;
 
 // ── Widgets REGAR ───────────────────────────────────────────────────────────────
 // ── Widgets LUX/PPFD ────────────────────────────────────────────────────────────
-static lv_obj_t *lblLux, *lblPpfd, *luxBar;
+// targetPpfd = valor ajustado pelo usuario (persistido via POST /readings)
+// currentPpfd/currentLux = ultima leitura do sensor (GET /display)
+// luxMode = 0 PPFD | 1 LUX (toggle de visualizacao)
+// Conversao: 1 PPFD ~= 54 LUX (cultivo LEDs)
+static lv_obj_t *lblLuxValue, *lblLuxUnit, *luxBar;
+static lv_obj_t *btnModePpfd, *btnModeLux;
 static int currentLux = 0, currentPpfd = 0;
+static int targetPpfd = 450;
+static int luxMode = 0;  // 0=PPFD, 1=LUX
+static const int LUX_PER_PPFD = 54;
+static const int STEP_PPFD    = 25;
 
 // ── Widgets pH/EC ───────────────────────────────────────────────────────────────
 static lv_obj_t *taPh, *taEc, *kbNumero;
@@ -424,6 +458,117 @@ static void applyRingWave(lv_obj_t *parent, int cx, int cy, int maxSize, uint32_
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Modal de configuracao (WiFi, Server, Token, TentId) — abre via gear icon
+// Salva em NVS e reboota. Usado tambem como tela de setup inicial se NVS vazio.
+// ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t *configModal = nullptr;
+static lv_obj_t *taSsid, *taPass, *taUrl, *taToken, *taTent;
+static lv_obj_t *kbCfg;
+
+static void cfgFocusCb(lv_event_t *e) {
+  lv_obj_t *ta = (lv_obj_t*)lv_event_get_target(e);
+  lv_keyboard_set_textarea(kbCfg, ta);
+  lv_obj_remove_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void cfgSaveCb(lv_event_t *e) {
+  const char *ssid  = lv_textarea_get_text(taSsid);
+  const char *pass  = lv_textarea_get_text(taPass);
+  const char *url   = lv_textarea_get_text(taUrl);
+  const char *token = lv_textarea_get_text(taToken);
+  int tent          = atoi(lv_textarea_get_text(taTent));
+  saveConfigToNVS(ssid, pass, url, token, tent);
+  Serial.println("[cfg] salvo, reiniciando...");
+  delay(500);
+  ESP.restart();
+}
+
+static void cfgCancelCb(lv_event_t *e) {
+  if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
+}
+
+static void openConfigModal() {
+  if (configModal) return;  // ja aberto
+  configModal = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(configModal, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(configModal, 0, 0);
+  lv_obj_set_style_bg_color(configModal, lv_color_hex(0x060A10), 0);
+  lv_obj_set_style_bg_opa(configModal, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(configModal, 0, 0);
+  lv_obj_set_style_radius(configModal, 0, 0);
+  lv_obj_set_style_pad_all(configModal, sw(6), 0);
+  lv_obj_clear_flag(configModal, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(configModal, "CONFIGURACAO", COL_GRN, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(2));
+
+  // Area scrollavel com os 5 campos
+  lv_obj_t *list = lv_obj_create(configModal);
+  lv_obj_set_size(list, SCREEN_W - sw(12), sh(130));
+  lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(24));
+  lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(list, 0, 0);
+  lv_obj_set_style_pad_all(list, sw(2), 0);
+  lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(list, sh(3), 0);
+
+  auto addField = [&](const char *label, const char *initVal, lv_obj_t **out,
+                       bool pwd = false, bool numeric = false) {
+    makeLabel(list, label, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_t *ta = lv_textarea_create(list);
+    lv_obj_set_width(ta, lv_pct(100));
+    lv_obj_set_height(ta, sh(22));
+    lv_textarea_set_one_line(ta, true);
+    lv_textarea_set_text(ta, initVal ? initVal : "");
+    if (pwd)     lv_textarea_set_password_mode(ta, true);
+    if (numeric) lv_textarea_set_accepted_chars(ta, "0123456789");
+    lv_obj_set_style_text_font(ta, FONT_BODY, 0);
+    lv_obj_set_style_bg_color(ta, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(ta, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(ta, 1, 0);
+    lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
+    *out = ta;
+  };
+
+  addField("WiFi SSID",      WIFI_SSID,    &taSsid);
+  addField("WiFi Senha",     WIFI_PASS,    &taPass,  true);
+  addField("Server URL",     SERVER_URL,   &taUrl);
+  addField("Device Token",   DEVICE_TOKEN, &taToken);
+  char tentStr[12]; snprintf(tentStr, sizeof(tentStr), "%d", TENT_ID);
+  addField("Tent ID",        tentStr,      &taTent,  false, true);
+
+  // Botoes no rodape
+  int btnY = sh(160);
+  lv_obj_t *btnCancel = lv_btn_create(configModal);
+  lv_obj_set_size(btnCancel, sw(90), sh(28));
+  lv_obj_align(btnCancel, LV_ALIGN_BOTTOM_LEFT, sw(6), -sh(6));
+  lv_obj_set_style_bg_color(btnCancel, lv_color_hex(COL_CARD), 0);
+  lv_obj_add_event_cb(btnCancel, cfgCancelCb, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnCancel, "Cancelar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+
+  lv_obj_t *btnSave = lv_btn_create(configModal);
+  lv_obj_set_size(btnSave, sw(100), sh(28));
+  lv_obj_align(btnSave, LV_ALIGN_BOTTOM_RIGHT, -sw(6), -sh(6));
+  lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_GRN), 0);
+  applyBloom(btnSave, COL_GRN);
+  lv_obj_add_event_cb(btnSave, cfgSaveCb, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnSave, "Salvar + Reboot", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  (void)btnY;
+
+  // Keyboard compartilhado — esconde ao pressionar OK ou Cancelar
+  kbCfg = lv_keyboard_create(configModal);
+  lv_obj_set_size(kbCfg, SCREEN_W, sh(110));
+  lv_obj_align(kbCfg, LV_ALIGN_BOTTOM_MID, 0, 0);
+  lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_style_text_font(kbCfg, FONT_BODY, 0);
+  lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
+    lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
+  }, LV_EVENT_READY, NULL);
+  lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
+    lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
+  }, LV_EVENT_CANCEL, NULL);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Aba HOME — estilo Ebike demo: arc gigante (TEMP) + coluna de mini-cards
 // Layout responsivo via sw()/sh() — escala proporcional no hardware real
 // ════════════════════════════════════════════════════════════════════════════════
@@ -452,6 +597,18 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_img_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
   lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
   lblWifi = wifiIcon;
+
+  // Gear icon (ao lado do wifi) — abre modal de configuracao
+  // Usa lv_font_montserrat_14 porque LV_SYMBOL_SETTINGS e' glyph FontAwesome
+  // (Manrope nao tem essa faixa Unicode)
+  lv_obj_t *btnCfg = lv_label_create(tab);
+  lv_label_set_text(btnCfg, LV_SYMBOL_SETTINGS);
+  lv_obj_set_style_text_color(btnCfg, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_14, 0);
+  lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(36), sh(6));
+  lv_obj_add_flag(btnCfg, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(btnCfg, sw(12));
+  lv_obj_add_event_cb(btnCfg, [](lv_event_t *e) { openConfigModal(); }, LV_EVENT_CLICKED, NULL);
 
   // ═══ Corpo: arc gigante à esquerda + 3 mini-cards à direita ═══
   int bodyY = sh(42);
@@ -625,58 +782,144 @@ static void startPulseTimer() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Aba LUX / PPFD — leitura do sensor de luz (rega agora é automática)
+// Aba LUX / PPFD — toggle de unidade + ajuste via +/- + salvar no backend
 // ════════════════════════════════════════════════════════════════════════════════
+static bool postPpfd(int ppfd);  // fwd
+
+static void refreshLuxDisplay() {
+  if (!lblLuxValue || !lblLuxUnit) return;
+  char buf[16];
+  if (luxMode == 0) {
+    snprintf(buf, sizeof(buf), "%d", targetPpfd);
+    lv_label_set_text(lblLuxValue, buf);
+    lv_label_set_text(lblLuxUnit, "umol/s.m²");
+    lv_obj_set_style_text_color(lblLuxValue, lv_color_hex(COL_GRN), 0);
+  } else {
+    snprintf(buf, sizeof(buf), "%d", targetPpfd * LUX_PER_PPFD);
+    lv_label_set_text(lblLuxValue, buf);
+    lv_label_set_text(lblLuxUnit, "LUX");
+    lv_obj_set_style_text_color(lblLuxValue, lv_color_hex(COL_YEL), 0);
+  }
+  // Toggle visual: destaca o modo ativo
+  if (btnModePpfd && btnModeLux) {
+    lv_obj_set_style_bg_color(btnModePpfd, lv_color_hex(luxMode==0 ? COL_GRN  : COL_CARD), 0);
+    lv_obj_set_style_bg_color(btnModeLux,  lv_color_hex(luxMode==1 ? COL_YEL  : COL_CARD), 0);
+  }
+  if (luxBar) lv_bar_set_value(luxBar, targetPpfd, LV_ANIM_ON);
+}
+
+static void luxStepCb(lv_event_t *e) {
+  int delta = (int)(intptr_t)lv_event_get_user_data(e);
+  targetPpfd += delta;
+  if (targetPpfd < 0)    targetPpfd = 0;
+  if (targetPpfd > 2000) targetPpfd = 2000;
+  refreshLuxDisplay();
+}
+
+static void luxModeCb(lv_event_t *e) {
+  luxMode = (int)(intptr_t)lv_event_get_user_data(e);
+  refreshLuxDisplay();
+}
+
+static void luxSaveCb(lv_event_t *e) {
+  if (postPpfd(targetPpfd)) {
+    currentPpfd = targetPpfd;
+    currentLux  = targetPpfd * LUX_PER_PPFD;
+  }
+}
+
 static void buildLux(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, sw(6), 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  // Header: lampada + titulo + wifi
+  // Header: lampada + titulo
   lv_obj_t *iconBulb = lv_img_create(tab);
   lv_img_set_src(iconBulb, &ic_lightbulb);
   lv_obj_set_style_img_recolor(iconBulb, lv_color_hex(COL_YEL), 0);
   lv_obj_set_style_img_recolor_opa(iconBulb, LV_OPA_COVER, 0);
   lv_obj_align(iconBulb, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
-
   makeLabel(tab, "LUX / PPFD", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
 
-  // 2 cards grandes (LUX + PPFD)
-  int cardY = sh(38);
-  int cardH = sh(70);
-  int gap = sw(6);
-  int cardW = (SCREEN_W - 3 * gap) / 2;
+  // Toggle PPFD/LUX (2 botoes no topo direito)
+  int togW = sw(52), togH = sh(20);
+  btnModePpfd = lv_btn_create(tab);
+  lv_obj_set_size(btnModePpfd, togW, togH);
+  lv_obj_align(btnModePpfd, LV_ALIGN_TOP_RIGHT, -togW - sw(4), sh(4));
+  lv_obj_set_style_radius(btnModePpfd, 6, 0);
+  lv_obj_add_event_cb(btnModePpfd, luxModeCb, LV_EVENT_CLICKED, (void*)(intptr_t)0);
+  makeLabel(btnModePpfd, "PPFD", COL_TEXT, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
 
-  // Card LUX
-  lv_obj_t *cardLux = makeCard(tab, gap, cardY, cardW, cardH);
-  makeLabel(cardLux, "LUX", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-  lblLux = makeLabel(cardLux, "--", COL_YEL, FONT_VALUE, LV_ALIGN_CENTER, 0, sh(4));
-  applyBloom(lblLux, COL_YEL);
+  btnModeLux = lv_btn_create(tab);
+  lv_obj_set_size(btnModeLux, togW, togH);
+  lv_obj_align(btnModeLux, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
+  lv_obj_set_style_radius(btnModeLux, 6, 0);
+  lv_obj_add_event_cb(btnModeLux, luxModeCb, LV_EVENT_CLICKED, (void*)(intptr_t)1);
+  makeLabel(btnModeLux, "LUX", COL_TEXT, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
 
-  // Card PPFD
-  lv_obj_t *cardPpfd = makeCard(tab, gap * 2 + cardW, cardY, cardW, cardH);
-  makeLabel(cardPpfd, "PPFD umol/s.m²", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-  lblPpfd = makeLabel(cardPpfd, "--", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, sh(4));
-  applyBloom(lblPpfd, COL_GRN);
+  // Valor grande centralizado
+  int valueY = sh(48);
+  lblLuxValue = lv_label_create(tab);
+  lv_label_set_text(lblLuxValue, "0");
+  lv_obj_set_style_text_font(lblLuxValue, FONT_VALUE, 0);
+  lv_obj_set_style_text_color(lblLuxValue, lv_color_hex(COL_GRN), 0);
+  lv_obj_align(lblLuxValue, LV_ALIGN_TOP_MID, 0, valueY);
+  applyBloom(lblLuxValue, COL_GRN);
 
-  // Barra de visualizacao da lux (0 a 70000)
-  int barY = cardY + cardH + sh(20);
-  makeLabel(tab, "0", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, sw(6), barY - sh(14));
-  makeLabel(tab, "70000 LUX", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), barY - sh(14));
+  lblLuxUnit = lv_label_create(tab);
+  lv_label_set_text(lblLuxUnit, "umol/s.m²");
+  lv_obj_set_style_text_font(lblLuxUnit, FONT_CAPTION, 0);
+  lv_obj_set_style_text_color(lblLuxUnit, lv_color_hex(COL_DIM), 0);
+  lv_obj_align(lblLuxUnit, LV_ALIGN_TOP_MID, 0, valueY + sh(40));
 
+  // Linha com botoes - / +
+  int ctlY = valueY + sh(60);
+  int btnSize = sh(38);
+  lv_obj_t *btnMinus = lv_btn_create(tab);
+  lv_obj_set_size(btnMinus, btnSize, btnSize);
+  lv_obj_align(btnMinus, LV_ALIGN_TOP_MID, -sw(60), ctlY);
+  lv_obj_set_style_radius(btnMinus, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(btnMinus, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(btnMinus, lv_color_hex(COL_RED), 0);
+  lv_obj_set_style_border_width(btnMinus, 2, 0);
+  lv_obj_add_event_cb(btnMinus, luxStepCb, LV_EVENT_CLICKED, (void*)(intptr_t)(-STEP_PPFD));
+  lv_obj_add_event_cb(btnMinus, luxStepCb, LV_EVENT_LONG_PRESSED_REPEAT, (void*)(intptr_t)(-STEP_PPFD));
+  makeLabel(btnMinus, "-", COL_RED, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(4));
+
+  lv_obj_t *btnPlus = lv_btn_create(tab);
+  lv_obj_set_size(btnPlus, btnSize, btnSize);
+  lv_obj_align(btnPlus, LV_ALIGN_TOP_MID, sw(60), ctlY);
+  lv_obj_set_style_radius(btnPlus, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(btnPlus, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(btnPlus, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_border_width(btnPlus, 2, 0);
+  lv_obj_add_event_cb(btnPlus, luxStepCb, LV_EVENT_CLICKED, (void*)(intptr_t)(+STEP_PPFD));
+  lv_obj_add_event_cb(btnPlus, luxStepCb, LV_EVENT_LONG_PRESSED_REPEAT, (void*)(intptr_t)(+STEP_PPFD));
+  makeLabel(btnPlus, "+", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(4));
+
+  // Botao SALVAR
+  lv_obj_t *btnSave = lv_btn_create(tab);
+  lv_obj_set_size(btnSave, sw(120), sh(24));
+  lv_obj_align(btnSave, LV_ALIGN_TOP_MID, 0, ctlY + btnSize + sh(6));
+  lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_GRN), 0);
+  applyBloom(btnSave, COL_GRN);
+  lv_obj_add_event_cb(btnSave, luxSaveCb, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnSave, "SALVAR", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+
+  // Barra visual (0 a 1500 PPFD)
+  int barY = TAB_H - sh(18);
   luxBar = lv_bar_create(tab);
-  lv_obj_set_size(luxBar, SCREEN_W - sw(12), sh(14));
-  lv_obj_set_pos(luxBar, sw(6), barY);
-  lv_bar_set_range(luxBar, 0, 70000);
-  lv_bar_set_value(luxBar, currentLux, LV_ANIM_OFF);
+  lv_obj_set_size(luxBar, SCREEN_W - sw(16), sh(8));
+  lv_obj_set_pos(luxBar, sw(8), barY);
+  lv_bar_set_range(luxBar, 0, 1500);
   lv_obj_set_style_bg_color(luxBar, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(luxBar, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(luxBar, 1, 0);
-  lv_obj_set_style_bg_color(luxBar, lv_color_hex(COL_YEL), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_color(luxBar, lv_color_hex(COL_YEL), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_width(luxBar, 16, LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_opa(luxBar, LV_OPA_70, LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(luxBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_color(luxBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_width(luxBar, 12, LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_opa(luxBar, LV_OPA_60, LV_PART_INDICATOR);
+
+  refreshLuxDisplay();
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -983,16 +1226,8 @@ static void refreshHomeValues() {
   snprintf(buf, sizeof(buf), "%.1f", phv);  lv_label_set_text(lblPh, buf);
   snprintf(buf, sizeof(buf), "%.1f", ecv);  lv_label_set_text(lblEc, buf);
 
-  // LUX / PPFD (aba nova)
-  if (lblLux) {
-    snprintf(buf, sizeof(buf), "%d", currentLux);
-    lv_label_set_text(lblLux, buf);
-  }
-  if (lblPpfd) {
-    snprintf(buf, sizeof(buf), "%d", currentPpfd);
-    lv_label_set_text(lblPpfd, buf);
-  }
-  if (luxBar) lv_bar_set_value(luxBar, currentLux, LV_ANIM_ON);
+  // LUX / PPFD (aba reformulada: toggle + ± + salvar)
+  refreshLuxDisplay();
 
   char subBuf[48];
   snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
@@ -1060,7 +1295,11 @@ static bool fetchDisplayData() {
   if (!doc["semana"].isNull())   semana   = doc["semana"].as<int>();
   if (!doc["totalSem"].isNull()) totalSem = doc["totalSem"].as<int>();
   if (!doc["lux"].isNull())      currentLux  = doc["lux"].as<int>();
-  if (!doc["ppfd"].isNull())     currentPpfd = doc["ppfd"].as<int>();
+  if (!doc["ppfd"].isNull()) {
+    currentPpfd = doc["ppfd"].as<int>();
+    // Sincroniza targetPpfd com o ultimo valor salvo (pra o usuario ver "como deixou")
+    if (currentPpfd > 0) targetPpfd = currentPpfd;
+  }
   const char* f = doc["fase"];     if (f) { strncpy(FASE, f, sizeof(FASE)-1); FASE[sizeof(FASE)-1]='\0'; }
   const char* t = doc["tentName"]; if (t) { strncpy(TENT_NAME, t, sizeof(TENT_NAME)-1); TENT_NAME[sizeof(TENT_NAME)-1]='\0'; }
   return true;
@@ -1142,6 +1381,21 @@ static void postReading(float newPh, float newEc) {
   int code = http.POST(body);
   http.end();
   Serial.printf("postReading: %d\n", code);
+}
+
+static bool postPpfd(int ppfd) {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  http.begin(String(SERVER_URL) + "/api/device/readings");
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  String body = "{\"tentId\":" + String(TENT_ID) +
+                ",\"ppfd\":" + String(ppfd) + "}";
+  int code = http.POST(body);
+  http.end();
+  Serial.printf("postPpfd(%d): %d\n", ppfd, code);
+  return code == 200;
 }
 
 // postWatering removido — rega agora e automatica (bomba do hardware real)
@@ -1345,6 +1599,7 @@ static void buildUI() {
 void setup() {
   Serial.begin(115200);
   Serial.println("\n[LVGL] boot");
+  loadConfigFromNVS();
 
 #ifdef REAL_HARDWARE
   bus = new Arduino_HWSPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, TFT_MISO);
