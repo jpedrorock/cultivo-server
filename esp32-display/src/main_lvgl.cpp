@@ -224,6 +224,11 @@ static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
   data->point.y = map(rx, 0, 240, SCREEN_H, 0);
 #endif
   data->state = LV_INDEV_STATE_PRESSED;
+  static uint32_t lastPrint = 0;
+  if (millis() - lastPrint > 200) {
+    lastPrint = millis();
+    Serial.printf("[touch] raw=%d,%d -> mapped=%d,%d\n", rx, ry, data->point.x, data->point.y);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -1457,6 +1462,7 @@ static void switchScreen(int idx) {
 // Callback de clique no icone da navbar
 static void navBtnClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  Serial.printf("[nav] click idx=%d\n", idx);
   switchScreen(idx);
 }
 
