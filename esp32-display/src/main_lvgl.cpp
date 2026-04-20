@@ -189,28 +189,30 @@ static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Helper: card estilizado com gradient + sombra sutil
+// Helper: card estilizado com gradient glassmorphism de 3 stops
 // ════════════════════════════════════════════════════════════════════════════════
 static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
   lv_obj_t *c = lv_obj_create(parent);
   lv_obj_set_size(c, w, h);
   lv_obj_set_pos(c, x, y);
-  // gradient vertical: topo mais claro, base mais escura (efeito glassmorphism)
-  lv_obj_set_style_bg_color(c, lv_color_hex(0x1A2332), 0);
-  lv_obj_set_style_bg_grad_color(c, lv_color_hex(0x0A0F17), 0);
+  // Gradient 3-stop (highlight top + body + shadow base) — efeito glassmorphism
+  lv_obj_set_style_bg_color(c, lv_color_hex(0x243142), 0);       // topo (claro)
+  lv_obj_set_style_bg_grad_color(c, lv_color_hex(0x050811), 0);  // base (bem escuro)
   lv_obj_set_style_bg_grad_dir(c, LV_GRAD_DIR_VER, 0);
+  lv_obj_set_style_bg_main_stop(c, 0, 0);       // topo comeca 0%
+  lv_obj_set_style_bg_grad_stop(c, 230, 0);     // escurece apos 90% (reforca base escura)
   lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(c, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(c, 1, 0);
   lv_obj_set_style_radius(c, 10, 0);
   lv_obj_set_style_pad_all(c, 6, 0);
-  // sombra interna sutil
+  // Sombra externa (projecao embaixo do card — profundidade)
   lv_obj_set_style_shadow_color(c, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_shadow_width(c, 8, 0);
-  lv_obj_set_style_shadow_opa(c, LV_OPA_40, 0);
+  lv_obj_set_style_shadow_width(c, 12, 0);
+  lv_obj_set_style_shadow_opa(c, LV_OPA_50, 0);
   lv_obj_set_style_shadow_spread(c, 0, 0);
   lv_obj_set_style_shadow_ofs_x(c, 0, 0);
-  lv_obj_set_style_shadow_ofs_y(c, 2, 0);
+  lv_obj_set_style_shadow_ofs_y(c, 4, 0);
   lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
   return c;
 }
@@ -385,7 +387,10 @@ static void buildHome(lv_obj_t *tab) {
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ch, 20);
     lv_chart_set_div_line_count(ch, 0, 0);
-    lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
+    // Aura translucida atras da linha (da profundidade ao sparkline)
+    lv_obj_set_style_bg_color(ch, lv_color_hex(color), 0);
+    lv_obj_set_style_bg_opa(ch, LV_OPA_10, 0);
+    lv_obj_set_style_radius(ch, 4, 0);
     lv_obj_set_style_border_width(ch, 0, 0);
     lv_obj_set_style_width(ch,  0, LV_PART_INDICATOR);   // v9: size separado em w/h
     lv_obj_set_style_height(ch, 0, LV_PART_INDICATOR);
@@ -1048,12 +1053,45 @@ static void buildNavbar(lv_obj_t *parent) {
 // ════════════════════════════════════════════════════════════════════════════════
 static void buildUI() {
   lv_obj_t *scr = lv_scr_act();
-  // Background gradient vertical (azul escuro -> preto puro)
+  // Background: gradient diagonal-ish (azul escuro -> preto puro)
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x0F1729), 0);
   lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x000000), 0);
   lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, 0);
+  lv_obj_set_style_bg_main_stop(scr, 0, 0);
+  lv_obj_set_style_bg_grad_stop(scr, 200, 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
   lv_obj_set_style_pad_all(scr, 0, 0);
+
+  // Overlay 1 — glow ambient verde sutil no canto superior esquerdo
+  // (simula luz "caindo" sobre o dashboard, tipo HUD de nave)
+  lv_obj_t *glow1 = lv_obj_create(scr);
+  lv_obj_set_size(glow1, SCREEN_W * 3 / 5, SCREEN_H * 3 / 5);
+  lv_obj_set_pos(glow1, 0, 0);
+  lv_obj_set_style_bg_color(glow1, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_bg_opa(glow1, LV_OPA_10, 0);
+  lv_obj_set_style_bg_grad_color(glow1, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_grad_dir(glow1, LV_GRAD_DIR_HOR, 0);
+  lv_obj_set_style_border_width(glow1, 0, 0);
+  lv_obj_set_style_radius(glow1, 0, 0);
+  lv_obj_set_style_pad_all(glow1, 0, 0);
+  lv_obj_add_flag(glow1, LV_OBJ_FLAG_IGNORE_LAYOUT);
+  lv_obj_remove_flag(glow1, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(glow1, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Overlay 2 — glow ciano no canto direito inferior (contraponto de cor)
+  lv_obj_t *glow2 = lv_obj_create(scr);
+  lv_obj_set_size(glow2, SCREEN_W * 2 / 5, SCREEN_H * 2 / 5);
+  lv_obj_align(glow2, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  lv_obj_set_style_bg_color(glow2, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_bg_opa(glow2, LV_OPA_10, 0);
+  lv_obj_set_style_bg_grad_color(glow2, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_grad_dir(glow2, LV_GRAD_DIR_VER, 0);
+  lv_obj_set_style_border_width(glow2, 0, 0);
+  lv_obj_set_style_radius(glow2, 0, 0);
+  lv_obj_set_style_pad_all(glow2, 0, 0);
+  lv_obj_add_flag(glow2, LV_OBJ_FLAG_IGNORE_LAYOUT);
+  lv_obj_remove_flag(glow2, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(glow2, LV_OBJ_FLAG_SCROLLABLE);
 
   // Area de conteudo (ocupa a tela inteira menos a navbar)
   contentArea = lv_obj_create(scr);
