@@ -1443,10 +1443,11 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
             </button>
             {/* PPFD */}
             <div className="kpi-ppfd flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-amber-500/20 dark:border-yellow-500/15">
-              <Sun className="w-4 h-4 text-amber-500 dark:text-yellow-400 mb-0.5" />
+              <Sun className="w-5 h-5 text-amber-500 dark:text-yellow-400 mb-0.5"
+                style={{ animation: 'ppfd-breathe 3.5s ease-in-out infinite' }} />
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PPFD</p>
               <div className="flex items-center gap-0.5">
-                <p className="text-base font-bold tracking-tight leading-none text-foreground">
+                <p className="text-lg font-bold tracking-tight leading-none text-foreground">
                   {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
                 </p>
               </div>
