@@ -1278,8 +1278,10 @@ static void buildUI() {
 
   buildNavbar(scr);
 
-  // FASE C — Scan line no topo de tudo (varre por cima do conteudo + navbar)
-  buildScanLine(scr);
+  // FASE C — Scan line desabilitado: o overlay no topo do z-order estava
+  // bloqueando hits em cima da navbar. Mantemos a funcao pra reativar depois
+  // movendo pra dentro do contentArea se quisermos o efeito sem interferencia.
+  // buildScanLine(scr);
 
   refreshHomeValues();
   startPulseTimer();   // anima sparklines dos mini-cards a cada 300ms
