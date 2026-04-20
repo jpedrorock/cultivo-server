@@ -933,54 +933,99 @@ export default function Home() {
 }
 
 
-// Mini-sparkline ECG animado — mostra tendência dos últimos 7 dias
-function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; color: string; w?: number; h?: number }) {
-  if (values.length < 2) return null;
-  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
-  const pts = values.map((v, i) =>
-    `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`
-  );
-  const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
-  const uid = `ecg-${color.replace(/[^a-z0-9]/gi, "")}`;
-  const dur = "3.5s";
+// Heartbeat ECG — picos agudos a partir dos dados reais, scanner pulsante
+function MiniSparkline({ values, color, w = 72, h = 26 }: { values: number[]; color: string; w?: number; h?: number }) {
+  // ── Monta path ECG: linha de base plana + picos agudos nos dados ──────────
+  const buildPath = (vals: number[]) => {
+    if (vals.length < 2) return "";
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = max - min || 1;
+    const norm = vals.map(v => (v - min) / range); // 0..1
+
+    const baseline = h * 0.82;                  // y da linha de base
+    const maxH     = h * 0.72;                  // altura máxima do pico
+    const segW     = w / norm.length;
+
+    const parts: string[] = [`M 0,${baseline}`];
+    norm.forEach((n, i) => {
+      const cx  = (i + 0.5) * segW;             // centro do segmento
+      const pre = cx - segW * 0.18;             // início do pico
+      const pos = cx + segW * 0.18;             // fim do pico
+      const py  = baseline - n * maxH;          // y do pico (mais alto = menor y)
+
+      parts.push(
+        `L ${pre.toFixed(1)},${baseline.toFixed(1)}`,  // linha plana até o pico
+        `L ${cx.toFixed(1)},${py.toFixed(1)}`,          // subida aguda
+        `L ${pos.toFixed(1)},${baseline.toFixed(1)}`,   // descida aguda
+      );
+    });
+    parts.push(`L ${w},${baseline.toFixed(1)}`);        // cauda plana final
+    return parts.join(" ");
+  };
+
+  const pathD = buildPath(values);
+  if (!pathD) return null;
+
+  const uid = `hb-${color.replace(/[^a-z0-9]/gi, "")}`;
+  // Ritmo: rápido para parecer um batimento, pausa implícita no final do loop
+  const dur = "2.2s";
 
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: "visible", opacity: 0.85 }}>
+    <svg
+      width={w} height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      style={{ overflow: "visible", opacity: 0.9, display: "block" }}
+    >
       <defs>
-        <filter id={`${uid}-glow`} x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
+        {/* Glow suave nos picos */}
+        <filter id={`${uid}-glow`} x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.4" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
-      {/* Traço de fundo apagado */}
+
+      {/* Traço fantasma — ECG completo, apagado */}
       <path d={pathD} fill="none" stroke={color} strokeWidth="1"
-        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.10" />
-      {/* Rastro longo e tênue */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.18"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.35 0.65">
-        <animate attributeName="stroke-dashoffset" values="0.35;-0.65" dur={dur} repeatCount="indefinite" calcMode="linear" />
+        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.08" />
+
+      {/* Trail largo — rastro longo que vai sumindo atrás do scanner */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.20"
+        strokeLinecap="round" strokeLinejoin="round"
+        pathLength="1" strokeDasharray="0.45 0.55">
+        <animate attributeName="stroke-dashoffset"
+          values="0.45;-0.55" dur={dur} repeatCount="indefinite" calcMode="linear" />
       </path>
-      {/* Rastro médio */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.45"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.18 0.82">
-        <animate attributeName="stroke-dashoffset" values="0.18;-0.82" dur={dur} repeatCount="indefinite" calcMode="linear" />
+
+      {/* Trail médio — brilho crescente atrás do ponto */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.55"
+        strokeLinecap="round" strokeLinejoin="round"
+        pathLength="1" strokeDasharray="0.14 0.86">
+        <animate attributeName="stroke-dashoffset"
+          values="0.14;-0.86" dur={dur} repeatCount="indefinite" calcMode="linear" />
       </path>
-      {/* Rastro curto */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.80"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.07 0.93">
-        <animate attributeName="stroke-dashoffset" values="0.07;-0.93" dur={dur} repeatCount="indefinite" calcMode="linear" />
+
+      {/* Traço nítido — o "recém desenhado" logo atrás da ponta */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeOpacity="0.88"
+        strokeLinecap="round" strokeLinejoin="round"
+        pathLength="1" strokeDasharray="0.05 0.95">
+        <animate attributeName="stroke-dashoffset"
+          values="0.05;-0.95" dur={dur} repeatCount="indefinite" calcMode="linear" />
       </path>
-      {/* Ponta brilhante com glow */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeOpacity="1"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.02 0.98"
+
+      {/* Ponta brilhante com glow — a "cabeça" do scanner */}
+      <path d={pathD} fill="none" stroke={color} strokeWidth="3" strokeOpacity="1"
+        strokeLinecap="round" strokeLinejoin="round"
+        pathLength="1" strokeDasharray="0.018 0.982"
         filter={`url(#${uid}-glow)`}>
-        <animate attributeName="stroke-dashoffset" values="0.02;-0.98" dur={dur} repeatCount="indefinite" calcMode="linear" />
+        <animate attributeName="stroke-dashoffset"
+          values="0.018;-0.982" dur={dur} repeatCount="indefinite" calcMode="linear" />
       </path>
-      {/* Ponto de luz na frente */}
-      <circle r="2.2" fill={color} filter={`url(#${uid}-glow)`} opacity="0.95">
+
+      {/* Ponto de luz correndo na frente */}
+      <circle r="2.6" fill={color} filter={`url(#${uid}-glow)`} opacity="1">
         <animateMotion path={pathD} dur={dur} repeatCount="indefinite" calcMode="linear" />
       </circle>
     </svg>
