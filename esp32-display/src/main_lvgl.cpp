@@ -332,151 +332,142 @@ static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// FASE C — Efeitos ambientes (particles, scan line, ring wave / radar ping)
+// App splash — logo + barra de progresso (estilo app mobile)
+// Overlay sobre o UI já montado, fade-in no início e fade-out ao final.
 // ════════════════════════════════════════════════════════════════════════════════
-// fx_anim_y_cb usado pelo matrix boot splash (screen de entrada)
-static void fx_anim_y_cb(void *obj, int32_t v) {
-  lv_obj_set_y((lv_obj_t*)obj, v);
-}
+static lv_obj_t  *splashScreen = nullptr;
+static lv_obj_t  *splashBar    = nullptr;
+static lv_obj_t  *splashMsg    = nullptr;
+static lv_timer_t *splashTimer = nullptr;
+static int        splashStep   = 0;
 
-// ════════════════════════════════════════════════════════════════════════════════
-// Matrix boot splash — chuva de chars verdes + mensagens de boot (estilo terminal)
-// Criado em cima do UI principal, fade out ao final ou no tap.
-// ════════════════════════════════════════════════════════════════════════════════
-#define MATRIX_COLS 8
-static lv_obj_t *matrixScreen = nullptr;
-static lv_obj_t *matrixColumns[MATRIX_COLS];
-static lv_obj_t *matrixMsg = nullptr;
-static lv_timer_t *matrixTimer = nullptr;
-static int matrixStep = 0;
-
-static const char* BOOT_MSGS[] = {
-  "INITIALIZING...",
-  "LVGL: READY",
-  "TOUCH: OK",
-  "CHLOROPHYLL: 98.2%",
-  "> ACESSO CONCEDIDO"
+static const char *SPLASH_MSGS[] = {
+  "Iniciando sistema...",
+  "Carregando interface...",
+  "Verificando sensores...",
+  "Conectando ao servidor...",
+  "Pronto!",
 };
-#define MATRIX_STEPS (int)(sizeof(BOOT_MSGS) / sizeof(BOOT_MSGS[0]))
+#define SPLASH_STEPS (int)(sizeof(SPLASH_MSGS) / sizeof(SPLASH_MSGS[0]))
 
-static void matrixFillColumn(lv_obj_t *col) {
-  char buf[96];
-  int k = 0;
-  for (int j = 0; j < 10; j++) {
-    // Chars imprimiveis, enviesado pra digitos e letras (mais vibe "terminal")
-    char c;
-    int r = rand() % 100;
-    if      (r < 40) c = '0' + (rand() % 10);
-    else if (r < 75) c = 'A' + (rand() % 26);
-    else             c = "!@#$%&*+/\\<>:;"[rand() % 14];
-    buf[k++] = c;
-    buf[k++] = '\n';
-  }
-  buf[k] = '\0';
-  lv_label_set_text(col, buf);
-}
+static void splashFinish();
 
-static void matrixFinish();
-
-static void matrixTick(lv_timer_t *t) {
-  // Reembaralha chars de todas as colunas
-  for (int i = 0; i < MATRIX_COLS; i++) {
-    if (matrixColumns[i]) matrixFillColumn(matrixColumns[i]);
-  }
-  // Avanca mensagem central
-  matrixStep++;
-  if (matrixStep < MATRIX_STEPS) {
-    if (matrixMsg) lv_label_set_text(matrixMsg, BOOT_MSGS[matrixStep]);
-  } else if (matrixStep >= MATRIX_STEPS + 1) {
-    matrixFinish();
+static void splashTick(lv_timer_t *) {
+  splashStep++;
+  if (splashStep < SPLASH_STEPS) {
+    if (splashMsg) lv_label_set_text(splashMsg, SPLASH_MSGS[splashStep]);
+    if (splashBar)  lv_bar_set_value(splashBar, (splashStep * 100) / (SPLASH_STEPS - 1), LV_ANIM_ON);
+  } else {
+    splashFinish();
   }
 }
 
-static void buildMatrixSplash() {
-  matrixStep = 0;
-  matrixScreen = lv_obj_create(lv_scr_act());
-  lv_obj_set_size(matrixScreen, SCREEN_W, SCREEN_H);
-  lv_obj_set_pos(matrixScreen, 0, 0);
-  lv_obj_set_style_bg_color(matrixScreen, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_opa(matrixScreen, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(matrixScreen, 0, 0);
-  lv_obj_set_style_radius(matrixScreen, 0, 0);
-  lv_obj_set_style_pad_all(matrixScreen, 0, 0);
-  lv_obj_clear_flag(matrixScreen, LV_OBJ_FLAG_SCROLLABLE);
+static void buildSplash() {
+  splashStep = 0;
 
-  // Colunas de chars caindo
-  int colW = SCREEN_W / MATRIX_COLS;
-  for (int i = 0; i < MATRIX_COLS; i++) {
-    lv_obj_t *col = lv_label_create(matrixScreen);
-    matrixColumns[i] = col;
-    matrixFillColumn(col);
-    lv_obj_set_style_text_font(col, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(col, lv_color_hex(0x4ADE80), 0);
-    lv_obj_set_style_text_opa(col, LV_OPA_80, 0);
-    lv_obj_set_style_text_line_space(col, 2, 0);
-    int startY = -(SCREEN_H / 2) - (rand() % (SCREEN_H / 2));
-    lv_obj_set_pos(col, i * colW + 2, startY);
+  splashScreen = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(splashScreen, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(splashScreen, 0, 0);
+  lv_obj_set_style_bg_color(splashScreen, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(splashScreen, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(splashScreen, 0, 0);
+  lv_obj_set_style_radius(splashScreen, 0, 0);
+  lv_obj_set_style_pad_all(splashScreen, 0, 0);
+  lv_obj_clear_flag(splashScreen, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, col);
-    lv_anim_set_values(&a, startY, SCREEN_H + 40);
-    lv_anim_set_time(&a, 1800 + (rand() % 1800));
-    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_exec_cb(&a, fx_anim_y_cb);
-    lv_anim_start(&a);
-  }
+  // Anel circular com glow verde — funciona como ícone de app
+  lv_obj_t *logoCont = lv_obj_create(splashScreen);
+  lv_obj_set_size(logoCont, sw(64), sw(64));
+  lv_obj_align(logoCont, LV_ALIGN_CENTER, 0, -sh(48));
+  lv_obj_set_style_radius(logoCont, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(logoCont, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_bg_opa(logoCont, LV_OPA_20, 0);
+  lv_obj_set_style_border_color(logoCont, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_border_width(logoCont, 2, 0);
+  lv_obj_set_style_border_opa(logoCont, LV_OPA_60, 0);
+  lv_obj_set_style_shadow_color(logoCont, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_shadow_width(logoCont, 28, 0);
+  lv_obj_set_style_shadow_opa(logoCont, LV_OPA_40, 0);
+  lv_obj_set_style_pad_all(logoCont, 0, 0);
+  lv_obj_clear_flag(logoCont, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Caixa central com mensagem (background preto pra isolar do rain)
-  lv_obj_t *msgBg = lv_obj_create(matrixScreen);
-  lv_obj_set_size(msgBg, SCREEN_W - sw(20), sh(48));
-  lv_obj_align(msgBg, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_bg_color(msgBg, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_opa(msgBg, LV_OPA_80, 0);
-  lv_obj_set_style_border_color(msgBg, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(msgBg, 1, 0);
-  lv_obj_set_style_radius(msgBg, 4, 0);
-  lv_obj_set_style_pad_all(msgBg, 0, 0);
-  lv_obj_remove_flag(msgBg, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_remove_flag(msgBg, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_shadow_color(msgBg, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_shadow_width(msgBg, 16, 0);
-  lv_obj_set_style_shadow_opa(msgBg, LV_OPA_60, 0);
+  lv_obj_t *logo = lv_img_create(logoCont);
+  lv_img_set_src(logo, &ic_sprout);
+  lv_obj_center(logo);
 
-  matrixMsg = lv_label_create(msgBg);
-  lv_label_set_text(matrixMsg, BOOT_MSGS[0]);
-  lv_obj_set_style_text_font(matrixMsg, FONT_BODY, 0);
-  lv_obj_set_style_text_color(matrixMsg, lv_color_hex(COL_GRN), 0);
-  lv_obj_center(matrixMsg);
+  // Nome do app
+  lv_obj_t *lblName = lv_label_create(splashScreen);
+  lv_label_set_text(lblName, "cultivo");
+  lv_obj_set_style_text_font(lblName, FONT_VALUE, 0);
+  lv_obj_set_style_text_color(lblName, lv_color_hex(COL_TEXT), 0);
+  lv_obj_align(lblName, LV_ALIGN_CENTER, 0, sh(12));
 
-  // Tap em qualquer lugar pula
-  lv_obj_add_flag(matrixScreen, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(matrixScreen, [](lv_event_t *e) {
-    matrixFinish();
-  }, LV_EVENT_CLICKED, NULL);
+  // Subtítulo
+  lv_obj_t *lblSub = lv_label_create(splashScreen);
+  lv_label_set_text(lblSub, "Monitor de Estufa");
+  lv_obj_set_style_text_font(lblSub, FONT_BODY, 0);
+  lv_obj_set_style_text_color(lblSub, lv_color_hex(COL_DIM), 0);
+  lv_obj_align(lblSub, LV_ALIGN_CENTER, 0, sh(40));
 
-  matrixTimer = lv_timer_create(matrixTick, 650, NULL);
+  // Barra de progresso — fina, verde, preenche da esquerda pra direita
+  splashBar = lv_bar_create(splashScreen);
+  lv_obj_set_size(splashBar, SCREEN_W - sw(48), sh(4));
+  lv_obj_align(splashBar, LV_ALIGN_BOTTOM_MID, 0, -sh(28));
+  lv_obj_set_style_bg_color(splashBar, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_bg_opa(splashBar, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(splashBar, 2, 0);
+  lv_obj_set_style_bg_color(splashBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(splashBar, 2, LV_PART_INDICATOR);
+  lv_bar_set_range(splashBar, 0, 100);
+  lv_bar_set_value(splashBar, 0, LV_ANIM_OFF);
+
+  // Mensagem de status
+  splashMsg = lv_label_create(splashScreen);
+  lv_label_set_text(splashMsg, SPLASH_MSGS[0]);
+  lv_obj_set_style_text_font(splashMsg, FONT_CAPTION, 0);
+  lv_obj_set_style_text_color(splashMsg, lv_color_hex(COL_DIM), 0);
+  lv_obj_align(splashMsg, LV_ALIGN_BOTTOM_MID, 0, -sh(10));
+
+  // Versão no canto inferior direito
+  lv_obj_t *lblVer = lv_label_create(splashScreen);
+  lv_label_set_text(lblVer, "v" FW_VERSION);
+  lv_obj_set_style_text_font(lblVer, FONT_CAPTION, 0);
+  lv_obj_set_style_text_color(lblVer, lv_color_hex(COL_BORDER), 0);
+  lv_obj_align(lblVer, LV_ALIGN_BOTTOM_RIGHT, -sw(8), -sh(6));
+
+  // Fade in
+  lv_obj_set_style_opa(splashScreen, LV_OPA_0, 0);
+  lv_anim_t fadeIn;
+  lv_anim_init(&fadeIn);
+  lv_anim_set_var(&fadeIn, splashScreen);
+  lv_anim_set_values(&fadeIn, LV_OPA_0, LV_OPA_COVER);
+  lv_anim_set_time(&fadeIn, 300);
+  lv_anim_set_exec_cb(&fadeIn, [](void *obj, int32_t v) {
+    lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
+  });
+  lv_anim_start(&fadeIn);
+
+  splashTimer = lv_timer_create(splashTick, 600, NULL);
 }
 
-static void matrixFinish() {
-  if (!matrixScreen) return;
-  if (matrixTimer) { lv_timer_del(matrixTimer); matrixTimer = nullptr; }
+static void splashFinish() {
+  if (!splashScreen) return;
+  if (splashTimer) { lv_timer_del(splashTimer); splashTimer = nullptr; }
 
-  // Fade out via opacidade do container inteiro
   lv_anim_t a;
   lv_anim_init(&a);
-  lv_anim_set_var(&a, matrixScreen);
+  lv_anim_set_var(&a, splashScreen);
   lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_0);
   lv_anim_set_time(&a, 450);
   lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
     lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
   });
-  lv_anim_set_completed_cb(&a, [](lv_anim_t *an) {
-    if (matrixScreen) {
-      lv_obj_del(matrixScreen);
-      matrixScreen = nullptr;
-      for (int i = 0; i < MATRIX_COLS; i++) matrixColumns[i] = nullptr;
-      matrixMsg = nullptr;
+  lv_anim_set_completed_cb(&a, [](lv_anim_t *) {
+    if (splashScreen) {
+      lv_obj_del(splashScreen);
+      splashScreen = nullptr;
+      splashBar    = nullptr;
+      splashMsg    = nullptr;
     }
   });
   lv_anim_start(&a);
@@ -2157,18 +2148,18 @@ void setup() {
   buildUI();
   Serial.println("[boot] buildUI ok"); Serial.flush();
 
-  // Matrix splash — overlay em cima do UI ja montado
-  Serial.println("[boot] matrix splash"); Serial.flush();
-  buildMatrixSplash();
+  // App splash — logo + barra de progresso
+  Serial.println("[boot] splash"); Serial.flush();
+  buildSplash();
   unsigned long splashStart = millis();
-  while (matrixScreen && millis() - splashStart < 4200) {
+  while (splashScreen && millis() - splashStart < 3500) {
     lv_timer_handler();
     delay(5);
   }
-  matrixFinish();
+  splashFinish();
   // Deixa o fade completar
   unsigned long fadeStart = millis();
-  while (matrixScreen && millis() - fadeStart < 600) {
+  while (splashScreen && millis() - fadeStart < 600) {
     lv_timer_handler();
     delay(5);
   }
