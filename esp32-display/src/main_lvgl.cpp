@@ -1943,6 +1943,15 @@ static void fetchHistoryAll() {
 // ════════════════════════════════════════════════════════════════════════════════
 static TaskHandle_t netTaskHandle = NULL;
 
+// Logger de tempo decorrido — acima do threshold, loga WARN.
+// Substitui WDT customizado: WDT so ajuda se setuparmos timeout > Tuya timeout
+// (8s), mas reboot em falso positivo seria pior UX que um log no serial.
+// HTTPClient.setTimeout() ja garante que nenhuma chamada trave alem do limite.
+static inline void logIfSlow(const char *label, uint32_t t0, uint32_t thresholdMs) {
+  uint32_t dt = millis() - t0;
+  if (dt > thresholdMs) Serial.printf("[net] WARN %s lento: %ums\n", label, dt);
+}
+
 static void netTaskFn(void *param) {
   for (;;) {
     if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
@@ -1950,12 +1959,16 @@ static void netTaskFn(void *param) {
     if (refreshPending) {
       refreshPending = false;
       Serial.println("[net] refreshTuya");
+      uint32_t t0 = millis();
       if (refreshTuyaNow()) uiNeedsRefresh = true;
+      logIfSlow("refreshTuya", t0, 9000);
     }
 
     if (millis() - lastFetch >= FETCH_INTERVAL) {
       lastFetch = millis();
+      uint32_t t0 = millis();
       if (fetchDisplayData()) uiNeedsRefresh = true;
+      logIfSlow("fetchDisplay", t0, 6000);
       fetchHistoryAll();
     }
 
