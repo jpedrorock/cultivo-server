@@ -142,6 +142,10 @@ static const unsigned long FETCH_INTERVAL = 30000;
 // Flag setada por handlers de tap (TEMP/UMIDADE) — loop() processa fora do click
 static volatile bool refreshPending = false;
 
+// netTask → loop: seta quando ha' dados novos. loop() chama refreshHomeValues()
+// no thread principal (LVGL nao e thread-safe). atomic volatile basta, flag simples.
+static volatile bool uiNeedsRefresh = false;
+
 // ── Widgets HOME ────────────────────────────────────────────────────────────────
 static lv_obj_t *contentArea;
 static lv_obj_t *screenHome, *screenLux, *screenPhEc, *screenTarefa, *screenGrafic;
@@ -1892,6 +1896,43 @@ static void fetchHistoryAll() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Task FreeRTOS de rede — isola HTTP do loop principal
+// Roda no core 0 (Arduino loop fica no core 1). Sem essa task, fetchDisplayData()
+// bloqueava o loop por ate 5s, travando animacoes LVGL e touch.
+// As funcoes de fetch so escrevem globais (tempC, rh, phv, etc) — nao tocam LVGL.
+// Apos fetch OK, seta uiNeedsRefresh → loop() chama refreshHomeValues() no thread
+// principal (LVGL nao e thread-safe).
+// ════════════════════════════════════════════════════════════════════════════════
+static TaskHandle_t netTaskHandle = NULL;
+
+static void netTaskFn(void *param) {
+  for (;;) {
+    if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
+
+    if (refreshPending) {
+      refreshPending = false;
+      Serial.println("[net] refreshTuya");
+      if (refreshTuyaNow()) uiNeedsRefresh = true;
+    }
+
+    if (millis() - lastFetch >= FETCH_INTERVAL) {
+      lastFetch = millis();
+      if (fetchDisplayData()) uiNeedsRefresh = true;
+      fetchHistoryAll();
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+static void startNetTask() {
+  if (netTaskHandle) return;
+  // Stack 8KB: cobre TLS handshake (~4KB) + JSON parsing (~2KB) com folga
+  xTaskCreatePinnedToCore(netTaskFn, "netTask", 8192, NULL, 1, &netTaskHandle, 0);
+  Serial.println("[net] task iniciada no core 0");
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Navegação custom: content area + bottom nav com icones Lucide coloridos
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -2172,12 +2213,15 @@ void setup() {
 
   connectWifi();
   if (wifiOk) {
+    // Fetch inicial no thread principal — garante dados prontos antes de mostrar UI
     fetchDisplayData();
     fetchHistoryAll();
     fetchTasks();
     rebuildTarefasList();
     lastFetch = millis();
     refreshHomeValues();
+    // Dai em diante HTTP roda em background, loop() fica livre pra UI
+    startNetTask();
   }
   Serial.println("[LVGL] UI pronta");
 }
@@ -2191,15 +2235,12 @@ void loop() {
     return;
   }
 
-  if (refreshPending) {
-    refreshPending = false;
-    if (refreshTuyaNow()) refreshHomeValues();
+  // Rede roda em background no netTask. Loop so' aplica os dados na UI.
+  if (uiNeedsRefresh) {
+    uiNeedsRefresh = false;
+    refreshHomeValues();
   }
-  if (wifiOk && millis() - lastFetch >= FETCH_INTERVAL) {
-    lastFetch = millis();
-    if (fetchDisplayData()) refreshHomeValues();
-    fetchHistoryAll();
-  }
+
   lv_timer_handler();
   delay(5);
 }
