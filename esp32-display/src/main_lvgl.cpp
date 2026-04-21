@@ -19,19 +19,9 @@
 #include <lvgl.h>
 #include "cultivo_icons.h"
 #include "fonts/cultivo_fonts.h"
+#include "hal_platform.h"
 
-// Fontes responsivas — escalam automaticamente conforme hardware alvo
-#ifdef REAL_HARDWARE
-  #define FONT_VALUE   (&manrope_bold_40)    // 480x320: valores GIGANTES
-  #define FONT_TITLE   (&manrope_bold_24)
-  #define FONT_BODY    (&manrope_sb_18)
-  #define FONT_CAPTION (&manrope_sb_14)
-#else
-  #define FONT_VALUE   (&manrope_bold_28)    // 320x240: valores compactos
-  #define FONT_TITLE   (&manrope_bold_18)
-  #define FONT_BODY    (&manrope_sb_14)
-  #define FONT_CAPTION (&manrope_sb_12)
-#endif
+// FONT_* macros e extern declarations vêm de hal_platform.h
 
 // ════════════════════════════════════════════════════════════════════════════════
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
@@ -87,19 +77,15 @@ static void clearConfigNVS() {
 #define TOUCH_SCL  5
 #define FT_ADDR   0x38
 
+// Definições dos objetos declarados como extern em hal_platform.h
 #ifdef REAL_HARDWARE
-  #include <Arduino_GFX_Library.h>
-  static Arduino_DataBus *bus = nullptr;
-  static Arduino_GFX     *gfx = nullptr;
-  static const int SCREEN_W = 480;
-  static const int SCREEN_H = 320;
+  Arduino_DataBus *bus = nullptr;
+  Arduino_GFX     *gfx = nullptr;
 #else
-  #include <Adafruit_GFX.h>
-  #include <Adafruit_ILI9341.h>
-  static Adafruit_ILI9341 tft(TFT_CS, TFT_DC, TFT_RST);
-  static const int SCREEN_W = 320;
-  static const int SCREEN_H = 240;
+  Adafruit_ILI9341 tft(TFT_CS, TFT_DC, TFT_RST);
 #endif
+static const int SCREEN_W = HAL_SCREEN_W;
+static const int SCREEN_H = HAL_SCREEN_H;
 
 // Helpers de escala — base 320x240 (Wokwi). No real (480x320) multiplica por 1.5 / 1.33
 // Use pra todas dimensões de layout (posições, paddings, tamanhos de container).
@@ -204,14 +190,7 @@ static const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
 static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
   uint32_t w = area->x2 - area->x1 + 1;
   uint32_t h = area->y2 - area->y1 + 1;
-#ifdef REAL_HARDWARE
-  gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)px_map, w, h);
-#else
-  tft.startWrite();
-  tft.setAddrWindow(area->x1, area->y1, w, h);
-  tft.writePixels((uint16_t*)px_map, w * h);
-  tft.endWrite();
-#endif
+  hal_push_pixels(area->x1, area->y1, w, h, (uint16_t*)px_map);
   lv_display_flush_ready(disp);
 }
 
@@ -231,19 +210,16 @@ static bool ftRead(int &rx, int &ry) {
 }
 
 static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
-  int rx, ry;
+  int rx, ry, mx, my;
   if (!ftRead(rx, ry)) { data->state = LV_INDEV_STATE_RELEASED; return; }
-#ifdef REAL_HARDWARE
-  data->point.x = rx; data->point.y = ry;
-#else
-  data->point.x = map(ry, 0, 320, 0, SCREEN_W);
-  data->point.y = map(rx, 0, 240, SCREEN_H, 0);
-#endif
+  hal_map_touch(rx, ry, &mx, &my);
+  data->point.x = mx;
+  data->point.y = my;
   data->state = LV_INDEV_STATE_PRESSED;
   static uint32_t lastPrint = 0;
   if (millis() - lastPrint > 200) {
     lastPrint = millis();
-    Serial.printf("[touch] raw=%d,%d -> mapped=%d,%d\n", rx, ry, data->point.x, data->point.y);
+    Serial.printf("[touch] raw=%d,%d -> mapped=%d,%d\n", rx, ry, mx, my);
   }
 }
 
@@ -2131,18 +2107,8 @@ void setup() {
   Serial.printf("\n[boot] Cultivo ESP32 Display fw=%s\n", FW_VERSION);
   loadConfigFromNVS();
 
-#ifdef REAL_HARDWARE
-  bus = new Arduino_HWSPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, TFT_MISO);
-  gfx = new Arduino_AXS15231B(bus, TFT_RST, 1);
-  gfx->begin();
-  gfx->fillScreen(0);
-#else
-  Serial.println("[boot] SPI+TFT init"); Serial.flush();
-  SPI.begin(TFT_SCK, TFT_MISO, TFT_MOSI, TFT_CS);
-  tft.begin();
-  tft.setRotation(1);
-  tft.fillScreen(0);
-#endif
+  Serial.println("[boot] display init"); Serial.flush();
+  hal_display_init(TFT_SCK, TFT_MISO, TFT_MOSI, TFT_CS, TFT_DC, TFT_RST);
 
   Serial.println("[boot] Wire init"); Serial.flush();
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
