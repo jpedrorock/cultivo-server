@@ -13,6 +13,7 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
+#include <Update.h>
 #include <Preferences.h>
 #include <math.h>
 #include <lvgl.h>
@@ -894,6 +895,7 @@ button:active{transform:translateY(1px)}
 <button type="submit">Salvar e Reiniciar</button>
 <div class="status" id="status">Escaneando redes WiFi...</div>
 </form>
+<p style="color:#475569;font-size:11px;text-align:center;margin-top:20px"><a href="/update" style="color:#475569">recovery: atualizar firmware</a></p>
 <script>
 fetch('/scan').then(r=>r.json()).then(d=>{
   const s=document.getElementById('ssid');s.innerHTML='';
@@ -940,6 +942,47 @@ static void handlePortalSave() {
   apServer->send_P(200, "text/html", PORTAL_DONE_HTML);
   delay(800);
   ESP.restart();
+}
+
+// Recovery de firmware via AP portal — util quando OTA comum nao e' viavel
+// (nao ha' internet, mDNS bloqueado, etc). Upload de .bin direto pro flash.
+static const char PORTAL_UPDATE_HTML[] PROGMEM = R"HTML(
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cultivo Update</title>
+<style>body{background:#0b0f14;color:#e2e8f0;font-family:system-ui;padding:20px;max-width:480px;margin:0 auto}
+h1{color:#22c55e}button{background:#22c55e;color:#000;border:0;padding:12px 20px;border-radius:8px;font-weight:700;width:100%;margin-top:12px}
+input[type=file]{color:#e2e8f0;width:100%;padding:8px;border:1px solid #475569;border-radius:6px;background:#1e293b}
+p{color:#94a3b8;font-size:14px}</style></head><body>
+<h1>Firmware Update</h1>
+<p>Selecione o arquivo <code>firmware.bin</code> (tipicamente em <code>.pio/build/real/firmware.bin</code>).</p>
+<form method="POST" enctype="multipart/form-data" action="/update"><input type="file" name="fw" accept=".bin" required><button type="submit">Enviar</button></form>
+<p><a href="/" style="color:#22c55e">← Voltar</a></p></body></html>
+)HTML";
+
+static void handlePortalUpdateGet() {
+  apServer->send_P(200, "text/html", PORTAL_UPDATE_HTML);
+}
+
+static void handlePortalUpdateDone() {
+  bool ok = !Update.hasError();
+  apServer->send(200, "text/html",
+    ok ? "<h1 style='color:#22c55e'>Update OK — rebootando...</h1>"
+       : "<h1 style='color:#ef4444'>Update FALHOU</h1>");
+  delay(800);
+  if (ok) ESP.restart();
+}
+
+static void handlePortalUpdateUpload() {
+  HTTPUpload &up = apServer->upload();
+  if (up.status == UPLOAD_FILE_START) {
+    Serial.printf("[ap] update upload: %s\n", up.filename.c_str());
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
+  } else if (up.status == UPLOAD_FILE_WRITE) {
+    if (Update.write(up.buf, up.currentSize) != up.currentSize) Update.printError(Serial);
+  } else if (up.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) Serial.printf("[ap] update %u bytes ok\n", up.totalSize);
+    else Update.printError(Serial);
+  }
 }
 
 static void buildApScreen(const char *ssid, const char *pass, const char *ip) {
@@ -1021,9 +1064,11 @@ static void startApPortal() {
   IPAddress ip = WiFi.softAPIP();
 
   apServer = new WebServer(80);
-  apServer->on("/",      HTTP_GET,  handlePortalRoot);
-  apServer->on("/scan",  HTTP_GET,  handlePortalScan);
-  apServer->on("/save",  HTTP_POST, handlePortalSave);
+  apServer->on("/",       HTTP_GET,  handlePortalRoot);
+  apServer->on("/scan",   HTTP_GET,  handlePortalScan);
+  apServer->on("/save",   HTTP_POST, handlePortalSave);
+  apServer->on("/update", HTTP_GET,  handlePortalUpdateGet);
+  apServer->on("/update", HTTP_POST, handlePortalUpdateDone, handlePortalUpdateUpload);
   apServer->onNotFound([]() { apServer->send_P(200, "text/html", PORTAL_HTML); });
   apServer->begin();
 
