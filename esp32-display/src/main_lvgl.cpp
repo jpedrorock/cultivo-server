@@ -1753,12 +1753,12 @@ static WiFiClient       httpPlainClient;
 static WiFiClientSecure httpSecureClient;
 static bool httpClientsInited = false;
 
-static bool httpBegin(HTTPClient &http, const String &url) {
+static bool httpBegin(HTTPClient &http, const char *url) {
   if (!httpClientsInited) {
     httpSecureClient.setCACert(ISRG_ROOT_X1);
     httpClientsInited = true;
   }
-  if (url.startsWith("https://")) {
+  if (strncmp(url, "https://", 8) == 0) {
     return http.begin(httpSecureClient, url);
   }
   return http.begin(httpPlainClient, url);
@@ -1770,18 +1770,19 @@ static bool httpBegin(HTTPClient &http, const String &url) {
 static bool refreshTuyaNow() {
   if (!wifiOk) return false;
   HTTPClient http;
-  String url = String(SERVER_URL) + "/api/device/refresh-tuya/" + String(TENT_ID);
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/refresh-tuya/%d", SERVER_URL, TENT_ID);
   httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.addHeader("Content-Type", "application/json");
   http.setTimeout(8000);  // Tuya cloud as vezes e lento
   int code = http.POST("{}");
   if (code != 200) { http.end(); return false; }
-  String body = http.getString();
-  http.end();
 
   JsonDocument doc;
-  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return false;
   if (!doc["tempC"].isNull()) tempC = doc["tempC"].as<float>();
   if (!doc["rh"].isNull())    rh    = doc["rh"].as<float>();
   if (!doc["vpd"].isNull())   vpd   = doc["vpd"].as<float>();
@@ -1791,17 +1792,18 @@ static bool refreshTuyaNow() {
 static bool fetchDisplayData() {
   if (!wifiOk) return false;
   HTTPClient http;
-  String url = String(SERVER_URL) + "/api/device/display/" + String(TENT_ID);
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/display/%d", SERVER_URL, TENT_ID);
   httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
   int code = http.GET();
   if (code != 200) { http.end(); return false; }
-  String body = http.getString();
-  http.end();
 
   JsonDocument doc;
-  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return false;
   if (!doc["tempC"].isNull())    tempC    = doc["tempC"].as<float>();
   if (!doc["rh"].isNull())       rh       = doc["rh"].as<float>();
   if (!doc["vpd"].isNull())      vpd      = doc["vpd"].as<float>();
@@ -1824,18 +1826,19 @@ static bool fetchHistory(const char* metric, const char* period, float *buf, int
   n = 0;
   if (!wifiOk) return false;
   HTTPClient http;
-  String url = String(SERVER_URL) + "/api/device/history/" + String(TENT_ID)
-               + "?metric=" + metric + "&period=" + period;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/history/%d?metric=%s&period=%s",
+           SERVER_URL, TENT_ID, metric, period);
   httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
   int code = http.GET();
   if (code != 200) { http.end(); return false; }
-  String body = http.getString();
-  http.end();
 
   JsonDocument doc;
-  if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return false;
   JsonArray arr = doc.as<JsonArray>();
   for (JsonObject pt : arr) {
     if (n >= maxN) break;
@@ -1847,16 +1850,18 @@ static bool fetchHistory(const char* metric, const char* period, float *buf, int
 static void fetchTasks() {
   if (!wifiOk) return;
   HTTPClient http;
-  httpBegin(http, String(SERVER_URL) + "/api/device/tasks/" + String(TENT_ID));
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/tasks/%d", SERVER_URL, TENT_ID);
+  httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
   int code = http.GET();
   if (code != 200) { http.end(); return; }
-  String body = http.getString();
-  http.end();
 
   JsonDocument doc;
-  if (deserializeJson(doc, body) != DeserializationError::Ok) return;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return;
   JsonArray arr = doc.as<JsonArray>();
   numTarefas = 0;
   for (JsonObject t : arr) {
@@ -1873,11 +1878,14 @@ static void fetchTasks() {
 static void postTaskComplete(int taskId) {
   if (!wifiOk || taskId <= 0) return;
   HTTPClient http;
-  httpBegin(http, String(SERVER_URL) + "/api/device/task-complete");
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/task-complete", SERVER_URL);
+  httpBegin(http, url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
-  String body = "{\"taskId\":" + String(taskId) + "}";
+  char body[48];
+  snprintf(body, sizeof(body), "{\"taskId\":%d}", taskId);
   int code = http.POST(body);
   http.end();
   Serial.printf("postTaskComplete(%d): %d\n", taskId, code);
@@ -1886,13 +1894,15 @@ static void postTaskComplete(int taskId) {
 static void postReading(float newPh, float newEc) {
   if (!wifiOk) return;
   HTTPClient http;
-  httpBegin(http, String(SERVER_URL) + "/api/device/readings");
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/readings", SERVER_URL);
+  httpBegin(http, url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
-  String body = "{\"tentId\":" + String(TENT_ID) +
-                ",\"ph\":" + String(newPh, 1) +
-                ",\"ec\":" + String(newEc, 2) + "}";
+  char body[96];
+  snprintf(body, sizeof(body), "{\"tentId\":%d,\"ph\":%.1f,\"ec\":%.2f}",
+           TENT_ID, newPh, newEc);
   int code = http.POST(body);
   http.end();
   Serial.printf("postReading: %d\n", code);
@@ -1901,12 +1911,14 @@ static void postReading(float newPh, float newEc) {
 static bool postPpfd(int ppfd) {
   if (!wifiOk) return false;
   HTTPClient http;
-  httpBegin(http, String(SERVER_URL) + "/api/device/readings");
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/readings", SERVER_URL);
+  httpBegin(http, url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
-  String body = "{\"tentId\":" + String(TENT_ID) +
-                ",\"ppfd\":" + String(ppfd) + "}";
+  char body[64];
+  snprintf(body, sizeof(body), "{\"tentId\":%d,\"ppfd\":%d}", TENT_ID, ppfd);
   int code = http.POST(body);
   http.end();
   Serial.printf("postPpfd(%d): %d\n", ppfd, code);
