@@ -631,6 +631,91 @@ static void cfgFocusCb(lv_event_t *e) {
   lv_obj_remove_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// WiFi scan assíncrono — nao trava LVGL durante a busca
+// WiFi.scanNetworks(true) retorna imediatamente; poll via lv_timer.
+// Buffer estatico elimina o strdup() leak do callback sincrono antigo.
+// ════════════════════════════════════════════════════════════════════════════════
+static char         scanSsidBuf[12][33];
+static lv_obj_t    *scanModalRef = nullptr;
+static lv_timer_t  *scanPollTimer = nullptr;
+
+static void scanClose(lv_event_t *ev) {
+  if (scanModalRef) { lv_obj_del(scanModalRef); scanModalRef = nullptr; }
+  if (scanPollTimer) { lv_timer_del(scanPollTimer); scanPollTimer = nullptr; }
+  WiFi.scanDelete();
+}
+
+static void scanPickRow(lv_event_t *ev) {
+  const char *picked = (const char*)lv_event_get_user_data(ev);
+  lv_textarea_set_text(taSsid, picked);
+  Serial.printf("[cfg] scan pick: %s\n", picked);
+  scanClose(ev);
+}
+
+static void scanFinalize(int n) {
+  if (!scanModalRef) return;
+  lv_obj_clean(scanModalRef);
+  lv_obj_set_flex_flow(scanModalRef, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(scanModalRef, sh(3), 0);
+
+  makeLabel(scanModalRef, n > 0 ? "Toque na rede desejada:" : "Nenhuma rede encontrada",
+            n > 0 ? COL_GRN : COL_RED, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
+
+  int shown = 0;
+  for (int i = 0; i < n && shown < 12; i++) {
+    strncpy(scanSsidBuf[shown], WiFi.SSID(i).c_str(), 32);
+    scanSsidBuf[shown][32] = '\0';
+    int rssi = WiFi.RSSI(i);
+
+    lv_obj_t *row = lv_btn_create(scanModalRef);
+    lv_obj_set_width(row, lv_pct(100));
+    lv_obj_set_height(row, sh(20));
+    lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
+    char label[64];
+    snprintf(label, sizeof(label), "%s (%d dBm)", scanSsidBuf[shown], rssi);
+    lv_obj_add_event_cb(row, scanPickRow, LV_EVENT_CLICKED, scanSsidBuf[shown]);
+    makeLabel(row, label, COL_TEXT, FONT_CAPTION, LV_ALIGN_LEFT_MID, sw(4), 0);
+    shown++;
+  }
+
+  lv_obj_t *btnClose = lv_btn_create(scanModalRef);
+  lv_obj_set_size(btnClose, sw(60), sh(20));
+  lv_obj_set_style_bg_color(btnClose, lv_color_hex(COL_BORDER), 0);
+  lv_obj_add_event_cb(btnClose, scanClose, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnClose, "Fechar", COL_TEXT, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+}
+
+static void scanPollCb(lv_timer_t *t) {
+  int status = WiFi.scanComplete();
+  if (status == WIFI_SCAN_RUNNING) return;
+  scanFinalize(status < 0 ? 0 : status);
+  lv_timer_del(t);
+  scanPollTimer = nullptr;
+}
+
+static void scanStartCb(lv_event_t *e) {
+  if (scanModalRef) return;  // scan ja em andamento
+
+  scanModalRef = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(scanModalRef, SCREEN_W - sw(20), sh(180));
+  lv_obj_center(scanModalRef);
+  lv_obj_set_style_bg_color(scanModalRef, lv_color_hex(0x0F172A), 0);
+  lv_obj_set_style_border_color(scanModalRef, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_border_width(scanModalRef, 2, 0);
+  lv_obj_set_style_radius(scanModalRef, sw(8), 0);
+  lv_obj_set_style_pad_all(scanModalRef, sw(6), 0);
+  lv_obj_move_foreground(scanModalRef);
+  makeLabel(scanModalRef, "Escaneando redes...", COL_CYN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+
+  WiFi.mode(WIFI_STA);
+  int r = WiFi.scanNetworks(true);  // assincrono — retorna imediato
+  Serial.printf("[cfg] scan async start -> %d\n", r);
+
+  if (scanPollTimer) lv_timer_del(scanPollTimer);
+  scanPollTimer = lv_timer_create(scanPollCb, 200, NULL);
+}
+
 static void cfgSaveCb(lv_event_t *e) {
   const char *ssid  = lv_textarea_get_text(taSsid);
   const char *pass  = lv_textarea_get_text(taPass);
@@ -694,73 +779,14 @@ static void openConfigModal() {
 
   addField("WiFi SSID",      WIFI_SSID,    &taSsid);
 
-  // Botao SCAN — pesquisa redes WiFi e mostra lista pra selecionar
+  // Botao SCAN — dispara busca assincrona, nao trava LVGL
   lv_obj_t *btnScan = lv_btn_create(list);
   lv_obj_set_width(btnScan, lv_pct(100));
   lv_obj_set_height(btnScan, sh(22));
   lv_obj_set_style_bg_color(btnScan, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(btnScan, lv_color_hex(COL_CYN), 0);
   lv_obj_set_style_border_width(btnScan, 1, 0);
-  lv_obj_add_event_cb(btnScan, [](lv_event_t *e) {
-    lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
-    // feedback imediato no botao enquanto escaneia
-    lv_obj_t *lbl = lv_obj_get_child(btn, 0);
-    if (lbl) lv_label_set_text(lbl, "Escaneando...");
-    lv_timer_handler();
-    Serial.println("[cfg] scan WiFi start");
-
-    WiFi.mode(WIFI_STA);
-    int n = WiFi.scanNetworks();
-    Serial.printf("[cfg] scan WiFi -> %d redes\n", n);
-
-    // Overlay com lista de redes
-    lv_obj_t *scanModal = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(scanModal, SCREEN_W - sw(20), sh(180));
-    lv_obj_center(scanModal);
-    lv_obj_set_style_bg_color(scanModal, lv_color_hex(0x0F172A), 0);
-    lv_obj_set_style_border_color(scanModal, lv_color_hex(COL_CYN), 0);
-    lv_obj_set_style_border_width(scanModal, 2, 0);
-    lv_obj_set_style_radius(scanModal, sw(8), 0);
-    lv_obj_set_style_pad_all(scanModal, sw(6), 0);
-    lv_obj_set_flex_flow(scanModal, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(scanModal, sh(3), 0);
-    lv_obj_move_foreground(scanModal);
-
-    makeLabel(scanModal, n > 0 ? "Toque na rede desejada:" : "Nenhuma rede encontrada",
-              n > 0 ? COL_GRN : COL_RED, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
-
-    for (int i = 0; i < n && i < 12; i++) {
-      String ssid = WiFi.SSID(i);
-      int rssi    = WiFi.RSSI(i);
-      lv_obj_t *row = lv_btn_create(scanModal);
-      lv_obj_set_width(row, lv_pct(100));
-      lv_obj_set_height(row, sh(20));
-      lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
-      char label[64];
-      snprintf(label, sizeof(label), "%s (%d dBm)", ssid.c_str(), rssi);
-      // strdup alloca heap permanente — o modal sai logo entao o leak e' trivial
-      char *ssidHeap = strdup(ssid.c_str());
-      lv_obj_add_event_cb(row, [](lv_event_t *ev) {
-        const char *picked = (const char*)lv_event_get_user_data(ev);
-        lv_textarea_set_text(taSsid, picked);
-        Serial.printf("[cfg] scan pick: %s\n", picked);
-        lv_obj_t *rowBtn = (lv_obj_t*)lv_event_get_current_target(ev);
-        lv_obj_del(lv_obj_get_parent(rowBtn));
-      }, LV_EVENT_CLICKED, ssidHeap);
-      makeLabel(row, label, COL_TEXT, FONT_CAPTION, LV_ALIGN_LEFT_MID, sw(4), 0);
-    }
-
-    lv_obj_t *btnClose = lv_btn_create(scanModal);
-    lv_obj_set_size(btnClose, sw(60), sh(20));
-    lv_obj_set_style_bg_color(btnClose, lv_color_hex(COL_BORDER), 0);
-    lv_obj_add_event_cb(btnClose, [](lv_event_t *ev) {
-      lv_obj_t *btn = (lv_obj_t*)lv_event_get_current_target(ev);
-      lv_obj_del(lv_obj_get_parent(btn));
-    }, LV_EVENT_CLICKED, NULL);
-    makeLabel(btnClose, "Fechar", COL_TEXT, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
-
-    if (lbl) lv_label_set_text(lbl, "Buscar redes WiFi");
-  }, LV_EVENT_CLICKED, NULL);
+  lv_obj_add_event_cb(btnScan, scanStartCb, LV_EVENT_CLICKED, NULL);
   makeLabel(btnScan, "Buscar redes WiFi", COL_CYN, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
 
   addField("WiFi Senha",     WIFI_PASS,    &taPass,  true);
