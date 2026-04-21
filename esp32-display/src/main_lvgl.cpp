@@ -35,6 +35,8 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
+#define FW_VERSION "0.4.0"
+
 static Preferences prefs;
 static char    WIFI_SSID[33]    = "";
 static char    WIFI_PASS[65]    = "";
@@ -748,6 +750,7 @@ static void openConfigModal() {
   lv_obj_clear_flag(configModal, LV_OBJ_FLAG_SCROLLABLE);
 
   makeLabel(configModal, "CONFIGURACAO", COL_GRN, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(2));
+  makeLabel(configModal, "fw " FW_VERSION, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(4));
 
   // Area scrollavel com os 5 campos
   lv_obj_t *list = lv_obj_create(configModal);
@@ -999,7 +1002,9 @@ static void buildApScreen(const char *ssid, const char *pass, const char *ip) {
   makeLabel(btnManual, "Configurar no display", COL_GRN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   makeLabel(apScreen, "Aguardando configuracao...", COL_DIM, FONT_CAPTION,
-            LV_ALIGN_BOTTOM_MID, 0, -sh(10));
+            LV_ALIGN_BOTTOM_MID, 0, -sh(22));
+  makeLabel(apScreen, "fw " FW_VERSION, COL_DIM, FONT_CAPTION,
+            LV_ALIGN_BOTTOM_RIGHT, -sw(6), -sh(4));
 }
 
 static void startApPortal() {
@@ -2177,7 +2182,7 @@ static void buildUI() {
 // ════════════════════════════════════════════════════════════════════════════════
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n[LVGL] boot");
+  Serial.printf("\n[boot] Cultivo ESP32 Display fw=%s\n", FW_VERSION);
   loadConfigFromNVS();
 
 #ifdef REAL_HARDWARE
