@@ -341,141 +341,9 @@ static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
 // ════════════════════════════════════════════════════════════════════════════════
 // FASE C — Efeitos ambientes (particles, scan line, ring wave / radar ping)
 // ════════════════════════════════════════════════════════════════════════════════
+// fx_anim_y_cb usado pelo matrix boot splash (screen de entrada)
 static void fx_anim_y_cb(void *obj, int32_t v) {
   lv_obj_set_y((lv_obj_t*)obj, v);
-}
-static void fx_anim_bg_opa_cb(void *obj, int32_t v) {
-  lv_obj_set_style_bg_opa((lv_obj_t*)obj, v, 0);
-}
-static void fx_anim_border_opa_cb(void *obj, int32_t v) {
-  lv_obj_set_style_border_opa((lv_obj_t*)obj, v, 0);
-}
-static void fx_anim_ring_size_cb(void *obj, int32_t v) {
-  lv_obj_set_size((lv_obj_t*)obj, v, v);
-  lv_obj_align((lv_obj_t*)obj, LV_ALIGN_CENTER, 0, 0);
-}
-
-// Particles — pontinhos flutuando no fundo (vibe HUD / estrelas)
-static void spawnParticle(lv_obj_t *parent, int xPos, int yStart, uint32_t color,
-                          uint32_t duration, uint32_t delay) {
-  lv_obj_t *p = lv_obj_create(parent);
-  int size = 2 + (rand() % 2);
-  lv_obj_set_size(p, size, size);
-  lv_obj_set_pos(p, xPos, yStart);
-  lv_obj_set_style_bg_color(p, lv_color_hex(color), 0);
-  lv_obj_set_style_bg_opa(p, LV_OPA_0, 0);
-  lv_obj_set_style_border_width(p, 0, 0);
-  lv_obj_set_style_radius(p, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_pad_all(p, 0, 0);
-  lv_obj_remove_flag(p, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_remove_flag(p, LV_OBJ_FLAG_SCROLLABLE);
-
-  // Drift vertical ascendente (sobe devagar, volta pro inicio)
-  lv_anim_t ay;
-  lv_anim_init(&ay);
-  lv_anim_set_var(&ay, p);
-  lv_anim_set_values(&ay, yStart, -8);
-  lv_anim_set_time(&ay, duration);
-  lv_anim_set_delay(&ay, delay);
-  lv_anim_set_repeat_count(&ay, LV_ANIM_REPEAT_INFINITE);
-  lv_anim_set_exec_cb(&ay, fx_anim_y_cb);
-  lv_anim_start(&ay);
-
-  // Opacidade pulsa (aparece, desaparece) — sincronizada com o drift
-  lv_anim_t ao;
-  lv_anim_init(&ao);
-  lv_anim_set_var(&ao, p);
-  lv_anim_set_values(&ao, LV_OPA_0, LV_OPA_40);
-  lv_anim_set_time(&ao, duration / 2);
-  lv_anim_set_playback_time(&ao, duration / 2);
-  lv_anim_set_delay(&ao, delay);
-  lv_anim_set_repeat_count(&ao, LV_ANIM_REPEAT_INFINITE);
-  lv_anim_set_exec_cb(&ao, fx_anim_bg_opa_cb);
-  lv_anim_start(&ao);
-}
-
-static void spawnParticleField(lv_obj_t *parent) {
-  // 10 particulas com posicoes/delays/cores variados
-  static const uint32_t colors[] = { COL_GRN, COL_CYN, COL_PRP, COL_GRN, COL_CYN };
-  for (int i = 0; i < 10; i++) {
-    int x = rand() % SCREEN_W;
-    int yStart = SCREEN_H + (rand() % sh(40));
-    uint32_t dur = 6000 + (rand() % 6000);
-    uint32_t delay = rand() % 4000;
-    uint32_t col = colors[i % 5];
-    spawnParticle(parent, x, yStart, col, dur, delay);
-  }
-}
-
-// Scan line — linha horizontal varrendo top->bottom (CRT / Tesla HUD)
-static void buildScanLine(lv_obj_t *parent) {
-  lv_obj_t *line = lv_obj_create(parent);
-  lv_obj_set_size(line, SCREEN_W, 2);
-  lv_obj_set_pos(line, 0, 0);
-  lv_obj_set_style_bg_color(line, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_bg_opa(line, LV_OPA_20, 0);
-  lv_obj_set_style_border_width(line, 0, 0);
-  lv_obj_set_style_radius(line, 0, 0);
-  lv_obj_set_style_pad_all(line, 0, 0);
-  lv_obj_remove_flag(line, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_remove_flag(line, LV_OBJ_FLAG_SCROLLABLE);
-
-  lv_anim_t a;
-  lv_anim_init(&a);
-  lv_anim_set_var(&a, line);
-  lv_anim_set_values(&a, -4, SCREEN_H + 4);
-  lv_anim_set_time(&a, 5000);
-  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-  lv_anim_set_exec_cb(&a, fx_anim_y_cb);
-  lv_anim_start(&a);
-}
-
-// Ring wave — anel expandindo a partir do arco (radar / ping)
-// O "ring" e' child de um wrapper invisivel centrado em (cx, cy) com tamanho maxSize.
-// Conforme o ring cresce, fx_anim_ring_size_cb realinha no centro do wrapper.
-static void applyRingWave(lv_obj_t *parent, int cx, int cy, int maxSize, uint32_t color) {
-  for (int i = 0; i < 2; i++) {
-    lv_obj_t *wrap = lv_obj_create(parent);
-    lv_obj_set_size(wrap, maxSize, maxSize);
-    lv_obj_set_pos(wrap, cx - maxSize / 2, cy - maxSize / 2);
-    lv_obj_set_style_bg_opa(wrap, LV_OPA_0, 0);
-    lv_obj_set_style_border_width(wrap, 0, 0);
-    lv_obj_set_style_pad_all(wrap, 0, 0);
-    lv_obj_remove_flag(wrap, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(wrap, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *ring = lv_obj_create(wrap);
-    lv_obj_set_size(ring, 12, 12);
-    lv_obj_center(ring);
-    lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(ring, LV_OPA_0, 0);
-    lv_obj_set_style_border_color(ring, lv_color_hex(color), 0);
-    lv_obj_set_style_border_width(ring, 2, 0);
-    lv_obj_set_style_border_opa(ring, LV_OPA_60, 0);
-    lv_obj_set_style_pad_all(ring, 0, 0);
-    lv_obj_remove_flag(ring, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_anim_t as;
-    lv_anim_init(&as);
-    lv_anim_set_var(&as, ring);
-    lv_anim_set_values(&as, 12, maxSize);
-    lv_anim_set_time(&as, 2600);
-    lv_anim_set_delay(&as, i * 1300);
-    lv_anim_set_repeat_count(&as, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_exec_cb(&as, fx_anim_ring_size_cb);
-    lv_anim_start(&as);
-
-    lv_anim_t ao;
-    lv_anim_init(&ao);
-    lv_anim_set_var(&ao, ring);
-    lv_anim_set_values(&ao, LV_OPA_60, LV_OPA_0);
-    lv_anim_set_time(&ao, 2600);
-    lv_anim_set_delay(&ao, i * 1300);
-    lv_anim_set_repeat_count(&ao, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_exec_cb(&ao, fx_anim_border_opa_cb);
-    lv_anim_start(&ao);
-  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -628,6 +496,7 @@ static void matrixFinish() {
 static lv_obj_t *configModal = nullptr;
 static lv_obj_t *taSsid, *taPass, *taUrl, *taToken, *taTent;
 static lv_obj_t *kbCfg;
+static void startApPortal();  // fwd: botao "Setup celular" do modal chama
 
 static void cfgFocusCb(lv_event_t *e) {
   lv_obj_t *ta = (lv_obj_t*)lv_event_get_target(e);
@@ -781,6 +650,21 @@ static void openConfigModal() {
     lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
     *out = ta;
   };
+
+  // Botao "Setup via celular" — sobe AP portal para o usuario configurar
+  // via browser do celular em 192.168.4.1. Alternativa ao preenchimento manual.
+  lv_obj_t *btnAp = lv_btn_create(list);
+  lv_obj_set_width(btnAp, lv_pct(100));
+  lv_obj_set_height(btnAp, sh(24));
+  lv_obj_set_style_bg_color(btnAp, lv_color_hex(0x1E3A8A), 0);
+  lv_obj_set_style_border_color(btnAp, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_border_width(btnAp, 1, 0);
+  lv_obj_add_event_cb(btnAp, [](lv_event_t *e) {
+    Serial.println("[cfg] abrindo AP portal a pedido do usuario");
+    if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
+    startApPortal();
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnAp, "Setup via celular (AP)", COL_CYN, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
 
   addField("WiFi SSID",      WIFI_SSID,    &taSsid);
 
@@ -1163,8 +1047,7 @@ static void buildHome(lv_obj_t *tab) {
   int arcCx = (halfW - arcSize) / 2 + arcSize / 2;
   int arcCy = bodyY + (bodyH - arcSize) / 2 + arcSize / 2;
   // Ring wave desabilitado temporariamente — o wrapper extrapolava TAB_H
-  // e parecia confundir o hit-test do LVGL v9 sobre a navbar.
-  // applyRingWave(tab, arcCx, arcCy, (int)(arcSize * 1.35f), COL_GRN);
+
 
   lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
   lv_label_set_text(lblTempUnit, "°C");
@@ -2195,9 +2078,6 @@ static void buildUI() {
   lv_obj_remove_flag(glow2, LV_OBJ_FLAG_SCROLLABLE);
 
   // Area de conteudo (ocupa a tela inteira menos a navbar)
-  // FASE C — Particles flutuando no fundo (atras do conteudo, na frente dos glows)
-  // Temporariamente off enquanto investigo o hit-test da navbar
-  // spawnParticleField(scr);
 
   contentArea = lv_obj_create(scr);
   lv_obj_set_size(contentArea, SCREEN_W, TAB_H);
@@ -2238,9 +2118,6 @@ static void buildUI() {
   buildNavbar(scr);
 
   // FASE C — Scan line desabilitado: o overlay no topo do z-order estava
-  // bloqueando hits em cima da navbar. Mantemos a funcao pra reativar depois
-  // movendo pra dentro do contentArea se quisermos o efeito sem interferencia.
-  // buildScanLine(scr);
 
   refreshHomeValues();
   startPulseTimer();   // anima sparklines dos mini-cards a cada 300ms
@@ -2316,27 +2193,16 @@ void setup() {
   initMockTarefas();
   rebuildTarefasList();
 
-  // Sem WiFi salvo → primeiro boot. Comportamento muda por alvo:
-  //  • Hardware real: sobe AP portal (user configura via celular no 192.168.4.1)
-  //  • Wokwi (esp32dev): nao tem AP real + o softAP trava o I2C do touch.
-  //    Entao abre direto o modal de config com teclado no display.
-  if (strlen(WIFI_SSID) == 0) {
-#ifdef REAL_HARDWARE
-    Serial.println("[boot] sem WiFi salvo, subindo AP portal");
-    startApPortal();
-    return;
-#else
-    Serial.println("[boot] sem WiFi (Wokwi) -> modal de config direto");
-    // Reabre o modal sempre que fechar — sem salvar, sem saida. Save -> reboot.
-    while (true) {
-      if (!configModal) openConfigModal();
-      lv_timer_handler();
-      delay(5);
-    }
-#endif
+  // Sem WiFi salvo: UI sobe em modo offline (ic_wifi_off), usuario toca gear
+  // pra abrir config e setar WiFi+token. Botao "Setup via celular" dentro do
+  // modal abre o AP portal pra quem preferir esse fluxo.
+  if (strlen(WIFI_SSID) > 0) {
+    connectWifi();
+  } else {
+    Serial.println("[boot] sem WiFi salvo — UI offline, toque no gear pra configurar");
+    wifiOk = false;
   }
 
-  connectWifi();
   if (wifiOk) {
     // Fetch inicial no thread principal — garante dados prontos antes de mostrar UI
     fetchDisplayData();
