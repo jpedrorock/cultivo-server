@@ -633,6 +633,9 @@ static void cfgSaveCb(lv_event_t *e) {
   const char *url   = lv_textarea_get_text(taUrl);
   const char *token = lv_textarea_get_text(taToken);
   int tent          = atoi(lv_textarea_get_text(taTent));
+  if (tent <= 0) tent = 1;  // nunca salvar tent=0 — quebraria os endpoints da API
+  if (strlen(ssid) == 0) { Serial.println("[cfg] ssid vazio, abortando"); return; }
+  if (strlen(token) == 0) { Serial.println("[cfg] token vazio, abortando"); return; }
   saveConfigToNVS(ssid, pass, url, token, tent);
   Serial.println("[cfg] salvo, reiniciando...");
   delay(500);
@@ -816,6 +819,7 @@ static void openConfigModal() {
 static WebServer *apServer = nullptr;
 static bool apPortalActive = false;
 static char apSsid[24] = "";
+static char apPass[13] = "";  // "cultivoXXYY" — derivada dos 2 últimos bytes do MAC
 static lv_obj_t *apScreen = nullptr;
 
 static const char PORTAL_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
@@ -903,7 +907,7 @@ static void handlePortalSave() {
   ESP.restart();
 }
 
-static void buildApScreen(const char *ssid, const char *ip) {
+static void buildApScreen(const char *ssid, const char *pass, const char *ip) {
   if (apScreen) { lv_obj_del(apScreen); apScreen = nullptr; }
   apScreen = lv_obj_create(lv_scr_act());
   lv_obj_set_size(apScreen, SCREEN_W, SCREEN_H);
@@ -919,17 +923,25 @@ static void buildApScreen(const char *ssid, const char *ip) {
 
   makeLabel(apScreen, "MODO SETUP", COL_YEL, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(14));
   makeLabel(apScreen, "Conecte seu celular na rede:", COL_DIM, FONT_CAPTION,
-            LV_ALIGN_TOP_MID, 0, sh(46));
+            LV_ALIGN_TOP_MID, 0, sh(40));
 
   lv_obj_t *lblSsid = lv_label_create(apScreen);
   lv_label_set_text(lblSsid, ssid);
-  lv_obj_set_style_text_font(lblSsid, FONT_TITLE, 0);
+  lv_obj_set_style_text_font(lblSsid, FONT_BODY, 0);
   lv_obj_set_style_text_color(lblSsid, lv_color_hex(COL_GRN), 0);
-  lv_obj_align(lblSsid, LV_ALIGN_TOP_MID, 0, sh(62));
+  lv_obj_align(lblSsid, LV_ALIGN_TOP_MID, 0, sh(54));
   applyBloom(lblSsid, COL_GRN);
 
+  makeLabel(apScreen, "Senha:", COL_DIM, FONT_CAPTION,
+            LV_ALIGN_TOP_MID, 0, sh(76));
+  lv_obj_t *lblPass = lv_label_create(apScreen);
+  lv_label_set_text(lblPass, pass);
+  lv_obj_set_style_text_font(lblPass, FONT_BODY, 0);
+  lv_obj_set_style_text_color(lblPass, lv_color_hex(COL_YEL), 0);
+  lv_obj_align(lblPass, LV_ALIGN_TOP_MID, 0, sh(90));
+
   makeLabel(apScreen, "Abra no navegador:", COL_DIM, FONT_CAPTION,
-            LV_ALIGN_TOP_MID, 0, sh(104));
+            LV_ALIGN_TOP_MID, 0, sh(110));
 
   lv_obj_t *lblIp = lv_label_create(apScreen);
   char buf[32];
@@ -963,10 +975,11 @@ static void buildApScreen(const char *ssid, const char *ip) {
 static void startApPortal() {
   uint8_t mac[6];
   WiFi.macAddress(mac);
-  snprintf(apSsid, sizeof(apSsid), "Cultivo-Setup-%02X%02X", mac[4], mac[5]);
+  snprintf(apSsid, sizeof(apSsid), "Cultivo-%02X%02X", mac[4], mac[5]);
+  snprintf(apPass, sizeof(apPass), "cultivo%02x%02x", mac[4], mac[5]);
 
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(apSsid);
+  WiFi.softAP(apSsid, apPass);
   delay(300);
   IPAddress ip = WiFi.softAPIP();
 
@@ -978,8 +991,8 @@ static void startApPortal() {
   apServer->begin();
 
   apPortalActive = true;
-  buildApScreen(apSsid, ip.toString().c_str());
-  Serial.printf("[ap] portal ativo: %s @ %s\n", apSsid, ip.toString().c_str());
+  buildApScreen(apSsid, apPass, ip.toString().c_str());
+  Serial.printf("[ap] portal ativo: %s pass=%s @ %s\n", apSsid, apPass, ip.toString().c_str());
 }
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -1666,16 +1679,53 @@ static void connectWifi() {
   Serial.println(wifiOk ? " OK" : " FALHOU");
 }
 
+// Certificado raiz ISRG Root X1 (Let's Encrypt) — cobre cultivo.x.andy.plus e
+// qualquer outro servidor HTTPS com cert Let's Encrypt. Para servidores self-hosted
+// com CA diferente, troque pelo cert raiz correspondente.
+static const char ISRG_ROOT_X1[] PROGMEM = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoBggIBAK3oJHP0FDfzm54rVygc
+h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+
+0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U
+A5/TR5d8mUgjU+g4rk8Kb4Mu0UlXjIB0ttov0DiNewNwIRt18jA8+o+u3dpjq+sW
+T8KOEUt+zwvo/7V3LvSye0rgTBIlDHCNAymg4VMk7BPZ7hm/ELNKjD+Jo2FR3qyH
+B5T0Y3HsLuJvW5iB4YlcNHlsdu87kGJ55tukmi8mxdAQ4Q7e2RCOFvu396j3x+UC
+B5iPNgiV5+I3lg02dZ77DnKxHZu8A/lJBdiB3QW0KtZB6awBdpUKD9jf1b0SHzUv
+KBds0pjBqAlkd25HN7rOrFleaJ1/ctaJxQZBKT5ZPt0m9STJEadao0xAH0ahmbWn
+OlFuhjuefXKnEgV4We0+UXgVCwOPjdAvBbI+e0ocS3MFEvzG6uBQE3xDk3SzynTn
+jh8BCNAw1FtxNrQHusEwMFxIt4I7mKZ9YIqioymCzLq9gwQbooMDQaHWBfEbwrbw
+qHyGO0aoSCqI3Haadr8faqU9GY/rOPNk3sgrDQoo//fb4hVC1CLQJ13hef4Y53CI
+rU7m2Ys6xt0nUW7/vGT1M0NPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNV
+HRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFzgAiIyBpY9umbbjANBgkq
+hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL
+ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ
+3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK
+NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5
+ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur
+TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC
+jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc
+oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq
+4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
+mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
+emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
+-----END CERTIFICATE-----
+)EOF";
+
 // Helper que escolhe WiFiClient (http) ou WiFiClientSecure (https) automaticamente.
-// Usa setInsecure() — nao validamos CA pra economizar flash e pq o ESP32 nao tem
-// a cadeia de certificados do Let's Encrypt embutida. Adequado pra IoT privado.
+// Usa ISRG Root X1 para validar certs Let's Encrypt (cultivo.x.andy.plus).
+// Para servidores self-hosted com outra CA, ajuste ISRG_ROOT_X1 acima.
 static WiFiClient       httpPlainClient;
 static WiFiClientSecure httpSecureClient;
 static bool httpClientsInited = false;
 
 static bool httpBegin(HTTPClient &http, const String &url) {
   if (!httpClientsInited) {
-    httpSecureClient.setInsecure();
+    httpSecureClient.setCACert(ISRG_ROOT_X1);
     httpClientsInited = true;
   }
   if (url.startsWith("https://")) {
