@@ -849,7 +849,7 @@ export default function QuickLog() {
                 )}
                 {(logMode === 'trichome' ? floraTents : tents).map((tent: any) => {
                   const isSelected = tentId === tent.id;
-                  const catLabel = tent.category === "FLORA" ? "Floração" : tent.category === "VEGA" ? "Vegetativa" : tent.category === "CLONING" ? "Clonagem" : (tent.category ?? "");
+                  const catLabel = tent.category === "FLORA" ? "Floração" : tent.category === "VEGA" ? "Vegetativa" : tent.category === "CLONING" ? "Clonagem" : tent.category === "MAINTENANCE" ? "Manutenção" : tent.category === "DRYING" ? "Secagem" : (tent.category ?? "");
                   const accentRgba = logMode === 'trichome' ? "139,92,246" : "16,185,129";
                   const accentBorder = logMode === 'trichome' ? "border-violet-500" : "border-primary";
                   return (
@@ -1266,36 +1266,7 @@ export default function QuickLog() {
                   })}
                 </div>
 
-                {/* Sintomas e Notas — aberto por padrão */}
-                <Accordion type="multiple" defaultValue={["details"]} className="space-y-0">
-                  <AccordionItem value="details" className="border border-border rounded-xl bg-card shadow-sm">
-                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                      <span className="text-sm font-medium text-muted-foreground">Sintomas e Notas</span>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4 space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">Sintomas</label>
-                        <Input
-                          value={plantHealthRecords.get(plants[currentPlantIndex].id)?.symptoms || ""}
-                          onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "symptoms", e.target.value)}
-                          placeholder="Ex: Folhas amareladas, manchas..."
-                          className="h-12 border-2 border-input rounded-xl bg-card text-foreground shadow-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">Notas</label>
-                        <Textarea
-                          value={plantHealthRecords.get(plants[currentPlantIndex].id)?.notes || ""}
-                          onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "notes", e.target.value)}
-                          placeholder="Observações gerais..."
-                          className="min-h-[80px] border-2 border-input rounded-xl bg-card text-foreground shadow-sm"
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-
-                {/* Foto — direto, sem accordion */}
+                {/* Foto — primeiro, destaque */}
                 {(plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl) ? (
                   <div className="relative">
                     <LazyImage
@@ -1338,6 +1309,31 @@ export default function QuickLog() {
                     />
                   </label>
                 )}
+
+                {/* Observações — visível direto */}
+                <Textarea
+                  value={plantHealthRecords.get(plants[currentPlantIndex].id)?.notes || ""}
+                  onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "notes", e.target.value)}
+                  placeholder="Observações gerais..."
+                  className="min-h-[80px] border-2 border-input rounded-xl bg-card text-foreground shadow-sm"
+                />
+
+                {/* Sintomas — colapsado por padrão */}
+                <Accordion type="multiple" defaultValue={[]} className="space-y-0">
+                  <AccordionItem value="symptoms" className="border border-border rounded-xl bg-card shadow-sm">
+                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                      <span className="text-sm font-medium text-muted-foreground">Sintomas</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <Input
+                        value={plantHealthRecords.get(plants[currentPlantIndex].id)?.symptoms || ""}
+                        onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "symptoms", e.target.value)}
+                        placeholder="Ex: Folhas amareladas, manchas..."
+                        className="h-12 border-2 border-input rounded-xl bg-card text-foreground shadow-sm"
+                      />
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
             )}
             {/* Pergunta: registrar tricomas? — só no modo planta, nunca no modo status/estufa */}
