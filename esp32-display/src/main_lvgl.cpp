@@ -29,12 +29,29 @@
 // ════════════════════════════════════════════════════════════════════════════════
 #define FW_VERSION "0.4.0"
 
+// Configuração de rede — agrupada em struct para facilitar passagem
+// por referência em futuras refatorações e documentar o que é "config"
+// (persistido em NVS) vs "estado" (volatil, recarregado no boot).
+struct NetConfig {
+  char ssid[33];
+  char pass[65];
+  char url[96];
+  char token[65];
+  int  tentId;
+};
+
 static Preferences prefs;
-static char    WIFI_SSID[33]    = "";
-static char    WIFI_PASS[65]    = "";
-static char    SERVER_URL[96]   = "https://cultivo.x.andy.plus";
-static char    DEVICE_TOKEN[65] = "";
-static int     TENT_ID          = 1;
+static NetConfig netCfg = {
+  "", "", "https://cultivo.x.andy.plus", "", 1,
+};
+
+// Aliases retroativos — mantidos para minimizar diff em 35+ call sites.
+// Podem ser removidos incrementalmente quando cada usuário migrar pra netCfg.X
+#define WIFI_SSID     netCfg.ssid
+#define WIFI_PASS     netCfg.pass
+#define SERVER_URL    netCfg.url
+#define DEVICE_TOKEN  netCfg.token
+#define TENT_ID       netCfg.tentId
 
 static void loadConfigFromNVS() {
   prefs.begin("cultivo", true);
