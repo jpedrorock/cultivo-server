@@ -12,6 +12,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
+#include <ArduinoOTA.h>
 #include <Preferences.h>
 #include <math.h>
 #include <lvgl.h>
@@ -852,7 +853,8 @@ static void openConfigModal() {
 static WebServer *apServer = nullptr;
 static bool apPortalActive = false;
 static char apSsid[24] = "";
-static char apPass[13] = "";  // "cultivoXXYY" — derivada dos 2 últimos bytes do MAC
+static char apPass[13]  = "";  // "cultivoXXYY" — derivada dos 2 últimos bytes do MAC
+static char otaPass[20] = "";  // senha de OTA derivada do MAC (idem AP mas com 3 bytes)
 static lv_obj_t *apScreen = nullptr;
 
 static const char PORTAL_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
@@ -1989,6 +1991,28 @@ static void startNetTask() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// ArduinoOTA — update por WiFi via PlatformIO/espota.py
+// Hostname derivado do MAC (cultivo-XXYY.local via mDNS).
+// Senha derivada do MAC (cultivoOTAaabbcc) — impede upload nao autorizado.
+// A senha e' logada no serial no boot pra o desenvolvedor saber.
+// ════════════════════════════════════════════════════════════════════════════════
+static void startOTA() {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  char hostname[32];
+  snprintf(hostname, sizeof(hostname), "cultivo-%02X%02X", mac[4], mac[5]);
+  snprintf(otaPass, sizeof(otaPass), "cultivoOTA%02x%02x%02x", mac[3], mac[4], mac[5]);
+
+  ArduinoOTA.setHostname(hostname);
+  ArduinoOTA.setPassword(otaPass);
+  ArduinoOTA.onStart([]() { Serial.println("[ota] iniciando update"); });
+  ArduinoOTA.onEnd([]()   { Serial.println("[ota] concluido, rebootando"); });
+  ArduinoOTA.onError([](ota_error_t err) { Serial.printf("[ota] erro %u\n", err); });
+  ArduinoOTA.begin();
+  Serial.printf("[ota] host=%s.local pass=%s\n", hostname, otaPass);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // Navegação custom: content area + bottom nav com icones Lucide coloridos
 // ════════════════════════════════════════════════════════════════════════════════
 
@@ -2278,6 +2302,8 @@ void setup() {
     refreshHomeValues();
     // Dai em diante HTTP roda em background, loop() fica livre pra UI
     startNetTask();
+    // OTA disponivel enquanto o device ta online
+    startOTA();
   }
   Serial.println("[LVGL] UI pronta");
 }
@@ -2296,6 +2322,10 @@ void loop() {
     uiNeedsRefresh = false;
     refreshHomeValues();
   }
+
+  // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI
+  // intencionalmente (reboot acontece logo apos, entao eh OK)
+  if (wifiOk) ArduinoOTA.handle();
 
   lv_timer_handler();
   delay(5);
