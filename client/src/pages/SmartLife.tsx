@@ -1141,9 +1141,9 @@ function ScenesTab() {
               <Zap className="w-4 h-4 text-amber-500" />
             </div>
             <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
-            <button onClick={() => deleteManual.mutate({ id: scene.id })}
-              className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-all shrink-0">
-              <X className="w-3 h-3 text-red-400" />
+            <button onClick={() => { if (confirm(`Excluir "${scene.name}"?`)) deleteManual.mutate({ id: scene.id }, { onSuccess: () => refetchManual() }); }}
+              className="w-7 h-7 rounded-full bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 active:scale-95 transition-all shrink-0">
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
             </button>
             <button
               onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
