@@ -10,11 +10,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(SDL2 REQUIRED)
 
 # LVGL 9.2.2 via FetchContent — mesmo tag que platformio.ini usa
+# FETCHCONTENT_QUIET=OFF faz o git clone mostrar progresso (LVGL ~30MB).
+# GIT_SHALLOW=TRUE pega so o tag especifico (muito mais rapido que clone full).
 include(FetchContent)
+set(FETCHCONTENT_QUIET OFF)
 FetchContent_Declare(
     lvgl
     GIT_REPOSITORY https://github.com/lvgl/lvgl.git
     GIT_TAG v9.2.2
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
 )
 
 # Aponta o LVGL pro nosso lv_conf.h antes de materializar o subdir.
