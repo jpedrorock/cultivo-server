@@ -175,7 +175,7 @@ static lv_timer_t *pulseTimer = nullptr;
 // currentPpfd/currentLux = ultima leitura do sensor (GET /display)
 // luxMode = 0 PPFD | 1 LUX (toggle de visualizacao)
 // Conversao: 1 PPFD ~= 54 LUX (cultivo LEDs)
-static lv_obj_t *lblLuxValue, *lblLuxUnit, *luxBar;
+static lv_obj_t *lblLuxValue, *lblLuxUnit;
 static lv_obj_t *btnModePpfd, *btnModeLux;
 static int currentLux = 0, currentPpfd = 0;
 static int targetPpfd = 450;
@@ -705,7 +705,9 @@ static void openConfigModal() {
   lv_obj_set_size(kbCfg, SCREEN_W, sh(110));
   lv_obj_align(kbCfg, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_text_font(kbCfg, FONT_BODY, 0);
+  // Monserrat 14 tem os glyphs FontAwesome (SHIFT/BKSP/OK/etc).
+  // Manrope (FONT_BODY) nao tem esses glyphs -> botoes apareceriam vazios.
+  lv_obj_set_style_text_font(kbCfg, &lv_font_montserrat_14, 0);
   lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
     lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
   }, LV_EVENT_READY, NULL);
@@ -1184,7 +1186,6 @@ static void refreshLuxDisplay() {
     lv_obj_set_style_bg_color(btnModePpfd, lv_color_hex(luxMode==0 ? COL_GRN  : COL_CARD), 0);
     lv_obj_set_style_bg_color(btnModeLux,  lv_color_hex(luxMode==1 ? COL_YEL  : COL_CARD), 0);
   }
-  if (luxBar) lv_bar_set_value(luxBar, targetPpfd, LV_ANIM_ON);
 }
 
 static void luxStepCb(lv_event_t *e) {
@@ -1285,18 +1286,6 @@ static void buildLux(lv_obj_t *tab) {
   applyBloom(btnSave, COL_GRN);
   lv_obj_add_event_cb(btnSave, luxSaveCb, LV_EVENT_CLICKED, NULL);
   makeLabel(btnSave, "SALVAR", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-
-  // Barra visual (0 a 1500 PPFD)
-  int barY = TAB_H - sh(18);
-  luxBar = lv_bar_create(tab);
-  lv_obj_set_size(luxBar, SCREEN_W - sw(16), sh(8));
-  lv_obj_set_pos(luxBar, sw(8), barY);
-  lv_bar_set_range(luxBar, 0, 1500);
-  lv_obj_set_style_bg_color(luxBar, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_bg_color(luxBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_color(luxBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_width(luxBar, 12, LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_opa(luxBar, LV_OPA_60, LV_PART_INDICATOR);
 
   refreshLuxDisplay();
 }
