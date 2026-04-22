@@ -523,37 +523,6 @@ const tuyaRouter = router({
       }
     }),
 
-  /** Debug: retorna JSON bruto da API Tuya para diagnóstico */
-  debugAutomationRaw: protectedProcedure
-    .input(z.object({ automationId: z.string().min(1) }))
-    .query(async ({ ctx, input }) => {
-      const pool = getMysqlPool();
-      const [rows]: any = await pool.execute(
-        `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ?`,
-        [ctx.user.id]
-      );
-      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Sem config" });
-      const cfg = rows[0];
-      const { getToken, tuyaGet } = await import("./lib/tuya") as any;
-      const { accessToken } = await getToken(cfg.accessId, cfg.accessSecret, cfg.region);
-      const homeId = cfg.homeId ? Number(cfg.homeId) : null;
-      const results: Record<string, any> = {};
-      const paths = [
-        homeId ? `/v2.0/homes/${homeId}/automations/${input.automationId}` : null,
-        homeId ? `/v1.0/homes/${homeId}/automations/${input.automationId}` : null,
-        `/v2.0/cloud/scene/rule/${input.automationId}`,
-      ].filter(Boolean) as string[];
-      for (const path of paths) {
-        try {
-          const data = await tuyaGet(path, cfg.accessId, cfg.accessSecret, accessToken, cfg.region);
-          results[path] = { success: data.success, code: data.code, msg: data.msg, result: data.result };
-        } catch (e: any) {
-          results[path] = { error: e?.message };
-        }
-      }
-      return results;
-    }),
-
   /** Lista dispositivos da conta Tuya */
   listDevices: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
