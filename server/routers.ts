@@ -824,6 +824,44 @@ const tuyaRouter = router({
     return allScenes;
   }),
 
+  /** Lista cenas salvas manualmente */
+  listManualScenes: protectedProcedure.query(async ({ ctx }) => {
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT id, homeId, sceneId, name FROM tuyaManualScenes WHERE userId = ? ORDER BY createdAt DESC`,
+      [ctx.user.id]
+    );
+    return (rows as any[]).map((r: any) => ({
+      id: r.id as number,
+      homeId: Number(r.homeId),
+      sceneId: r.sceneId as string,
+      name: r.name as string,
+    }));
+  }),
+
+  /** Salva uma cena manual */
+  saveManualScene: protectedProcedure
+    .input(z.object({ homeId: z.string().min(1), sceneId: z.string().min(1), name: z.string().min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      await pool.execute(
+        `INSERT INTO tuyaManualScenes (userId, homeId, sceneId, name)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE homeId = VALUES(homeId), name = VALUES(name)`,
+        [ctx.user.id, input.homeId, input.sceneId, input.name]
+      );
+      return { ok: true };
+    }),
+
+  /** Remove uma cena manual */
+  deleteManualScene: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      await pool.execute(`DELETE FROM tuyaManualScenes WHERE id = ? AND userId = ?`, [input.id, ctx.user.id]);
+      return { ok: true };
+    }),
+
   /** Dispara uma cena SmartLife */
   triggerScene: protectedProcedure
     .input(z.object({ homeId: z.number(), sceneId: z.string() }))

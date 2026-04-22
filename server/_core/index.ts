@@ -251,6 +251,19 @@ async function ensureTuyaTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // Tabela de cenas manuais
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`tuyaManualScenes\` (
+        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\`    INT NOT NULL,
+        \`homeId\`    VARCHAR(50) NOT NULL,
+        \`sceneId\`   VARCHAR(100) NOT NULL,
+        \`name\`      VARCHAR(200) NOT NULL DEFAULT 'Cena',
+        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE KEY \`tuyaManualScenes_user_scene\` (\`userId\`, \`sceneId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     // Adicionar homeId à tuyaConfig se não existir
     const [cfgCols]: any = await conn.execute(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS

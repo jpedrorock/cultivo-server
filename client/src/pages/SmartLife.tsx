@@ -777,14 +777,65 @@ function DevicesTab() {
 
 // ─── ScenesTab ────────────────────────────────────────────────────────────────
 
+function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
+  const [homeId, setHomeId] = useState('');
+  const [sceneId, setSceneId] = useState('');
+  const [name, setName] = useState('');
+
+  const save = trpc.tuya.saveManualScene.useMutation({
+    onSuccess: () => { toast.success('Cena adicionada!'); setHomeId(''); setSceneId(''); setName(''); onSaved(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-border/40 bg-muted/20">
+        <p className="text-sm font-semibold text-foreground">Adicionar cena manualmente</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          No portal iot.tuya.com → seu projeto → API Explorer → busque homes/scenes
+        </p>
+      </div>
+      <div className="px-4 py-4 space-y-3">
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Home ID</p>
+          <input type="text" value={homeId} onChange={e => setHomeId(e.target.value.trim())}
+            placeholder="ex: 123456789"
+            className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Scene ID</p>
+          <input type="text" value={sceneId} onChange={e => setSceneId(e.target.value.trim())}
+            placeholder="ex: dYNQ1695123456789abc"
+            className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
+        </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Nome da cena</p>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            placeholder="ex: Ligar tudo"
+            className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
+        </div>
+        <Button className="w-full bg-emerald-600 hover:bg-emerald-700"
+          disabled={!homeId || !sceneId || !name || save.isPending}
+          onClick={() => save.mutate({ homeId, sceneId, name })}
+        >
+          {save.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Salvando...</> : <><Check className="w-4 h-4 mr-2" />Salvar cena</>}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ScenesTab() {
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [expandedHomes, setExpandedHomes] = useState<Set<string>>(new Set());
+  const [showManualForm, setShowManualForm] = useState(false);
+  const utils = trpc.useUtils();
 
   const { data: config } = trpc.tuya.getConfig.useQuery();
-  const { data: scenes = [], isLoading, isError, error: scenesError, refetch } = trpc.tuya.listScenes.useQuery(
+  const { data: scenes = [], isLoading, isError, refetch } = trpc.tuya.listScenes.useQuery(
     undefined, { enabled: !!config, retry: false }
   );
+  const { data: manualScenes = [], refetch: refetchManual } = trpc.tuya.listManualScenes.useQuery();
 
   // Auto-expand all homes on first load
   useEffect(() => {
@@ -797,6 +848,10 @@ function ScenesTab() {
   const triggerScene = trpc.tuya.triggerScene.useMutation({
     onSuccess: () => { toast.success('Cena disparada!'); setTriggeringId(null); },
     onError: (e) => { toast.error(e.message); setTriggeringId(null); },
+  });
+
+  const deleteManual = trpc.tuya.deleteManualScene.useMutation({
+    onSuccess: () => { refetchManual(); toast.success('Cena removida'); },
   });
 
   const toggleHome = (homeName: string) => {
@@ -821,33 +876,86 @@ function ScenesTab() {
 
   if (isLoading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
 
+  // Cenas manuais renderizadas (sempre mostradas mesmo se API falhou)
+  const manualScenesBlock = manualScenes.length > 0 && (
+    <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/30 bg-muted/20">
+        <Zap className="w-3.5 h-3.5 text-muted-foreground/60" />
+        <p className="text-sm font-semibold text-foreground flex-1">Cenas manuais</p>
+      </div>
+      {manualScenes.map((scene: any) => {
+        const isTriggering = triggeringId === scene.sceneId;
+        return (
+          <div key={scene.id} className="flex items-center gap-3 px-4 py-3.5 border-b border-border/20 last:border-0 group">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-amber-500" />
+            </div>
+            <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
+            <button onClick={() => deleteManual.mutate({ id: scene.id })}
+              className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 transition-all shrink-0">
+              <X className="w-3 h-3 text-red-400" />
+            </button>
+            <button
+              onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId }); }}
+              disabled={!!triggeringId}
+              className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+            >
+              {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              {isTriggering ? 'Disparando...' : 'Disparar'}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   if (isError) {
-    const errMsg = (scenesError as any)?.message ?? String(scenesError);
     return (
-      <div className="rounded-2xl border border-border/40 bg-card py-10 text-center px-6 space-y-3">
-        <AlertCircle className="w-8 h-8 mx-auto text-red-400/60" />
-        <p className="font-medium text-foreground">Erro ao carregar cenas</p>
-        {errMsg && (
-          <p className="text-xs font-mono text-red-400 bg-red-500/8 border border-red-500/20 rounded-xl px-3 py-2 text-left break-all">
-            {errMsg}
+      <div className="space-y-4 pt-2">
+        {/* Aviso de fallback */}
+        <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 p-4 space-y-2">
+          <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Listagem automática indisponível</p>
+          <p className="text-xs text-muted-foreground">
+            A API Tuya não conseguiu descobrir o Home ID automaticamente. Você pode adicionar cenas manualmente usando o <strong>API Explorer</strong> do portal Tuya.
           </p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Adicione os serviços <strong>Industry Basic Service</strong> e <strong>Smart Home Scene Linkage</strong> no portal iot.tuya.com → seu projeto → Service API
-        </p>
-        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
-          <RefreshCw className="w-4 h-4" /> Tentar novamente
-        </Button>
+          <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
+            <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto</li>
+            <li>Clique em <strong>API Explorer</strong> (menu lateral)</li>
+            <li>Busque por <span className="font-mono">/homes</span> → execute para ver o <strong>home_id</strong></li>
+            <li>Cole abaixo junto com o <strong>scene_id</strong> de cada cena</li>
+          </ol>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2 mt-1 w-full">
+            <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
+          </Button>
+        </div>
+
+        {manualScenesBlock}
+
+        <button onClick={() => setShowManualForm(v => !v)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/60 text-sm text-muted-foreground hover:bg-muted/30 transition-colors">
+          <Plus className="w-4 h-4" />
+          {showManualForm ? 'Fechar formulário' : 'Adicionar cena manualmente'}
+        </button>
+
+        {showManualForm && <ManualSceneForm onSaved={() => { refetchManual(); setShowManualForm(false); }} />}
       </div>
     );
   }
 
-  if (scenes.length === 0) {
+  if (scenes.length === 0 && manualScenes.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border/60 bg-card/50 py-12 text-center px-6">
-        <Zap className="w-10 h-10 mx-auto text-muted-foreground/25 mb-3" />
-        <p className="font-medium text-foreground">Nenhuma cena encontrada</p>
-        <p className="text-sm text-muted-foreground mt-1">Crie cenas no app SmartLife para vê-las aqui</p>
+      <div className="space-y-4 pt-2">
+        <div className="rounded-2xl border border-dashed border-border/60 bg-card/50 py-12 text-center px-6">
+          <Zap className="w-10 h-10 mx-auto text-muted-foreground/25 mb-3" />
+          <p className="font-medium text-foreground">Nenhuma cena encontrada</p>
+          <p className="text-sm text-muted-foreground mt-1">Crie cenas no app SmartLife para vê-las aqui</p>
+        </div>
+        <button onClick={() => setShowManualForm(v => !v)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/60 text-sm text-muted-foreground hover:bg-muted/30 transition-colors">
+          <Plus className="w-4 h-4" />
+          Adicionar cena manualmente
+        </button>
+        {showManualForm && <ManualSceneForm onSaved={() => { refetchManual(); setShowManualForm(false); }} />}
       </div>
     );
   }
@@ -860,6 +968,7 @@ function ScenesTab() {
 
   return (
     <div className="space-y-3 pt-2">
+      {manualScenesBlock}
       {Object.entries(grouped).map(([homeName, homeScenes]) => {
         const isOpen = expandedHomes.has(homeName);
         return (
