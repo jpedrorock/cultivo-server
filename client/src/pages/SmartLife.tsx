@@ -1145,11 +1145,39 @@ function AutomationCard({ automation }: { automation: { sceneId: string; name: s
               </div>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground py-1">
-              {details?.found === false ? 'Horários não disponíveis via API' : 'Sem horários (gatilho por sensor ou outro)'}
-            </p>
+            <div className="space-y-2 pt-1">
+              <p className="text-xs text-muted-foreground">
+                {details?.found === false ? 'Horários não disponíveis via API' : 'Sem horários (gatilho por sensor ou outro)'}
+              </p>
+              <DebugAutomation sceneId={automation.sceneId} conditions={automation.conditions} />
+            </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function DebugAutomation({ sceneId, conditions }: { sceneId: string; conditions?: any[] }) {
+  const [show, setShow] = useState(false);
+  const { data, isLoading } = trpc.tuya.debugAutomationRaw.useQuery(
+    { automationId: sceneId },
+    { enabled: show, staleTime: 60_000 }
+  );
+  return (
+    <div className="space-y-1">
+      <button onClick={() => setShow(v => !v)} className="text-[10px] text-blue-400/60 hover:text-blue-400 transition-colors">
+        {show ? 'Fechar diagnóstico' : '🔍 Diagnóstico API'}
+      </button>
+      {show && (
+        <pre className="text-[9px] bg-muted/50 rounded-lg p-2 overflow-x-auto max-h-40 text-muted-foreground whitespace-pre-wrap break-all">
+          {isLoading ? 'Carregando...' : JSON.stringify(data, null, 2)}
+        </pre>
+      )}
+      {conditions && conditions.length > 0 && (
+        <pre className="text-[9px] bg-amber-500/10 rounded-lg p-2 overflow-x-auto max-h-24 text-amber-600 whitespace-pre-wrap break-all">
+          inline: {JSON.stringify(conditions, null, 2)}
+        </pre>
       )}
     </div>
   );
