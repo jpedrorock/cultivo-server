@@ -385,7 +385,7 @@ export interface TuyaScene {
 
 /**
  * Lista as "casas" da conta SmartLife do usuário.
- * Endpoint: GET /v2.0/homes?uid={uid}
+ * Tenta v1.1 → v1.0 para compatibilidade com [Deprecate]Smart Home Scene Linkage.
  */
 export async function listTuyaHomes(
   accessId: string,
@@ -393,18 +393,37 @@ export async function listTuyaHomes(
   region: TuyaRegion
 ): Promise<TuyaHome[]> {
   const { accessToken, uid } = await getToken(accessId, accessSecret, region);
-  const path = `/v2.0/homes?uid=${uid}&page_no=1&page_size=20`;
-  const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-  if (!data.success) throw new Error(`listTuyaHomes: ${data.msg ?? data.code}`);
-  return ((data.result as any[]) ?? []).map((h: any) => ({
-    homeId: h.home_id ?? h.id,
-    name: h.name ?? h.home_name ?? "Casa",
-  }));
+
+  // Tenta diferentes versões do endpoint de homes
+  const attempts = [
+    `/v1.1/homes?uid=${uid}&page_no=1&page_size=20`,
+    `/v1.0/homes?uid=${uid}&page_no=1&page_size=20`,
+    `/v2.0/homes?uid=${uid}&page_no=1&page_size=20`,
+  ];
+
+  let lastError = "";
+  for (const path of attempts) {
+    try {
+      const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+      console.log(`[Tuya] listTuyaHomes ${path}: success=${data.success} code=${data.code ?? "-"} msg="${data.msg ?? "-"}"`);
+      if (data.success) {
+        const list = Array.isArray(data.result) ? data.result : (data.result?.list ?? []);
+        return (list as any[]).map((h: any) => ({
+          homeId: h.home_id ?? h.id,
+          name: h.name ?? h.home_name ?? "Casa",
+        }));
+      }
+      lastError = `${data.msg ?? data.code}`;
+    } catch (e: any) {
+      lastError = e?.message ?? String(e);
+    }
+  }
+  throw new Error(`listTuyaHomes: ${lastError}`);
 }
 
 /**
  * Lista cenas de uma casa.
- * Endpoint: GET /v2.0/homes/{homeId}/scenes
+ * Tenta v1.0 primeiro (compatível com [Deprecate]Smart Home Scene Linkage).
  */
 export async function listTuyaScenes(
   homeId: number,
@@ -413,20 +432,36 @@ export async function listTuyaScenes(
   region: TuyaRegion
 ): Promise<Omit<TuyaScene, "homeName">[]> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
-  const path = `/v2.0/homes/${homeId}/scenes?page_no=1&page_size=50`;
-  const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-  if (!data.success) throw new Error(`listTuyaScenes: ${data.msg ?? data.code}`);
-  const list = data.result?.list ?? data.result ?? [];
-  return (list as any[]).map((s: any) => ({
-    sceneId: s.scene_id ?? s.id,
-    name: s.name ?? s.scene_name ?? "Cena",
-    homeId,
-  }));
+
+  const attempts = [
+    `/v1.0/homes/${homeId}/scenes?page_no=1&page_size=50`,
+    `/v2.0/homes/${homeId}/scenes?page_no=1&page_size=50`,
+  ];
+
+  let lastError = "";
+  for (const path of attempts) {
+    try {
+      const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+      console.log(`[Tuya] listTuyaScenes ${path}: success=${data.success} code=${data.code ?? "-"} msg="${data.msg ?? "-"}"`);
+      if (data.success) {
+        const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
+        return (list as any[]).map((s: any) => ({
+          sceneId: s.scene_id ?? s.id,
+          name: s.name ?? s.scene_name ?? "Cena",
+          homeId,
+        }));
+      }
+      lastError = `${data.msg ?? data.code}`;
+    } catch (e: any) {
+      lastError = e?.message ?? String(e);
+    }
+  }
+  throw new Error(`listTuyaScenes: ${lastError}`);
 }
 
 /**
  * Dispara uma cena SmartLife.
- * Endpoint: POST /v2.0/homes/{homeId}/scenes/{sceneId}/actions/trigger
+ * Tenta v1.0 primeiro (compatível com [Deprecate]Smart Home Scene Linkage).
  */
 export async function triggerTuyaScene(
   homeId: number,
@@ -436,7 +471,18 @@ export async function triggerTuyaScene(
   region: TuyaRegion
 ): Promise<{ success: boolean; msg?: string }> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
-  const path = `/v2.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`;
-  const data = await tuyaPost(path, {}, accessId, accessSecret, accessToken, region);
-  return { success: Boolean(data.success), msg: data.msg };
+
+  const attempts = [
+    `/v1.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
+    `/v2.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
+  ];
+
+  for (const path of attempts) {
+    try {
+      const data = await tuyaPost(path, {}, accessId, accessSecret, accessToken, region);
+      console.log(`[Tuya] triggerTuyaScene ${path}: success=${data.success} code=${data.code ?? "-"}`);
+      if (data.success) return { success: true };
+    } catch {}
+  }
+  return { success: false, msg: "Nenhum endpoint de trigger funcionou" };
 }
