@@ -658,16 +658,56 @@ export async function getTuyaRuleDetails(
   accessId: string,
   accessSecret: string,
   region: TuyaRegion
-): Promise<{ conditions: any[]; actions: any[] }> {
+): Promise<{ conditions: any[]; actions: any[]; found: boolean }> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
-  const data = await tuyaGet(
-    `/v2.0/cloud/scene/rule/${ruleId}`,
+
+  // Tenta endpoint de detalhe direto primeiro
+  try {
+    const data = await tuyaGet(
+      `/v2.0/cloud/scene/rule/${ruleId}`,
+      accessId, accessSecret, accessToken, region
+    );
+    console.log(`[Tuya] getRuleDetails ${ruleId}: success=${data.success} code=${data.code ?? '-'}`);
+    if (data.success && data.result) {
+      return {
+        conditions: data.result.conditions ?? [],
+        actions: data.result.actions ?? [],
+        found: true,
+      };
+    }
+  } catch { /* fallthrough */ }
+
+  // Fallback: busca na lista de todas as regras pelo space_id e encontra pelo id
+  console.log(`[Tuya] getRuleDetails fallback: buscando ${ruleId} via lista`);
+  const spacesData = await tuyaGet(
+    `/v2.0/cloud/space/child?only_sub=false&page_size=50`,
     accessId, accessSecret, accessToken, region
   );
-  console.log(`[Tuya] getRuleDetails ${ruleId}: success=${data.success} code=${data.code ?? '-'}`);
-  if (!data.success) throw new Error(`[${data.code}] ${data.msg ?? 'erro'}`);
-  return {
-    conditions: data.result?.conditions ?? [],
-    actions: data.result?.actions ?? [],
-  };
+  const spaceIds: string[] = spacesData.success
+    ? (spacesData.result?.data ?? []).map(String)
+    : [];
+
+  for (const spaceId of spaceIds) {
+    try {
+      const data = await tuyaGet(
+        `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100`,
+        accessId, accessSecret, accessToken, region
+      );
+      if (data.success && Array.isArray(data.result?.list)) {
+        const rule = data.result.list.find((r: any) => r.id === ruleId);
+        if (rule) {
+          console.log(`[Tuya] getRuleDetails found in list: space=${spaceId} rule=${JSON.stringify(rule)}`);
+          return {
+            conditions: rule.conditions ?? [],
+            actions: rule.actions ?? [],
+            found: true,
+          };
+        }
+      }
+    } catch { /* continue */ }
+  }
+
+  // Não encontrou — retorna vazio sem erro
+  console.warn(`[Tuya] getRuleDetails: regra ${ruleId} não encontrada`);
+  return { conditions: [], actions: [], found: false };
 }

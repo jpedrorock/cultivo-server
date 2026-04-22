@@ -1072,7 +1072,9 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
               </div>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground py-1">Sem horários encontrados (gatilho por sensor ou outro)</p>
+            <p className="text-xs text-muted-foreground py-1">
+              {details?.found === false ? 'Horários não disponíveis via API' : 'Sem horários configurados (gatilho por sensor ou outro)'}
+            </p>
           )}
         </div>
       )}
@@ -1138,7 +1140,9 @@ function AutomationCard({ automation }: { automation: { sceneId: string; name: s
               </div>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground py-1">Sem horários configurados (gatilho por sensor ou outro)</p>
+            <p className="text-xs text-muted-foreground py-1">
+              {details?.found === false ? 'Horários não disponíveis via API' : 'Sem horários configurados (gatilho por sensor ou outro)'}
+            </p>
           )}
         </div>
       )}

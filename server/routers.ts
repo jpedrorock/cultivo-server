@@ -518,7 +518,9 @@ const tuyaRouter = router({
       try {
         return await getTuyaRuleDetails(input.ruleId, cfg.accessId, cfg.accessSecret, cfg.region);
       } catch (e: any) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e?.message ?? String(e) });
+        // Nunca joga 500 para o cliente — retorna vazio e loga o erro
+        console.warn(`[Tuya] getAutomationDetails ${input.ruleId}: ${e?.message}`);
+        return { conditions: [], actions: [], found: false };
       }
     }),
 
