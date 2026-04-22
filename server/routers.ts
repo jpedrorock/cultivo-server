@@ -822,10 +822,23 @@ const tuyaRouter = router({
 
     // ── Tentativa 2: Smart Home com homeId manual ───────────────────────────────
     if (cfg.homeId) {
-      const { listTuyaScenes } = await import("./lib/tuya");
+      const { listTuyaScenes, listTuyaAutomations } = await import("./lib/tuya");
       try {
-        const scenes = await listTuyaScenes(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region);
-        return scenes.map(s => ({ ...s, homeName: "Minha Casa" }));
+        const [scenes, automations] = await Promise.allSettled([
+          listTuyaScenes(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region),
+          listTuyaAutomations(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region),
+        ]);
+
+        const result: any[] = [];
+
+        if (scenes.status === "fulfilled") {
+          result.push(...scenes.value.map(s => ({ ...s, homeName: "Minha Casa", conditions: [] })));
+        }
+        if (automations.status === "fulfilled" && automations.value.length > 0) {
+          result.push(...automations.value.map(a => ({ ...a, homeName: "Automações", conditions: a.conditions })));
+        }
+
+        if (result.length > 0) return result;
       } catch (e: any) {
         console.warn(`[Tuya] listScenes Smart Home homeId=${cfg.homeId}: ${e?.message}`);
       }

@@ -523,6 +523,43 @@ export async function listTuyaScenes(
 }
 
 /**
+ * Lista automações de uma casa com seus horários (Smart Home API).
+ * Retorna automações com conditions já incluídas.
+ */
+export async function listTuyaAutomations(
+  homeId: number,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<Array<{ sceneId: string; name: string; homeId: number; conditions: any[] }>> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+
+  const attempts = [
+    `/v2.0/homes/${homeId}/automations?page_no=1&page_size=100`,
+    `/v1.0/homes/${homeId}/automations?page_no=1&page_size=50`,
+  ];
+
+  for (const path of attempts) {
+    try {
+      const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+      console.log(`[Tuya] listTuyaAutomations ${path}: success=${data.success} code=${data.code ?? "-"} count=${data.result?.list?.length ?? 0}`);
+      if (data.success) {
+        const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
+        return (list as any[]).map((a: any) => ({
+          sceneId: a.id ?? a.automation_id ?? a.scene_id,
+          name: a.name ?? a.automation_name ?? "Automação",
+          homeId,
+          conditions: a.conditions ?? a.decide_conditions ?? a.preconditions ?? [],
+        }));
+      }
+    } catch (e: any) {
+      console.warn(`[Tuya] listTuyaAutomations ${path}: ${e?.message}`);
+    }
+  }
+  return []; // sem erro — retorna vazio
+}
+
+/**
  * Dispara uma cena/automação via IoT Core ou Smart Home.
  * Ordem: IoT Core v2 (funciona com scene_id de /v2.0/cloud/scene/rule)
  *        → Smart Home v1/v2 com homeId (legado)
