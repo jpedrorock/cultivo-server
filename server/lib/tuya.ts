@@ -571,7 +571,7 @@ export async function listTuyaScenesIoTCore(
   accessId: string,
   accessSecret: string,
   region: TuyaRegion
-): Promise<Array<{ sceneId: string; name: string; type: string; status: string; spaceId: string }>> {
+): Promise<Array<{ sceneId: string; name: string; type: string; status: string; spaceId: string; conditions: any[] }>> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
 
   // 1. Busca o space_id do projeto
@@ -589,7 +589,18 @@ export async function listTuyaScenesIoTCore(
     throw new Error("Nenhum space encontrado no projeto IoT Core");
   }
 
-  const allScenes: Array<{ sceneId: string; name: string; type: string; status: string; spaceId: string }> = [];
+  const allScenes: Array<{ sceneId: string; name: string; type: string; status: string; spaceId: string; conditions: any[] }> = [];
+
+  function pushItem(item: any, type: "scene" | "automation") {
+    allScenes.push({
+      sceneId: item.id,
+      name: item.name ?? "Sem nome",
+      type,
+      status: item.status ?? "enable",
+      spaceId: "",   // preenchido abaixo
+      conditions: item.conditions ?? item.actions_list ?? [],
+    });
+  }
 
   // Busca TAP-TO-RUN e AUTOMAÇÕES separadamente para garantir classificação correta
   async function fetchRules(spaceId: string, ruleType: "scene" | "automation") {
@@ -599,17 +610,13 @@ export async function listTuyaScenesIoTCore(
         accessId, accessSecret, accessToken, region
       );
       console.log(`[Tuya] space=${spaceId} rule_type=${ruleType}: success=${data.success} count=${data.result?.list?.length ?? 0}`);
-      if (data.success && Array.isArray(data.result?.list)) {
+      if (data.success && Array.isArray(data.result?.list) && data.result.list.length > 0) {
         for (const item of data.result.list) {
-          allScenes.push({
-            sceneId: item.id,
-            name: item.name ?? "Sem nome",
-            type: ruleType === "automation" ? "automation" : "scene",
-            status: item.status ?? "enable",
-            spaceId,
-          });
+          console.log(`[Tuya] ${ruleType} item: id=${item.id} name="${item.name}" conditions=${JSON.stringify(item.conditions ?? [])}`);
+          pushItem(item, ruleType);
+          allScenes[allScenes.length - 1].spaceId = spaceId;
         }
-        return true; // endpoint suporta rule_type
+        return true;
       }
       return false;
     } catch { return false; }
@@ -630,18 +637,11 @@ export async function listTuyaScenesIoTCore(
         console.log(`[Tuya] space=${spaceId} fallback: success=${data.success} count=${data.result?.list?.length ?? 0}`);
         if (data.success && Array.isArray(data.result?.list)) {
           for (const item of data.result.list) {
-            console.log(`[Tuya] item id=${item.id} name="${item.name}" type=${JSON.stringify(item.type)} running_mode=${JSON.stringify(item.running_mode)}`);
+            console.log(`[Tuya] item id=${item.id} name="${item.name}" type=${JSON.stringify(item.type)} conditions=${JSON.stringify(item.conditions ?? [])}`);
             const t = item.type;
-            const isAuto =
-              t === "automation" || t === 2 || t === "linkage" ||
-              item.running_mode === "automation";
-            allScenes.push({
-              sceneId: item.id,
-              name: item.name ?? "Sem nome",
-              type: isAuto ? "automation" : "scene",
-              status: item.status ?? "enable",
-              spaceId,
-            });
+            const isAuto = t === "automation" || t === 2 || t === "linkage" || item.running_mode === "automation";
+            pushItem(item, isAuto ? "automation" : "scene");
+            allScenes[allScenes.length - 1].spaceId = spaceId;
           }
         }
       }

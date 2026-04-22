@@ -812,6 +812,7 @@ const tuyaRouter = router({
           name: s.name,
           homeId: 0,
           homeName: s.type === "automation" ? "Automações" : "Cenas",
+          conditions: s.conditions ?? [],
         }));
       }
       iotCoreError = "IoT Core retornou 0 cenas";

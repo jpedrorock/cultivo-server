@@ -1082,25 +1082,32 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
   );
 }
 
-function AutomationCard({ automation }: { automation: { sceneId: string; name: string } }) {
-  const [expanded, setExpanded] = useState(false);
-  const { data: details, isLoading } = trpc.tuya.getAutomationDetails.useQuery(
-    { ruleId: automation.sceneId },
-    { enabled: expanded, staleTime: 300_000 }
-  );
-
-  // Parse timer conditions
-  const schedules = (details?.conditions ?? [])
-    .filter((c: any) => c.entity_type === 'timer' || c.expr?.time)
+function parseSchedules(conditions: any[]) {
+  return conditions
+    .filter((c: any) => c.entity_type === 'timer' || c.expr?.time || c.time)
     .map((c: any) => {
       const time = c.expr?.time ?? c.time ?? '';
-      const loops = c.expr?.loops ?? '1111111';
+      const loops = c.expr?.loops ?? c.loops ?? '1111111';
       const dayLabels = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
       const days = loops === '1111111' || loops === ''
         ? 'Todos os dias'
         : loops.split('').map((v: string, i: number) => v === '1' ? dayLabels[i] : null).filter(Boolean).join(', ');
       return { time, days };
     });
+}
+
+function AutomationCard({ automation }: { automation: { sceneId: string; name: string; conditions?: any[] } }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Usa condições já vindas da listagem; só chama API se não tiver
+  const hasInlineConditions = Array.isArray(automation.conditions) && automation.conditions.length > 0;
+  const { data: details, isLoading } = trpc.tuya.getAutomationDetails.useQuery(
+    { ruleId: automation.sceneId },
+    { enabled: expanded && !hasInlineConditions, staleTime: 300_000 }
+  );
+
+  const rawConditions = hasInlineConditions ? automation.conditions! : (details?.conditions ?? []);
+  const schedules = parseSchedules(rawConditions);
 
   return (
     <div className="border-b border-border/20 last:border-0">
@@ -1124,7 +1131,7 @@ function AutomationCard({ automation }: { automation: { sceneId: string; name: s
           : expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground/40 shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
       </button>
 
-      {expanded && details && (
+      {expanded && (hasInlineConditions || details) && (
         <div className="px-4 pb-4 space-y-2 bg-muted/20">
           {schedules.length > 0 ? (
             <>
@@ -1141,7 +1148,7 @@ function AutomationCard({ automation }: { automation: { sceneId: string; name: s
             </>
           ) : (
             <p className="text-xs text-muted-foreground py-1">
-              {details?.found === false ? 'Horários não disponíveis via API' : 'Sem horários configurados (gatilho por sensor ou outro)'}
+              {details?.found === false ? 'Horários não disponíveis via API' : 'Sem horários (gatilho por sensor ou outro)'}
             </p>
           )}
         </div>
@@ -1374,6 +1381,18 @@ function ScenesTab() {
 
   return (
     <div className="space-y-3 pt-2">
+      {/* Botão atualizar */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => { refetch(); refetchManual(); }}
+          disabled={isLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          Atualizar
+        </button>
+      </div>
+
       {manualScenesBlock}
 
       {/* Tap-to-run scenes */}
