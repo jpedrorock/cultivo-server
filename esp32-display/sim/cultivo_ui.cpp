@@ -160,7 +160,8 @@ static void anim_outline_opa_cb(void *obj, int32_t v) {
   lv_obj_set_style_outline_opa((lv_obj_t*)obj, v, 0);
 }
 
-static void applyRingPulse(lv_obj_t *card, uint32_t color, uint32_t periodMs = 2800) {
+static void applyRingPulse(lv_obj_t *card, uint32_t color,
+                           uint32_t periodMs = 2800, uint32_t delayMs = 0) {
   lv_obj_set_style_outline_color(card, lv_color_hex(color), 0);
   lv_obj_set_style_outline_width(card, 2, 0);
   lv_obj_set_style_outline_pad(card, 0, 0);
@@ -171,6 +172,7 @@ static void applyRingPulse(lv_obj_t *card, uint32_t color, uint32_t periodMs = 2
   lv_anim_set_values(&a, LV_OPA_0, LV_OPA_60);
   lv_anim_set_time(&a, periodMs);
   lv_anim_set_playback_time(&a, periodMs);
+  lv_anim_set_delay(&a, delayMs);
   lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
   lv_anim_set_exec_cb(&a, anim_outline_opa_cb);
   lv_anim_start(&a);
@@ -289,11 +291,14 @@ static void buildHome(lv_obj_t *tab) {
 
   auto makeMiniCard = [&](int yOffset, const char *label, const char *initVal,
                           uint32_t color, const lv_image_dsc_t *icon,
-                          lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
+                          lv_obj_t **sparkOut, lv_chart_series_t **serOut,
+                          uint32_t pulseDelayMs) -> lv_obj_t* {
     lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
     lv_obj_set_style_pad_all(c, sw(4), 0);
-    // Sem applyRingPulse aqui — com 3 cards + arc ficava "tudo brilhando".
-    // Bloom no valor (applyBloom abaixo) ja da destaque suficiente.
+    // Ring-pulse defasado: 3 cards a 2800ms com offsets distribuidos no
+    // periodo ficam visivelmente fora de fase e a tela "respira" em vez
+    // de piscar junto.
+    applyRingPulse(c, color, 2800, pulseDelayMs);
 
     lv_obj_t *ico = lv_image_create(c);
     lv_image_set_src(ico, icon);
@@ -336,9 +341,9 @@ static void buildHome(lv_obj_t *tab) {
     return v;
   };
 
-  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,   &sparkRh, &serRhS);
-  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker,    &sparkPh, &serPhS);
-  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube, &sparkEc, &serEcS);
+  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,   &sparkRh, &serRhS,    0);
+  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker,    &sparkPh, &serPhS,  933);
+  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube, &sparkEc, &serEcS, 1866);
 
   lv_chart_set_range(sparkRh, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
   lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);
