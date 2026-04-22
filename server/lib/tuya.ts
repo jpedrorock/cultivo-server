@@ -544,19 +544,48 @@ export async function listTuyaAutomations(
       const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
       console.log(`[Tuya] listTuyaAutomations ${path}: success=${data.success} code=${data.code ?? "-"} count=${data.result?.list?.length ?? 0}`);
       if (data.success) {
-        const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
-        return (list as any[]).map((a: any) => ({
-          sceneId: a.id ?? a.automation_id ?? a.scene_id,
-          name: a.name ?? a.automation_name ?? "Automação",
-          homeId,
-          conditions: a.conditions ?? a.decide_conditions ?? a.preconditions ?? [],
-        }));
+        const list: any[] = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
+
+        // Busca detalhes de cada automação (onde ficam as conditions/horários)
+        const detailed = await Promise.all(
+          list.map(async (a: any) => {
+            const autoId = a.id ?? a.automation_id ?? a.scene_id;
+            const name = a.name ?? a.automation_name ?? "Automação";
+
+            // Condições inline já vêm na lista? Usa direto
+            const inlineConds = a.conditions ?? a.decide_conditions ?? a.preconditions ?? [];
+            if (inlineConds.length > 0) {
+              console.log(`[Tuya] auto ${autoId} "${name}" inline conditions=${JSON.stringify(inlineConds)}`);
+              return { sceneId: autoId, name, homeId, conditions: inlineConds };
+            }
+
+            // Busca detalhe individual
+            const detailPaths = [
+              `/v2.0/homes/${homeId}/automations/${autoId}`,
+              `/v1.0/homes/${homeId}/automations/${autoId}`,
+            ];
+            for (const dp of detailPaths) {
+              try {
+                const det = await tuyaGet(dp, accessId, accessSecret, accessToken, region);
+                console.log(`[Tuya] auto detail ${dp}: success=${det.success} result=${JSON.stringify(det.result)}`);
+                if (det.success && det.result) {
+                  const conds = det.result.conditions ?? det.result.decide_conditions ?? det.result.preconditions ?? [];
+                  return { sceneId: autoId, name, homeId, conditions: conds };
+                }
+              } catch { /* próximo */ }
+            }
+
+            return { sceneId: autoId, name, homeId, conditions: [] };
+          })
+        );
+
+        return detailed;
       }
     } catch (e: any) {
       console.warn(`[Tuya] listTuyaAutomations ${path}: ${e?.message}`);
     }
   }
-  return []; // sem erro — retorna vazio
+  return [];
 }
 
 /**
@@ -775,11 +804,29 @@ export async function getTuyaRuleDetails(
 }
 
 function extractSchedules(conditions: any[]): { time: string; loops: string }[] {
-  return conditions
-    .filter((c: any) => c.entity_type === 'timer' || c.type === 'timer' || c.expr?.time || c.time)
-    .map((c: any) => ({
-      time: c.expr?.time ?? c.time ?? '',
-      loops: c.expr?.loops ?? c.loops ?? '1111111',
-    }))
-    .filter(s => s.time);
+  const results: { time: string; loops: string }[] = [];
+
+  for (const c of conditions) {
+    // Formato IoT Core: entity_type="timer", expr.time, expr.loops
+    if (c.entity_type === 'timer' || c.type === 'timer') {
+      const time = c.expr?.time ?? c.time ?? '';
+      const loops = c.expr?.loops ?? c.loops ?? '1111111';
+      if (time) results.push({ time, loops });
+      continue;
+    }
+
+    // Formato Smart Home v1: entity_type=6 (inteiro), display.start_time, display.loops
+    if (c.entity_type === 6 || c.entity_type === '6') {
+      const time = c.display?.start_time ?? c.display?.time ?? c.expr?.time ?? c.time ?? '';
+      const loops = c.display?.loops ?? c.expr?.loops ?? c.loops ?? '1111111';
+      if (time) results.push({ time, loops });
+      continue;
+    }
+
+    // Campos diretos (qualquer formato)
+    if (c.expr?.time) results.push({ time: c.expr.time, loops: c.expr.loops ?? '1111111' });
+    else if (c.time) results.push({ time: c.time, loops: c.loops ?? '1111111' });
+  }
+
+  return results;
 }
