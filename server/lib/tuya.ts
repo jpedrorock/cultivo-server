@@ -385,7 +385,8 @@ export interface TuyaScene {
 
 /**
  * Lista as "casas" da conta SmartLife do usuário.
- * Tenta v1.1 → v1.0 para compatibilidade com [Deprecate]Smart Home Scene Linkage.
+ * Smart Home Basic Service: GET /v1.0/users/{uid}/homes
+ * Fallback: /v2.0/homes?uid={uid} (Industry Basic Service)
  */
 export async function listTuyaHomes(
   accessId: string,
@@ -394,26 +395,42 @@ export async function listTuyaHomes(
 ): Promise<TuyaHome[]> {
   const { accessToken, uid } = await getToken(accessId, accessSecret, region);
 
-  // Tenta diferentes versões do endpoint de homes
+  // Tenta primeiro buscar usuários SmartLife vinculados ao projeto
+  // (após "Link App Account" no portal Tuya, o uid do app user é diferente do developer uid)
+  let userUid = uid;
+  try {
+    const usersData = await tuyaGet(
+      `/v1.0/users?page_no=1&page_size=20`,
+      accessId, accessSecret, accessToken, region
+    );
+    if (usersData.success) {
+      const list = usersData.result?.list ?? usersData.result ?? [];
+      if (Array.isArray(list) && list.length > 0) {
+        userUid = list[0].uid ?? uid;
+        console.log(`[Tuya] listTuyaHomes: usando uid do usuário SmartLife vinculado: ${userUid}`);
+      }
+    }
+  } catch {}
+
+  // Endpoints em ordem de prioridade
   const attempts = [
-    `/v1.1/homes?uid=${uid}&page_no=1&page_size=20`,
-    `/v1.0/homes?uid=${uid}&page_no=1&page_size=20`,
-    `/v2.0/homes?uid=${uid}&page_no=1&page_size=20`,
+    { path: `/v1.0/users/${userUid}/homes?page_no=1&page_size=20`, extract: (r: any) => Array.isArray(r) ? r : (r?.list ?? []) },
+    { path: `/v2.0/homes?uid=${userUid}&page_no=1&page_size=20`, extract: (r: any) => Array.isArray(r) ? r : (r?.list ?? []) },
   ];
 
   let lastError = "";
-  for (const path of attempts) {
+  for (const { path, extract } of attempts) {
     try {
       const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
       console.log(`[Tuya] listTuyaHomes ${path}: success=${data.success} code=${data.code ?? "-"} msg="${data.msg ?? "-"}"`);
       if (data.success) {
-        const list = Array.isArray(data.result) ? data.result : (data.result?.list ?? []);
+        const list = extract(data.result);
         return (list as any[]).map((h: any) => ({
           homeId: h.home_id ?? h.id,
           name: h.name ?? h.home_name ?? "Casa",
         }));
       }
-      lastError = `${data.msg ?? data.code}`;
+      lastError = `[${data.code}] ${data.msg ?? "erro desconhecido"}`;
     } catch (e: any) {
       lastError = e?.message ?? String(e);
     }
