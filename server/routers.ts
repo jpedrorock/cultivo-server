@@ -839,7 +839,7 @@ const tuyaRouter = router({
   listManualScenes: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
     const [rows]: any = await pool.execute(
-      `SELECT id, homeId, sceneId, name FROM tuyaManualScenes WHERE userId = ? ORDER BY createdAt DESC`,
+      `SELECT id, homeId, sceneId, name, COALESCE(type, 'tap') as type FROM tuyaManualScenes WHERE userId = ? ORDER BY createdAt DESC`,
       [ctx.user.id]
     );
     return (rows as any[]).map((r: any) => ({
@@ -847,19 +847,20 @@ const tuyaRouter = router({
       homeId: Number(r.homeId),
       sceneId: r.sceneId as string,
       name: r.name as string,
+      type: (r.type as string) === 'automation' ? 'automation' : 'tap',
     }));
   }),
 
   /** Salva uma cena manual */
   saveManualScene: protectedProcedure
-    .input(z.object({ homeId: z.string().max(50).optional(), sceneId: z.string().min(1), name: z.string().min(1).max(200) }))
+    .input(z.object({ homeId: z.string().max(50).optional(), sceneId: z.string().min(1), name: z.string().min(1).max(200), type: z.enum(['tap', 'automation']).default('tap') }))
     .mutation(async ({ ctx, input }) => {
       const pool = getMysqlPool();
       await pool.execute(
-        `INSERT INTO tuyaManualScenes (userId, homeId, sceneId, name)
-         VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE homeId = VALUES(homeId), name = VALUES(name)`,
-        [ctx.user.id, input.homeId ?? '', input.sceneId, input.name]
+        `INSERT INTO tuyaManualScenes (userId, homeId, sceneId, name, type)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE homeId = VALUES(homeId), name = VALUES(name), type = VALUES(type)`,
+        [ctx.user.id, input.homeId ?? '', input.sceneId, input.name, input.type]
       );
       return { ok: true };
     }),

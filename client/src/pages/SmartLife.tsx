@@ -950,7 +950,7 @@ const SCENE_SWIPE_WIDTH = 80;
 const SCENE_SWIPE_THRESHOLD = 50;
 
 function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisabled }: {
-  scene: { id: number; sceneId: string; name: string; homeId?: number | null };
+  scene: { id: number; sceneId: string; name: string; homeId?: number | null; type?: string };
   isTriggering: boolean;
   onTrigger: () => void;
   onDelete: () => void;
@@ -1005,18 +1005,25 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
           userSelect: 'none',
         }}
       >
-        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-          <Zap className="w-4 h-4 text-amber-500" />
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${scene.type === 'automation' ? 'bg-violet-500/10' : 'bg-amber-500/10'}`}>
+          {scene.type === 'automation' ? <Clock className="w-4 h-4 text-violet-500" /> : <Zap className="w-4 h-4 text-amber-500" />}
         </div>
-        <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
-        <button
-          onClick={e => { e.stopPropagation(); if (!open) onTrigger(); }}
-          disabled={triggerDisabled}
-          className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
-        >
-          {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-          {isTriggering ? 'Disparando...' : 'Disparar'}
-        </button>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{scene.name}</p>
+          {scene.type === 'automation' && (
+            <p className="text-[10px] text-muted-foreground">Disparo automático por horário</p>
+          )}
+        </div>
+        {scene.type !== 'automation' && (
+          <button
+            onClick={e => { e.stopPropagation(); if (!open) onTrigger(); }}
+            disabled={triggerDisabled}
+            className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+          >
+            {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+            {isTriggering ? 'Disparando...' : 'Disparar'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1092,9 +1099,10 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
   const [homeId, setHomeId] = useState('');
   const [sceneId, setSceneId] = useState('');
   const [name, setName] = useState('');
+  const [type, setType] = useState<'tap' | 'automation'>('tap');
 
   const save = trpc.tuya.saveManualScene.useMutation({
-    onSuccess: () => { toast.success('Cena adicionada!'); setHomeId(''); setSceneId(''); setName(''); onSaved(); },
+    onSuccess: () => { toast.success('Cena adicionada!'); setHomeId(''); setSceneId(''); setName(''); setType('tap'); onSaved(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -1132,6 +1140,32 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
             placeholder="ex: Ligar tudo"
             className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
         </div>
+        {/* Tipo da cena */}
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Tipo</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setType('tap')}
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${type === 'tap' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}
+            >
+              <Play className="w-3.5 h-3.5" />
+              Tap-to-Run
+            </button>
+            <button
+              type="button"
+              onClick={() => setType('automation')}
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${type === 'automation' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'}`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Automação
+            </button>
+          </div>
+          {type === 'automation' && (
+            <p className="text-[10px] text-muted-foreground mt-1.5">Automações são disparadas por horário — sem botão Disparar.</p>
+          )}
+        </div>
+
         <div>
           <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
             Home ID <span className="font-normal text-muted-foreground/50">(opcional)</span>
@@ -1142,7 +1176,7 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
         </div>
         <Button className="w-full bg-emerald-600 hover:bg-emerald-700"
           disabled={!sceneId || !name || save.isPending}
-          onClick={() => save.mutate({ homeId: homeId || undefined, sceneId, name })}
+          onClick={() => save.mutate({ homeId: homeId || undefined, sceneId, name, type })}
         >
           {save.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Salvando...</> : <><Check className="w-4 h-4 mr-2" />Salvar cena</>}
         </Button>

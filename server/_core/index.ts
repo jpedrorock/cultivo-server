@@ -275,6 +275,17 @@ async function ensureTuyaTables() {
       console.log("[DB] Coluna homeId adicionada à tuyaConfig");
     }
 
+    // Adicionar coluna type à tuyaManualScenes se não existir
+    const [manualCols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tuyaManualScenes'`
+    );
+    const manualColNames = manualCols.map((r: any) => r.COLUMN_NAME);
+    if (!manualColNames.includes('type')) {
+      await conn.execute(`ALTER TABLE \`tuyaManualScenes\` ADD COLUMN \`type\` VARCHAR(20) NOT NULL DEFAULT 'tap' AFTER \`name\``);
+      console.log("[DB] Coluna type adicionada à tuyaManualScenes");
+    }
+
     await conn.end();
     console.log("[DB] Tabelas Tuya OK");
   } catch (err: any) {
