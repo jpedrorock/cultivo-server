@@ -527,13 +527,13 @@ const tuyaRouter = router({
   listDevices: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
     const [rows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+      `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
       [ctx.user.id]
     );
     if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
     const cfg = rows[0];
     const { listTuyaDevices } = await import("./lib/tuya");
-    return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region);
+    return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region, cfg.homeId ? Number(cfg.homeId) : undefined);
   }),
 
   /** Salva mapeamento dispositivo ↔ estufa */

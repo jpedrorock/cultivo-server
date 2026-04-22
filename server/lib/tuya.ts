@@ -203,7 +203,8 @@ export async function testTuyaConnection(
 export async function listTuyaDevices(
   accessId: string,
   accessSecret: string,
-  region: TuyaRegion
+  region: TuyaRegion,
+  homeId?: number
 ): Promise<TuyaDevice[]> {
   const { accessToken, uid } = await getToken(accessId, accessSecret, region);
 
@@ -218,16 +219,27 @@ export async function listTuyaDevices(
     }));
   }
 
-  // Endpoints tentados em ordem — loga tudo para diagnóstico
+  // Endpoints tentados em ordem — Smart Home com homeId tem prioridade (mesma lógica das automações)
   const attempts: Array<{ label: string; path: string; extract: (r: any) => any[] }> = [
+    // Smart Home: dispositivos da casa — funciona com contas SmartLife vinculadas
+    ...(homeId ? [
+      {
+        label: `Smart Home /v1.0/homes/${homeId}/devices`,
+        path: `/v1.0/homes/${homeId}/devices`,
+        extract: (r: any) => (Array.isArray(r) ? r : r?.devices ?? r?.list ?? []),
+      },
+      {
+        label: `Smart Home /v2.0/homes/${homeId}/devices`,
+        path: `/v2.0/homes/${homeId}/devices`,
+        extract: (r: any) => (Array.isArray(r) ? r : r?.devices ?? r?.list ?? []),
+      },
+    ] : []),
     // Smart Home Basic Service: busca todos dispositivos do projeto (página de 100)
     {
       label: "Smart Home /v1.0/devices",
       path: `/v1.0/devices?page_no=1&page_size=100`,
       extract: (r) => (Array.isArray(r) ? r : r?.devices ?? r?.list ?? []),
     },
-    // Homes: busca casas do uid e depois dispositivos de cada casa
-    // — tentativa indireta via iot-03
     {
       label: "IoT-03 /v1.0/iot-03/devices",
       path: `/v1.0/iot-03/devices?page_no=1&page_size=100`,
@@ -238,7 +250,6 @@ export async function listTuyaDevices(
       path: `/v1.2/iot-03/devices?page_no=1&page_size=100`,
       extract: (r) => r?.devices ?? [],
     },
-    // Legado: usuário do projeto (geralmente developer uid, pode não ter dispositivos SmartLife)
     {
       label: `Legacy /v1.0/users/${uid}/devices`,
       path: `/v1.0/users/${uid}/devices`,
