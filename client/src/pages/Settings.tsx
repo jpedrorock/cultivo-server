@@ -51,7 +51,7 @@ export default function Settings() {
 
           {/* Seção: Integrações */}
           <SettingsSection title="Integrações">
-            <SettingsRow href="/settings/sensors" icon={<Wifi className="w-4 h-4" />} label="Sensores SmartLife / Tuya" description="Temperatura e umidade automáticos" />
+            <SettingsRow href="/smartlife" icon={<Wifi className="w-4 h-4" />} label="SmartLife / Tuya" description="Dispositivos, cenas e sensores" />
             <SettingsRow href="/settings/dispositivos" icon={<Cpu className="w-4 h-4" />} label="Dispositivos ESP32" description="Tokens de acesso para displays e sensores" />
           </SettingsSection>
 
