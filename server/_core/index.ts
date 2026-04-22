@@ -236,6 +236,21 @@ async function ensureTuyaTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // Dispositivos controláveis (tomadas, relés, etc.) por estufa
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS \`tuyaDeviceMappings\` (
+        \`id\`          INT AUTO_INCREMENT PRIMARY KEY,
+        \`userId\`      INT NOT NULL,
+        \`tentId\`      INT NOT NULL,
+        \`deviceId\`    VARCHAR(100) NOT NULL,
+        \`deviceName\`  VARCHAR(200),
+        \`switchCode\`  VARCHAR(50) NOT NULL DEFAULT 'switch_1',
+        \`enabled\`     TINYINT(1) NOT NULL DEFAULT 1,
+        \`createdAt\`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE KEY \`tuyaDeviceMappings_user_tent_dev\` (\`userId\`, \`tentId\`, \`deviceId\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     await conn.end();
     console.log("[DB] Tabelas Tuya OK");
   } catch (err: any) {

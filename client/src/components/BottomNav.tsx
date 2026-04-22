@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -218,6 +218,7 @@ export function BottomNav() {
   const moreMenuItems: NavItem[] = [
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
+    { href: "/smartlife", icon: Wifi, label: "SmartLife" },
     { href: "/calculators", icon: Calculator, label: "Calculadoras" },
     { href: "/manage-strains", icon: Sprout, label: "Strains" },
     { href: "/help", icon: BookOpen, label: "Guia do Usuário" },

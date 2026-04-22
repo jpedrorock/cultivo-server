@@ -1,4 +1,4 @@
-import { Calculator, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen, AlertTriangle, Wind } from "lucide-react";
+import { Calculator, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen, AlertTriangle, Wind, Wifi } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -49,6 +49,7 @@ export function Sidebar() {
     { href: "/plants", icon: Sprout, label: "Plantas", enabled: true, badge: 0 },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", enabled: true, badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas", enabled: true, badge: 0 },
+    { href: "/smartlife", icon: Wifi, label: "SmartLife", enabled: true, badge: 0 },
     { href: "/calculators", icon: Calculator, label: "Calculadoras", enabled: true, badge: 0 },
     { href: "/alerts", icon: Bell, label: "Alertas", enabled: true, badge: alertCount || 0 },
     { href: "/manage-strains", icon: Leaf, label: "Strains", enabled: true, badge: 0 },

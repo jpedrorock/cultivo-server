@@ -147,6 +147,37 @@ async function tuyaGet(
   return res.json();
 }
 
+// ─── Authenticated POST ───────────────────────────────────────────────────────
+
+async function tuyaPost(
+  pathAndQuery: string,
+  body: object,
+  accessId: string,
+  accessSecret: string,
+  accessToken: string,
+  region: TuyaRegion
+): Promise<any> {
+  const t = Date.now().toString();
+  const nonce = "";
+  const bodyStr = JSON.stringify(body);
+  const signature = buildSign(accessId, accessSecret, t, nonce, pathAndQuery, accessToken, "POST", bodyStr);
+
+  const res = await fetch(`${BASE_URLS[region]}${pathAndQuery}`, {
+    method: "POST",
+    headers: {
+      client_id: accessId,
+      access_token: accessToken,
+      sign: signature,
+      t,
+      sign_method: "HMAC-SHA256",
+      nonce,
+      "Content-Type": "application/json",
+    },
+    body: bodyStr,
+  });
+  return res.json();
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function testTuyaConnection(
@@ -275,4 +306,135 @@ export async function readTuyaDeviceStatus(
     tempC: rawTemp !== null ? (rawTemp > 100 ? rawTemp / 10 : rawTemp) : null,
     rhPct: rawHum  !== null ? (rawHum  > 100 ? rawHum  / 10 : rawHum)  : null,
   };
+}
+
+// ─── Device control ───────────────────────────────────────────────────────────
+
+export interface TuyaSwitchState {
+  online: boolean;
+  switchOn: boolean | null;   // null = dispositivo não expõe switch DP
+  switchCode: string | null;  // "switch", "switch_1", etc.
+}
+
+const SWITCH_CODES = ["switch_1", "switch", "switch_led", "power", "led_switch"];
+
+/**
+ * Retorna o estado online + switch atual de um dispositivo controlável.
+ */
+export async function getTuyaDeviceSwitchState(
+  deviceId: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<TuyaSwitchState> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+
+  // Busca info + status em paralelo
+  const [devData, statusData] = await Promise.all([
+    tuyaGet(`/v1.0/devices/${deviceId}`, accessId, accessSecret, accessToken, region),
+    tuyaGet(`/v1.0/devices/${deviceId}/status`, accessId, accessSecret, accessToken, region),
+  ]);
+
+  const online = devData.success ? Boolean(devData.result?.online) : false;
+
+  let switchOn: boolean | null = null;
+  let switchCode: string | null = null;
+  for (const s of (statusData.result ?? []) as { code: string; value: any }[]) {
+    if (SWITCH_CODES.includes(s.code) && switchCode === null) {
+      switchCode = s.code;
+      switchOn = Boolean(s.value);
+    }
+  }
+
+  return { online, switchOn, switchCode };
+}
+
+/**
+ * Liga ou desliga um dispositivo via DP command.
+ */
+export async function controlTuyaDevice(
+  deviceId: string,
+  switchCode: string,
+  value: boolean,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<{ success: boolean; msg?: string }> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+  const path = `/v1.0/devices/${deviceId}/commands`;
+  const body = { commands: [{ code: switchCode, value }] };
+  const data = await tuyaPost(path, body, accessId, accessSecret, accessToken, region);
+  return { success: Boolean(data.success), msg: data.msg };
+}
+
+// ─── SmartLife homes & scenes ─────────────────────────────────────────────────
+
+export interface TuyaHome {
+  homeId: number;
+  name: string;
+}
+
+export interface TuyaScene {
+  sceneId: string;
+  name: string;
+  homeId: number;
+  homeName: string;
+}
+
+/**
+ * Lista as "casas" da conta SmartLife do usuário.
+ * Endpoint: GET /v2.0/homes?uid={uid}
+ */
+export async function listTuyaHomes(
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<TuyaHome[]> {
+  const { accessToken, uid } = await getToken(accessId, accessSecret, region);
+  const path = `/v2.0/homes?uid=${uid}&page_no=1&page_size=20`;
+  const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+  if (!data.success) throw new Error(`listTuyaHomes: ${data.msg ?? data.code}`);
+  return ((data.result as any[]) ?? []).map((h: any) => ({
+    homeId: h.home_id ?? h.id,
+    name: h.name ?? h.home_name ?? "Casa",
+  }));
+}
+
+/**
+ * Lista cenas de uma casa.
+ * Endpoint: GET /v2.0/homes/{homeId}/scenes
+ */
+export async function listTuyaScenes(
+  homeId: number,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<Omit<TuyaScene, "homeName">[]> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+  const path = `/v2.0/homes/${homeId}/scenes?page_no=1&page_size=50`;
+  const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+  if (!data.success) throw new Error(`listTuyaScenes: ${data.msg ?? data.code}`);
+  const list = data.result?.list ?? data.result ?? [];
+  return (list as any[]).map((s: any) => ({
+    sceneId: s.scene_id ?? s.id,
+    name: s.name ?? s.scene_name ?? "Cena",
+    homeId,
+  }));
+}
+
+/**
+ * Dispara uma cena SmartLife.
+ * Endpoint: POST /v2.0/homes/{homeId}/scenes/{sceneId}/actions/trigger
+ */
+export async function triggerTuyaScene(
+  homeId: number,
+  sceneId: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<{ success: boolean; msg?: string }> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+  const path = `/v2.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`;
+  const data = await tuyaPost(path, {}, accessId, accessSecret, accessToken, region);
+  return { success: Boolean(data.success), msg: data.msg };
 }

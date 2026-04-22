@@ -656,6 +656,133 @@ const tuyaRouter = router({
 
       return { ...reading, readAt: new Date() };
     }),
+
+  // ─── Device control ─────────────────────────────────────────────────────────
+
+  /** Salva mapeamentos de dispositivos controláveis por estufa */
+  saveDeviceMappings: protectedProcedure
+    .input(z.array(z.object({
+      tentId: z.number(),
+      deviceId: z.string().min(1),
+      deviceName: z.string(),
+      switchCode: z.string().default("switch_1"),
+      enabled: z.boolean(),
+    })))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const tentIds = [...new Set(input.map(m => m.tentId))];
+      for (const tentId of tentIds) {
+        await pool.execute(
+          `DELETE FROM tuyaDeviceMappings WHERE userId = ? AND tentId = ?`,
+          [ctx.user.id, tentId]
+        );
+      }
+      for (const m of input) {
+        await pool.execute(
+          `INSERT INTO tuyaDeviceMappings (userId, tentId, deviceId, deviceName, switchCode, enabled)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE deviceName=VALUES(deviceName), switchCode=VALUES(switchCode), enabled=VALUES(enabled)`,
+          [ctx.user.id, m.tentId, m.deviceId, m.deviceName, m.switchCode, m.enabled ? 1 : 0]
+        );
+      }
+      return { ok: true };
+    }),
+
+  /** Busca mapeamentos de dispositivos controláveis */
+  getDeviceMappings: protectedProcedure.query(async ({ ctx }) => {
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT tentId, deviceId, deviceName, switchCode, enabled FROM tuyaDeviceMappings WHERE userId = ? AND enabled = 1`,
+      [ctx.user.id]
+    );
+    return (rows as any[]).map(r => ({
+      tentId: r.tentId as number,
+      deviceId: r.deviceId as string,
+      deviceName: r.deviceName as string,
+      switchCode: r.switchCode as string,
+      enabled: Boolean(r.enabled),
+    }));
+  }),
+
+  /** Estado atual (online + switch on/off) de um dispositivo */
+  getDeviceCurrentStatus: protectedProcedure
+    .input(z.object({ deviceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const [cfgRows]: any = await pool.execute(
+        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+        [ctx.user.id]
+      );
+      if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+      const cfg = cfgRows[0];
+      const { getTuyaDeviceSwitchState } = await import("./lib/tuya");
+      return getTuyaDeviceSwitchState(input.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+    }),
+
+  /** Liga / desliga um dispositivo */
+  sendDeviceCommand: protectedProcedure
+    .input(z.object({
+      deviceId: z.string(),
+      switchCode: z.string().default("switch_1"),
+      value: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const [cfgRows]: any = await pool.execute(
+        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+        [ctx.user.id]
+      );
+      if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+      const cfg = cfgRows[0];
+      const { controlTuyaDevice } = await import("./lib/tuya");
+      const result = await controlTuyaDevice(input.deviceId, input.switchCode, input.value, cfg.accessId, cfg.accessSecret, cfg.region);
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Erro ao controlar dispositivo" });
+      return { ok: true };
+    }),
+
+  // ─── SmartLife scenes ────────────────────────────────────────────────────────
+
+  /** Lista todas as cenas SmartLife agregadas de todas as casas do usuário */
+  listScenes: protectedProcedure.query(async ({ ctx }) => {
+    const pool = getMysqlPool();
+    const [cfgRows]: any = await pool.execute(
+      `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+      [ctx.user.id]
+    );
+    if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+    const cfg = cfgRows[0];
+    const { listTuyaHomes, listTuyaScenes } = await import("./lib/tuya");
+
+    const homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+    const allScenes: Array<{ sceneId: string; name: string; homeId: number; homeName: string }> = [];
+
+    for (const home of homes) {
+      try {
+        const scenes = await listTuyaScenes(home.homeId, cfg.accessId, cfg.accessSecret, cfg.region);
+        for (const s of scenes) allScenes.push({ ...s, homeName: home.name });
+      } catch (e: any) {
+        console.warn(`[Tuya] listScenes home ${home.homeId}: ${e?.message}`);
+      }
+    }
+    return allScenes;
+  }),
+
+  /** Dispara uma cena SmartLife */
+  triggerScene: protectedProcedure
+    .input(z.object({ homeId: z.number(), sceneId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const [cfgRows]: any = await pool.execute(
+        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+        [ctx.user.id]
+      );
+      if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+      const cfg = cfgRows[0];
+      const { triggerTuyaScene } = await import("./lib/tuya");
+      const result = await triggerTuyaScene(input.homeId, input.sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao disparar cena" });
+      return { ok: true };
+    }),
 });
 
 export const appRouter = router({
