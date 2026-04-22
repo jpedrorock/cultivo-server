@@ -667,9 +667,9 @@ function DevicesTab() {
 
       {/* Device picker modal */}
       {pickerOpen && addingTentId !== null && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setPickerOpen(false); setManualDeviceId(''); setManualDeviceName(''); }} />
-          <div className="relative bg-card border border-border rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+          <div className="relative bg-card border border-border rounded-2xl w-full max-w-md max-h-[75vh] flex flex-col overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
               <p className="font-semibold text-foreground">Escolher dispositivo</p>
               <button onClick={() => { setPickerOpen(false); setManualDeviceId(''); setManualDeviceName(''); }} className="w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center">
