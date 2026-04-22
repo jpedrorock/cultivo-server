@@ -956,75 +956,126 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
   onDelete: () => void;
   triggerDisabled: boolean;
 }) {
-  const [offset, setOffset] = useState(0);
-  const [open, setOpen] = useState(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swipeOpen, setSwipeOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const startX = useRef(0);
   const startOffset = useRef(0);
   const dragging = useRef(false);
+  const isAuto = scene.type === 'automation';
 
-  const closeSwipe = () => { setOffset(0); setOpen(false); };
+  const { data: details, isLoading: detailsLoading } = trpc.tuya.getAutomationDetails.useQuery(
+    { ruleId: scene.sceneId },
+    { enabled: isAuto && expanded, staleTime: 300_000 }
+  );
 
-  const startDrag = (clientX: number) => { startX.current = clientX; startOffset.current = offset; dragging.current = true; };
+  const schedules = (details?.conditions ?? [])
+    .filter((c: any) => c.entity_type === 'timer' || c.expr?.time)
+    .map((c: any) => {
+      const time = c.expr?.time ?? c.time ?? '';
+      const loops = c.expr?.loops ?? '1111111';
+      const dayLabels = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+      const days = loops === '1111111' || loops === ''
+        ? 'Todos os dias'
+        : loops.split('').map((v: string, i: number) => v === '1' ? dayLabels[i] : null).filter(Boolean).join(', ');
+      return { time, days };
+    });
+
+  const closeSwipe = () => { setSwipeOffset(0); setSwipeOpen(false); };
+
+  const startDrag = (clientX: number) => { startX.current = clientX; startOffset.current = swipeOffset; dragging.current = true; };
   const moveDrag = (clientX: number) => {
     if (!dragging.current) return;
     const delta = startX.current - clientX;
-    setOffset(Math.max(0, Math.min(SCENE_SWIPE_WIDTH, startOffset.current + delta)));
+    setSwipeOffset(Math.max(0, Math.min(SCENE_SWIPE_WIDTH, startOffset.current + delta)));
   };
   const endDrag = () => {
     if (!dragging.current) return;
     dragging.current = false;
-    if (offset > SCENE_SWIPE_THRESHOLD) { setOffset(SCENE_SWIPE_WIDTH); setOpen(true); }
-    else { setOffset(0); setOpen(false); }
+    if (swipeOffset > SCENE_SWIPE_THRESHOLD) { setSwipeOffset(SCENE_SWIPE_WIDTH); setSwipeOpen(true); }
+    else { setSwipeOffset(0); setSwipeOpen(false); }
   };
 
   return (
-    <div className="relative overflow-hidden border-b border-border/20 last:border-0">
-      {/* Botão excluir revelado no swipe */}
-      <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-500" style={{ width: SCENE_SWIPE_WIDTH }}>
-        <button onClick={() => { closeSwipe(); onDelete(); }} className="w-full h-full flex flex-col items-center justify-center gap-1">
-          <Trash2 className="w-5 h-5 text-white" />
-          <span className="text-[10px] font-semibold text-white">Excluir</span>
-        </button>
+    <div className="border-b border-border/20 last:border-0">
+      <div className="relative overflow-hidden">
+        {/* Botão excluir revelado no swipe */}
+        <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-500" style={{ width: SCENE_SWIPE_WIDTH }}>
+          <button onClick={() => { closeSwipe(); onDelete(); }} className="w-full h-full flex flex-col items-center justify-center gap-1">
+            <Trash2 className="w-5 h-5 text-white" />
+            <span className="text-[10px] font-semibold text-white">Excluir</span>
+          </button>
+        </div>
+
+        {/* Linha principal — desliza para esquerda */}
+        <div
+          className="relative bg-card flex items-center gap-3 px-4 py-3.5"
+          onTouchStart={e => startDrag(e.touches[0].clientX)}
+          onTouchMove={e => moveDrag(e.touches[0].clientX)}
+          onTouchEnd={endDrag}
+          onMouseDown={e => startDrag(e.clientX)}
+          onMouseMove={e => moveDrag(e.clientX)}
+          onMouseUp={endDrag}
+          onMouseLeave={endDrag}
+          onClick={() => { if (swipeOpen) { closeSwipe(); return; } if (isAuto) setExpanded(v => !v); }}
+          style={{
+            transform: `translateX(-${swipeOffset}px)`,
+            transition: dragging.current ? 'none' : 'transform 0.25s ease',
+            cursor: isAuto ? 'pointer' : swipeOpen ? 'default' : 'grab',
+            userSelect: 'none',
+          }}
+        >
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isAuto ? 'bg-blue-500/10' : 'bg-amber-500/10'}`}>
+            {isAuto ? <Clock className="w-4 h-4 text-blue-500" /> : <Zap className="w-4 h-4 text-amber-500" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">{scene.name}</p>
+            {isAuto && !expanded && schedules.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">{schedules.map(s => s.time).join(' · ')}</p>
+            )}
+            {isAuto && !expanded && schedules.length === 0 && (
+              <p className="text-[11px] text-muted-foreground">Toque para ver horários</p>
+            )}
+          </div>
+          {isAuto
+            ? detailsLoading && expanded
+              ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+              : expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground/40 shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+            : (
+              <button
+                onClick={e => { e.stopPropagation(); if (!swipeOpen) onTrigger(); }}
+                disabled={triggerDisabled}
+                className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+              >
+                {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                {isTriggering ? 'Disparando...' : 'Disparar'}
+              </button>
+            )
+          }
+        </div>
       </div>
 
-      {/* Linha principal — desliza para esquerda */}
-      <div
-        className="relative bg-card flex items-center gap-3 px-4 py-3.5"
-        onTouchStart={e => startDrag(e.touches[0].clientX)}
-        onTouchMove={e => moveDrag(e.touches[0].clientX)}
-        onTouchEnd={endDrag}
-        onMouseDown={e => startDrag(e.clientX)}
-        onMouseMove={e => moveDrag(e.clientX)}
-        onMouseUp={endDrag}
-        onMouseLeave={endDrag}
-        onClick={() => open && closeSwipe()}
-        style={{
-          transform: `translateX(-${offset}px)`,
-          transition: dragging.current ? 'none' : 'transform 0.25s ease',
-          cursor: open ? 'default' : 'grab',
-          userSelect: 'none',
-        }}
-      >
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${scene.type === 'automation' ? 'bg-violet-500/10' : 'bg-amber-500/10'}`}>
-          {scene.type === 'automation' ? <Clock className="w-4 h-4 text-violet-500" /> : <Zap className="w-4 h-4 text-amber-500" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{scene.name}</p>
-          {scene.type === 'automation' && (
-            <p className="text-[10px] text-muted-foreground">Disparo automático por horário</p>
+      {/* Horários expandidos (só automações) */}
+      {isAuto && expanded && details && (
+        <div className="px-4 pb-4 space-y-2 bg-muted/20">
+          {schedules.length > 0 ? (
+            <>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide pt-1">Horários</p>
+              <div className="space-y-1.5">
+                {schedules.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span className="text-sm font-mono font-semibold text-foreground">{s.time}</span>
+                    <span className="text-xs text-muted-foreground">— {s.days}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground py-1">Sem horários encontrados (gatilho por sensor ou outro)</p>
           )}
         </div>
-        {scene.type !== 'automation' && (
-          <button
-            onClick={e => { e.stopPropagation(); if (!open) onTrigger(); }}
-            disabled={triggerDisabled}
-            className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
-          >
-            {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {isTriggering ? 'Disparando...' : 'Disparar'}
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
