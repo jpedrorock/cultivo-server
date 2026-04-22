@@ -481,6 +481,47 @@ const tuyaRouter = router({
       return testTuyaConnection(input.accessId, input.accessSecret, input.region);
     }),
 
+  /**
+   * Dado o UID do usuário SmartLife, busca as casas (homeId + nome).
+   * Usar no Config tab: usuário cola o UID que encontrou no API Explorer.
+   */
+  resolveHomeId: protectedProcedure
+    .input(z.object({ smartlifeUid: z.string().min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ?`,
+        [ctx.user.id]
+      );
+      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+      const cfg = rows[0];
+      const { listHomesForUid } = await import("./lib/tuya");
+      try {
+        const homes = await listHomesForUid(input.smartlifeUid, cfg.accessId, cfg.accessSecret, cfg.region);
+        return homes;
+      } catch (e: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Tuya: ${e?.message ?? String(e)}` });
+      }
+    }),
+
+  getAutomationDetails: protectedProcedure
+    .input(z.object({ ruleId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ?`,
+        [ctx.user.id]
+      );
+      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+      const cfg = rows[0];
+      const { getTuyaRuleDetails } = await import("./lib/tuya");
+      try {
+        return await getTuyaRuleDetails(input.ruleId, cfg.accessId, cfg.accessSecret, cfg.region);
+      } catch (e: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e?.message ?? String(e) });
+      }
+    }),
+
   /** Lista dispositivos da conta Tuya */
   listDevices: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
@@ -751,77 +792,47 @@ const tuyaRouter = router({
   listScenes: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
     const [cfgRows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+      `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ?`,
       [ctx.user.id]
     );
     if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
     const cfg = cfgRows[0];
-    const { listTuyaHomes, listTuyaScenes } = await import("./lib/tuya");
+    const { listTuyaScenesIoTCore } = await import("./lib/tuya");
 
-    const allScenes: Array<{ sceneId: string; name: string; homeId: number; homeName: string }> = [];
+    // ── Tentativa 1: IoT Core (/v2.0/cloud/scene/rule) ─────────────────────────
+    let iotCoreError = "";
+    try {
+      const iotScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
+      if (iotScenes.length > 0) {
+        console.log(`[Tuya] listScenes: IoT Core retornou ${iotScenes.length} cenas`);
+        return iotScenes.map(s => ({
+          sceneId: s.sceneId,
+          name: s.name,
+          homeId: 0,
+          homeName: s.type === "automation" ? "Automações" : "Cenas",
+        }));
+      }
+      iotCoreError = "IoT Core retornou 0 cenas";
+    } catch (e: any) {
+      iotCoreError = e?.message ?? String(e);
+      console.warn(`[Tuya] listScenes IoT Core falhou: ${iotCoreError}`);
+    }
 
-    let homes: Array<{ homeId: number; name: string }> = [];
-
+    // ── Tentativa 2: Smart Home com homeId manual ───────────────────────────────
     if (cfg.homeId) {
-      // Home ID configurado manualmente — usa diretamente
-      homes = [{ homeId: Number(cfg.homeId), name: "Minha Casa" }];
-      console.log(`[Tuya] listScenes: usando homeId manual = ${cfg.homeId}`);
-    } else {
-      // Tenta extrair home_id a partir de dispositivos já conhecidos (sensores ou controláveis)
-      const { getDeviceHomeId } = await import("./lib/tuya");
+      const { listTuyaScenes } = await import("./lib/tuya");
       try {
-        const [sensorRows]: any = await pool.execute(
-          `SELECT deviceId FROM tuyaSensorMappings WHERE userId = ? AND deviceId IS NOT NULL AND deviceId != '' LIMIT 5`,
-          [ctx.user.id]
-        );
-        const [deviceRows]: any = await pool.execute(
-          `SELECT deviceId FROM tuyaDeviceMappings WHERE userId = ? AND deviceId IS NOT NULL AND deviceId != '' LIMIT 5`,
-          [ctx.user.id]
-        );
-        const knownDeviceIds: string[] = [
-          ...sensorRows.map((r: any) => r.deviceId),
-          ...deviceRows.map((r: any) => r.deviceId),
-        ];
-
-        const discoveredHomeIds = new Set<number>();
-        for (const deviceId of knownDeviceIds) {
-          const hid = await getDeviceHomeId(deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
-          if (hid !== null) {
-            discoveredHomeIds.add(hid);
-            console.log(`[Tuya] listScenes: home_id ${hid} descoberto via device ${deviceId}`);
-          }
-        }
-        if (discoveredHomeIds.size > 0) {
-          homes = Array.from(discoveredHomeIds).map(hid => ({ homeId: hid, name: "Minha Casa" }));
-        }
+        const scenes = await listTuyaScenes(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region);
+        return scenes.map(s => ({ ...s, homeName: "Minha Casa" }));
       } catch (e: any) {
-        console.warn(`[Tuya] listScenes: erro ao descobrir homeId via devices: ${e?.message}`);
-      }
-
-      // Se ainda não descobriu, tenta API de homes
-      if (homes.length === 0) {
-        try {
-          homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
-        } catch {}
-      }
-
-      if (homes.length === 0) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Configure o Home ID na aba Config → role para baixo. Ou adicione um sensor/dispositivo primeiro para auto-detecção.",
-        });
+        console.warn(`[Tuya] listScenes Smart Home homeId=${cfg.homeId}: ${e?.message}`);
       }
     }
 
-    for (const home of homes) {
-      try {
-        const scenes = await listTuyaScenes(home.homeId, cfg.accessId, cfg.accessSecret, cfg.region);
-        for (const s of scenes) allScenes.push({ ...s, homeName: home.name });
-      } catch (e: any) {
-        console.warn(`[Tuya] listScenes home ${home.homeId}: ${e?.message}`);
-      }
-    }
-    return allScenes;
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `IoT Core: ${iotCoreError}. Verifique se a região na aba Config está correta (Europa/América/China) e se o serviço "Scene Linkage Rules" está ativo no projeto Tuya.`,
+    });
   }),
 
   /** Lista cenas salvas manualmente */
@@ -841,14 +852,14 @@ const tuyaRouter = router({
 
   /** Salva uma cena manual */
   saveManualScene: protectedProcedure
-    .input(z.object({ homeId: z.string().min(1), sceneId: z.string().min(1), name: z.string().min(1).max(200) }))
+    .input(z.object({ homeId: z.string().max(50).optional(), sceneId: z.string().min(1), name: z.string().min(1).max(200) }))
     .mutation(async ({ ctx, input }) => {
       const pool = getMysqlPool();
       await pool.execute(
         `INSERT INTO tuyaManualScenes (userId, homeId, sceneId, name)
          VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE homeId = VALUES(homeId), name = VALUES(name)`,
-        [ctx.user.id, input.homeId, input.sceneId, input.name]
+        [ctx.user.id, input.homeId ?? '', input.sceneId, input.name]
       );
       return { ok: true };
     }),
@@ -862,19 +873,19 @@ const tuyaRouter = router({
       return { ok: true };
     }),
 
-  /** Dispara uma cena SmartLife */
+  /** Dispara uma cena SmartLife (homeId opcional — tenta endpoints sem homeId como fallback) */
   triggerScene: protectedProcedure
-    .input(z.object({ homeId: z.number(), sceneId: z.string() }))
+    .input(z.object({ homeId: z.number().optional(), sceneId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const pool = getMysqlPool();
       const [cfgRows]: any = await pool.execute(
-        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ?`,
         [ctx.user.id]
       );
       if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
       const cfg = cfgRows[0];
       const { triggerTuyaScene } = await import("./lib/tuya");
-      const result = await triggerTuyaScene(input.homeId, input.sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
+      const result = await triggerTuyaScene(input.homeId ?? 0, input.sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
       if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao disparar cena" });
       return { ok: true };
     }),

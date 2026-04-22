@@ -389,6 +389,32 @@ export async function getDeviceHomeId(
   return null;
 }
 
+/**
+ * Lista casas de um UID SmartLife específico.
+ * Usar quando o usuário encontrar o UID via API Explorer → Smart Home User Management.
+ */
+export async function listHomesForUid(
+  smartlifeUid: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<Array<{ homeId: string; name: string }>> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+  const data = await tuyaGet(
+    `/v1.0/users/${smartlifeUid}/homes?page_no=1&page_size=20`,
+    accessId, accessSecret, accessToken, region
+  );
+  console.log(`[Tuya] listHomesForUid uid=${smartlifeUid}: success=${data.success} code=${data.code ?? '-'} msg="${data.msg ?? '-'}"`);
+  if (!data.success) {
+    throw new Error(`[${data.code}] ${data.msg ?? 'erro desconhecido'}`);
+  }
+  const list = Array.isArray(data.result) ? data.result : (data.result?.list ?? []);
+  return (list as any[]).map((h: any) => ({
+    homeId: String(h.home_id ?? h.id ?? ''),
+    name: h.name ?? h.home_name ?? 'Casa',
+  }));
+}
+
 // ─── SmartLife homes & scenes ─────────────────────────────────────────────────
 
 export interface TuyaHome {
@@ -497,8 +523,10 @@ export async function listTuyaScenes(
 }
 
 /**
- * Dispara uma cena SmartLife.
- * Tenta v1.0 primeiro (compatível com [Deprecate]Smart Home Scene Linkage).
+ * Dispara uma cena/automação via IoT Core ou Smart Home.
+ * Ordem: IoT Core v2 (funciona com scene_id de /v2.0/cloud/scene/rule)
+ *        → Smart Home v1/v2 com homeId (legado)
+ *        → endpoints sem homeId
  */
 export async function triggerTuyaScene(
   homeId: number,
@@ -509,10 +537,20 @@ export async function triggerTuyaScene(
 ): Promise<{ success: boolean; msg?: string }> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
 
-  const attempts = [
-    `/v1.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
-    `/v2.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
+  const attempts: string[] = [
+    // IoT Core endpoint — funciona com IDs listados via /v2.0/cloud/scene/rule
+    `/v2.0/cloud/scene/rule/${sceneId}/actions/trigger`,
   ];
+  if (homeId) {
+    attempts.push(
+      `/v1.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
+      `/v2.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
+    );
+  }
+  attempts.push(
+    `/v1.0/scenes/${sceneId}/actions/trigger`,
+    `/v2.0/scenes/${sceneId}/actions/trigger`,
+  );
 
   for (const path of attempts) {
     try {
@@ -522,4 +560,78 @@ export async function triggerTuyaScene(
     } catch {}
   }
   return { success: false, msg: "Nenhum endpoint de trigger funcionou" };
+}
+
+/**
+ * Lista cenas e automações via IoT Core (/v2.0/cloud/scene/rule).
+ * Não precisa de homeId — usa o space_id do projeto.
+ * Retorna apenas itens do tipo "scene" (tap-to-run) e "automation".
+ */
+export async function listTuyaScenesIoTCore(
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<Array<{ sceneId: string; name: string; type: string; status: string; spaceId: string }>> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+
+  // 1. Busca o space_id do projeto
+  const spacesData = await tuyaGet(
+    `/v2.0/cloud/space/child?only_sub=false&page_size=50`,
+    accessId, accessSecret, accessToken, region
+  );
+  console.log(`[Tuya] listTuyaScenesIoTCore spaces: success=${spacesData.success} data=${JSON.stringify(spacesData.result?.data ?? [])}`);
+
+  const spaceIds: string[] = spacesData.success
+    ? (spacesData.result?.data ?? []).map(String)
+    : [];
+
+  if (spaceIds.length === 0) {
+    throw new Error("Nenhum space encontrado no projeto IoT Core");
+  }
+
+  const allScenes: Array<{ sceneId: string; name: string; type: string; status: string; spaceId: string }> = [];
+
+  for (const spaceId of spaceIds) {
+    try {
+      const data = await tuyaGet(
+        `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100`,
+        accessId, accessSecret, accessToken, region
+      );
+      console.log(`[Tuya] listTuyaScenesIoTCore space=${spaceId}: success=${data.success} count=${data.result?.list?.length ?? 0}`);
+      if (data.success && Array.isArray(data.result?.list)) {
+        for (const item of data.result.list) {
+          allScenes.push({
+            sceneId: item.id,
+            name: item.name ?? "Sem nome",
+            type: item.type ?? "scene",
+            status: item.status ?? "enable",
+            spaceId,
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[Tuya] listTuyaScenesIoTCore space=${spaceId}: ${e?.message}`);
+    }
+  }
+
+  return allScenes;
+}
+
+export async function getTuyaRuleDetails(
+  ruleId: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<{ conditions: any[]; actions: any[] }> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+  const data = await tuyaGet(
+    `/v2.0/cloud/scene/rule/${ruleId}`,
+    accessId, accessSecret, accessToken, region
+  );
+  console.log(`[Tuya] getRuleDetails ${ruleId}: success=${data.success} code=${data.code ?? '-'}`);
+  if (!data.success) throw new Error(`[${data.code}] ${data.msg ?? 'erro'}`);
+  return {
+    conditions: data.result?.conditions ?? [],
+    actions: data.result?.actions ?? [],
+  };
 }

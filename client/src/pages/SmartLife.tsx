@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Wifi, WifiOff, Power, Play, Loader2, Plus, X, Settings,
   Zap, Home, ChevronDown, ChevronUp, AlertCircle, RefreshCw,
-  Check, ToggleLeft, ToggleRight, ChevronRight, Pencil,
+  Check, ToggleLeft, ToggleRight, ChevronRight, Pencil, Search, Trash2, Clock,
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
@@ -76,6 +76,8 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
   const [pollInterval, setPollInterval] = useState<PollInterval>(180);
   const [integrationEnabled, setIntegrationEnabled] = useState(true);
   const [homeId, setHomeId] = useState('');
+  const [smartlifeUid, setSmartlifeUid] = useState('');
+  const [resolvedHomes, setResolvedHomes] = useState<Array<{ homeId: string; name: string }>>([]);
   const [connStatus, setConnStatus] = useState<null | 'ok' | 'error'>(null);
   const [connMsg, setConnMsg] = useState('');
 
@@ -105,17 +107,47 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
     onError: (e) => { setConnStatus('error'); setConnMsg(e.message); },
   });
 
+  const resolveHomes = trpc.tuya.resolveHomeId.useMutation({
+    onSuccess: (homes) => {
+      setResolvedHomes(homes);
+      if (homes.length === 1) {
+        setHomeId(homes[0].homeId);
+        toast.success(`Casa encontrada: ${homes[0].name} — Home ID preenchido!`);
+      } else if (homes.length === 0) {
+        toast.warning('Nenhuma casa encontrada para esse UID');
+      } else {
+        toast.success(`${homes.length} casas encontradas — escolha abaixo`);
+      }
+    },
+    onError: (e) => toast.error(`Erro ao buscar casas: ${e.message}`),
+  });
+
   return (
     <div className="space-y-4 pt-2">
       {/* Guia */}
-      <div className="rounded-2xl bg-blue-500/8 border border-blue-500/20 p-4 space-y-1.5">
-        <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Como obter as credenciais</p>
-        <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-          <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> e crie uma conta</li>
-          <li>Crie um <strong>Cloud Project</strong> → Smart Home → Data Center: Western Europe</li>
-          <li>Em <strong>Devices → Link App Account</strong>, leia o QR code no SmartLife</li>
-          <li>Copie o <strong>Access ID</strong> e <strong>Access Secret</strong></li>
-        </ol>
+      <div className="rounded-2xl bg-blue-500/8 border border-blue-500/20 p-4 space-y-3">
+        <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Como configurar</p>
+
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold text-foreground">① Access ID e Access Secret</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            <span className="font-mono text-foreground">iot.tuya.com</span> → Cloud → seu projeto → aba <strong>Overview</strong> → campo <strong>Access ID/Client ID</strong> e <strong>Access Secret</strong>
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold text-foreground">② Região</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Veja no canto superior direito do portal. <strong>Western America</strong> = América · <strong>Western Europe</strong> = Europa · <strong>China</strong> = China
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold text-foreground">③ Vincular SmartLife (para sensores e dispositivos)</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Aba <strong>Devices → Link App Account</strong> → clique em <strong>Add App Account</strong> → escaneie o QR code no SmartLife. Após vincular, o UID do usuário aparece na coluna <strong>UID</strong> e os Device IDs aparecem em <strong>All Devices</strong>.
+          </p>
+        </div>
       </div>
 
       {/* Toggle geral */}
@@ -159,22 +191,75 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
         </div>
       </div>
 
-      {/* Home ID */}
+      {/* Home ID — busca automática via UID SmartLife */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="px-4 py-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Home ID <span className="normal-case font-normal">(para cenas)</span></p>
+        <div className="px-4 pt-3 pb-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            Home ID <span className="normal-case font-normal">(para cenas)</span>
+          </p>
+
+          {/* Busca pelo UID SmartLife */}
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+            UID do usuário SmartLife{' '}
+            <span className="font-normal text-muted-foreground/60">
+              (API Explorer → Smart Home User Management → Query User List → campo <span className="font-mono">uid</span>)
+            </span>
+          </p>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={smartlifeUid}
+              onChange={e => setSmartlifeUid(e.target.value.trim())}
+              placeholder="ex: eu1234567890abcdef"
+              className="flex-1 bg-muted rounded-xl px-3 py-2 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!smartlifeUid || resolveHomes.isPending || !accessId}
+              onClick={() => resolveHomes.mutate({ smartlifeUid })}
+              className="shrink-0 gap-1.5"
+            >
+              {resolveHomes.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Search className="w-3.5 h-3.5" />}
+              {resolveHomes.isPending ? 'Buscando...' : 'Buscar casas'}
+            </Button>
+          </div>
+
+          {/* Casas encontradas */}
+          {resolvedHomes.length > 0 && (
+            <div className="rounded-xl border border-border/60 overflow-hidden mb-3">
+              {resolvedHomes.map(h => (
+                <button
+                  key={h.homeId}
+                  onClick={() => setHomeId(h.homeId)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-border/30 last:border-0 ${
+                    homeId === h.homeId ? 'bg-emerald-500/8' : 'hover:bg-muted/40'
+                  }`}
+                >
+                  <Home className="w-4 h-4 text-muted-foreground/60 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{h.name}</p>
+                    <p className="text-[10px] font-mono text-muted-foreground">{h.homeId}</p>
+                  </div>
+                  {homeId === h.homeId && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Home ID manual (fallback) */}
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+            Home ID <span className="font-normal text-muted-foreground/60">(preenchido automaticamente acima, ou insira manualmente)</span>
+          </p>
           <input
             type="text"
             value={homeId}
             onChange={e => setHomeId(e.target.value.trim())}
             placeholder="ex: 123456789"
-            className="w-full bg-transparent text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 mt-1"
+            className="w-full bg-muted rounded-xl px-3 py-2 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50 mb-1"
           />
-        </div>
-        <div className="border-t border-border/50 px-4 py-2.5 bg-muted/30">
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Onde encontrar: <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto → aba <strong>Devices</strong> → clique em qualquer dispositivo → campo <strong>Home</strong> ou <strong>home_id</strong>
-          </p>
         </div>
       </div>
 
@@ -497,7 +582,10 @@ function SensoresTab() {
 
 // ─── DeviceToggle ─────────────────────────────────────────────────────────────
 
-function DeviceToggle({ mapping }: { mapping: DeviceMapping }) {
+const SWIPE_DELETE_WIDTH = 80;
+const SWIPE_THRESHOLD = 50;
+
+function DeviceToggle({ mapping, onRemove }: { mapping: DeviceMapping; onRemove: () => void }) {
   const { data: status, isLoading, refetch } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId: mapping.deviceId },
     { refetchInterval: 30_000, retry: false }
@@ -512,16 +600,94 @@ function DeviceToggle({ mapping }: { mapping: DeviceMapping }) {
   const isOnline = status?.online ?? false;
   const pending = cmd.isPending;
 
+  // Swipe state
+  const [offset, setOffset] = useState(0);
+  const [open, setOpen] = useState(false);
+  const startX = useRef(0);
+  const startOffset = useRef(0);
+  const dragging = useRef(false);
+
   const toggle = () => {
     const code = status?.switchCode ?? mapping.switchCode;
     cmd.mutate({ deviceId: mapping.deviceId, switchCode: code, value: !isOn });
   };
 
+  const closeSwipe = () => { setOffset(0); setOpen(false); };
+
+  const startDrag = (clientX: number) => {
+    startX.current = clientX;
+    startOffset.current = offset;
+    dragging.current = true;
+  };
+
+  const moveDrag = (clientX: number) => {
+    if (!dragging.current) return;
+    const delta = startX.current - clientX;
+    const next = Math.max(0, Math.min(SWIPE_DELETE_WIDTH, startOffset.current + delta));
+    setOffset(next);
+  };
+
+  const endDrag = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (offset > SWIPE_THRESHOLD) {
+      setOffset(SWIPE_DELETE_WIDTH);
+      setOpen(true);
+    } else {
+      setOffset(0);
+      setOpen(false);
+    }
+  };
+
+  // Touch
+  const onTouchStart = (e: React.TouchEvent) => startDrag(e.touches[0].clientX);
+  const onTouchMove  = (e: React.TouchEvent) => moveDrag(e.touches[0].clientX);
+  const onTouchEnd   = () => endDrag();
+
+  // Mouse (desktop)
+  const onMouseDown = (e: React.MouseEvent) => startDrag(e.clientX);
+  const onMouseMove = (e: React.MouseEvent) => moveDrag(e.clientX);
+  const onMouseUp   = () => endDrag();
+
   return (
-    <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/20 last:border-0">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="relative overflow-hidden border-b border-border/20 last:border-0">
+      {/* Botão excluir revelado no swipe */}
+      <div
+        className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-500"
+        style={{ width: SWIPE_DELETE_WIDTH }}
+      >
+        <button
+          onClick={() => { closeSwipe(); onRemove(); }}
+          className="w-full h-full flex flex-col items-center justify-center gap-1"
+        >
+          <Trash2 className="w-5 h-5 text-white" />
+          <span className="text-[10px] font-semibold text-white">Excluir</span>
+        </button>
+      </div>
+
+      {/* Linha principal — desliza para esquerda */}
+      <div
+        className="relative bg-card flex items-center gap-3 px-4 py-3.5"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
+        onClick={() => open && closeSwipe()}
+        style={{
+          transform: `translateX(-${offset}px)`,
+          transition: dragging.current ? 'none' : 'transform 0.25s ease',
+          cursor: open ? 'default' : 'grab',
+          userSelect: 'none',
+        }}
+      >
+        {/* Status dot */}
         <span className={`w-2 h-2 rounded-full shrink-0 ${isLoading ? 'bg-muted animate-pulse' : isOnline ? 'bg-green-400' : 'bg-red-400/50'}`} />
-        <div className="min-w-0">
+
+        {/* Name + status */}
+        <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{mapping.deviceName}</p>
           <p className="text-[11px] text-muted-foreground/60">
             {isLoading ? 'Verificando...' : isOnline
@@ -529,20 +695,22 @@ function DeviceToggle({ mapping }: { mapping: DeviceMapping }) {
               : 'Offline'}
           </p>
         </div>
+
+        {/* Toggle switch */}
+        {!isLoading && status?.switchOn !== null && isOnline && (
+          <button
+            onClick={e => { e.stopPropagation(); if (open) { closeSwipe(); return; } toggle(); }}
+            disabled={pending}
+            className={`relative w-12 h-6 rounded-full transition-all duration-300 shrink-0 disabled:opacity-60 ${isOn ? 'bg-green-500' : 'bg-muted'}`}
+          >
+            {pending
+              ? <Loader2 className="absolute inset-0 m-auto w-3.5 h-3.5 animate-spin text-white" />
+              : <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-300 ${isOn ? 'left-[26px]' : 'left-0.5'}`} />
+            }
+          </button>
+        )}
+        {!isLoading && !isOnline && <WifiOff className="w-4 h-4 text-muted-foreground/30 shrink-0" />}
       </div>
-      {!isLoading && status?.switchOn !== null && isOnline && (
-        <button
-          onClick={toggle}
-          disabled={pending}
-          className={`relative w-12 h-6 rounded-full transition-all duration-300 shrink-0 disabled:opacity-60 ${isOn ? 'bg-green-500' : 'bg-muted'}`}
-        >
-          {pending
-            ? <Loader2 className="absolute inset-0 m-auto w-3.5 h-3.5 animate-spin text-white" />
-            : <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-300 ${isOn ? 'left-[26px]' : 'left-0.5'}`} />
-          }
-        </button>
-      )}
-      {!isLoading && !isOnline && <WifiOff className="w-4 h-4 text-muted-foreground/30 shrink-0" />}
     </div>
   );
 }
@@ -550,11 +718,14 @@ function DeviceToggle({ mapping }: { mapping: DeviceMapping }) {
 // ─── DevicesTab ───────────────────────────────────────────────────────────────
 
 function DevicesTab() {
+  // modal state: null = fechado | 'tent' = escolher estufa | 'device' = escolher dispositivo
+  const [modalStep, setModalStep] = useState<null | 'tent' | 'device'>(null);
   const [addingTentId, setAddingTentId] = useState<number | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [manualDeviceId, setManualDeviceId] = useState('');
   const [manualDeviceName, setManualDeviceName] = useState('');
   const utils = trpc.useUtils();
+
+  const pickerOpen = modalStep === 'device';
 
   const { data: mappings = [], isLoading: mappingsLoading } = trpc.tuya.getDeviceMappings.useQuery();
   const { data: tents = [] } = trpc.tents.list.useQuery();
@@ -571,7 +742,7 @@ function DevicesTab() {
   const pickerDevices = controllableDevices.filter((d: any) => !mappedDeviceIds.has(d.id));
 
   const saveDeviceMappings = trpc.tuya.saveDeviceMappings.useMutation({
-    onSuccess: () => { utils.tuya.getDeviceMappings.invalidate(); setAddingTentId(null); setPickerOpen(false); toast.success('Dispositivo adicionado!'); },
+    onSuccess: () => { utils.tuya.getDeviceMappings.invalidate(); closeModal(); toast.success('Dispositivo adicionado!'); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -588,6 +759,8 @@ function DevicesTab() {
 
   const mappedTentIds = Object.keys(byTent).map(Number);
 
+  const closeModal = () => { setModalStep(null); setAddingTentId(null); setManualDeviceId(''); setManualDeviceName(''); };
+
   const handleAddDevice = (tentId: number, device: { id: string; name: string }) => {
     const existing = (byTent[tentId] ?? []).map((m: DeviceMapping) => ({
       tentId: m.tentId, deviceId: m.deviceId, deviceName: m.deviceName, switchCode: m.switchCode, enabled: m.enabled,
@@ -598,8 +771,6 @@ function DevicesTab() {
   const handleAddManual = () => {
     if (!manualDeviceId.trim() || addingTentId === null) return;
     handleAddDevice(addingTentId, { id: manualDeviceId.trim(), name: manualDeviceName.trim() || `Dispositivo ${manualDeviceId.trim().slice(-6)}` });
-    setManualDeviceId('');
-    setManualDeviceName('');
   };
 
   const handleRemoveDevice = (mapping: DeviceMapping) => {
@@ -627,6 +798,7 @@ function DevicesTab() {
 
   return (
     <div className="space-y-4 pt-2">
+      {/* Lista de dispositivos por estufa */}
       {mappedTentIds.map(tentId => {
         const tent = (tents as any[]).find((t: any) => t.id === tentId);
         const tentDevices = byTent[tentId] ?? [];
@@ -635,30 +807,17 @@ function DevicesTab() {
             <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/30 bg-muted/20">
               <Home className="w-3.5 h-3.5 text-muted-foreground/60" />
               <p className="text-sm font-semibold text-foreground flex-1">{tent?.name ?? `Estufa #${tentId}`}</p>
-              <button
-                onClick={() => { setAddingTentId(tentId); setPickerOpen(true); }}
-                className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5 text-primary" />
-              </button>
             </div>
             <div>
               {tentDevices.map((m: DeviceMapping) => (
-                <div key={m.deviceId} className="relative group">
-                  <DeviceToggle mapping={m} />
-                  <button
-                    onClick={() => handleRemoveDevice(m)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-red-500/10 items-center justify-center hidden group-hover:flex hover:bg-red-500/20 transition-colors"
-                  >
-                    <X className="w-3 h-3 text-red-400" />
-                  </button>
-                </div>
+                <DeviceToggle key={m.deviceId} mapping={m} onRemove={() => handleRemoveDevice(m)} />
               ))}
             </div>
           </div>
         );
       })}
 
+      {/* Empty state */}
       {mappedTentIds.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border/60 bg-card/50 py-12 text-center px-6">
           <Power className="w-10 h-10 mx-auto text-muted-foreground/25 mb-3" />
@@ -667,75 +826,103 @@ function DevicesTab() {
         </div>
       )}
 
-      {/* Adicionar a uma estufa */}
-      {(tents as any[]).length > 0 && (
-        <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 pt-3 pb-2">Adicionar dispositivo</p>
-          <div className="px-4 pb-3 flex flex-wrap gap-2">
-            {(tents as any[]).map((tent: any) => (
-              <button
-                key={tent.id}
-                onClick={() => { setAddingTentId(tent.id); setPickerOpen(true); }}
-                className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {tent.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Botão único de adicionar */}
+      <button
+        onClick={() => setModalStep('tent')}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-primary/30 bg-primary/5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+        Adicionar dispositivo
+      </button>
 
-      {/* Device picker modal */}
-      {pickerOpen && addingTentId !== null && (
+      {/* ── Modal ── */}
+      {modalStep !== null && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)' }}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setPickerOpen(false); setManualDeviceId(''); setManualDeviceName(''); }} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
           <div className="relative bg-card border border-border rounded-2xl w-full max-w-md max-h-[75vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
-              <p className="font-semibold text-foreground">Escolher dispositivo</p>
-              <button onClick={() => { setPickerOpen(false); setManualDeviceId(''); setManualDeviceName(''); }} className="w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1">
-              {devicesLoading ? (
-                <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm">Buscando dispositivos...</span>
-                </div>
-              ) : useManualEntry ? (
-                /* ── Modo manual ── */
-                <div className="px-5 py-5 space-y-4">
-                  <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 p-3.5 space-y-1.5">
-                    <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Inserção manual de Device ID</p>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      A listagem automática não está disponível. Encontre o <strong>Device ID</strong> em{' '}
-                      <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto → aba <strong>Devices</strong>.
-                    </p>
+
+            {/* ── Passo 1: Escolher estufa ── */}
+            {modalStep === 'tent' && (<>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
+                <p className="font-semibold text-foreground">Em qual estufa?</p>
+                <button onClick={closeModal} className="w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-2">
+                {(tents as any[]).map((tent: any) => (
+                  <button key={tent.id}
+                    onClick={() => { setAddingTentId(tent.id); setModalStep('device'); }}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Home className="w-4 h-4 text-primary" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">{tent.name}</p>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/40 ml-auto shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </>)}
+
+            {/* ── Passo 2: Escolher dispositivo ── */}
+            {modalStep === 'device' && addingTentId !== null && (<>
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-border/40">
+                <button onClick={() => setModalStep('tent')} className="w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center">
+                  <ChevronRight className="w-4 h-4 rotate-180" />
+                </button>
+                <p className="font-semibold text-foreground flex-1">
+                  {(tents as any[]).find((t: any) => t.id === addingTentId)?.name ?? 'Estufa'}
+                </p>
+                <button onClick={closeModal} className="w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {devicesLoading ? (
+                  <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Buscando dispositivos...</span>
                   </div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
-                        Device ID <span className="text-muted-foreground/50">(do portal iot.tuya.com)</span>
-                      </p>
-                      <input
-                        type="text"
-                        value={manualDeviceId}
-                        onChange={e => setManualDeviceId(e.target.value.trim())}
-                        placeholder="ex: eb8168f5771604de9ccjsi"
-                        className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
-                      />
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Nome do dispositivo</p>
-                      <input
-                        type="text"
-                        value={manualDeviceName}
-                        onChange={e => setManualDeviceName(e.target.value)}
-                        placeholder="ex: Tomada Ventilador"
-                        className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
-                      />
-                    </div>
+                ) : !useManualEntry && pickerDevices.length > 0 ? (
+                  /* Lista automática */
+                  pickerDevices.map((device: any) => (
+                    <button key={device.id}
+                      onClick={() => handleAddDevice(addingTentId, device)}
+                      disabled={saveDeviceMappings.isPending}
+                      className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-colors border-b border-border/20 last:border-0 text-left"
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${device.online ? 'bg-green-400' : 'bg-muted-foreground/30'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{device.name}</p>
+                        <p className="text-[11px] text-muted-foreground/60">{device.online ? 'Online' : 'Offline'}</p>
+                      </div>
+                      {saveDeviceMappings.isPending
+                        ? <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                        : <Plus className="w-4 h-4 text-primary shrink-0" />}
+                    </button>
+                  ))
+                ) : (
+                  /* Entrada manual */
+                  <div className="px-5 py-5 space-y-3">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Cole o <strong>Device ID</strong> do portal{' '}
+                      <span className="font-mono text-foreground">iot.tuya.com</span> → Devices → All Devices.
+                    </p>
+                    <input
+                      type="text"
+                      value={manualDeviceId}
+                      onChange={e => setManualDeviceId(e.target.value.trim())}
+                      placeholder="ex: eb8168f5771604de9ccjsi"
+                      className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
+                    />
+                    <input
+                      type="text"
+                      value={manualDeviceName}
+                      onChange={e => setManualDeviceName(e.target.value)}
+                      placeholder="Nome do dispositivo (ex: Tomada Ventilador)"
+                      className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
+                    />
                     <Button
                       className="w-full bg-emerald-600 hover:bg-emerald-700"
                       disabled={!manualDeviceId.trim() || saveDeviceMappings.isPending}
@@ -743,31 +930,13 @@ function DevicesTab() {
                     >
                       {saveDeviceMappings.isPending
                         ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Adicionando...</>
-                        : <><Check className="w-4 h-4 mr-2" /> Adicionar dispositivo</>}
+                        : <><Check className="w-4 h-4 mr-2" /> Adicionar</>}
                     </Button>
                   </div>
-                </div>
-              ) : pickerDevices.length === 0 ? (
-                <div className="py-10 text-center px-6">
-                  <p className="text-sm text-muted-foreground">Todos os dispositivos já foram mapeados</p>
-                </div>
-              ) : (
-                pickerDevices.map((device: any) => (
-                  <button key={device.id}
-                    onClick={() => handleAddDevice(addingTentId, device)}
-                    disabled={saveDeviceMappings.isPending}
-                    className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-colors border-b border-border/20 last:border-0 text-left"
-                  >
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${device.online ? 'bg-green-400' : 'bg-muted-foreground/30'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{device.name}</p>
-                      <p className="text-[11px] text-muted-foreground/60">{device.category} · {device.online ? 'Online' : 'Offline'}</p>
-                    </div>
-                    <Plus className="w-4 h-4 text-primary shrink-0" />
-                  </button>
-                ))
-              )}
-            </div>
+                )}
+              </div>
+            </>)}
+
           </div>
         </div>
       )}
@@ -776,6 +945,72 @@ function DevicesTab() {
 }
 
 // ─── ScenesTab ────────────────────────────────────────────────────────────────
+
+function AutomationCard({ automation }: { automation: { sceneId: string; name: string } }) {
+  const [expanded, setExpanded] = useState(false);
+  const { data: details, isLoading } = trpc.tuya.getAutomationDetails.useQuery(
+    { ruleId: automation.sceneId },
+    { enabled: expanded, staleTime: 300_000 }
+  );
+
+  // Parse timer conditions
+  const schedules = (details?.conditions ?? [])
+    .filter((c: any) => c.entity_type === 'timer' || c.expr?.time)
+    .map((c: any) => {
+      const time = c.expr?.time ?? c.time ?? '';
+      const loops = c.expr?.loops ?? '1111111';
+      const dayLabels = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+      const days = loops === '1111111' || loops === ''
+        ? 'Todos os dias'
+        : loops.split('').map((v: string, i: number) => v === '1' ? dayLabels[i] : null).filter(Boolean).join(', ');
+      return { time, days };
+    });
+
+  return (
+    <div className="border-b border-border/20 last:border-0">
+      <button
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 transition-colors"
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+          <Clock className="w-4 h-4 text-blue-500" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{automation.name}</p>
+          {!expanded && schedules.length > 0 && (
+            <p className="text-[11px] text-muted-foreground truncate">
+              {schedules.map(s => s.time).join(' · ')}
+            </p>
+          )}
+        </div>
+        {isLoading && expanded
+          ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+          : expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground/40 shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
+      </button>
+
+      {expanded && details && (
+        <div className="px-4 pb-4 space-y-2 bg-muted/20">
+          {schedules.length > 0 ? (
+            <>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide pt-1">Horários</p>
+              <div className="space-y-1.5">
+                {schedules.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span className="text-sm font-mono font-semibold text-foreground">{s.time}</span>
+                    <span className="text-xs text-muted-foreground">— {s.days}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground py-1">Sem horários configurados (gatilho por sensor ou outro)</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
   const [homeId, setHomeId] = useState('');
@@ -792,18 +1027,25 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
       <div className="px-4 py-3 border-b border-border/40 bg-muted/20">
         <p className="text-sm font-semibold text-foreground">Adicionar cena manualmente</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">
-          No portal iot.tuya.com → seu projeto → API Explorer → busque homes/scenes
+          Você precisa apenas do <strong>Scene ID</strong>. O Home ID é opcional.
         </p>
       </div>
       <div className="px-4 py-4 space-y-3">
-        <div>
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Home ID</p>
-          <input type="text" value={homeId} onChange={e => setHomeId(e.target.value.trim())}
-            placeholder="ex: 123456789"
-            className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
+        {/* Como encontrar o Scene ID */}
+        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 p-3 space-y-1.5">
+          <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">Como encontrar o Scene ID</p>
+          <ol className="text-[11px] text-muted-foreground space-y-0.5 list-decimal list-inside leading-relaxed">
+            <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto</li>
+            <li>Menu lateral → <strong>API Explorer</strong></li>
+            <li>Busque <span className="font-mono">Get Scene List</span> ou <span className="font-mono">scenes</span></li>
+            <li>Execute → copie o campo <span className="font-mono">scene_id</span> de cada cena</li>
+          </ol>
         </div>
+
         <div>
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Scene ID</p>
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+            Scene ID <span className="text-red-400">*</span>
+          </p>
           <input type="text" value={sceneId} onChange={e => setSceneId(e.target.value.trim())}
             placeholder="ex: dYNQ1695123456789abc"
             className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
@@ -814,9 +1056,17 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
             placeholder="ex: Ligar tudo"
             className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
         </div>
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+            Home ID <span className="font-normal text-muted-foreground/50">(opcional)</span>
+          </p>
+          <input type="text" value={homeId} onChange={e => setHomeId(e.target.value.trim())}
+            placeholder="ex: 123456789  (deixe em branco se não souber)"
+            className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
+        </div>
         <Button className="w-full bg-emerald-600 hover:bg-emerald-700"
-          disabled={!homeId || !sceneId || !name || save.isPending}
-          onClick={() => save.mutate({ homeId, sceneId, name })}
+          disabled={!sceneId || !name || save.isPending}
+          onClick={() => save.mutate({ homeId: homeId || undefined, sceneId, name })}
         >
           {save.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Salvando...</> : <><Check className="w-4 h-4 mr-2" />Salvar cena</>}
         </Button>
@@ -896,7 +1146,7 @@ function ScenesTab() {
               <X className="w-3 h-3 text-red-400" />
             </button>
             <button
-              onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId }); }}
+              onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
               disabled={!!triggeringId}
               className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
             >
@@ -960,16 +1210,22 @@ function ScenesTab() {
     );
   }
 
-  const grouped = (scenes as any[]).reduce<Record<string, any[]>>((acc, s) => {
-    if (!acc[s.homeName]) acc[s.homeName] = [];
-    acc[s.homeName].push(s);
-    return acc;
-  }, {});
+  const tapToRunGrouped = (scenes as any[])
+    .filter(s => s.homeName !== 'Automações')
+    .reduce<Record<string, any[]>>((acc, s) => {
+      if (!acc[s.homeName]) acc[s.homeName] = [];
+      acc[s.homeName].push(s);
+      return acc;
+    }, {});
+
+  const automationList = (scenes as any[]).filter(s => s.homeName === 'Automações');
 
   return (
     <div className="space-y-3 pt-2">
       {manualScenesBlock}
-      {Object.entries(grouped).map(([homeName, homeScenes]) => {
+
+      {/* Tap-to-run scenes */}
+      {Object.entries(tapToRunGrouped).map(([homeName, homeScenes]) => {
         const isOpen = expandedHomes.has(homeName);
         return (
           <div key={homeName} className="rounded-2xl border border-border/50 bg-card overflow-hidden">
@@ -993,7 +1249,7 @@ function ScenesTab() {
                       </div>
                       <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
                       <button
-                        onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId }); }}
+                        onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
                         disabled={!!triggeringId}
                         className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 shrink-0"
                       >
@@ -1008,6 +1264,28 @@ function ScenesTab() {
           </div>
         );
       })}
+
+      {/* Automations */}
+      {automationList.length > 0 && (
+        <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+          <button
+            className="w-full flex items-center gap-2.5 px-4 py-3 border-b border-border/30 bg-muted/20 hover:bg-muted/30 transition-colors text-left"
+            onClick={() => toggleHome('Automações')}
+          >
+            <Clock className="w-3.5 h-3.5 text-blue-400/70" />
+            <p className="text-sm font-semibold text-foreground flex-1">Automações</p>
+            <span className="text-xs text-muted-foreground/50">{automationList.length} regra{automationList.length !== 1 ? 's' : ''}</span>
+            {expandedHomes.has('Automações') ? <ChevronUp className="w-4 h-4 text-muted-foreground/40" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40" />}
+          </button>
+          {expandedHomes.has('Automações') && (
+            <div>
+              {automationList.map((automation: any) => (
+                <AutomationCard key={automation.sceneId} automation={automation} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
