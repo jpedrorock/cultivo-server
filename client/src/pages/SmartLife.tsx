@@ -1085,10 +1085,21 @@ function formatSchedules(raw: { time: string; loops: string }[]) {
 }
 
 function parseSchedules(conditions: any[]) {
-  const raw = conditions
-    .filter((c: any) => c.entity_type === 'timer' || c.type === 'timer' || c.expr?.time || c.time)
-    .map((c: any) => ({ time: c.expr?.time ?? c.time ?? '', loops: c.expr?.loops ?? c.loops ?? '1111111' }))
-    .filter(s => s.time);
+  const raw: { time: string; loops: string }[] = [];
+  for (const c of conditions) {
+    // Smart Home format: entity_type=6 (timer), horário em display.time
+    if (c.entity_type === 6 || c.entity_type === '6' || c.entity_id === 'timer') {
+      const time = c.display?.time ?? c.display?.start_time ?? c.expr?.time ?? c.time ?? '';
+      const loops = c.display?.loops ?? c.expr?.loops ?? c.loops ?? '1111111';
+      if (time) { raw.push({ time, loops }); continue; }
+    }
+    // IoT Core format: entity_type="timer", horário em expr.time
+    if (c.entity_type === 'timer' || c.type === 'timer' || c.expr?.time) {
+      const time = c.expr?.time ?? c.time ?? '';
+      const loops = c.expr?.loops ?? c.loops ?? '1111111';
+      if (time) raw.push({ time, loops });
+    }
+  }
   return formatSchedules(raw);
 }
 
