@@ -93,10 +93,11 @@ static const lv_image_dsc_t *NAV_ICONS_IMG[5] = {
 };
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
-static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
+static lv_obj_t *lblTemp, *lblRh, *lblVpd, *lblPpfd;
+static lv_obj_t *lblCiclo, *ciclBar;       // strip de ciclo (fase + semana)
 static lv_obj_t *arcTemp;
-static lv_obj_t *sparkRh, *sparkPh, *sparkEc;
-static lv_chart_series_t *serRhS, *serPhS, *serEcS;
+static lv_obj_t *sparkRh, *sparkVpd, *sparkPpfd;
+static lv_chart_series_t *serRhS, *serVpdS, *serPpfdS;
 static lv_timer_t *pulseTimer = nullptr;
 static lv_timer_t *mockTimer  = nullptr;
 
@@ -236,9 +237,12 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_14, 0);
   lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(36), sh(6));
 
-  // Corpo: arc grande a esquerda + coluna de mini-cards a direita
+  // Corpo: arc grande a esquerda + coluna de mini-cards a direita.
+  // Reservamos stripH + gap no rodape pro strip de ciclo (fase/semana).
+  int stripH = sh(26);
+  int stripGap = sh(4);
   int bodyY = sh(42);
-  int bodyH = TAB_H - bodyY - sh(4);
+  int bodyH = TAB_H - bodyY - stripH - stripGap - sh(4);
   int halfW = SCREEN_W / 2;
 
   int arcSize = (bodyH < halfW - sw(8)) ? bodyH : halfW - sw(8);
@@ -341,18 +345,67 @@ static void buildHome(lv_obj_t *tab) {
     return v;
   };
 
-  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,   &sparkRh, &serRhS,    0);
-  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker,    &sparkPh, &serPhS,  933);
-  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube, &sparkEc, &serEcS, 1866);
+  lblRh   = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,    &sparkRh,   &serRhS,     0);
+  lblVpd  = makeMiniCard(cardH + cardGap,       "VPD",     "--", COL_RED, &ic_droplets,   &sparkVpd,  &serVpdS,  933);
+  lblPpfd = makeMiniCard((cardH + cardGap) * 2, "PPFD",    "--", COL_YEL, &ic_lightbulb,  &sparkPpfd, &serPpfdS,1866);
 
-  lv_chart_set_range(sparkRh, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
-  lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);
-  lv_chart_set_range(sparkEc, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
+  lv_chart_set_range(sparkRh,   LV_CHART_AXIS_PRIMARY_Y, 0, 100);
+  lv_chart_set_range(sparkVpd,  LV_CHART_AXIS_PRIMARY_Y, 0, 30);     // VPD * 10 (0-3.0 kPa)
+  lv_chart_set_range(sparkPpfd, LV_CHART_AXIS_PRIMARY_Y, 0, 1500);
   for (int i = 0; i < 20; i++) {
-    lv_chart_set_next_value(sparkRh, serRhS, (int32_t)rh);
-    lv_chart_set_next_value(sparkPh, serPhS, (int32_t)(phv * 10));
-    lv_chart_set_next_value(sparkEc, serEcS, (int32_t)(ecv * 10));
+    lv_chart_set_next_value(sparkRh,   serRhS,   (int32_t)rh);
+    lv_chart_set_next_value(sparkVpd,  serVpdS,  (int32_t)(vpd * 10));
+    lv_chart_set_next_value(sparkPpfd, serPpfdS, (int32_t)currentPpfd);
   }
+
+  // ═══ Strip de ciclo (fase + semana + barra) no rodape ═══
+  int stripY = bodyY + bodyH + stripGap;
+  lv_obj_t *strip = makeCard(tab, sw(4), stripY, SCREEN_W - sw(8), stripH);
+  lv_obj_set_style_pad_hor(strip, sw(8), 0);
+  lv_obj_set_style_pad_ver(strip, 0, 0);
+  lv_obj_clear_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Pill colorida com FASE (ex: VEGA / FLORACAO)
+  lv_obj_t *phasePill = lv_obj_create(strip);
+  lv_obj_set_size(phasePill, sw(48), sh(16));
+  lv_obj_align(phasePill, LV_ALIGN_LEFT_MID, 0, 0);
+  lv_obj_set_style_bg_color(phasePill, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_bg_opa(phasePill, LV_OPA_30, 0);
+  lv_obj_set_style_border_color(phasePill, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_border_width(phasePill, 1, 0);
+  lv_obj_set_style_radius(phasePill, sh(8), 0);
+  lv_obj_set_style_pad_all(phasePill, 0, 0);
+  lv_obj_clear_flag(phasePill, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *phaseLbl = lv_label_create(phasePill);
+  lv_label_set_text(phaseLbl, FASE);
+  lv_obj_set_style_text_color(phaseLbl, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_text_font(phaseLbl, FONT_CAPTION, 0);
+  lv_obj_center(phaseLbl);
+
+  // "Sem 12 / ~16"
+  char ciclBuf[32];
+  snprintf(ciclBuf, sizeof(ciclBuf), "Sem %d / ~%d", semana, totalSem);
+  lblCiclo = makeLabel(strip, ciclBuf, COL_TEXT, FONT_BODY,
+                       LV_ALIGN_LEFT_MID, sw(56), 0);
+
+  // "~N restantes" a direita
+  char restBuf[24];
+  int rest = (totalSem > semana) ? (totalSem - semana) : 0;
+  snprintf(restBuf, sizeof(restBuf), "~%d restantes", rest);
+  makeLabel(strip, restBuf, COL_DIM, FONT_CAPTION,
+            LV_ALIGN_RIGHT_MID, 0, 0);
+
+  // Barra de progresso do ciclo — linha fina alinhada no rodape do strip
+  ciclBar = lv_bar_create(strip);
+  lv_obj_set_size(ciclBar, SCREEN_W - sw(24), sh(3));
+  lv_obj_align(ciclBar, LV_ALIGN_BOTTOM_MID, 0, -sh(2));
+  lv_bar_set_range(ciclBar, 0, totalSem > 0 ? totalSem : 1);
+  lv_bar_set_value(ciclBar, semana, LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_bg_opa(ciclBar, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(ciclBar, sh(2), 0);
+  lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(ciclBar, sh(2), LV_PART_INDICATOR);
 }
 
 static void refreshHomeValues() {
@@ -366,11 +419,17 @@ static void refreshHomeValues() {
   lv_label_set_text(lblRh, buf);
   lv_obj_set_style_text_color(lblRh, lv_color_hex(cRH(rh)), 0);
 
-  snprintf(buf, sizeof(buf), "%.1f", phv);
-  lv_label_set_text(lblPh, buf);
+  // VPD calculado via Tetens (0.6108 * e^(17.27T/(T+237.3)) * (1-RH/100)).
+  // Mantem paridade com a conta do web app; alimenta o mock timer.
+  if (lblVpd) {
+    snprintf(buf, sizeof(buf), "%.2f", vpd);
+    lv_label_set_text(lblVpd, buf);
+  }
 
-  snprintf(buf, sizeof(buf), "%.1f", ecv);
-  lv_label_set_text(lblEc, buf);
+  if (lblPpfd) {
+    snprintf(buf, sizeof(buf), "%d", currentPpfd);
+    lv_label_set_text(lblPpfd, buf);
+  }
 }
 
 // Timer de pulso: anima sparklines + arc pra simular monitor ao vivo
@@ -384,11 +443,11 @@ static void pulseTimerCb(lv_timer_t *t) {
   if (sparkRh && serRhS) {
     lv_chart_set_next_value(sparkRh, serRhS, (int32_t)(rh + wave * 1.5f + jitter));
   }
-  if (sparkPh && serPhS) {
-    lv_chart_set_next_value(sparkPh, serPhS, (int32_t)((phv + wave * 0.05f) * 10));
+  if (sparkVpd && serVpdS) {
+    lv_chart_set_next_value(sparkVpd, serVpdS, (int32_t)((vpd + wave * 0.03f) * 10));
   }
-  if (sparkEc && serEcS) {
-    lv_chart_set_next_value(sparkEc, serEcS, (int32_t)((ecv + wave * 0.03f) * 10));
+  if (sparkPpfd && serPpfdS) {
+    lv_chart_set_next_value(sparkPpfd, serPpfdS, (int32_t)(currentPpfd + wave * 12));
   }
 }
 
@@ -974,7 +1033,15 @@ static void mockTimerCb(lv_timer_t *t) {
   rh    = 62.0f + w2 * 6.0f;
   phv   = 6.2f  + w3 * 0.3f;
   ecv   = 1.8f  + w1 * 0.2f;
-  vpd   = 1.1f  + w2 * 0.15f;
+
+  // VPD via Tetens — SVP(kPa) = 0.6108 * e^(17.27*T/(T+237.3))
+  // VPD = SVP * (1 - RH/100). Mesma formula do app web.
+  float svp = 0.6108f * expf(17.27f * tempC / (tempC + 237.3f));
+  vpd = svp * (1.0f - rh / 100.0f);
+
+  // PPFD atual oscilando em torno do target (simula dimming/flutuacao)
+  currentPpfd = targetPpfd + (int)(w3 * 25.0f);
+  if (currentPpfd < 0) currentPpfd = 0;
 
   if (activeScreen == 0) refreshHomeValues();
 }
