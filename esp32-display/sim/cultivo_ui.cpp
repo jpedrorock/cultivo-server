@@ -29,7 +29,7 @@
 // ════════════════════════════════════════════════════════════════════════════════
 static const int SCREEN_W = 480;
 static const int SCREEN_H = 320;
-static const int TABBAR_H = 44;
+static const int TABBAR_H = 54;
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
 #define FONT_VALUE   (&manrope_bold_40)
@@ -240,6 +240,10 @@ static void buildHome(lv_obj_t *tab) {
   lv_arc_set_rotation(arcTemp, 0);
   lv_obj_remove_style(arcTemp, NULL, LV_PART_KNOB);
   lv_obj_clear_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
+  // Remove o fundo retangular e borda padrao do lv_arc — queremos so o anel
+  lv_obj_set_style_bg_opa(arcTemp, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(arcTemp, 0, 0);
+  lv_obj_set_style_pad_all(arcTemp, 0, 0);
   lv_obj_set_style_arc_width(arcTemp, sw(8),  LV_PART_MAIN);
   lv_obj_set_style_arc_color(arcTemp, lv_color_hex(0x1F2937), LV_PART_MAIN);
   lv_obj_set_style_arc_opa(arcTemp, LV_OPA_80, LV_PART_MAIN);
@@ -498,42 +502,293 @@ static void buildLux(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Stubs das telas restantes (pH/EC, Tarefas, Grafico) — placeholder pra ter
-// algo renderizavel e navegacao funcional. Portavel conforme evoluir.
+// Tela pH/EC — 2 cards com valor + botoes -/+ + SALVAR
 // ════════════════════════════════════════════════════════════════════════════════
-static void buildPlaceholder(lv_obj_t *tab, const char *titulo,
-                              const lv_image_dsc_t *icon, uint32_t color,
-                              const char *descricao) {
+static lv_obj_t *lblPhVal, *lblEcVal;
+
+static void refreshPhEcDisplay() {
+  char buf[16];
+  if (lblPhVal) { snprintf(buf, sizeof(buf), "%.1f", phv); lv_label_set_text(lblPhVal, buf); }
+  if (lblEcVal) { snprintf(buf, sizeof(buf), "%.1f", ecv); lv_label_set_text(lblEcVal, buf); }
+}
+
+static void phStepCb(lv_event_t *e) {
+  int dir = (int)(intptr_t)lv_event_get_user_data(e);
+  phv += dir * 0.1f;
+  if (phv < 0)  phv = 0;
+  if (phv > 14) phv = 14;
+  refreshPhEcDisplay();
+}
+
+static void ecStepCb(lv_event_t *e) {
+  int dir = (int)(intptr_t)lv_event_get_user_data(e);
+  ecv += dir * 0.1f;
+  if (ecv < 0) ecv = 0;
+  if (ecv > 5) ecv = 5;
+  refreshPhEcDisplay();
+}
+
+static void buildPhEc(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  lv_obj_t *ico = lv_image_create(tab);
-  lv_image_set_src(ico, icon);
-  lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
-  lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-  lv_obj_align(ico, LV_ALIGN_CENTER, 0, -sh(40));
+  lv_obj_t *hdrIcon = lv_image_create(tab);
+  lv_image_set_src(hdrIcon, &ic_flask);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRP), 0);
+  lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
+  makeLabel(tab, "pH / EC", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
 
-  makeLabel(tab, titulo, color, FONT_TITLE, LV_ALIGN_CENTER, 0, -sh(5));
-  makeLabel(tab, descricao, COL_DIM, FONT_CAPTION, LV_ALIGN_CENTER, 0, sh(20));
-  makeLabel(tab, "(stub do simulador)", COL_DIM, FONT_CAPTION,
-            LV_ALIGN_CENTER, 0, sh(42));
+  int cardGap = sw(8);
+  int cardW = (SCREEN_W - cardGap * 3) / 2;
+  int cardY = sh(38);
+  int cardH = TAB_H - cardY - sh(40);  // deixa espaco pro SALVAR
+
+  auto makeValueCard = [&](int x, const char *label, uint32_t color,
+                           const lv_image_dsc_t *icon, lv_obj_t **out,
+                           lv_event_cb_t cbFn) {
+    lv_obj_t *c = makeCard(tab, x, cardY, cardW, cardH);
+    applyRingPulse(c, color);
+
+    lv_obj_t *ico = lv_image_create(c);
+    lv_image_set_src(ico, icon);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    makeLabel(c, label, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t *v = lv_label_create(c);
+    lv_label_set_text(v, "0.0");
+    lv_obj_set_style_text_font(v, FONT_VALUE, 0);
+    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
+    lv_obj_align(v, LV_ALIGN_CENTER, 0, -sh(4));
+    applyBloom(v, color);
+    *out = v;
+
+    int btnSize = sh(30);
+    lv_obj_t *btnMinus = lv_btn_create(c);
+    lv_obj_set_size(btnMinus, btnSize, btnSize);
+    lv_obj_align(btnMinus, LV_ALIGN_BOTTOM_LEFT, sw(4), -sh(4));
+    lv_obj_set_style_radius(btnMinus, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(btnMinus, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(btnMinus, lv_color_hex(COL_RED), 0);
+    lv_obj_set_style_border_width(btnMinus, 2, 0);
+    lv_obj_add_event_cb(btnMinus, cbFn, LV_EVENT_CLICKED, (void*)(intptr_t)(-1));
+    lv_obj_add_event_cb(btnMinus, cbFn, LV_EVENT_LONG_PRESSED_REPEAT, (void*)(intptr_t)(-1));
+    makeLabel(btnMinus, "-", COL_RED, FONT_TITLE, LV_ALIGN_CENTER, 0, -sh(2));
+
+    lv_obj_t *btnPlus = lv_btn_create(c);
+    lv_obj_set_size(btnPlus, btnSize, btnSize);
+    lv_obj_align(btnPlus, LV_ALIGN_BOTTOM_RIGHT, -sw(4), -sh(4));
+    lv_obj_set_style_radius(btnPlus, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(btnPlus, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(btnPlus, lv_color_hex(COL_GRN), 0);
+    lv_obj_set_style_border_width(btnPlus, 2, 0);
+    lv_obj_add_event_cb(btnPlus, cbFn, LV_EVENT_CLICKED, (void*)(intptr_t)(+1));
+    lv_obj_add_event_cb(btnPlus, cbFn, LV_EVENT_LONG_PRESSED_REPEAT, (void*)(intptr_t)(+1));
+    makeLabel(btnPlus, "+", COL_GRN, FONT_TITLE, LV_ALIGN_CENTER, 0, -sh(2));
+  };
+
+  makeValueCard(cardGap, "pH", COL_GRN, &ic_beaker, &lblPhVal, phStepCb);
+  makeValueCard(cardGap * 2 + cardW, "EC", COL_PRP, &ic_test_tube, &lblEcVal, ecStepCb);
+
+  lv_obj_t *btnSave = lv_btn_create(tab);
+  lv_obj_set_size(btnSave, sw(140), sh(26));
+  lv_obj_align(btnSave, LV_ALIGN_BOTTOM_MID, 0, -sh(6));
+  lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_GRN), 0);
+  applyBloom(btnSave, COL_GRN);
+  lv_obj_add_event_cb(btnSave, [](lv_event_t *e) {
+    (void)e;
+    printf("[sim] pH/EC salvo: pH=%.1f EC=%.1f\n", phv, ecv);
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnSave, "SALVAR", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+
+  refreshPhEcDisplay();
 }
 
-static void buildPhEc(lv_obj_t *tab) {
-  buildPlaceholder(tab, "pH / EC", &ic_flask, COL_PRP,
-                   "Entrada manual pelo teclado numerico");
+// ════════════════════════════════════════════════════════════════════════════════
+// Tela Tarefas — lista com checkbox + texto, mockada
+// ════════════════════════════════════════════════════════════════════════════════
+struct SimTarefa { const char *texto; bool feito; };
+static SimTarefa simTarefas[] = {
+  {"Regar plantas da area 1",     true},
+  {"Trocar solucao nutriente",    false},
+  {"Verificar pH da reserva",     true},
+  {"Podar folhas baixas",         false},
+  {"Calibrar sensor de EC",       false},
+  {"Checar temperatura noturna",  true},
+};
+
+static void tarefaToggleCb(lv_event_t *e) {
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  simTarefas[idx].feito = !simTarefas[idx].feito;
+  lv_obj_t *row = (lv_obj_t*)lv_event_get_target(e);
+  lv_obj_t *chk = lv_obj_get_child(row, 0);
+  lv_obj_t *txt = lv_obj_get_child(row, 1);
+  lv_label_set_text(chk, simTarefas[idx].feito ? LV_SYMBOL_OK : LV_SYMBOL_MINUS);
+  lv_obj_set_style_text_color(chk,
+    lv_color_hex(simTarefas[idx].feito ? COL_GRN : COL_DIM), 0);
+  lv_obj_set_style_text_color(txt,
+    lv_color_hex(simTarefas[idx].feito ? COL_DIM : COL_TEXT), 0);
 }
 
 static void buildTarefas(lv_obj_t *tab) {
-  buildPlaceholder(tab, "Tarefas", &ic_tasks, COL_YEL,
-                   "Lista de tarefas do ciclo");
+  lv_obj_set_style_pad_all(tab, 0, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
+
+  lv_obj_t *hdrIcon = lv_image_create(tab);
+  lv_image_set_src(hdrIcon, &ic_tasks);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_YEL), 0);
+  lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
+  makeLabel(tab, "TAREFAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
+
+  // Contador de tarefas no header direito
+  int feitas = 0;
+  int total = sizeof(simTarefas) / sizeof(simTarefas[0]);
+  for (int i = 0; i < total; i++) if (simTarefas[i].feito) feitas++;
+  char cntBuf[16];
+  snprintf(cntBuf, sizeof(cntBuf), "%d / %d", feitas, total);
+  makeLabel(tab, cntBuf, COL_YEL, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(6));
+
+  lv_obj_t *list = lv_obj_create(tab);
+  lv_obj_set_size(list, SCREEN_W - sw(8), TAB_H - sh(36));
+  lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(30));
+  lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(list, 0, 0);
+  lv_obj_set_style_pad_all(list, sw(2), 0);
+  lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(list, sh(4), 0);
+
+  for (int i = 0; i < total; i++) {
+    lv_obj_t *row = lv_obj_create(list);
+    lv_obj_set_width(row, lv_pct(100));
+    lv_obj_set_height(row, sh(28));
+    lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(row, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(row, 1, 0);
+    lv_obj_set_style_radius(row, 6, 0);
+    lv_obj_set_style_pad_all(row, sw(6), 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(row, tarefaToggleCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+
+    lv_obj_t *chk = lv_label_create(row);
+    lv_label_set_text(chk, simTarefas[i].feito ? LV_SYMBOL_OK : LV_SYMBOL_MINUS);
+    lv_obj_set_style_text_color(chk,
+      lv_color_hex(simTarefas[i].feito ? COL_GRN : COL_DIM), 0);
+    lv_obj_set_style_text_font(chk, &lv_font_montserrat_14, 0);
+    lv_obj_align(chk, LV_ALIGN_LEFT_MID, 0, 0);
+
+    lv_obj_t *txt = lv_label_create(row);
+    lv_label_set_text(txt, simTarefas[i].texto);
+    lv_obj_set_style_text_color(txt,
+      lv_color_hex(simTarefas[i].feito ? COL_DIM : COL_TEXT), 0);
+    lv_obj_set_style_text_font(txt, FONT_BODY, 0);
+    lv_obj_align(txt, LV_ALIGN_LEFT_MID, sw(22), 0);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Tela Historico — chart + botoes de metrica (temp/rh/ph/ec) e periodo
+// ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t *histChart = nullptr;
+static lv_chart_series_t *histSer = nullptr;
+static int histMetric = 0;  // 0=temp, 1=rh, 2=ph, 3=ec
+
+static const struct {
+  const char *name;
+  uint32_t color;
+  int ymin, ymax;
+  float base, amp;
+} HIST_METRICS[4] = {
+  {"TEMP", COL_GRN, 15, 32,  24.0f, 3.0f},
+  {"UMID", COL_CYN, 40, 85,  62.0f, 8.0f},
+  {"pH",   COL_GRN, 40, 90,  62.0f, 5.0f},   // pH * 10
+  {"EC",   COL_PRP,  0, 40,  18.0f, 4.0f},   // EC * 10
+};
+
+static void applyHistData() {
+  if (!histChart || !histSer) return;
+  auto &m = HIST_METRICS[histMetric];
+  lv_chart_set_range(histChart, LV_CHART_AXIS_PRIMARY_Y, m.ymin, m.ymax);
+  lv_obj_set_style_line_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_INDICATOR);
+  for (int i = 0; i < 24; i++) {
+    float v = m.base + sinf(i * 0.35f + histMetric) * m.amp
+              + ((rand() % 100) - 50) / 100.0f * m.amp * 0.3f;
+    lv_chart_set_next_value(histChart, histSer, (int32_t)v);
+  }
+}
+
+static lv_obj_t *histMetricBtns[4] = {nullptr};
+
+static void histMetricCb(lv_event_t *e) {
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  histMetric = idx;
+  for (int i = 0; i < 4; i++) {
+    lv_obj_set_style_bg_color(histMetricBtns[i],
+      lv_color_hex(i == idx ? HIST_METRICS[i].color : COL_CARD), 0);
+  }
+  applyHistData();
 }
 
 static void buildHistorico(lv_obj_t *tab) {
-  buildPlaceholder(tab, "Historico", &ic_activity, COL_CYN,
-                   "Graficos de 24h / 7d / 30d");
+  lv_obj_set_style_pad_all(tab, 0, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
+
+  lv_obj_t *hdrIcon = lv_image_create(tab);
+  lv_image_set_src(hdrIcon, &ic_activity);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
+  makeLabel(tab, "HISTORICO", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
+  makeLabel(tab, "ultimas 24h", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+
+  // Chart
+  int btnAreaH = sh(28);
+  histChart = lv_chart_create(tab);
+  lv_obj_set_size(histChart, SCREEN_W - sw(16), TAB_H - sh(36) - btnAreaH);
+  lv_obj_align(histChart, LV_ALIGN_TOP_MID, 0, sh(30));
+  lv_chart_set_type(histChart, LV_CHART_TYPE_LINE);
+  lv_chart_set_point_count(histChart, 24);
+  lv_chart_set_div_line_count(histChart, 3, 5);
+  lv_obj_set_style_bg_color(histChart, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(histChart, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(histChart, 1, 0);
+  lv_obj_set_style_radius(histChart, 8, 0);
+  lv_obj_set_style_line_color(histChart, lv_color_hex(COL_BORDER), LV_PART_MAIN);
+  lv_obj_set_style_line_width(histChart, sw(2), LV_PART_ITEMS);
+  lv_obj_set_style_width(histChart,  0, LV_PART_INDICATOR);
+  lv_obj_set_style_height(histChart, 0, LV_PART_INDICATOR);
+  lv_obj_set_style_pad_all(histChart, sw(6), 0);
+  histSer = lv_chart_add_series(histChart, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
+
+  // Botoes de metrica (bottom)
+  int btnW = (SCREEN_W - sw(16) - sw(6) * 3) / 4;
+  for (int i = 0; i < 4; i++) {
+    lv_obj_t *btn = lv_btn_create(tab);
+    lv_obj_set_size(btn, btnW, sh(22));
+    lv_obj_align(btn, LV_ALIGN_BOTTOM_LEFT,
+                 sw(8) + i * (btnW + sw(6)), -sh(3));
+    lv_obj_set_style_bg_color(btn,
+      lv_color_hex(i == 0 ? HIST_METRICS[i].color : COL_CARD), 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(HIST_METRICS[i].color), 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_add_event_cb(btn, histMetricCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    makeLabel(btn, HIST_METRICS[i].name, COL_TEXT, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+    histMetricBtns[i] = btn;
+  }
+
+  applyHistData();
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
