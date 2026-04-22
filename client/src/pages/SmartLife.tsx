@@ -531,6 +531,8 @@ function DeviceToggle({ mapping }: { mapping: DeviceMapping }) {
 function DevicesTab() {
   const [addingTentId, setAddingTentId] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [manualDeviceId, setManualDeviceId] = useState('');
+  const [manualDeviceName, setManualDeviceName] = useState('');
   const utils = trpc.useUtils();
 
   const { data: mappings = [], isLoading: mappingsLoading } = trpc.tuya.getDeviceMappings.useQuery();
@@ -539,6 +541,8 @@ function DevicesTab() {
   const { data: allDevices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
     undefined, { enabled: !!config && pickerOpen, retry: false, staleTime: 60_000 }
   );
+
+  const useManualEntry = !devicesLoading && allDevices.length === 0;
 
   const SENSOR_CATS = ['wsdcg', 'mcs', 'zdkj', 'wnykq', 'hjjcy'];
   const mappedDeviceIds = new Set(mappings.map((m: DeviceMapping) => m.deviceId));
@@ -563,11 +567,18 @@ function DevicesTab() {
 
   const mappedTentIds = Object.keys(byTent).map(Number);
 
-  const handleAddDevice = (tentId: number, device: any) => {
+  const handleAddDevice = (tentId: number, device: { id: string; name: string }) => {
     const existing = (byTent[tentId] ?? []).map((m: DeviceMapping) => ({
       tentId: m.tentId, deviceId: m.deviceId, deviceName: m.deviceName, switchCode: m.switchCode, enabled: m.enabled,
     }));
     saveDeviceMappings.mutate([...existing, { tentId, deviceId: device.id, deviceName: device.name, switchCode: 'switch_1', enabled: true }]);
+  };
+
+  const handleAddManual = () => {
+    if (!manualDeviceId.trim() || addingTentId === null) return;
+    handleAddDevice(addingTentId, { id: manualDeviceId.trim(), name: manualDeviceName.trim() || `Dispositivo ${manualDeviceId.trim().slice(-6)}` });
+    setManualDeviceId('');
+    setManualDeviceName('');
   };
 
   const handleRemoveDevice = (mapping: DeviceMapping) => {
@@ -657,22 +668,67 @@ function DevicesTab() {
       {/* Device picker modal */}
       {pickerOpen && addingTentId !== null && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setPickerOpen(false)} />
-          <div className="relative bg-card border border-border rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col overflow-hidden shadow-2xl">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setPickerOpen(false); setManualDeviceId(''); setManualDeviceName(''); }} />
+          <div className="relative bg-card border border-border rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border/40">
               <p className="font-semibold text-foreground">Escolher dispositivo</p>
-              <button onClick={() => setPickerOpen(false)} className="w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center">
+              <button onClick={() => { setPickerOpen(false); setManualDeviceId(''); setManualDeviceName(''); }} className="w-7 h-7 rounded-full bg-muted/60 flex items-center justify-center">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="overflow-y-auto flex-1">
               {devicesLoading ? (
-                <div className="flex items-center justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+                <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">Buscando dispositivos...</span>
+                </div>
+              ) : useManualEntry ? (
+                /* ── Modo manual ── */
+                <div className="px-5 py-5 space-y-4">
+                  <div className="rounded-xl bg-amber-500/8 border border-amber-500/20 p-3.5 space-y-1.5">
+                    <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Inserção manual de Device ID</p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      A listagem automática não está disponível. Encontre o <strong>Device ID</strong> em{' '}
+                      <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto → aba <strong>Devices</strong>.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+                        Device ID <span className="text-muted-foreground/50">(do portal iot.tuya.com)</span>
+                      </p>
+                      <input
+                        type="text"
+                        value={manualDeviceId}
+                        onChange={e => setManualDeviceId(e.target.value.trim())}
+                        placeholder="ex: eb8168f5771604de9ccjsi"
+                        className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Nome do dispositivo</p>
+                      <input
+                        type="text"
+                        value={manualDeviceName}
+                        onChange={e => setManualDeviceName(e.target.value)}
+                        placeholder="ex: Tomada Ventilador"
+                        className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50"
+                      />
+                    </div>
+                    <Button
+                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      disabled={!manualDeviceId.trim() || saveDeviceMappings.isPending}
+                      onClick={handleAddManual}
+                    >
+                      {saveDeviceMappings.isPending
+                        ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Adicionando...</>
+                        : <><Check className="w-4 h-4 mr-2" /> Adicionar dispositivo</>}
+                    </Button>
+                  </div>
+                </div>
               ) : pickerDevices.length === 0 ? (
                 <div className="py-10 text-center px-6">
-                  <p className="text-sm text-muted-foreground">
-                    {(allDevices as any[]).length === 0 ? 'Nenhum dispositivo encontrado' : 'Todos os dispositivos já foram mapeados'}
-                  </p>
+                  <p className="text-sm text-muted-foreground">Todos os dispositivos já foram mapeados</p>
                 </div>
               ) : (
                 pickerDevices.map((device: any) => (
