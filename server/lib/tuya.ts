@@ -591,36 +591,58 @@ export async function listTuyaScenesIoTCore(
 
   const allScenes: Array<{ sceneId: string; name: string; type: string; status: string; spaceId: string }> = [];
 
-  for (const spaceId of spaceIds) {
+  // Busca TAP-TO-RUN e AUTOMAÇÕES separadamente para garantir classificação correta
+  async function fetchRules(spaceId: string, ruleType: "scene" | "automation") {
     try {
       const data = await tuyaGet(
-        `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100`,
+        `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100&rule_type=${ruleType}`,
         accessId, accessSecret, accessToken, region
       );
-      console.log(`[Tuya] listTuyaScenesIoTCore space=${spaceId}: success=${data.success} count=${data.result?.list?.length ?? 0}`);
+      console.log(`[Tuya] space=${spaceId} rule_type=${ruleType}: success=${data.success} count=${data.result?.list?.length ?? 0}`);
       if (data.success && Array.isArray(data.result?.list)) {
         for (const item of data.result.list) {
-          // Log do item completo para depurar campos de tipo
-          console.log(`[Tuya] scene item: id=${item.id} name="${item.name}" type=${JSON.stringify(item.type)} running_mode=${JSON.stringify(item.running_mode)} trigger_type=${JSON.stringify(item.trigger_type)} scene_type=${JSON.stringify(item.scene_type)}`);
-
-          // Detectar automação por vários campos possíveis da API Tuya
-          const rawType = item.type;
-          const isAutomation =
-            rawType === "automation" ||
-            rawType === 2 ||            // Tuya às vezes usa número 2
-            rawType === "linkage" ||
-            item.running_mode === "automation" ||
-            item.trigger_type === "timer" ||
-            item.trigger_type === "automation" ||
-            item.scene_type === "automation";
-
           allScenes.push({
             sceneId: item.id,
             name: item.name ?? "Sem nome",
-            type: isAutomation ? "automation" : "scene",
+            type: ruleType === "automation" ? "automation" : "scene",
             status: item.status ?? "enable",
             spaceId,
           });
+        }
+        return true; // endpoint suporta rule_type
+      }
+      return false;
+    } catch { return false; }
+  }
+
+  for (const spaceId of spaceIds) {
+    try {
+      // Tenta buscar com filtro explícito de tipo
+      const tapOk  = await fetchRules(spaceId, "scene");
+      const autoOk = await fetchRules(spaceId, "automation");
+
+      // Se o filtro não funcionou (nenhum retornou nada), faz chamada única e usa heurística
+      if (!tapOk && !autoOk) {
+        const data = await tuyaGet(
+          `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100`,
+          accessId, accessSecret, accessToken, region
+        );
+        console.log(`[Tuya] space=${spaceId} fallback: success=${data.success} count=${data.result?.list?.length ?? 0}`);
+        if (data.success && Array.isArray(data.result?.list)) {
+          for (const item of data.result.list) {
+            console.log(`[Tuya] item id=${item.id} name="${item.name}" type=${JSON.stringify(item.type)} running_mode=${JSON.stringify(item.running_mode)}`);
+            const t = item.type;
+            const isAuto =
+              t === "automation" || t === 2 || t === "linkage" ||
+              item.running_mode === "automation";
+            allScenes.push({
+              sceneId: item.id,
+              name: item.name ?? "Sem nome",
+              type: isAuto ? "automation" : "scene",
+              status: item.status ?? "enable",
+              spaceId,
+            });
+          }
         }
       }
     } catch (e: any) {
