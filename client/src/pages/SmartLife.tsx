@@ -75,6 +75,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
   const [region, setRegion] = useState<Region>('eu');
   const [pollInterval, setPollInterval] = useState<PollInterval>(180);
   const [integrationEnabled, setIntegrationEnabled] = useState(true);
+  const [homeId, setHomeId] = useState('');
   const [connStatus, setConnStatus] = useState<null | 'ok' | 'error'>(null);
   const [connMsg, setConnMsg] = useState('');
 
@@ -87,6 +88,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
       setRegion(config.region as Region);
       setPollInterval(config.pollIntervalMin as PollInterval);
       setIntegrationEnabled(config.enabled);
+      setHomeId(config.homeId ?? '');
     }
   }, [config]);
 
@@ -157,6 +159,25 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
         </div>
       </div>
 
+      {/* Home ID */}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="px-4 py-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Home ID <span className="normal-case font-normal">(para cenas)</span></p>
+          <input
+            type="text"
+            value={homeId}
+            onChange={e => setHomeId(e.target.value.trim())}
+            placeholder="ex: 123456789"
+            className="w-full bg-transparent text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 mt-1"
+          />
+        </div>
+        <div className="border-t border-border/50 px-4 py-2.5 bg-muted/30">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Onde encontrar: <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto → aba <strong>Devices</strong> → clique em qualquer dispositivo → campo <strong>Home</strong> ou <strong>home_id</strong>
+          </p>
+        </div>
+      </div>
+
       {/* Frequência */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 pt-3 pb-2">Frequência de leitura automática</p>
@@ -197,7 +218,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
         </Button>
         <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700"
           disabled={saveConfig.isPending}
-          onClick={() => saveConfig.mutate({ accessId, accessSecret, region, pollIntervalMin: pollInterval, enabled: integrationEnabled })}
+          onClick={() => saveConfig.mutate({ accessId, accessSecret, region, pollIntervalMin: pollInterval, enabled: integrationEnabled, homeId: homeId || undefined })}
         >
           {saveConfig.isPending ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
           Salvar

@@ -431,19 +431,21 @@ const tuyaRouter = router({
       region: z.enum(["eu", "us", "cn", "in"]),
       pollIntervalMin: z.number().refine(v => POLL_INTERVAL_OPTIONS.includes(v as any)),
       enabled: z.boolean(),
+      homeId: z.string().max(50).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const pool = getMysqlPool();
       await pool.execute(
-        `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled, homeId)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            accessId = VALUES(accessId),
            accessSecret = VALUES(accessSecret),
            region = VALUES(region),
            pollIntervalMin = VALUES(pollIntervalMin),
-           enabled = VALUES(enabled)`,
-        [ctx.user.id, input.accessId, input.accessSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0]
+           enabled = VALUES(enabled),
+           homeId = VALUES(homeId)`,
+        [ctx.user.id, input.accessId, input.accessSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0, input.homeId ?? null]
       );
       return { ok: true };
     }),
@@ -452,7 +454,7 @@ const tuyaRouter = router({
   getConfig: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
     const [rows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region, pollIntervalMin, enabled FROM tuyaConfig WHERE userId = ?`,
+      `SELECT accessId, accessSecret, region, pollIntervalMin, enabled, homeId FROM tuyaConfig WHERE userId = ?`,
       [ctx.user.id]
     );
     if (rows.length === 0) return null;
@@ -463,6 +465,7 @@ const tuyaRouter = router({
       region: r.region as string,
       pollIntervalMin: r.pollIntervalMin as number,
       enabled: Boolean(r.enabled),
+      homeId: r.homeId as string | null,
     };
   }),
 
@@ -742,19 +745,38 @@ const tuyaRouter = router({
 
   // ─── SmartLife scenes ────────────────────────────────────────────────────────
 
-  /** Lista todas as cenas SmartLife agregadas de todas as casas do usuário */
+  /** Lista todas as cenas SmartLife.
+   *  Se homeId estiver salvo na config, usa diretamente (bypass da listTuyaHomes).
+   *  Caso contrário, tenta auto-detectar as casas via API. */
   listScenes: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
     const [cfgRows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
+      `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
       [ctx.user.id]
     );
     if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
     const cfg = cfgRows[0];
     const { listTuyaHomes, listTuyaScenes } = await import("./lib/tuya");
 
-    const homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
     const allScenes: Array<{ sceneId: string; name: string; homeId: number; homeName: string }> = [];
+
+    let homes: Array<{ homeId: number; name: string }> = [];
+
+    if (cfg.homeId) {
+      // Home ID configurado manualmente — usa diretamente sem chamar a API de homes
+      homes = [{ homeId: Number(cfg.homeId), name: "Minha Casa" }];
+      console.log(`[Tuya] listScenes: usando homeId manual = ${cfg.homeId}`);
+    } else {
+      // Tenta auto-detectar
+      try {
+        homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+      } catch (e: any) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Não foi possível listar as casas automaticamente. Configure o Home ID manualmente na aba Config. Erro: ${e?.message}`,
+        });
+      }
+    }
 
     for (const home of homes) {
       try {

@@ -251,6 +251,17 @@ async function ensureTuyaTables() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // Adicionar homeId à tuyaConfig se não existir
+    const [cfgCols]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tuyaConfig'`
+    );
+    const cfgColNames = cfgCols.map((r: any) => r.COLUMN_NAME);
+    if (!cfgColNames.includes('homeId')) {
+      await conn.execute(`ALTER TABLE \`tuyaConfig\` ADD COLUMN \`homeId\` VARCHAR(50) NULL AFTER \`enabled\``);
+      console.log("[DB] Coluna homeId adicionada à tuyaConfig");
+    }
+
     await conn.end();
     console.log("[DB] Tabelas Tuya OK");
   } catch (err: any) {
