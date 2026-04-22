@@ -26,6 +26,10 @@
 #define LV_USE_STDLIB_STRING   LV_STDLIB_CLIB
 #define LV_USE_STDLIB_SPRINTF  LV_STDLIB_CLIB
 
+/* Desabilita otimizacoes assembly (NEON/Helium) — os arquivos .S usam
+ * diretivas GCC que nao compilam com o assembler do Apple no macOS ARM64. */
+#define LV_DRAW_SW_ASM LV_DRAW_SW_ASM_NONE
+
 /*====================
  * HAL
  *====================*/

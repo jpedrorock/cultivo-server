@@ -9,6 +9,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # SDL2 via Homebrew no Mac: brew install sdl2
 find_package(SDL2 REQUIRED)
 
+# Includes SDL2 globais — LVGL precisa ver SDL2/SDL.h quando compila seu
+# proprio driver (lv_sdl_window.c etc). find_package so exporta pro nosso
+# target por default, entao sem isso o build do LVGL falha no SDL driver.
+include_directories(${SDL2_INCLUDE_DIRS})
+
 # LVGL 9.2.2 via FetchContent — mesmo tag que platformio.ini usa
 # FETCHCONTENT_QUIET=OFF faz o git clone mostrar progresso (LVGL ~30MB).
 # GIT_SHALLOW=TRUE pega so o tag especifico (muito mais rapido que clone full).
