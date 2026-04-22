@@ -761,7 +761,7 @@ function ScenesTab() {
   const [expandedHomes, setExpandedHomes] = useState<Set<string>>(new Set());
 
   const { data: config } = trpc.tuya.getConfig.useQuery();
-  const { data: scenes = [], isLoading, isError, refetch } = trpc.tuya.listScenes.useQuery(
+  const { data: scenes = [], isLoading, isError, error: scenesError, refetch } = trpc.tuya.listScenes.useQuery(
     undefined, { enabled: !!config, retry: false }
   );
 
@@ -801,11 +801,19 @@ function ScenesTab() {
   if (isLoading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
 
   if (isError) {
+    const errMsg = (scenesError as any)?.message ?? String(scenesError);
     return (
-      <div className="rounded-2xl border border-border/40 bg-card py-12 text-center px-6">
-        <AlertCircle className="w-8 h-8 mx-auto text-red-400/60 mb-3" />
+      <div className="rounded-2xl border border-border/40 bg-card py-10 text-center px-6 space-y-3">
+        <AlertCircle className="w-8 h-8 mx-auto text-red-400/60" />
         <p className="font-medium text-foreground">Erro ao carregar cenas</p>
-        <p className="text-sm text-muted-foreground mt-1 mb-4">Verifique as permissões de Homes na API Tuya</p>
+        {errMsg && (
+          <p className="text-xs font-mono text-red-400 bg-red-500/8 border border-red-500/20 rounded-xl px-3 py-2 text-left break-all">
+            {errMsg}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Adicione os serviços <strong>Industry Basic Service</strong> e <strong>Smart Home Scene Linkage</strong> no portal iot.tuya.com → seu projeto → Service API
+        </p>
         <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
           <RefreshCw className="w-4 h-4" /> Tentar novamente
         </Button>
