@@ -946,6 +946,82 @@ function DevicesTab() {
 
 // ─── ScenesTab ────────────────────────────────────────────────────────────────
 
+const SCENE_SWIPE_WIDTH = 80;
+const SCENE_SWIPE_THRESHOLD = 50;
+
+function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisabled }: {
+  scene: { id: number; sceneId: string; name: string; homeId?: number | null };
+  isTriggering: boolean;
+  onTrigger: () => void;
+  onDelete: () => void;
+  triggerDisabled: boolean;
+}) {
+  const [offset, setOffset] = useState(0);
+  const [open, setOpen] = useState(false);
+  const startX = useRef(0);
+  const startOffset = useRef(0);
+  const dragging = useRef(false);
+
+  const closeSwipe = () => { setOffset(0); setOpen(false); };
+
+  const startDrag = (clientX: number) => { startX.current = clientX; startOffset.current = offset; dragging.current = true; };
+  const moveDrag = (clientX: number) => {
+    if (!dragging.current) return;
+    const delta = startX.current - clientX;
+    setOffset(Math.max(0, Math.min(SCENE_SWIPE_WIDTH, startOffset.current + delta)));
+  };
+  const endDrag = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (offset > SCENE_SWIPE_THRESHOLD) { setOffset(SCENE_SWIPE_WIDTH); setOpen(true); }
+    else { setOffset(0); setOpen(false); }
+  };
+
+  return (
+    <div className="relative overflow-hidden border-b border-border/20 last:border-0">
+      {/* Botão excluir revelado no swipe */}
+      <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-500" style={{ width: SCENE_SWIPE_WIDTH }}>
+        <button onClick={() => { closeSwipe(); onDelete(); }} className="w-full h-full flex flex-col items-center justify-center gap-1">
+          <Trash2 className="w-5 h-5 text-white" />
+          <span className="text-[10px] font-semibold text-white">Excluir</span>
+        </button>
+      </div>
+
+      {/* Linha principal — desliza para esquerda */}
+      <div
+        className="relative bg-card flex items-center gap-3 px-4 py-3.5"
+        onTouchStart={e => startDrag(e.touches[0].clientX)}
+        onTouchMove={e => moveDrag(e.touches[0].clientX)}
+        onTouchEnd={endDrag}
+        onMouseDown={e => startDrag(e.clientX)}
+        onMouseMove={e => moveDrag(e.clientX)}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        onClick={() => open && closeSwipe()}
+        style={{
+          transform: `translateX(-${offset}px)`,
+          transition: dragging.current ? 'none' : 'transform 0.25s ease',
+          cursor: open ? 'default' : 'grab',
+          userSelect: 'none',
+        }}
+      >
+        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+          <Zap className="w-4 h-4 text-amber-500" />
+        </div>
+        <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
+        <button
+          onClick={e => { e.stopPropagation(); if (!open) onTrigger(); }}
+          disabled={triggerDisabled}
+          className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+        >
+          {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+          {isTriggering ? 'Disparando...' : 'Disparar'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AutomationCard({ automation }: { automation: { sceneId: string; name: string } }) {
   const [expanded, setExpanded] = useState(false);
   const { data: details, isLoading } = trpc.tuya.getAutomationDetails.useQuery(
@@ -1133,29 +1209,16 @@ function ScenesTab() {
         <Zap className="w-3.5 h-3.5 text-muted-foreground/60" />
         <p className="text-sm font-semibold text-foreground flex-1">Cenas manuais</p>
       </div>
-      {manualScenes.map((scene: any) => {
-        const isTriggering = triggeringId === scene.sceneId;
-        return (
-          <div key={scene.id} className="flex items-center gap-3 px-4 py-3.5 border-b border-border/20 last:border-0 group">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-              <Zap className="w-4 h-4 text-amber-500" />
-            </div>
-            <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
-            <button onClick={() => { if (confirm(`Excluir "${scene.name}"?`)) deleteManual.mutate({ id: scene.id }, { onSuccess: () => refetchManual() }); }}
-              className="w-7 h-7 rounded-full bg-red-500/10 flex items-center justify-center hover:bg-red-500/20 active:scale-95 transition-all shrink-0">
-              <Trash2 className="w-3.5 h-3.5 text-red-400" />
-            </button>
-            <button
-              onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
-              disabled={!!triggeringId}
-              className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
-            >
-              {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              {isTriggering ? 'Disparando...' : 'Disparar'}
-            </button>
-          </div>
-        );
-      })}
+      {manualScenes.map((scene: any) => (
+        <ManualSceneRow
+          key={scene.id}
+          scene={scene}
+          isTriggering={triggeringId === scene.sceneId}
+          onTrigger={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
+          onDelete={() => deleteManual.mutate({ id: scene.id })}
+          triggerDisabled={!!triggeringId}
+        />
+      ))}
     </div>
   );
 
