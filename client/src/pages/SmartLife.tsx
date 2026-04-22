@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Wifi, WifiOff, Power, Play, Loader2, Plus, X, Settings,
-  Zap, Home, ChevronDown, ChevronUp, AlertCircle, RefreshCw,
+  Zap, Home, ChevronDown, ChevronUp, RefreshCw,
   Check, ToggleLeft, ToggleRight, ChevronRight, Pencil, Search, Trash2, Clock,
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';

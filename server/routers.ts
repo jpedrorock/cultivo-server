@@ -422,6 +422,18 @@ async function callAiProviderWithFallback(opts: Parameters<typeof callAiProvider
 
 const POLL_INTERVAL_OPTIONS = [30, 60, 180, 480, 720] as const;
 
+/** Busca credenciais Tuya do usuário no banco. Lança NOT_FOUND se não configurado. */
+async function getTuyaConfig(userId: number, opts: { requireEnabled?: boolean } = {}) {
+  const pool = getMysqlPool();
+  const enabledClause = opts.requireEnabled ? ' AND enabled = 1' : '';
+  const [rows]: any = await pool.execute(
+    `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ?${enabledClause}`,
+    [userId]
+  );
+  if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+  return rows[0] as { accessId: string; accessSecret: string; region: import("./lib/tuya").TuyaRegion; homeId: string | null };
+}
+
 const tuyaRouter = router({
   /** Salva credenciais Tuya do usuário */
   saveConfig: protectedProcedure
@@ -488,13 +500,7 @@ const tuyaRouter = router({
   resolveHomeId: protectedProcedure
     .input(z.object({ smartlifeUid: z.string().min(1).max(200) }))
     .mutation(async ({ ctx, input }) => {
-      const pool = getMysqlPool();
-      const [rows]: any = await pool.execute(
-        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ?`,
-        [ctx.user.id]
-      );
-      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-      const cfg = rows[0];
+      const cfg = await getTuyaConfig(ctx.user.id);
       const { listHomesForUid } = await import("./lib/tuya");
       try {
         const homes = await listHomesForUid(input.smartlifeUid, cfg.accessId, cfg.accessSecret, cfg.region);
@@ -507,31 +513,18 @@ const tuyaRouter = router({
   getAutomationDetails: protectedProcedure
     .input(z.object({ ruleId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
-      const pool = getMysqlPool();
-      const [rows]: any = await pool.execute(
-        `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ?`,
-        [ctx.user.id]
-      );
-      if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-      const cfg = rows[0];
+      const cfg = await getTuyaConfig(ctx.user.id);
       const { getTuyaRuleDetails } = await import("./lib/tuya");
       try {
         return await getTuyaRuleDetails(input.ruleId, cfg.accessId, cfg.accessSecret, cfg.region, cfg.homeId ? Number(cfg.homeId) : undefined);
       } catch (e: any) {
-        console.warn(`[Tuya] getAutomationDetails ${input.ruleId}: ${e?.message}`);
         return { conditions: [], actions: [], found: false };
       }
     }),
 
   /** Lista dispositivos da conta Tuya */
   listDevices: protectedProcedure.query(async ({ ctx }) => {
-    const pool = getMysqlPool();
-    const [rows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
-      [ctx.user.id]
-    );
-    if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-    const cfg = rows[0];
+    const cfg = await getTuyaConfig(ctx.user.id, { requireEnabled: true });
     const { listTuyaDevices } = await import("./lib/tuya");
     return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region, cfg.homeId ? Number(cfg.homeId) : undefined);
   }),
@@ -753,13 +746,7 @@ const tuyaRouter = router({
   getDeviceCurrentStatus: protectedProcedure
     .input(z.object({ deviceId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const pool = getMysqlPool();
-      const [cfgRows]: any = await pool.execute(
-        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
-        [ctx.user.id]
-      );
-      if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-      const cfg = cfgRows[0];
+      const cfg = await getTuyaConfig(ctx.user.id, { requireEnabled: true });
       const { getTuyaDeviceSwitchState } = await import("./lib/tuya");
       return getTuyaDeviceSwitchState(input.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
     }),
@@ -772,13 +759,7 @@ const tuyaRouter = router({
       value: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const pool = getMysqlPool();
-      const [cfgRows]: any = await pool.execute(
-        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
-        [ctx.user.id]
-      );
-      if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-      const cfg = cfgRows[0];
+      const cfg = await getTuyaConfig(ctx.user.id, { requireEnabled: true });
       const { controlTuyaDevice } = await import("./lib/tuya");
       const result = await controlTuyaDevice(input.deviceId, input.switchCode, input.value, cfg.accessId, cfg.accessSecret, cfg.region);
       if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Erro ao controlar dispositivo" });
@@ -791,13 +772,7 @@ const tuyaRouter = router({
    *  Se homeId estiver salvo na config, usa diretamente (bypass da listTuyaHomes).
    *  Caso contrário, tenta auto-detectar as casas via API. */
   listScenes: protectedProcedure.query(async ({ ctx }) => {
-    const pool = getMysqlPool();
-    const [cfgRows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ?`,
-      [ctx.user.id]
-    );
-    if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-    const cfg = cfgRows[0];
+    const cfg = await getTuyaConfig(ctx.user.id);
     const { listTuyaScenesIoTCore } = await import("./lib/tuya");
 
     // ── Tentativa 1: IoT Core (/v2.0/cloud/scene/rule) ─────────────────────────
@@ -893,13 +868,7 @@ const tuyaRouter = router({
   triggerScene: protectedProcedure
     .input(z.object({ homeId: z.number().optional(), sceneId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const pool = getMysqlPool();
-      const [cfgRows]: any = await pool.execute(
-        `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ?`,
-        [ctx.user.id]
-      );
-      if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-      const cfg = cfgRows[0];
+      const cfg = await getTuyaConfig(ctx.user.id);
       const { triggerTuyaScene } = await import("./lib/tuya");
       const result = await triggerTuyaScene(input.homeId ?? 0, input.sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
       if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao disparar cena" });

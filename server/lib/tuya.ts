@@ -464,7 +464,6 @@ export async function listTuyaHomes(
       const list = usersData.result?.list ?? usersData.result ?? [];
       if (Array.isArray(list) && list.length > 0) {
         userUid = list[0].uid ?? uid;
-        console.log(`[Tuya] listTuyaHomes: usando uid do usuário SmartLife vinculado: ${userUid}`);
       }
     }
   } catch {}
@@ -479,7 +478,6 @@ export async function listTuyaHomes(
   for (const { path, extract } of attempts) {
     try {
       const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-      console.log(`[Tuya] listTuyaHomes ${path}: success=${data.success} code=${data.code ?? "-"} msg="${data.msg ?? "-"}"`);
       if (data.success) {
         const list = extract(data.result);
         return (list as any[]).map((h: any) => ({
@@ -516,8 +514,7 @@ export async function listTuyaScenes(
   for (const path of attempts) {
     try {
       const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-      console.log(`[Tuya] listTuyaScenes ${path}: success=${data.success} code=${data.code ?? "-"} msg="${data.msg ?? "-"}"`);
-      if (data.success) {
+          if (data.success) {
         const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
         return (list as any[]).map((s: any) => ({
           sceneId: s.scene_id ?? s.id,
@@ -553,23 +550,16 @@ export async function listTuyaAutomations(
   for (const path of attempts) {
     try {
       const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-      console.log(`[Tuya] listTuyaAutomations ${path}: success=${data.success} code=${data.code ?? "-"} count=${data.result?.list?.length ?? 0}`);
       if (data.success) {
         const list: any[] = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
 
-        // Log do primeiro item para ver todos os campos disponíveis
-        if (list.length > 0) {
-          console.log(`[Tuya] listTuyaAutomations first item keys: ${Object.keys(list[0]).join(', ')}`);
-          console.log(`[Tuya] listTuyaAutomations first item FULL: ${JSON.stringify(list[0])}`);
-        }
-
-        // Busca detalhes de cada automação (onde ficam as conditions/horários)
+        // Busca detalhes de cada automação para obter conditions/horários
         const detailed = await Promise.all(
           list.map(async (a: any) => {
             const autoId = a.id ?? a.automation_id ?? a.scene_id;
             const name = a.name ?? a.automation_name ?? "Automação";
 
-            // Tenta extrair condições de TODOS os campos possíveis da lista
+            // Tenta extrair condições inline (alguns endpoints já retornam)
             const inlineConds =
               a.conditions ??
               a.decide_conditions ??
@@ -580,11 +570,10 @@ export async function listTuyaAutomations(
               [];
 
             if (inlineConds.length > 0) {
-              console.log(`[Tuya] auto ${autoId} "${name}" inline conditions=${JSON.stringify(inlineConds)}`);
               return { sceneId: autoId, name, homeId, conditions: inlineConds };
             }
 
-            // Busca detalhe individual — testa vários formatos de endpoint
+            // Busca detalhe individual
             const detailPaths = [
               `/v2.0/homes/${homeId}/automations/${autoId}`,
               `/v1.0/homes/${homeId}/automations/${autoId}`,
@@ -594,7 +583,6 @@ export async function listTuyaAutomations(
             for (const dp of detailPaths) {
               try {
                 const det = await tuyaGet(dp, accessId, accessSecret, accessToken, region);
-                console.log(`[Tuya] auto detail ${dp}: success=${det.success} code=${det.code} keys=${det.result ? Object.keys(det.result).join(',') : 'null'} result=${JSON.stringify(det.result)}`);
                 if (det.success && det.result) {
                   const conds =
                     det.result.conditions ??
@@ -606,9 +594,7 @@ export async function listTuyaAutomations(
                     return { sceneId: autoId, name, homeId, conditions: conds };
                   }
                 }
-              } catch (e: any) {
-                console.log(`[Tuya] auto detail ${dp}: ERROR ${e?.message}`);
-              }
+              } catch { /* tenta próximo endpoint */ }
             }
 
             return { sceneId: autoId, name, homeId, conditions: [] };
@@ -657,7 +643,6 @@ export async function triggerTuyaScene(
   for (const path of attempts) {
     try {
       const data = await tuyaPost(path, {}, accessId, accessSecret, accessToken, region);
-      console.log(`[Tuya] triggerTuyaScene ${path}: success=${data.success} code=${data.code ?? "-"}`);
       if (data.success) return { success: true };
     } catch {}
   }
@@ -681,8 +666,6 @@ export async function listTuyaScenesIoTCore(
     `/v2.0/cloud/space/child?only_sub=false&page_size=50`,
     accessId, accessSecret, accessToken, region
   );
-  console.log(`[Tuya] listTuyaScenesIoTCore spaces: success=${spacesData.success} data=${JSON.stringify(spacesData.result?.data ?? [])}`);
-
   const spaceIds: string[] = spacesData.success
     ? (spacesData.result?.data ?? []).map(String)
     : [];
@@ -711,10 +694,8 @@ export async function listTuyaScenesIoTCore(
         `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100&rule_type=${ruleType}`,
         accessId, accessSecret, accessToken, region
       );
-      console.log(`[Tuya] space=${spaceId} rule_type=${ruleType}: success=${data.success} count=${data.result?.list?.length ?? 0}`);
       if (data.success && Array.isArray(data.result?.list) && data.result.list.length > 0) {
         for (const item of data.result.list) {
-          console.log(`[Tuya] ${ruleType} item: id=${item.id} name="${item.name}" conditions=${JSON.stringify(item.conditions ?? [])}`);
           pushItem(item, ruleType);
           allScenes[allScenes.length - 1].spaceId = spaceId;
         }
@@ -736,10 +717,8 @@ export async function listTuyaScenesIoTCore(
           `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100`,
           accessId, accessSecret, accessToken, region
         );
-        console.log(`[Tuya] space=${spaceId} fallback: success=${data.success} count=${data.result?.list?.length ?? 0}`);
         if (data.success && Array.isArray(data.result?.list)) {
           for (const item of data.result.list) {
-            console.log(`[Tuya] item id=${item.id} name="${item.name}" type=${JSON.stringify(item.type)} conditions=${JSON.stringify(item.conditions ?? [])}`);
             const t = item.type;
             const isAuto = t === "automation" || t === 2 || t === "linkage" || item.running_mode === "automation";
             pushItem(item, isAuto ? "automation" : "scene");
@@ -773,7 +752,6 @@ export async function getTuyaRuleDetails(
     for (const path of homeEndpoints) {
       try {
         const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-        console.log(`[Tuya] getRuleDetails SmartHome ${path}: success=${data.success} code=${data.code ?? '-'}`);
         if (data.success && data.result) {
           const result = data.result;
           // Extrair agendamentos de conditions/actions
@@ -793,12 +771,10 @@ export async function getTuyaRuleDetails(
     for (const path of listEndpoints) {
       try {
         const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-        console.log(`[Tuya] getRuleDetails listAutos ${path}: success=${data.success}`);
         if (data.success) {
           const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
           const found = list.find((a: any) => a.id === ruleId || a.scene_id === ruleId || a.automation_id === ruleId);
           if (found) {
-            console.log(`[Tuya] getRuleDetails found in home automations: ${JSON.stringify(found)}`);
             const conditions = found.conditions ?? found.decide_conditions ?? [];
             return { conditions, actions: found.actions ?? [], found: true, schedules: extractSchedules(conditions) };
           }
@@ -810,7 +786,6 @@ export async function getTuyaRuleDetails(
   // 2. IoT Core endpoint direto
   try {
     const data = await tuyaGet(`/v2.0/cloud/scene/rule/${ruleId}`, accessId, accessSecret, accessToken, region);
-    console.log(`[Tuya] getRuleDetails IoTCore ${ruleId}: success=${data.success} code=${data.code ?? '-'}`);
     if (data.success && data.result) {
       const conditions = data.result.conditions ?? [];
       return { conditions, actions: data.result.actions ?? [], found: true, schedules: extractSchedules(conditions) };
