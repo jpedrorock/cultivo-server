@@ -600,10 +600,24 @@ export async function listTuyaScenesIoTCore(
       console.log(`[Tuya] listTuyaScenesIoTCore space=${spaceId}: success=${data.success} count=${data.result?.list?.length ?? 0}`);
       if (data.success && Array.isArray(data.result?.list)) {
         for (const item of data.result.list) {
+          // Log do item completo para depurar campos de tipo
+          console.log(`[Tuya] scene item: id=${item.id} name="${item.name}" type=${JSON.stringify(item.type)} running_mode=${JSON.stringify(item.running_mode)} trigger_type=${JSON.stringify(item.trigger_type)} scene_type=${JSON.stringify(item.scene_type)}`);
+
+          // Detectar automação por vários campos possíveis da API Tuya
+          const rawType = item.type;
+          const isAutomation =
+            rawType === "automation" ||
+            rawType === 2 ||            // Tuya às vezes usa número 2
+            rawType === "linkage" ||
+            item.running_mode === "automation" ||
+            item.trigger_type === "timer" ||
+            item.trigger_type === "automation" ||
+            item.scene_type === "automation";
+
           allScenes.push({
             sceneId: item.id,
             name: item.name ?? "Sem nome",
-            type: item.type ?? "scene",
+            type: isAutomation ? "automation" : "scene",
             status: item.status ?? "enable",
             spaceId,
           });
