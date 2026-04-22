@@ -9,19 +9,40 @@ interface PageTransitionProps {
 /**
  * PageTransition — wrapper de transição entre páginas.
  *
- * IMPORTANTE: Não usar opacity, filter ou transform aqui.
- * Qualquer uma dessas propriedades cria um stacking context que:
- * 1. Faz position:sticky filhos ficarem contidos no motion.div (não na viewport)
- * 2. Faz headers sticky ficarem sem background visível durante a animação
- *
- * Solução: renderizar diretamente sem animação no wrapper.
- * Animações de entrada são feitas via CSS animate-in nos elementos filhos.
+ * Usa CSS animate-in (tailwindcss-animate) em vez de framer-motion opacity/transform
+ * para não criar stacking context persistente que quebraria position:sticky.
+ * A animação CSS completa em 220ms e remove o stacking context automaticamente.
  */
 export function PageTransition({ children, className }: PageTransitionProps) {
   return (
-    <div className={className}>
+    <div className={`animate-in fade-in duration-[220ms] ease-out ${className ?? ''}`}>
       {children}
     </div>
+  );
+}
+
+/**
+ * TabContent — anima a troca de conteúdo entre abas.
+ * Use com AnimatePresence e key={activeTab} no pai.
+ *
+ * @example
+ * <AnimatePresence mode="wait" initial={false}>
+ *   <TabContent key={tab}>
+ *     {tab === 'a' && <TabA />}
+ *   </TabContent>
+ * </AnimatePresence>
+ */
+export function TabContent({ children, className }: PageTransitionProps) {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -54,6 +75,21 @@ export function CardAnimation({ children, className }: PageTransitionProps) {
   );
 }
 
+/**
+ * PressableCard — wrapper com feedback tátil de pressão para cards clicáveis.
+ * Substitui active:scale-[0.98] do Tailwind com uma animação suave real.
+ */
+export function PressableCard({ children, className }: PageTransitionProps) {
+  return (
+    <motion.div
+      className={className}
+      whileTap={{ scale: 0.975, transition: { duration: 0.1, ease: "easeOut" } }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 // Stagger animation wrapper for lists
 interface StaggerListProps {
   children: ReactNode;
@@ -64,7 +100,7 @@ interface StaggerListProps {
 export function StaggerList({
   children,
   className,
-  staggerDelay = 0.05,
+  staggerDelay = 0.06,
 }: StaggerListProps) {
   return (
     <motion.div
@@ -76,7 +112,7 @@ export function StaggerList({
         visible: {
           transition: {
             staggerChildren: staggerDelay,
-            delayChildren: 0.05,
+            delayChildren: 0.04,
           },
         },
       }}
@@ -92,8 +128,8 @@ export function ListItemAnimation({ children, className }: PageTransitionProps) 
     <motion.div
       className={className}
       variants={{
-        hidden: { opacity: 0, y: 16 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
+        hidden: { opacity: 0, y: 14 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" } },
       }}
     >
       {children}

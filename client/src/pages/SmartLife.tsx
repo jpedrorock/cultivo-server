@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
-import { PageTransition } from '@/components/PageTransition';
+import { PageTransition, AnimatePresence, TabContent } from '@/components/PageTransition';
 import { Button } from '@/components/ui/button';
 import { TentIcon } from '@/components/TentIcon';
 
@@ -1541,10 +1541,14 @@ export default function SmartLife() {
 
         {/* Conteúdo */}
         <main className="container mx-auto px-4 pb-28 sm:pb-8 max-w-2xl">
-          {tab === 'devices' && <DevicesTab />}
-          {tab === 'scenes'  && <ScenesTab />}
-          {tab === 'sensors' && <SensoresTab />}
-          {tab === 'config'  && <ConfigTab onSaved={() => setTab('sensors')} />}
+          <AnimatePresence mode="wait" initial={false}>
+            <TabContent key={tab}>
+              {tab === 'devices' && <DevicesTab />}
+              {tab === 'scenes'  && <ScenesTab />}
+              {tab === 'sensors' && <SensoresTab />}
+              {tab === 'config'  && <ConfigTab onSaved={() => setTab('sensors')} />}
+            </TabContent>
+          </AnimatePresence>
         </main>
       </div>
     </PageTransition>
