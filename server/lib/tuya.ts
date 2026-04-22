@@ -369,6 +369,26 @@ export async function controlTuyaDevice(
   return { success: Boolean(data.success), msg: data.msg };
 }
 
+/**
+ * Busca o home_id de um dispositivo conhecido via /v1.0/devices/{id}.
+ * Retorna null se não conseguir.
+ */
+export async function getDeviceHomeId(
+  deviceId: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<number | null> {
+  try {
+    const { accessToken } = await getToken(accessId, accessSecret, region);
+    const data = await tuyaGet(`/v1.0/devices/${deviceId}`, accessId, accessSecret, accessToken, region);
+    if (data.success && data.result?.home_id) {
+      return Number(data.result.home_id);
+    }
+  } catch {}
+  return null;
+}
+
 // ─── SmartLife homes & scenes ─────────────────────────────────────────────────
 
 export interface TuyaHome {

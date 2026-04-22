@@ -763,17 +763,52 @@ const tuyaRouter = router({
     let homes: Array<{ homeId: number; name: string }> = [];
 
     if (cfg.homeId) {
-      // Home ID configurado manualmente — usa diretamente sem chamar a API de homes
+      // Home ID configurado manualmente — usa diretamente
       homes = [{ homeId: Number(cfg.homeId), name: "Minha Casa" }];
       console.log(`[Tuya] listScenes: usando homeId manual = ${cfg.homeId}`);
     } else {
-      // Tenta auto-detectar
+      // Tenta extrair home_id a partir de dispositivos já conhecidos (sensores ou controláveis)
+      const { getDeviceHomeId } = await import("./lib/tuya");
       try {
-        homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+        const [sensorRows]: any = await pool.execute(
+          `SELECT deviceId FROM tuyaSensorMappings WHERE userId = ? AND deviceId IS NOT NULL AND deviceId != '' LIMIT 5`,
+          [ctx.user.id]
+        );
+        const [deviceRows]: any = await pool.execute(
+          `SELECT deviceId FROM tuyaDeviceMappings WHERE userId = ? AND deviceId IS NOT NULL AND deviceId != '' LIMIT 5`,
+          [ctx.user.id]
+        );
+        const knownDeviceIds: string[] = [
+          ...sensorRows.map((r: any) => r.deviceId),
+          ...deviceRows.map((r: any) => r.deviceId),
+        ];
+
+        const discoveredHomeIds = new Set<number>();
+        for (const deviceId of knownDeviceIds) {
+          const hid = await getDeviceHomeId(deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+          if (hid !== null) {
+            discoveredHomeIds.add(hid);
+            console.log(`[Tuya] listScenes: home_id ${hid} descoberto via device ${deviceId}`);
+          }
+        }
+        if (discoveredHomeIds.size > 0) {
+          homes = Array.from(discoveredHomeIds).map(hid => ({ homeId: hid, name: "Minha Casa" }));
+        }
       } catch (e: any) {
+        console.warn(`[Tuya] listScenes: erro ao descobrir homeId via devices: ${e?.message}`);
+      }
+
+      // Se ainda não descobriu, tenta API de homes
+      if (homes.length === 0) {
+        try {
+          homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+        } catch {}
+      }
+
+      if (homes.length === 0) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Não foi possível listar as casas automaticamente. Configure o Home ID manualmente na aba Config. Erro: ${e?.message}`,
+          message: "Configure o Home ID na aba Config → role para baixo. Ou adicione um sensor/dispositivo primeiro para auto-detecção.",
         });
       }
     }
