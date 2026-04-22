@@ -4420,6 +4420,19 @@ export const appRouter = router({
         // Cada entrada: plant entra em toTentId em movedAt, sai quando a próxima entrada começa
         const periods: Array<{ tentId: number; tentName: string; start: Date; end: Date | null }> = [];
 
+        // Adicionar período na estufa original (antes da primeira movimentação)
+        if (history.length > 0) {
+          const firstMove = history[0] as any;
+          if (firstMove.fromTentId) {
+            periods.push({
+              tentId: firstMove.fromTentId,
+              tentName: tentMap[firstMove.fromTentId] ?? `Estufa #${firstMove.fromTentId}`,
+              start: new Date(plant.createdAt),
+              end: new Date(firstMove.movedAt),
+            });
+          }
+        }
+
         for (let i = 0; i < history.length; i++) {
           const entry = history[i] as any;
           if (!entry.toTentId) continue;
