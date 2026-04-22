@@ -516,9 +516,8 @@ const tuyaRouter = router({
       const cfg = rows[0];
       const { getTuyaRuleDetails } = await import("./lib/tuya");
       try {
-        return await getTuyaRuleDetails(input.ruleId, cfg.accessId, cfg.accessSecret, cfg.region);
+        return await getTuyaRuleDetails(input.ruleId, cfg.accessId, cfg.accessSecret, cfg.region, cfg.homeId ? Number(cfg.homeId) : undefined);
       } catch (e: any) {
-        // Nunca joga 500 para o cliente — retorna vazio e loga o erro
         console.warn(`[Tuya] getAutomationDetails ${input.ruleId}: ${e?.message}`);
         return { conditions: [], actions: [], found: false };
       }

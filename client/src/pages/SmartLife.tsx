@@ -969,17 +969,9 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
     { enabled: isAuto && expanded, staleTime: 300_000 }
   );
 
-  const schedules = (details?.conditions ?? [])
-    .filter((c: any) => c.entity_type === 'timer' || c.expr?.time)
-    .map((c: any) => {
-      const time = c.expr?.time ?? c.time ?? '';
-      const loops = c.expr?.loops ?? '1111111';
-      const dayLabels = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
-      const days = loops === '1111111' || loops === ''
-        ? 'Todos os dias'
-        : loops.split('').map((v: string, i: number) => v === '1' ? dayLabels[i] : null).filter(Boolean).join(', ');
-      return { time, days };
-    });
+  const schedules = details?.schedules
+    ? formatSchedules(details.schedules as any)
+    : parseSchedules(details?.conditions ?? []);
 
   const closeSwipe = () => { setSwipeOffset(0); setSwipeOpen(false); };
 
@@ -1082,18 +1074,22 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
   );
 }
 
+function formatSchedules(raw: { time: string; loops: string }[]) {
+  const dayLabels = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  return raw.map(s => ({
+    time: s.time,
+    days: s.loops === '1111111' || !s.loops
+      ? 'Todos os dias'
+      : s.loops.split('').map((v, i) => v === '1' ? dayLabels[i] : null).filter(Boolean).join(', '),
+  }));
+}
+
 function parseSchedules(conditions: any[]) {
-  return conditions
-    .filter((c: any) => c.entity_type === 'timer' || c.expr?.time || c.time)
-    .map((c: any) => {
-      const time = c.expr?.time ?? c.time ?? '';
-      const loops = c.expr?.loops ?? c.loops ?? '1111111';
-      const dayLabels = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
-      const days = loops === '1111111' || loops === ''
-        ? 'Todos os dias'
-        : loops.split('').map((v: string, i: number) => v === '1' ? dayLabels[i] : null).filter(Boolean).join(', ');
-      return { time, days };
-    });
+  const raw = conditions
+    .filter((c: any) => c.entity_type === 'timer' || c.type === 'timer' || c.expr?.time || c.time)
+    .map((c: any) => ({ time: c.expr?.time ?? c.time ?? '', loops: c.expr?.loops ?? c.loops ?? '1111111' }))
+    .filter(s => s.time);
+  return formatSchedules(raw);
 }
 
 function AutomationCard({ automation }: { automation: { sceneId: string; name: string; conditions?: any[] } }) {
@@ -1106,8 +1102,10 @@ function AutomationCard({ automation }: { automation: { sceneId: string; name: s
     { enabled: expanded && !hasInlineConditions, staleTime: 300_000 }
   );
 
-  const rawConditions = hasInlineConditions ? automation.conditions! : (details?.conditions ?? []);
-  const schedules = parseSchedules(rawConditions);
+  // Usa schedules já parseados pelo backend se disponível, senão parseia condições inline
+  const schedules = details?.schedules
+    ? formatSchedules(details.schedules as any)
+    : parseSchedules(hasInlineConditions ? automation.conditions! : (details?.conditions ?? []));
 
   return (
     <div className="border-b border-border/20 last:border-0">

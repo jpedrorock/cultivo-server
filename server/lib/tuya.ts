@@ -657,57 +657,92 @@ export async function getTuyaRuleDetails(
   ruleId: string,
   accessId: string,
   accessSecret: string,
-  region: TuyaRegion
-): Promise<{ conditions: any[]; actions: any[]; found: boolean }> {
+  region: TuyaRegion,
+  homeId?: number
+): Promise<{ conditions: any[]; actions: any[]; found: boolean; schedules?: { time: string; loops: string }[] }> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
 
-  // Tenta endpoint de detalhe direto primeiro
+  // 1. Tenta Smart Home API com homeId (automações SmartLife ficam aqui)
+  if (homeId) {
+    const homeEndpoints = [
+      `/v2.0/homes/${homeId}/automations/${ruleId}`,
+      `/v1.0/homes/${homeId}/automations/${ruleId}`,
+    ];
+    for (const path of homeEndpoints) {
+      try {
+        const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+        console.log(`[Tuya] getRuleDetails SmartHome ${path}: success=${data.success} code=${data.code ?? '-'}`);
+        if (data.success && data.result) {
+          const result = data.result;
+          // Extrair agendamentos de conditions/actions
+          const conditions: any[] = result.conditions ?? result.decide_conditions ?? [];
+          // Tentar extrair horários de timer conditions
+          const schedules = extractSchedules(conditions);
+          return { conditions, actions: result.actions ?? [], found: true, schedules };
+        }
+      } catch { /* próximo endpoint */ }
+    }
+
+    // Tentar listar automações da casa e encontrar por ID
+    const listEndpoints = [
+      `/v2.0/homes/${homeId}/automations?page_no=1&page_size=100`,
+      `/v1.0/homes/${homeId}/automations?page_no=1&page_size=50`,
+    ];
+    for (const path of listEndpoints) {
+      try {
+        const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+        console.log(`[Tuya] getRuleDetails listAutos ${path}: success=${data.success}`);
+        if (data.success) {
+          const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
+          const found = list.find((a: any) => a.id === ruleId || a.scene_id === ruleId || a.automation_id === ruleId);
+          if (found) {
+            console.log(`[Tuya] getRuleDetails found in home automations: ${JSON.stringify(found)}`);
+            const conditions = found.conditions ?? found.decide_conditions ?? [];
+            return { conditions, actions: found.actions ?? [], found: true, schedules: extractSchedules(conditions) };
+          }
+        }
+      } catch { /* próximo */ }
+    }
+  }
+
+  // 2. IoT Core endpoint direto
   try {
-    const data = await tuyaGet(
-      `/v2.0/cloud/scene/rule/${ruleId}`,
-      accessId, accessSecret, accessToken, region
-    );
-    console.log(`[Tuya] getRuleDetails ${ruleId}: success=${data.success} code=${data.code ?? '-'}`);
+    const data = await tuyaGet(`/v2.0/cloud/scene/rule/${ruleId}`, accessId, accessSecret, accessToken, region);
+    console.log(`[Tuya] getRuleDetails IoTCore ${ruleId}: success=${data.success} code=${data.code ?? '-'}`);
     if (data.success && data.result) {
-      return {
-        conditions: data.result.conditions ?? [],
-        actions: data.result.actions ?? [],
-        found: true,
-      };
+      const conditions = data.result.conditions ?? [];
+      return { conditions, actions: data.result.actions ?? [], found: true, schedules: extractSchedules(conditions) };
     }
   } catch { /* fallthrough */ }
 
-  // Fallback: busca na lista de todas as regras pelo space_id e encontra pelo id
-  console.log(`[Tuya] getRuleDetails fallback: buscando ${ruleId} via lista`);
-  const spacesData = await tuyaGet(
-    `/v2.0/cloud/space/child?only_sub=false&page_size=50`,
-    accessId, accessSecret, accessToken, region
-  );
-  const spaceIds: string[] = spacesData.success
-    ? (spacesData.result?.data ?? []).map(String)
-    : [];
-
-  for (const spaceId of spaceIds) {
-    try {
-      const data = await tuyaGet(
-        `/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100`,
-        accessId, accessSecret, accessToken, region
-      );
-      if (data.success && Array.isArray(data.result?.list)) {
-        const rule = data.result.list.find((r: any) => r.id === ruleId);
-        if (rule) {
-          console.log(`[Tuya] getRuleDetails found in list: space=${spaceId} rule=${JSON.stringify(rule)}`);
-          return {
-            conditions: rule.conditions ?? [],
-            actions: rule.actions ?? [],
-            found: true,
-          };
+  // 3. Busca na lista IoT Core pelo space_id
+  try {
+    const spacesData = await tuyaGet(`/v2.0/cloud/space/child?only_sub=false&page_size=50`, accessId, accessSecret, accessToken, region);
+    const spaceIds: string[] = spacesData.success ? (spacesData.result?.data ?? []).map(String) : [];
+    for (const spaceId of spaceIds) {
+      try {
+        const data = await tuyaGet(`/v2.0/cloud/scene/rule?space_id=${spaceId}&page_size=100`, accessId, accessSecret, accessToken, region);
+        if (data.success && Array.isArray(data.result?.list)) {
+          const rule = data.result.list.find((r: any) => r.id === ruleId);
+          if (rule) {
+            const conditions = rule.conditions ?? [];
+            return { conditions, actions: rule.actions ?? [], found: true, schedules: extractSchedules(conditions) };
+          }
         }
-      }
-    } catch { /* continue */ }
-  }
+      } catch { /* continue */ }
+    }
+  } catch { /* ignore */ }
 
-  // Não encontrou — retorna vazio sem erro
-  console.warn(`[Tuya] getRuleDetails: regra ${ruleId} não encontrada`);
+  console.warn(`[Tuya] getRuleDetails: regra ${ruleId} não encontrada em nenhum endpoint`);
   return { conditions: [], actions: [], found: false };
+}
+
+function extractSchedules(conditions: any[]): { time: string; loops: string }[] {
+  return conditions
+    .filter((c: any) => c.entity_type === 'timer' || c.type === 'timer' || c.expr?.time || c.time)
+    .map((c: any) => ({
+      time: c.expr?.time ?? c.time ?? '',
+      loops: c.expr?.loops ?? c.loops ?? '1111111',
+    }))
+    .filter(s => s.time);
 }
