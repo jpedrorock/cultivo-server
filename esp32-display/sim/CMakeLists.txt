@@ -35,6 +35,17 @@ set(LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(lvgl)
 
+# Remove os .S (NEON/Helium) do LVGL — o CMake deles inclui esses arquivos
+# automaticamente em ARM, mas o assembler do Apple nao aceita: os .S sao
+# pre-processados pelo clang e puxam stdint.h etc, que o assembler nao
+# entende. LV_DRAW_SW_ASM=NONE em lv_conf.h so gata o codigo C; o CMake
+# precisa ser instruido separadamente a nao compilar os .S.
+if(TARGET lvgl)
+    get_target_property(_LVGL_SRC lvgl SOURCES)
+    list(FILTER _LVGL_SRC EXCLUDE REGEX "/blend/(neon|helium)/.*\\.S$")
+    set_target_properties(lvgl PROPERTIES SOURCES "${_LVGL_SRC}")
+endif()
+
 # Faz lv_conf.h ficar acessivel via <lv_conf.h> em qualquer .c do projeto
 add_compile_definitions(LV_CONF_INCLUDE_SIMPLE)
 
