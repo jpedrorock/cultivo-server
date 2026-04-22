@@ -263,8 +263,10 @@ export async function listTuyaDevices(
     }
   }
 
-  // Nenhum endpoint retornou dispositivos
-  throw new Error("Nenhum dispositivo encontrado. Verifique se os sensores estão linkados ao projeto no iot.tuya.com → Devices.");
+  // Nenhum endpoint retornou dispositivos — retorna lista vazia (não lança erro)
+  // O client já trata lista vazia mostrando o modo de entrada manual
+  console.warn("[Tuya] Nenhum dispositivo encontrado em nenhum endpoint. Vincule sua conta SmartLife em iot.tuya.com → Devices → Link App Account.");
+  return [];
 }
 
 /**

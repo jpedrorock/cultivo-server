@@ -219,7 +219,7 @@ function SensoresTab() {
   const { data: tents = [] } = trpc.tents.list.useQuery();
   const { data: savedMappings = [] } = trpc.tuya.getMappings.useQuery();
   const { data: devices = [], isLoading: devicesLoading, isError: devicesError } = trpc.tuya.listDevices.useQuery(
-    undefined, { enabled: !!config, retry: false }
+    undefined, { enabled: !!config && openPicker !== null, retry: false, staleTime: 60_000 }
   );
   const { data: latestReadings = {}, refetch: refetchReadings } = trpc.tuya.getLatestReadingsAll.useQuery();
 
@@ -537,7 +537,7 @@ function DevicesTab() {
   const { data: tents = [] } = trpc.tents.list.useQuery();
   const { data: config } = trpc.tuya.getConfig.useQuery();
   const { data: allDevices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
-    undefined, { enabled: pickerOpen, retry: false }
+    undefined, { enabled: !!config && pickerOpen, retry: false, staleTime: 60_000 }
   );
 
   const SENSOR_CATS = ['wsdcg', 'mcs', 'zdkj', 'wnykq', 'hjjcy'];
