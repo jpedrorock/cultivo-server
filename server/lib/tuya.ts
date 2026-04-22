@@ -546,33 +546,58 @@ export async function listTuyaAutomations(
       if (data.success) {
         const list: any[] = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
 
+        // Log do primeiro item para ver todos os campos disponíveis
+        if (list.length > 0) {
+          console.log(`[Tuya] listTuyaAutomations first item keys: ${Object.keys(list[0]).join(', ')}`);
+          console.log(`[Tuya] listTuyaAutomations first item FULL: ${JSON.stringify(list[0])}`);
+        }
+
         // Busca detalhes de cada automação (onde ficam as conditions/horários)
         const detailed = await Promise.all(
           list.map(async (a: any) => {
             const autoId = a.id ?? a.automation_id ?? a.scene_id;
             const name = a.name ?? a.automation_name ?? "Automação";
 
-            // Condições inline já vêm na lista? Usa direto
-            const inlineConds = a.conditions ?? a.decide_conditions ?? a.preconditions ?? [];
+            // Tenta extrair condições de TODOS os campos possíveis da lista
+            const inlineConds =
+              a.conditions ??
+              a.decide_conditions ??
+              a.preconditions ??
+              a.rule_list ??
+              a.effective_conditions ??
+              a.linkage_rule?.conditions ??
+              [];
+
             if (inlineConds.length > 0) {
               console.log(`[Tuya] auto ${autoId} "${name}" inline conditions=${JSON.stringify(inlineConds)}`);
               return { sceneId: autoId, name, homeId, conditions: inlineConds };
             }
 
-            // Busca detalhe individual
+            // Busca detalhe individual — testa vários formatos de endpoint
             const detailPaths = [
               `/v2.0/homes/${homeId}/automations/${autoId}`,
               `/v1.0/homes/${homeId}/automations/${autoId}`,
+              `/v2.0/homes/${homeId}/scene/rule/${autoId}`,
+              `/v1.0/homes/${homeId}/scenes/${autoId}`,
             ];
             for (const dp of detailPaths) {
               try {
                 const det = await tuyaGet(dp, accessId, accessSecret, accessToken, region);
-                console.log(`[Tuya] auto detail ${dp}: success=${det.success} result=${JSON.stringify(det.result)}`);
+                console.log(`[Tuya] auto detail ${dp}: success=${det.success} code=${det.code} keys=${det.result ? Object.keys(det.result).join(',') : 'null'} result=${JSON.stringify(det.result)}`);
                 if (det.success && det.result) {
-                  const conds = det.result.conditions ?? det.result.decide_conditions ?? det.result.preconditions ?? [];
-                  return { sceneId: autoId, name, homeId, conditions: conds };
+                  const conds =
+                    det.result.conditions ??
+                    det.result.decide_conditions ??
+                    det.result.preconditions ??
+                    det.result.rule?.conditions ??
+                    [];
+                  if (conds.length > 0) {
+                    return { sceneId: autoId, name, homeId, conditions: conds };
+                  }
                 }
-              } catch { /* próximo */ }
+              } catch (e: any) {
+                console.log(`[Tuya] auto detail ${dp}: ERROR ${e?.message}`);
+              }
             }
 
             return { sceneId: autoId, name, homeId, conditions: [] };
