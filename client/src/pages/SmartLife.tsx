@@ -1286,6 +1286,16 @@ function ScenesTab() {
           )}
         </div>
       )}
+
+      {/* Botão sempre visível para adicionar cena manualmente */}
+      <button
+        onClick={() => setShowManualForm(v => !v)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/50 text-sm text-muted-foreground hover:bg-muted/30 transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+        {showManualForm ? 'Fechar formulário' : 'Adicionar cena manualmente'}
+      </button>
+      {showManualForm && <ManualSceneForm onSaved={() => { refetchManual(); setShowManualForm(false); }} />}
     </div>
   );
 }
