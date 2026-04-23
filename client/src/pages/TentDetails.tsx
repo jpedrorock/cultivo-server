@@ -1711,12 +1711,14 @@ function TentPlantsTab({ tentId, tentName }: { tentId: number; tentName: string 
                   </span>
                 )}
 
-                {/* Foto */}
+                {/* Foto ou inicial */}
                 {thumbUrl ? (
                   <img src={thumbUrl} alt={plant.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Leaf className="w-8 h-8 text-white/20" />
+                    <span className="text-4xl font-black text-white/30 select-none">
+                      {(plant.name ?? '?')[0].toUpperCase()}
+                    </span>
                   </div>
                 )}
 
