@@ -1540,7 +1540,7 @@ export default function SmartLife() {
         <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '136px' }} />
 
         {/* Conteúdo */}
-        <main className="container mx-auto px-4 pb-28 sm:pb-8 max-w-2xl">
+        <main className="container mx-auto px-4 pb-36 sm:pb-12 max-w-2xl">
           <AnimatePresence mode="wait" initial={false}>
             <TabContent key={tab}>
               {tab === 'devices' && <DevicesTab />}

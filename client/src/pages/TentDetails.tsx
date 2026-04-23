@@ -731,60 +731,65 @@ export default function TentDetails() {
               <div className="w-10 h-10 rounded-xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center shrink-0">
                 <TentIcon className="w-5 h-5 text-primary" />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{tent.name}</h1>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-xs text-muted-foreground">
-                    {tent.category} • {tent.width}×{tent.depth}×{tent.height}cm
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base md:text-xl font-bold text-foreground truncate leading-tight">{tent.name}</h1>
+
+                {/* Linha 1: dimensões + última leitura */}
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <p className="text-xs text-muted-foreground shrink-0">
+                    {tent.width}×{tent.depth}×{tent.height}cm
                   </p>
-                  {/* Semana corrente do ciclo */}
-                  {cycle && currentPhase && currentWeek && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary/80">
-                      <Calendar className="w-3 h-3" />
-                      Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : "Vega"}
-                      {" · "}
-                      <span className="text-muted-foreground font-normal">
-                        início {format(new Date(cycle.startDate), "dd/MM", { locale: ptBR })}
-                      </span>
-                    </span>
-                  )}
-                  {/* Freshness badge — último registro */}
+                  {/* Freshness badge */}
                   {logs && logs.length > 0 && (() => {
                     const lastLogDate = new Date(logs[0].logDate);
                     const hoursAgo = differenceInHours(new Date(), lastLogDate);
                     const daysAgo = differenceInDays(new Date(), lastLogDate);
                     if (hoursAgo < 24) return (
-                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                         {hoursAgo === 0 ? 'Agora' : `${hoursAgo}h atrás`}
                       </span>
                     );
                     if (daysAgo === 1) return (
-                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                         Ontem
                       </span>
                     );
                     return (
-                      <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
                         {daysAgo}d sem registro
                       </span>
                     );
                   })()}
                 </div>
+
+                {/* Linha 2: semana do ciclo (só se tiver) */}
+                {cycle && currentPhase && currentWeek && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Calendar className="w-3 h-3 text-primary/60 shrink-0" />
+                    <span className="text-[11px] font-semibold text-primary/80">
+                      Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : "Vega"}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      · início {format(new Date(cycle.startDate), "dd/MM", { locale: ptBR })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Ações */}
             <div className="flex items-center gap-2 shrink-0 print-hide">
               {cycle && (
-                <PhaseBadge
-                  phase={tent.category === "MAINTENANCE" ? "MAINTENANCE" : currentPhase ?? "VEGA"}
-                  week={currentWeek ?? undefined}
-                  size="sm"
-                  className="hidden sm:inline-flex"
-                />
+                <div className="hidden sm:block">
+                  <PhaseBadge
+                    phase={tent.category === "MAINTENANCE" ? "MAINTENANCE" : currentPhase ?? "VEGA"}
+                    week={currentWeek ?? undefined}
+                    size="sm"
+                  />
+                </div>
               )}
               {/* QR + Monitor — só desktop */}
               <div className="hidden sm:flex items-center gap-2">
