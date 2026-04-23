@@ -8,6 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { BigStepper } from "@/components/BigStepper";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle, Target, Smartphone, Sparkles, Wifi } from "lucide-react";
 import { RangeSlider } from "@/components/ui/range-slider";
 import { useLocation } from "wouter";
@@ -41,7 +46,17 @@ export default function QuickLog() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(urlMode);
+  const [confirmClose, setConfirmClose] = useState(false);
   const stepScrollRef = useRef<HTMLDivElement>(null);
+
+  // Fecha ou pede confirmação se o usuário está no meio de um fluxo
+  const handleClose = () => {
+    if (logMode !== null) {
+      setConfirmClose(true);
+    } else {
+      setLocation('/');
+    }
+  };
 
   // Body scroll lock not needed — outer container uses position:fixed inset-0
 
@@ -656,10 +671,7 @@ export default function QuickLog() {
           <div className="bg-card border border-border/60 rounded-2xl shadow-2xl h-[95%] overflow-hidden w-full flex flex-col relative">
           {/* Botão fechar — dentro do card, canto superior direito */}
           <button
-            onClick={() => {
-              triggerHaptic('light');
-              setLocation('/');
-            }}
+            onClick={() => { triggerHaptic('light'); handleClose(); }}
             aria-label="Cancelar registro"
             className="absolute top-4 right-4 z-[200] w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-sm text-white hover:bg-black/35 active:scale-95 transition-all"
           >
@@ -1594,6 +1606,27 @@ export default function QuickLog() {
         />
       )}
     </div>
+
+    {/* Confirm close mid-flow */}
+    <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancelar registro?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Os dados preenchidos não serão salvos. Tem certeza que quer sair?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Continuar preenchendo</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => setLocation('/')}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Sim, cancelar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </PageTransition>
   );
 }
