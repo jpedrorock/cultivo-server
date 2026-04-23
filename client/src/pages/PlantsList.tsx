@@ -61,7 +61,17 @@ export default function PlantsList() {
   const [expandedTents, setExpandedTents] = useState<Set<number>>(
     tentParam ? new Set([parseInt(tentParam)]) : new Set()
   );
-  // Expande todos os grupos na primeira carga (se não houver tentParam)
+  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [selectedPlants, setSelectedPlants] = useState<Set<number>>(new Set());
+
+  const { data: plants, isLoading, isError, refetch } = trpc.plants.list.useQuery({
+    status: filterStatus,
+  });
+
+  const { data: tents } = trpc.tents.list.useQuery();
+  const { data: strains } = trpc.strains.list.useQuery();
+
+  // Expande todos os grupos na primeira carga — deve vir APÓS declaração de tents
   const expandedInitRef = useRef(false);
   useEffect(() => {
     if (expandedInitRef.current || !tents?.length) return;
@@ -81,15 +91,6 @@ export default function PlantsList() {
   const cancelHold = () => {
     if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
   };
-  const [dialog, setDialog] = useState<DialogState | null>(null);
-  const [selectedPlants, setSelectedPlants] = useState<Set<number>>(new Set());
-
-  const { data: plants, isLoading, isError, refetch } = trpc.plants.list.useQuery({
-    status: filterStatus,
-  });
-
-  const { data: tents } = trpc.tents.list.useQuery();
-  const { data: strains } = trpc.strains.list.useQuery();
 
   const utils = trpc.useUtils();
   const moveMultiplePlants = trpc.plants.moveSelectedPlants.useMutation({
