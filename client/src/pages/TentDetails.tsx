@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings, CheckCircle2, Circle, ListChecks } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -369,6 +369,13 @@ export default function TentDetails() {
 
   // Plants — loaded at page level so the PDF export has access
   const { data: tentPlants } = trpc.plants.list.useQuery({ tentId });
+
+  // Tarefas desta estufa
+  const { data: allTasks } = trpc.tasks.getCurrentWeekTasks.useQuery();
+  const tentTasks = (allTasks ?? []).filter(t => t.tentId === tentId);
+  const markTaskDone = trpc.tasks.markAsDone.useMutation({
+    onSuccess: () => { utils.tasks.getCurrentWeekTasks.invalidate(); },
+  });
 
   // Filter logs by dateRange client-side for charts/averages (must be before conditional returns — Rules of Hooks)
   const filteredLogs = useMemo(() => {
@@ -1098,6 +1105,14 @@ export default function TentDetails() {
             <TabsTrigger value="history" className="flex-1">
               Histórico
             </TabsTrigger>
+            <TabsTrigger value="tasks" className="flex-1 relative">
+              Tarefas
+              {tentTasks.filter(t => !t.isDone).length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center">
+                  {tentTasks.filter(t => !t.isDone).length}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="charts" className="space-y-6">
@@ -1606,6 +1621,98 @@ export default function TentDetails() {
                   </Button>
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
+
+          {/* ── Aba Tarefas ── */}
+          <TabsContent value="tasks" className="space-y-4">
+            {tentTasks.length === 0 ? (
+              <Card className="bg-card/90 backdrop-blur-sm">
+                <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
+                  <ListChecks className="w-10 h-10 text-muted-foreground/30" />
+                  <p className="text-sm font-medium text-muted-foreground">Nenhuma tarefa para esta semana</p>
+                  <p className="text-xs text-muted-foreground/60">Configure templates em Configurações → Tarefas</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Progresso */}
+                <Card className="bg-card/90 backdrop-blur-sm">
+                  <CardContent className="pt-4 pb-4 space-y-2">
+                    {(() => {
+                      const done = tentTasks.filter(t => t.isDone).length;
+                      const total = tentTasks.length;
+                      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                      return (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground font-medium">Progresso da semana</span>
+                            <span className="font-bold text-green-600">{pct}%</span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{done} concluídas</span>
+                            <span>{total - done} pendentes</span>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Lista de tarefas */}
+                <Card className="bg-card/90 backdrop-blur-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <ListChecks className="w-4 h-4 text-primary" />
+                      {tentTasks[0]?.phase === "VEGA" ? "Vegetativa" : tentTasks[0]?.phase === "FLORA" ? "Floração" : "Manutenção"}
+                      {tentTasks[0]?.weekNumber ? ` · Semana ${tentTasks[0].weekNumber}` : ""}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-2">
+                      {tentTasks.map((task) => (
+                        <div
+                          key={task.id || task.title}
+                          className={`flex items-start gap-3 px-3 py-3 rounded-lg border transition-all min-h-[52px] ${
+                            task.isDone
+                              ? "bg-primary/10 border-primary/20"
+                              : "bg-background border-border hover:border-green-300"
+                          }`}
+                        >
+                          <button
+                            onClick={() => { if (!task.isDone && task.id > 0) markTaskDone.mutate({ taskId: task.id }); }}
+                            disabled={task.isDone || task.id === 0}
+                            className="mt-0.5 shrink-0 p-1 -m-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {task.isDone
+                              ? <CheckCircle2 className="w-5 h-5 text-green-600" />
+                              : <Circle className="w-5 h-5 text-muted-foreground" />
+                            }
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium leading-snug ${task.isDone ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p className={`text-xs mt-0.5 leading-snug ${task.isDone ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                                {task.description}
+                              </p>
+                            )}
+                            {task.completedAt && (
+                              <p className="text-xs text-muted-foreground/60 mt-1">
+                                Concluída em {new Date(task.completedAt).toLocaleDateString("pt-BR")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </TabsContent>
         </Tabs>
