@@ -99,7 +99,7 @@ function ChatPlantPicker({
               <button
                 key={p.id}
                 onClick={() => onSelect(p)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted/60 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
               >
                 <div className={`w-11 h-11 rounded-xl ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
                   {letter}
@@ -108,7 +108,7 @@ function ChatPlantPicker({
                   <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />
               </button>
             );
           })}
@@ -124,7 +124,7 @@ function ChatPlantPicker({
         <button
           key={group.key}
           onClick={() => setSelectedGroup(group.key)}
-          className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
+          className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
         >
           <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
             <TentIcon className="w-6 h-6 text-muted-foreground" />
@@ -133,7 +133,7 @@ function ChatPlantPicker({
             <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground/40 shrink-0" />
+          <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
         </button>
       ))}
     </div>
@@ -367,7 +367,7 @@ export function BottomNav() {
                     <p className="text-base font-semibold text-foreground leading-tight">Treinamento</p>
                     <p className="text-xs text-muted-foreground/60 mt-0.5">LST, topping, super crop</p>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                 </button>
 
                 {/* IA Especialista — abre picker de planta */}
@@ -382,7 +382,7 @@ export function BottomNav() {
                     <p className="text-base font-semibold text-foreground leading-tight">IA Especialista</p>
                     <p className="text-xs text-muted-foreground/60 mt-0.5">Diagnóstico · LST · Tricomas</p>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                 </button>
               </div>
             )}
@@ -408,7 +408,7 @@ export function BottomNav() {
                           setTrainingPickerOpen(false);
                           navigate(`/plants/${plant.id}/training?sandbox=1`);
                         }}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 active:scale-[0.98] transition-all text-left"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
                       >
                         <span className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-emerald-500">
                           {(plant.name ?? '?')[0].toUpperCase()}
@@ -419,7 +419,7 @@ export function BottomNav() {
                             <p className="text-xs text-muted-foreground truncate">{plant.strain}</p>
                           )}
                         </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />
                       </button>
                     ))}
                   </div>
