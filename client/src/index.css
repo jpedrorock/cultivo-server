@@ -118,19 +118,19 @@
   --foreground: oklch(0.97 0 0);          /* branco puro — max contraste */
 
   /* Cards: step claro de elevação sobre o fundo */
-  --card: oklch(0.14 0.010 240);
+  --card: oklch(0.16 0.010 240);
   --card-foreground: oklch(0.97 0 0);
 
   /* Popover */
-  --popover: oklch(0.14 0.010 240);
+  --popover: oklch(0.16 0.010 240);
   --popover-foreground: oklch(0.97 0 0);
 
   /* Secondary */
-  --secondary: oklch(0.18 0.010 240);
+  --secondary: oklch(0.20 0.010 240);
   --secondary-foreground: oklch(0.97 0 0);
 
-  /* Muted — claramente diferente do foreground para hierarquia */
-  --muted: oklch(0.14 0.008 240);
+  /* Muted — claramente diferente do card para hierarquia visual */
+  --muted: oklch(0.12 0.008 240);
   --muted-foreground: oklch(0.46 0.008 240);
 
   /* Accent: leve tint verde */

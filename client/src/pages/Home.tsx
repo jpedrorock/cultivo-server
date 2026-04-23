@@ -166,8 +166,8 @@ export default function Home() {
         const cleanup = startMissingReadingsMonitor(getTentsData);
         return cleanup; // Cleanup on unmount
       }
-    } catch (e) {
-      console.error('Error starting missing readings monitor:', e);
+    } catch {
+      // silent — monitor not critical
     }
   }, [tents]);
 
