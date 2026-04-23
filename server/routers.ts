@@ -2382,6 +2382,33 @@ export const appRouter = router({
         return result[0] || null;
       }),
     
+    sparkline: protectedProcedure
+      .input(z.object({ tentId: z.number(), days: z.number().default(14) }))
+      .query(async ({ input, ctx }) => {
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
+        const pool = getMysqlPool();
+        // Group by calendar day → genuine day-over-day variation
+        const [rows]: any = await pool.execute(
+          `SELECT
+             DATE(logDate) AS day,
+             AVG(CAST(tempC AS DECIMAL(6,2))) AS tempC,
+             AVG(CAST(rhPct  AS DECIMAL(6,2))) AS rhPct
+           FROM dailyLogs
+           WHERE tentId = ?
+             AND logDate >= DATE_SUB(NOW(), INTERVAL ? DAY)
+             AND (tempC IS NOT NULL OR rhPct IS NOT NULL)
+           GROUP BY DATE(logDate)
+           ORDER BY day ASC
+           LIMIT 14`,
+          [input.tentId, input.days]
+        );
+        return (rows as any[]).map((r: any) => ({
+          day:   String(r.day),
+          tempC: r.tempC != null ? parseFloat(r.tempC) : null,
+          rhPct: r.rhPct  != null ? parseFloat(r.rhPct)  : null,
+        }));
+      }),
+
     getWeeklyData: protectedProcedure
       .input(z.object({ tentId: z.number() }))
       .query(async ({ input, ctx }) => {

@@ -1095,8 +1095,8 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { tentId: tent.id }
   );
 
-  const { data: recentLogs } = trpc.dailyLogs.list.useQuery(
-    { tentId: tent.id, limit: 5 },
+  const { data: sparklineData } = trpc.dailyLogs.sparkline.useQuery(
+    { tentId: tent.id, days: 14 },
     { staleTime: 5 * 60 * 1000 }
   );
 
@@ -1139,10 +1139,10 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   // Badge "A" aparece sempre que o sensor estiver mapeado (hasSensor), independente de ter leitura
   const isSensorAuto = !!(sensorReading?.hasSensor);
 
-  // Sparkline: últimos 5 registros em ordem cronológica + leitura ao vivo do sensor se disponível
-  const logTempsAsc = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
-  const logRhAsc    = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
-  // Injeta leitura ao vivo no final se diferir do último log — torna sparkline útil desde o 1º registro manual
+  // Sparkline: média diária dos últimos 14 dias (GROUP BY DATE) → variação real dia a dia
+  const logTempsAsc = (sparklineData ?? []).map(r => r.tempC).filter((v): v is number => v !== null);
+  const logRhAsc    = (sparklineData ?? []).map(r => r.rhPct).filter((v): v is number => v !== null);
+  // Injeta leitura ao vivo no final se diferir do último avg diário — garante ponto atual
   const liveTemp = (sensorReading?.tempC != null && sensorReading.hasSensor) ? sensorReading.tempC : null;
   const liveRh   = (sensorReading?.rhPct  != null && sensorReading.hasSensor) ? sensorReading.rhPct  : null;
   const lastLogTemp = logTempsAsc.at(-1) ?? null;
