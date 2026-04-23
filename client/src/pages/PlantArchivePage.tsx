@@ -201,9 +201,13 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
                 )}
                 {log.photoUrl && (
                   <img
-                    src={log.photoUrl}
+                    src={log.photoUrl.startsWith('/uploads/')
+                      ? `/api/upload/thumbnail?url=${encodeURIComponent(log.photoUrl)}&w=400&h=100&q=70`
+                      : log.photoUrl}
                     alt="Foto de saúde"
                     className="w-full h-24 object-cover rounded mt-2"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )}
               </div>
@@ -482,9 +486,13 @@ export default function PlantArchivePage() {
                     {plant.lastHealthPhotoUrl && (
                       <div className="mt-3">
                         <img
-                          src={plant.lastHealthPhotoUrl}
+                          src={plant.lastHealthPhotoUrl.startsWith('/uploads/')
+                            ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=400&h=135&q=75`
+                            : plant.lastHealthPhotoUrl}
                           alt={plant.name}
                           className="w-full h-32 object-cover rounded-md"
+                          loading="lazy"
+                          decoding="async"
                         />
                       </div>
                     )}

@@ -717,7 +717,15 @@ export default function PlantsList() {
                         <div className="flex items-center gap-3 px-3 pt-3 pb-2.5">
                           <div className="w-10 h-10 rounded-lg border border-border/20 overflow-hidden bg-white/3 shrink-0 grayscale opacity-50 flex items-center justify-center">
                             {plant.photoUrl
-                              ? <img src={plant.photoUrl} alt={plant.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                              ? <img
+                                  src={plant.photoUrl.startsWith('/uploads/')
+                                    ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.photoUrl)}&w=80&h=80&q=60`
+                                    : plant.photoUrl}
+                                  alt={plant.name}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
                               : <Sprout className="w-5 h-5 text-muted-foreground" />
                             }
                           </div>

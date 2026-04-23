@@ -1146,7 +1146,6 @@ export default function TentDetails() {
               <>
                 {/* Temperature Chart */}
                 <Card className="bg-card/90 backdrop-blur-sm relative overflow-hidden group/chart">
-                  {/* Pulsing glow — subtle "live data" feel */}
                   <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover/chart:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 0 1px rgba(249,115,22,0.15) inset' }} />
                   <div className="chart-glow-line pointer-events-none absolute bottom-0 left-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
                   <CardHeader>
@@ -1773,9 +1772,13 @@ function TentPlantsTab({ tentId, tentName }: { tentId: number; tentName: string 
               {plant.lastHealthPhoto && (
                 <div className="aspect-[4/3] overflow-hidden rounded-t-lg">
                   <img
-                    src={plant.lastHealthPhoto}
+                    src={plant.lastHealthPhoto.startsWith('/uploads/')
+                      ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhoto)}&w=320&h=240&q=75`
+                      : plant.lastHealthPhoto}
                     alt={plant.name}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
               )}

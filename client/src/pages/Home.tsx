@@ -933,65 +933,128 @@ export default function Home() {
 }
 
 
-// Mini sparkline — onda de brilho deslizando sobre a linha dos dados da semana
-function MiniSparkline({ values, color, w = 72, h = 26 }: { values: number[]; color: string; w?: number; h?: number }) {
+// Mini sparkline — onda sonora: linha neon com fill refletido + sweep de luz
+// chartId único por instância evita colisão de IDs SVG entre múltiplos cards
+function MiniSparkline({
+  values, color, w = 72, h = 28, chartId = "",
+}: {
+  values: number[];
+  color: string;
+  w?: number;
+  h?: number;
+  chartId?: string;
+}) {
   if (values.length < 2) return null;
 
-  // Linha suave pelos dados reais
-  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
-  const pts = values.map((v, i) =>
-    `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.78 - h * 0.11).toFixed(1)}`
-  );
-  const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const uid = `spark-${chartId || color.replace(/[^a-z0-9]/gi, "")}`;
 
-  const uid = `spark-${color.replace(/[^a-z0-9]/gi, "")}`;
-  // Onda ocupa ~45% da largura total — entra pela esquerda e sai pela direita
-  const waveW = Math.round(w * 0.55);
-  const dur = "4s";
+  // Pontos da linha — mapeados na metade superior (h*0.12 … h*0.88)
+  const pts = values.map((v, i) => ({
+    x: (i / (values.length - 1)) * w,
+    y: h * 0.88 - ((v - min) / range) * h * 0.76,
+  }));
+
+  // Path da linha principal
+  const linePath = pts.reduce(
+    (acc, p, i) => (i === 0 ? `M ${p.x.toFixed(1)},${p.y.toFixed(1)}` : `${acc} L ${p.x.toFixed(1)},${p.y.toFixed(1)}`),
+    ""
+  );
+
+  // Path do fill: linha + borda inferior fechada → área de preenchimento
+  const fillPath = `${linePath} L ${w},${h} L 0,${h} Z`;
+
+  // Path espelhado na metade inferior (reflexo): y invertido em relação ao centro h
+  const reflPts = pts.map(p => ({ x: p.x, y: h - p.y + h * 0.12 }));
+  const reflPath = reflPts.reduce(
+    (acc, p, i) => (i === 0 ? `M ${p.x.toFixed(1)},${p.y.toFixed(1)}` : `${acc} L ${p.x.toFixed(1)},${p.y.toFixed(1)}`),
+    ""
+  );
+
+  // Scan ocupa ~35% da largura e varre da esquerda para direita em loop
+  const scanW = Math.round(w * 0.38);
 
   return (
     <svg
       width={w} height={h}
       viewBox={`0 0 ${w} ${h}`}
-      style={{ overflow: "visible", opacity: 0.92, display: "block" }}
+      style={{ overflow: "visible", display: "block", opacity: 0.95 }}
     >
       <defs>
-        {/* Glow para o traço iluminado */}
-        <filter id={`${uid}-glow`} x="-60%" y="-100%" width="220%" height="300%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+        {/* Glow da linha principal */}
+        <filter id={`${uid}-glow`} x="-40%" y="-200%" width="180%" height="500%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.4" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
 
-        {/* Gradiente da onda: apagado → brilhante → apagado */}
-        <linearGradient id={`${uid}-wgrad`} gradientUnits="userSpaceOnUse"
-          x1="0" y1="0" x2={waveW} y2="0">
+        {/* Fill degradê: cor viva → transparente descendo */}
+        <linearGradient id={`${uid}-fill`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0"    />
+        </linearGradient>
+
+        {/* Reflexo degradê: transparente → muito suave subindo */}
+        <linearGradient id={`${uid}-refl`} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%"   stopColor={color} stopOpacity="0.10" />
+          <stop offset="100%" stopColor={color} stopOpacity="0"    />
+        </linearGradient>
+
+        {/* Sweep: faixa de luz branca que varre horizontalmente */}
+        <linearGradient id={`${uid}-sweep`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%"   stopColor="white" stopOpacity="0"   />
-          <stop offset="25%"  stopColor="white" stopOpacity="0.5" />
+          <stop offset="30%"  stopColor="white" stopOpacity="0.6" />
           <stop offset="55%"  stopColor="white" stopOpacity="1"   />
-          <stop offset="80%"  stopColor="white" stopOpacity="0.4" />
           <stop offset="100%" stopColor="white" stopOpacity="0"   />
         </linearGradient>
 
-        {/* Máscara que desliza da esquerda para a direita */}
-        <mask id={`${uid}-mask`}>
-          <rect x="0" y="-4" width={waveW} height={h + 8} fill={`url(#${uid}-wgrad)`}>
+        <mask id={`${uid}-smask`}>
+          <rect x="0" y="-8" width={scanW} height={h + 16} fill={`url(#${uid}-sweep)`}>
             <animateTransform
               attributeName="transform" type="translate"
-              values={`${-waveW},0; ${w + 4},0`}
-              dur={dur} repeatCount="indefinite" calcMode="linear"
+              values={`${-scanW},0; ${w + scanW},0`}
+              dur="2.8s" repeatCount="indefinite" calcMode="linear"
             />
           </rect>
         </mask>
       </defs>
 
-      {/* Linha iluminada — brilha só onde a onda passa */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5"
+      {/* Fill sob a linha */}
+      <path d={fillPath} fill={`url(#${uid}-fill)`} />
+
+      {/* Reflexo (espelho inferior) — cria efeito de onda sonora */}
+      <path d={reflPath} fill="none"
+        stroke={color} strokeWidth="1" strokeOpacity="0.22"
+        strokeLinecap="round" strokeLinejoin="round"
+      />
+      <path
+        d={`${reflPath} L ${w},${h * 0.88} L 0,${h * 0.88} Z`}
+        fill={`url(#${uid}-refl)`}
+      />
+
+      {/* Linha principal base — dim */}
+      <path d={linePath} fill="none"
+        stroke={color} strokeWidth="1.5" strokeOpacity="0.45"
+        strokeLinecap="round" strokeLinejoin="round"
+      />
+
+      {/* Linha principal com glow — brilhante */}
+      <path d={linePath} fill="none"
+        stroke={color} strokeWidth="2" strokeOpacity="0.9"
         strokeLinecap="round" strokeLinejoin="round"
         filter={`url(#${uid}-glow)`}
-        mask={`url(#${uid}-mask)`} />
+      />
+
+      {/* Sweep de luz sobre a linha */}
+      <path d={linePath} fill="none"
+        stroke="white" strokeWidth="2.5" strokeOpacity="1"
+        strokeLinecap="round" strokeLinejoin="round"
+        mask={`url(#${uid}-smask)`}
+      />
     </svg>
   );
 }
@@ -1031,11 +1094,9 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   );
 
   const { data: recentLogs } = trpc.dailyLogs.list.useQuery(
-    { tentId: tent.id, limit: 7 },
+    { tentId: tent.id, limit: 5 },
     { staleTime: 5 * 60 * 1000 }
   );
-  const sparkTemps = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
-  const sparkRh    = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
 
   // Buscar targets ideais - usa média das strains das plantas na estufa
   const currentWeek = cycle ? (() => {
@@ -1075,6 +1136,18 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   );
   // Badge "A" aparece sempre que o sensor estiver mapeado (hasSensor), independente de ter leitura
   const isSensorAuto = !!(sensorReading?.hasSensor);
+
+  // Sparkline: últimos 5 registros em ordem cronológica + leitura ao vivo do sensor se disponível
+  const logTempsAsc = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
+  const logRhAsc    = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
+  // Injeta leitura ao vivo no final se diferir do último log — torna sparkline útil desde o 1º registro manual
+  const liveTemp = (sensorReading?.tempC != null && sensorReading.hasSensor) ? sensorReading.tempC : null;
+  const liveRh   = (sensorReading?.rhPct  != null && sensorReading.hasSensor) ? sensorReading.rhPct  : null;
+  const lastLogTemp = logTempsAsc.at(-1) ?? null;
+  const lastLogRh   = logRhAsc.at(-1) ?? null;
+  const injectLive  = liveTemp !== null && (lastLogTemp === null || Math.abs(lastLogTemp - liveTemp) > 0.05);
+  const sparkTemps  = injectLive ? [...logTempsAsc, liveTemp] : logTempsAsc;
+  const sparkRh     = injectLive && liveRh !== null ? [...logRhAsc, liveRh] : (lastLogRh === null && liveRh !== null ? [liveRh] : logRhAsc);
 
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
@@ -1411,7 +1484,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   }
                 </p>
               </div>
-              <MiniSparkline values={sparkTemps} color="#f97316" />
+              <MiniSparkline values={sparkTemps} color="#f97316" chartId={`t${tent.id}-temp`} />
               {isSensorAuto && (
                 <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-cyan-400 opacity-80"><Wifi className="w-3 h-3" /></span>
               )}
@@ -1436,7 +1509,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   }
                 </p>
               </div>
-              <MiniSparkline values={sparkRh} color="#0891b2" />
+              <MiniSparkline values={sparkRh} color="#0891b2" chartId={`t${tent.id}-rh`} />
               {isSensorAuto && (
                 <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-cyan-400 opacity-80"><Wifi className="w-3 h-3" /></span>
               )}
