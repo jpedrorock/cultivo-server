@@ -63,11 +63,14 @@ export function PageHeader({
   backHref,
   rightActions,
   sticky = true,
-  spacerHeight = "64px",
+  spacerHeight,
   className,
   titleClassName,
   children,
 }: PageHeaderProps) {
+  // Altura do spacer: com subtitle o header é ~88px, sem subtitle ~64px
+  // Quem passar spacerHeight explícito sempre tem precedência
+  const resolvedSpacerHeight = spacerHeight ?? (subtitle ? "88px" : "64px");
   const [, navigate] = useLocation();
 
   const handleBack = (e: MouseEvent<HTMLAnchorElement>) => {
@@ -136,7 +139,7 @@ export function PageHeader({
       <div
         aria-hidden="true"
         className="pt-safe"
-        style={{ paddingBottom: spacerHeight }}
+        style={{ paddingBottom: resolvedSpacerHeight }}
       />
     </>
   );

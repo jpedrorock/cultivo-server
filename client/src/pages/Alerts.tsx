@@ -126,6 +126,7 @@ export default function Alerts() {
             </>
           }
           subtitle="Toque em um alerta para marcá-lo como visto"
+          spacerHeight="88px"
           rightActions={
             <>
               {newCount > 0 && (
