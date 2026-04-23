@@ -94,7 +94,10 @@ static const lv_image_dsc_t *NAV_ICONS_IMG[5] = {
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblVpd, *lblPpfd;
-static lv_obj_t *lblCiclo, *ciclBar;       // strip de ciclo (fase + semana)
+static lv_obj_t *lblEcHome, *lblPhHome;       // face B: EC + pH
+static lv_obj_t *lblCiclo, *ciclBar;          // face B: card de ciclo
+static lv_obj_t *homeFaceA, *homeFaceB;       // containers das 2 faces
+static int homeFace = 0;                      // 0 = sensores, 1 = nutrientes+ciclo
 static lv_obj_t *arcTemp;
 static lv_obj_t *sparkRh, *sparkVpd, *sparkPpfd;
 static lv_chart_series_t *serRhS, *serVpdS, *serPpfdS;
@@ -237,14 +240,31 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_14, 0);
   lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(36), sh(6));
 
-  // Corpo: arc grande a esquerda + coluna de mini-cards a direita.
-  // Reservamos stripH + gaps pro strip de ciclo no rodape; aumentei o
-  // bottomGap pra dar respiro entre strip e navbar (antes colavam).
-  int stripH    = sh(26);
-  int stripGap  = sh(4);
-  int bottomGap = sh(12);
+  // Botao flip: alterna a Home entre face A (sensores) e face B (nutrientes/ciclo)
+  lv_obj_t *btnFlip = lv_label_create(tab);
+  lv_label_set_text(btnFlip, LV_SYMBOL_REFRESH);
+  lv_obj_set_style_text_color(btnFlip, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(btnFlip, &lv_font_montserrat_14, 0);
+  lv_obj_align(btnFlip, LV_ALIGN_TOP_RIGHT, -sw(56), sh(6));
+  lv_obj_add_flag(btnFlip, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(btnFlip, sw(8));  // hit area maior pro touch
+  lv_obj_add_event_cb(btnFlip, [](lv_event_t *e) {
+    (void)e;
+    homeFace = 1 - homeFace;
+    if (homeFace == 0) {
+      lv_obj_clear_flag(homeFaceA, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(homeFaceB, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_add_flag(homeFaceA, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_clear_flag(homeFaceB, LV_OBJ_FLAG_HIDDEN);
+    }
+  }, LV_EVENT_CLICKED, NULL);
+
+  // Corpo: arc grande a esquerda + 2 faces de mini-cards a direita
+  // (alternadas pelo botao flip). Sem strip no rodape agora — a info
+  // de ciclo virou um dos cards da face B.
   int bodyY = sh(42);
-  int bodyH = TAB_H - bodyY - stripH - stripGap - bottomGap;
+  int bodyH = TAB_H - bodyY - sh(4);
   int halfW = SCREEN_W / 2;
 
   int arcSize = (bodyH < halfW - sw(8)) ? bodyH : halfW - sw(8);
@@ -289,17 +309,32 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_text_font(lblTempUnit, FONT_CAPTION, 0);
   lv_obj_align(lblTempUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
 
-  // 3 mini-cards a direita
+  // 3 mini-cards a direita — cada face em seu proprio container
+  // transparente; trocar de face e apenas hide/show o container.
   int rightX = halfW + sw(2);
   int cardW = SCREEN_W - rightX - sw(4);
   int cardGap = sh(4);
   int cardH = (bodyH - 2 * cardGap) / 3;
 
-  auto makeMiniCard = [&](int yOffset, const char *label, const char *initVal,
+  auto makeFaceContainer = [&]() -> lv_obj_t* {
+    lv_obj_t *ctr = lv_obj_create(tab);
+    lv_obj_set_size(ctr, cardW, bodyH);
+    lv_obj_set_pos(ctr, rightX, bodyY);
+    lv_obj_set_style_bg_opa(ctr, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ctr, 0, 0);
+    lv_obj_set_style_pad_all(ctr, 0, 0);
+    lv_obj_clear_flag(ctr, LV_OBJ_FLAG_SCROLLABLE);
+    return ctr;
+  };
+  homeFaceA = makeFaceContainer();
+  homeFaceB = makeFaceContainer();
+  lv_obj_add_flag(homeFaceB, LV_OBJ_FLAG_HIDDEN);
+
+  auto makeMiniCard = [&](lv_obj_t *parent, int yOffset, const char *label, const char *initVal,
                           uint32_t color, const lv_image_dsc_t *icon,
                           lv_obj_t **sparkOut, lv_chart_series_t **serOut,
                           uint32_t pulseDelayMs) -> lv_obj_t* {
-    lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
+    lv_obj_t *c = makeCard(parent, 0, yOffset, cardW, cardH);
     lv_obj_set_style_pad_all(c, sw(4), 0);
     // Ring-pulse defasado: 3 cards a 2800ms com offsets distribuidos no
     // periodo ficam visivelmente fora de fase e a tela "respira" em vez
@@ -358,9 +393,10 @@ static void buildHome(lv_obj_t *tab) {
     return v;
   };
 
-  lblRh   = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,    &sparkRh,   &serRhS,     0);
-  lblVpd  = makeMiniCard(cardH + cardGap,       "VPD",     "--", COL_RED, &ic_droplets,   &sparkVpd,  &serVpdS,  933);
-  lblPpfd = makeMiniCard((cardH + cardGap) * 2, "PPFD",    "--", COL_YEL, &ic_lightbulb,  &sparkPpfd, &serPpfdS,1866);
+  // Face A — sensores de ambiente
+  lblRh   = makeMiniCard(homeFaceA, 0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,    &sparkRh,   &serRhS,     0);
+  lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_RED, &ic_droplets,   &sparkVpd,  &serVpdS,  933);
+  lblPpfd = makeMiniCard(homeFaceA, (cardH + cardGap) * 2, "PPFD",    "--", COL_YEL, &ic_lightbulb,  &sparkPpfd, &serPpfdS,1866);
 
   lv_chart_set_range(sparkRh,   LV_CHART_AXIS_PRIMARY_Y, 0, 100);
   lv_chart_set_range(sparkVpd,  LV_CHART_AXIS_PRIMARY_Y, 0, 30);     // VPD * 10 (0-3.0 kPa)
@@ -371,54 +407,65 @@ static void buildHome(lv_obj_t *tab) {
     lv_chart_set_next_value(sparkPpfd, serPpfdS, (int32_t)currentPpfd);
   }
 
-  // ═══ Strip de ciclo (fase + semana + barra) no rodape ═══
-  int stripY = bodyY + bodyH + stripGap;
-  lv_obj_t *strip = makeCard(tab, sw(4), stripY, SCREEN_W - sw(8), stripH);
-  lv_obj_set_style_pad_hor(strip, sw(8), 0);
-  lv_obj_set_style_pad_ver(strip, 0, 0);
-  lv_obj_clear_flag(strip, LV_OBJ_FLAG_SCROLLABLE);
+  // Face B — nutrientes (EC/pH) + ciclo. As sparklines destes dois cards
+  // ficam "mudas" por enquanto (sem historico mockado) — se quiser depois
+  // e so alimentar num timer igual as da face A.
+  static lv_obj_t *sparkEcHome = nullptr, *sparkPhHome = nullptr;
+  static lv_chart_series_t *serEcHome = nullptr, *serPhHome = nullptr;
+  lblEcHome = makeMiniCard(homeFaceB, 0,               "EC", "--", COL_PRP, &ic_test_tube, &sparkEcHome, &serEcHome, 0);
+  lblPhHome = makeMiniCard(homeFaceB, cardH + cardGap, "pH", "--", COL_GRN, &ic_beaker,    &sparkPhHome, &serPhHome, 933);
+  lv_chart_set_range(sparkEcHome, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
+  lv_chart_set_range(sparkPhHome, LV_CHART_AXIS_PRIMARY_Y, 40, 90);
+  for (int i = 0; i < 20; i++) {
+    lv_chart_set_next_value(sparkEcHome, serEcHome, (int32_t)(ecv * 10));
+    lv_chart_set_next_value(sparkPhHome, serPhHome, (int32_t)(phv * 10));
+  }
 
-  // Pill colorida com FASE (ex: VEGA / FLORACAO)
-  lv_obj_t *phasePill = lv_obj_create(strip);
-  lv_obj_set_size(phasePill, sw(48), sh(16));
-  lv_obj_align(phasePill, LV_ALIGN_LEFT_MID, 0, 0);
-  lv_obj_set_style_bg_color(phasePill, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_bg_opa(phasePill, LV_OPA_30, 0);
-  lv_obj_set_style_border_color(phasePill, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(phasePill, 1, 0);
-  lv_obj_set_style_radius(phasePill, sh(8), 0);
-  lv_obj_set_style_pad_all(phasePill, 0, 0);
-  lv_obj_clear_flag(phasePill, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_t *phaseLbl = lv_label_create(phasePill);
-  lv_label_set_text(phaseLbl, FASE);
-  lv_obj_set_style_text_color(phaseLbl, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_text_font(phaseLbl, FONT_CAPTION, 0);
-  lv_obj_center(phaseLbl);
+  // Card de ciclo (3o card da face B): layout especial — no lugar da
+  // sparkline vai a barra de progresso do ciclo (semana atual / total).
+  {
+    int yOff = (cardH + cardGap) * 2;
+    lv_obj_t *c = makeCard(homeFaceB, 0, yOff, cardW, cardH);
+    lv_obj_set_style_pad_all(c, sw(4), 0);
+    applyRingPulse(c, COL_GRN, 2800, 1866);
 
-  // "Sem 12 / ~16"
-  char ciclBuf[32];
-  snprintf(ciclBuf, sizeof(ciclBuf), "Sem %d / ~%d", semana, totalSem);
-  lblCiclo = makeLabel(strip, ciclBuf, COL_TEXT, FONT_BODY,
-                       LV_ALIGN_LEFT_MID, sw(56), 0);
+    lv_obj_t *ico = lv_image_create(c);
+    lv_image_set_src(ico, &ic_sprout);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(COL_GRN), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, sh(2));
 
-  // "~N restantes" a direita
-  char restBuf[24];
-  int rest = (totalSem > semana) ? (totalSem - semana) : 0;
-  snprintf(restBuf, sizeof(restBuf), "~%d restantes", rest);
-  makeLabel(strip, restBuf, COL_DIM, FONT_CAPTION,
-            LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_t *lb = lv_label_create(c);
+    lv_label_set_text(lb, FASE);
+    lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
+    lv_obj_align(lb, LV_ALIGN_TOP_LEFT, sw(22), sh(4));
 
-  // Barra de progresso do ciclo — linha fina alinhada no rodape do strip
-  ciclBar = lv_bar_create(strip);
-  lv_obj_set_size(ciclBar, SCREEN_W - sw(24), sh(3));
-  lv_obj_align(ciclBar, LV_ALIGN_BOTTOM_MID, 0, -sh(2));
-  lv_bar_set_range(ciclBar, 0, totalSem > 0 ? totalSem : 1);
-  lv_bar_set_value(ciclBar, semana, LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_bg_opa(ciclBar, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(ciclBar, sh(2), 0);
-  lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-  lv_obj_set_style_radius(ciclBar, sh(2), LV_PART_INDICATOR);
+    char ciclBuf[16];
+    snprintf(ciclBuf, sizeof(ciclBuf), "%d/%d", semana, totalSem);
+    lblCiclo = lv_label_create(c);
+    lv_label_set_text(lblCiclo, ciclBuf);
+    lv_obj_set_style_text_color(lblCiclo, lv_color_hex(COL_GRN), 0);
+    lv_obj_set_style_text_font(lblCiclo, FONT_TITLE, 0);
+    lv_obj_align(lblCiclo, LV_ALIGN_RIGHT_MID, 0, 0);
+    applyBloom(lblCiclo, COL_GRN);
+
+    // Barra de progresso no lugar da sparkline (mesmo footprint)
+    int barW = cardW - sw(60) - sw(6);
+    ciclBar = lv_bar_create(c);
+    lv_obj_set_size(ciclBar, barW, sh(6));
+    lv_obj_align(ciclBar, LV_ALIGN_BOTTOM_LEFT, 0, -sh(2));
+    lv_bar_set_range(ciclBar, 0, totalSem > 0 ? totalSem : 1);
+    lv_bar_set_value(ciclBar, semana, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_bg_opa(ciclBar, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(ciclBar, sh(3), 0);
+    lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+    lv_obj_set_style_radius(ciclBar, sh(3), LV_PART_INDICATOR);
+    lv_obj_set_style_shadow_color(ciclBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+    lv_obj_set_style_shadow_width(ciclBar, 10, LV_PART_INDICATOR);
+    lv_obj_set_style_shadow_opa(ciclBar, LV_OPA_40, LV_PART_INDICATOR);
+  }
 }
 
 static void refreshHomeValues() {
@@ -443,6 +490,21 @@ static void refreshHomeValues() {
     snprintf(buf, sizeof(buf), "%d", currentPpfd);
     lv_label_set_text(lblPpfd, buf);
   }
+
+  // Face B (escondida no primeiro load mas refresh nao custa nada)
+  if (lblEcHome) {
+    snprintf(buf, sizeof(buf), "%.1f", ecv);
+    lv_label_set_text(lblEcHome, buf);
+  }
+  if (lblPhHome) {
+    snprintf(buf, sizeof(buf), "%.1f", phv);
+    lv_label_set_text(lblPhHome, buf);
+  }
+  if (lblCiclo) {
+    snprintf(buf, sizeof(buf), "%d/%d", semana, totalSem);
+    lv_label_set_text(lblCiclo, buf);
+  }
+  if (ciclBar) lv_bar_set_value(ciclBar, semana, LV_ANIM_OFF);
 }
 
 // Timer de pulso: anima sparklines + arc pra simular monitor ao vivo
