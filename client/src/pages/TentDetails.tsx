@@ -860,106 +860,37 @@ export default function TentDetails() {
       {/* Main Content */}
       <main className="container py-6 max-w-7xl space-y-6">
 
-        {/* ── Stat cards do ÚLTIMO registro ── */}
-        {(() => {
-          const last = logs?.[0];
-          type StatCard = { label: string; value: string; unit: string; icon: React.ReactNode; ok: boolean | null };
-          const stats: StatCard[] = [
-            {
-              label: "Temperatura",
-              value: last?.tempC ? parseFloat(last.tempC).toFixed(1) : "—",
-              unit: "°C",
-              icon: <ThermometerSun className="w-4 h-4 text-orange-500" />,
-              ok: last?.tempC ? (parseFloat(last.tempC) >= 20 && parseFloat(last.tempC) <= 28) : null,
-            },
-            {
-              label: "Umidade",
-              value: last?.rhPct ? parseFloat(last.rhPct).toFixed(0) : "—",
-              unit: "%",
-              icon: <Droplets className="w-4 h-4 text-teal-400" />,
-              ok: last?.rhPct ? (parseFloat(last.rhPct) >= 40 && parseFloat(last.rhPct) <= 70) : null,
-            },
-            {
-              label: "PPFD",
-              value: last?.ppfd ? String(last.ppfd) : "—",
-              unit: "µmol",
-              icon: <Sun className="w-4 h-4 text-yellow-500" />,
-              ok: last?.ppfd ? (last.ppfd >= 400 && last.ppfd <= 900) : null,
-            },
-            {
-              label: "pH",
-              value: last?.ph ? parseFloat(last.ph).toFixed(1) : "—",
-              unit: "",
-              icon: <TestTube className="w-4 h-4 text-purple-500" />,
-              ok: last?.ph ? (parseFloat(last.ph) >= 5.8 && parseFloat(last.ph) <= 6.5) : null,
-            },
-            {
-              label: "EC",
-              value: last?.ec ? parseFloat(last.ec).toFixed(1) : "—",
-              unit: "mS",
-              icon: <Zap className="w-4 h-4 text-emerald-500" />,
-              ok: last?.ec ? (parseFloat(last.ec) >= 1.0 && parseFloat(last.ec) <= 2.5) : null,
-            },
-            {
-              label: "Rega",
-              value: last?.wateringVolume ? String(last.wateringVolume) : "—",
-              unit: "ml",
-              icon: <Droplets className="w-4 h-4 text-cyan-400" />,
-              ok: null,
-            },
-            {
-              label: "Runoff",
-              value: last?.runoffPercentage ? `${parseFloat(last.runoffPercentage).toFixed(0)}%` : "—",
-              unit: "",
-              icon: <Percent className="w-4 h-4 text-emerald-400" />,
-              ok: last?.runoffPercentage ? (parseFloat(last.runoffPercentage) >= 10 && parseFloat(last.runoffPercentage) <= 30) : null,
-            },
-            {
-              label: "Fotoperíodo",
-              value: (weekTargets as any)?.photoperiod ?? "—",
-              unit: "",
-              icon: <Sun className="w-4 h-4 text-amber-400" />,
-              ok: null,
-            },
-          ];
+        {/* ── Último registro — linha compacta ── */}
+        {logs && logs.length > 0 && (() => {
+          const last = logs[0];
+          type Pill = { icon: React.ReactNode; value: string; ok: boolean | null };
+          const pills: Pill[] = [
+            { icon: <ThermometerSun className="w-3 h-3 text-orange-400" />, value: last.tempC ? `${parseFloat(last.tempC).toFixed(1)}°C` : "—", ok: last.tempC ? (parseFloat(last.tempC) >= 20 && parseFloat(last.tempC) <= 28) : null },
+            { icon: <Droplets className="w-3 h-3 text-teal-400" />,         value: last.rhPct  ? `${parseFloat(last.rhPct).toFixed(0)}%`  : "—", ok: last.rhPct  ? (parseFloat(last.rhPct)  >= 40 && parseFloat(last.rhPct)  <= 70) : null },
+            { icon: <TestTube  className="w-3 h-3 text-purple-400" />,      value: last.ph     ? `pH ${parseFloat(last.ph).toFixed(1)}`    : "—", ok: last.ph     ? (parseFloat(last.ph)    >= 5.8 && parseFloat(last.ph)    <= 6.5) : null },
+            { icon: <Zap       className="w-3 h-3 text-emerald-400" />,     value: last.ec     ? `${parseFloat(last.ec).toFixed(1)} mS`    : "—", ok: last.ec     ? (parseFloat(last.ec)    >= 1.0 && parseFloat(last.ec)    <= 2.5) : null },
+            { icon: <Droplets  className="w-3 h-3 text-cyan-400" />,        value: last.wateringVolume ? `${last.wateringVolume}ml`         : "—", ok: null },
+            { icon: <Sun       className="w-3 h-3 text-amber-400" />,       value: (weekTargets as any)?.photoperiod ? `${(weekTargets as any).photoperiod}h` : "—", ok: null },
+          ].filter(p => p.value !== "—");
+          if (pills.length === 0) return null;
           return (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  Último registro
-                  {last && (
-                    <span className="text-xs text-muted-foreground/70 ml-1">
-                      {format(new Date(last.logDate), "dd/MM HH:mm", { locale: ptBR })}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-8 gap-2">
-                {stats.map((s) => (
-                  <div
-                    key={s.label}
-                    className={`rounded-xl border p-3 flex flex-col gap-1 ${
-                      s.ok === null
-                        ? "bg-muted/40 border-border"
-                        : s.ok
-                        ? "bg-emerald-500/5 border-emerald-500/20"
-                        : "bg-red-500/5 border-red-500/20"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      {s.icon}
-                      <span className="text-xs text-muted-foreground font-medium">{s.label}</span>
-                    </div>
-                    <p className={`text-xl font-bold leading-none ${
-                      s.ok === null ? "text-muted-foreground" : s.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
-                    }`}>
-                      {s.value}
-                      {s.unit && <span className="text-xs font-normal ml-0.5 text-muted-foreground">{s.unit}</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
+            <div className="flex items-center gap-1 flex-wrap px-1">
+              <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mr-1 shrink-0">
+                <Clock className="w-2.5 h-2.5" />
+                {format(new Date(last.logDate), "dd/MM HH:mm", { locale: ptBR })}
+              </span>
+              {pills.map((p, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                    p.ok === null    ? "bg-muted/30 border-border/40 text-muted-foreground" :
+                    p.ok            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
+                                      "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {p.icon}{p.value}
+                </span>
+              ))}
             </div>
           );
         })()}

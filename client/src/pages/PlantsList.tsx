@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
@@ -61,6 +61,26 @@ export default function PlantsList() {
   const [expandedTents, setExpandedTents] = useState<Set<number>>(
     tentParam ? new Set([parseInt(tentParam)]) : new Set()
   );
+  // Expande todos os grupos na primeira carga (se não houver tentParam)
+  const expandedInitRef = useRef(false);
+  useEffect(() => {
+    if (expandedInitRef.current || !tents?.length) return;
+    expandedInitRef.current = true;
+    if (!tentParam) setExpandedTents(new Set(tents.map(t => t.id)));
+  }, [tents]);
+
+  // Hold-to-select: pressionar e segurar 400ms ativa seleção
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startHold = (plantId: number) => {
+    holdTimerRef.current = setTimeout(() => {
+      togglePlantSelection(plantId);
+      (navigator as any).vibrate?.(40);
+      holdTimerRef.current = null;
+    }, 400);
+  };
+  const cancelHold = () => {
+    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+  };
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [selectedPlants, setSelectedPlants] = useState<Set<number>>(new Set());
 
@@ -297,7 +317,7 @@ export default function PlantsList() {
     <PageTransition>
       <div className="min-h-screen bg-background">
       {/* Header — fixed para funcionar dentro do scroll do iOS */}
-      <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe">
+      <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-40 pt-safe">
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -460,7 +480,7 @@ export default function PlantsList() {
                         const letter = (p.name ?? '?')[0].toUpperCase();
                         const thumbUrl = p.lastHealthPhotoUrl
                           ? (p.lastHealthPhotoUrl.startsWith('/uploads/')
-                              ? `/api/upload/thumbnail?url=${encodeURIComponent(p.lastHealthPhotoUrl)}&w=120&h=120&q=70`
+                              ? `/api/upload/thumbnail?url=${encodeURIComponent(p.lastHealthPhotoUrl)}&w=96&h=96&q=45`
                               : p.lastHealthPhotoUrl)
                           : null;
                         return (
@@ -521,7 +541,7 @@ export default function PlantsList() {
 
                           const thumbUrl = plant.lastHealthPhotoUrl
                             ? (plant.lastHealthPhotoUrl.startsWith('/uploads/')
-                                ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=300&h=400&q=75`
+                                ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=220&h=300&q=55`
                                 : plant.lastHealthPhotoUrl)
                             : null;
 
@@ -532,6 +552,10 @@ export default function PlantsList() {
                                 isSelected ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-background scale-[0.96]' : ''
                               }`}
                               style={{ background: cardBg }}
+                              onPointerDown={() => startHold(plant.id)}
+                              onPointerUp={cancelHold}
+                              onPointerLeave={cancelHold}
+                              onContextMenu={e => e.preventDefault()}
                             >
                               {/* Badge saúde / toggle seleção — canto superior esquerdo */}
                               <button
