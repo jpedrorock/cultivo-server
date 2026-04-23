@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings, CheckCircle2, Circle, ListChecks } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -369,8 +369,6 @@ export default function TentDetails() {
 
   // Plants — loaded at page level so the PDF export has access
   const { data: tentPlants } = trpc.plants.list.useQuery({ tentId });
-  const { data: strainsList } = trpc.strains.list.useQuery();
-  const getStrainName = (strainId: number) => strainsList?.find(s => s.id === strainId)?.name ?? null;
 
   // Filter logs by dateRange client-side for charts/averages (must be before conditional returns — Rules of Hooks)
   const filteredLogs = useMemo(() => {
@@ -1025,9 +1023,6 @@ export default function TentDetails() {
             <TabsTrigger value="history" className="flex-1">
               Histórico
             </TabsTrigger>
-            <TabsTrigger value="plants" className="flex-1">
-              Plantas
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="charts" className="space-y-6">
@@ -1539,63 +1534,6 @@ export default function TentDetails() {
             )}
           </TabsContent>
 
-          {/* ── Aba Plantas ── */}
-          <TabsContent value="plants" className="space-y-3">
-            {!tentPlants || tentPlants.length === 0 ? (
-              <Card className="bg-card/90 backdrop-blur-sm">
-                <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
-                  <Leaf className="w-10 h-10 text-muted-foreground/30" />
-                  <p className="text-sm font-medium text-muted-foreground">Nenhuma planta nesta estufa</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {tentPlants.map((plant) => (
-                  <Link key={plant.id} href={`/plants/${plant.id}`}>
-                    <div className="bg-card/90 backdrop-blur-sm border border-border rounded-2xl overflow-hidden hover:border-primary/40 active:scale-95 transition-all duration-150 cursor-pointer">
-                      {/* Foto */}
-                      <div className="relative w-full aspect-square bg-muted">
-                        {(plant.lastHealthPhotoUrl ?? plant.photoUrl) ? (
-                          <img
-                            src={(plant.lastHealthPhotoUrl ?? plant.photoUrl).startsWith('/uploads/')
-                              ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl ?? plant.photoUrl)}&w=200&h=200&q=55`
-                              : (plant.lastHealthPhotoUrl ?? plant.photoUrl)}
-                            alt={plant.name}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Leaf className="w-8 h-8 text-muted-foreground/20" />
-                          </div>
-                        )}
-                        {/* Status badge (saúde da planta) */}
-                        {plant.lastHealthStatus && (
-                          <span className={`absolute top-1.5 right-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
-                            plant.lastHealthStatus === 'healthy' ? 'bg-green-500/90 text-white' :
-                            plant.lastHealthStatus === 'attention' ? 'bg-amber-500/90 text-white' :
-                            plant.lastHealthStatus === 'sick' ? 'bg-red-500/90 text-white' :
-                            'bg-muted/80 text-muted-foreground'
-                          }`}>
-                            {plant.lastHealthStatus === 'healthy' ? 'Saudável' :
-                             plant.lastHealthStatus === 'attention' ? 'Atenção' :
-                             plant.lastHealthStatus === 'sick' ? 'Doente' : plant.lastHealthStatus}
-                          </span>
-                        )}
-                      </div>
-                      {/* Info */}
-                      <div className="p-2.5">
-                        <p className="text-xs font-semibold text-foreground truncate">{plant.name}</p>
-                        {plant.strainId && getStrainName(plant.strainId) && (
-                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{getStrainName(plant.strainId)}</p>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </TabsContent>
         </Tabs>
       </main>
 
@@ -1692,118 +1630,107 @@ export default function TentDetails() {
   );
 }
 
-// Componente para aba de plantas da estufa
+// Componente para lista de plantas da estufa — estilo PlantsList (cards foto full-cover)
 function TentPlantsTab({ tentId, tentName }: { tentId: number; tentName: string }) {
   const { data: plants, isLoading } = trpc.plants.list.useQuery({ tentId });
   const { data: strains } = trpc.strains.list.useQuery();
 
-  const getStrainName = (strainId: number) => {
-    return strains?.find((s) => s.id === strainId)?.name || "--";
-  };
-
-  // getStatusColor e getStatusLabel importados de @/lib/plantUtils
-
-  const getHealthIcon = (status?: string) => {
-    switch (status) {
-      case "HEALTHY": return <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0 inline-block"/>;
-      case "STRESSED": return <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0 inline-block"/>;
-      case "SICK": return <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block"/>;
-      case "RECOVERING": return <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0 inline-block"/>;
-      default: return <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/30 shrink-0 inline-block"/>;
-    }
-  };
+  const getStrainName = (strainId: number) =>
+    strains?.find((s) => s.id === strainId)?.name ?? null;
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="grid grid-cols-3 gap-2.5">
+        {[1,2,3].map(i => (
+          <div key={i} className="rounded-2xl aspect-[3/4] bg-muted/40 animate-pulse" />
+        ))}
       </div>
     );
   }
 
   if (!plants || plants.length === 0) {
     return (
-      <Card className="bg-card/90 backdrop-blur-sm">
-        <CardContent className="p-12 text-center">
-          <Leaf className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground mb-2">Nenhuma planta nesta estufa</p>
-          <p className="text-muted-foreground mb-4">Adicione plantas para acompanhar o crescimento</p>
-          <Button asChild>
-            <Link href="/plants/new">
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Planta
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <Leaf className="w-10 h-10 text-muted-foreground/20" />
+        <p className="text-sm text-muted-foreground">Nenhuma planta nesta estufa</p>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/plants/new"><Plus className="w-3.5 h-3.5 mr-1.5" />Nova Planta</Link>
+        </Button>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {plants.length} {plants.length === 1 ? "planta" : "plantas"} em {tentName}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-0.5">
+        <p className="text-xs text-muted-foreground">
+          {plants.length} {plants.length === 1 ? "planta" : "plantas"}
         </p>
-        <Button asChild size="sm">
-          <Link href="/plants/new">
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Planta
-          </Link>
+        <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+          <Link href="/plants/new"><Plus className="w-3 h-3 mr-1" />Nova</Link>
         </Button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {plants.map((plant: any) => (
-          <Link key={plant.id} href={`/plants/${plant.id}`}>
-            <Card className="bg-card/90 backdrop-blur-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer h-full">
-              {/* Foto da planta */}
-              {plant.lastHealthPhoto && (
-                <div className="aspect-[4/3] overflow-hidden rounded-t-lg">
-                  <img
-                    src={plant.lastHealthPhoto.startsWith('/uploads/')
-                      ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhoto)}&w=320&h=240&q=75`
-                      : plant.lastHealthPhoto}
-                    alt={plant.name}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-              )}
-              <CardHeader className={plant.lastHealthPhoto ? "pt-3" : ""}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{plant.name}</CardTitle>
-                    {plant.code && (
-                      <CardDescription className="text-sm font-mono">{plant.code}</CardDescription>
-                    )}
-                  </div>
-                  <div className={`px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(plant.status)}`}>
-                    {getStatusLabel(plant.status)}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2 pt-0">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Sprout className="w-4 h-4" />
-                  <span>{getStrainName(plant.strainId)}</span>
-                </div>
-                {plant.lastHealthStatus && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{getHealthIcon(plant.lastHealthStatus)}</span>
-                    <span>Saúde: {plant.lastHealthStatus === "HEALTHY" ? "Saudável" : plant.lastHealthStatus === "STRESSED" ? "Estressada" : plant.lastHealthStatus === "SICK" ? "Doente" : plant.lastHealthStatus === "RECOVERING" ? "Recuperando" : "--"}</span>
+
+      <div className="grid grid-cols-3 gap-2.5">
+        {plants.map((plant: any) => {
+          const thumbUrl = plant.lastHealthPhotoUrl
+            ? (plant.lastHealthPhotoUrl.startsWith('/uploads/')
+                ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=220&h=300&q=55`
+                : plant.lastHealthPhotoUrl)
+            : null;
+
+          const cardBg =
+            plant.cyclePhase === 'FLORA' ? '#581c87' :
+            plant.cyclePhase === 'VEGA'  ? '#14532d' : '#1e293b';
+
+          const healthBadge =
+            plant.lastHealthStatus === 'HEALTHY'    ? { icon: '✓', bg: 'rgba(74,222,128,0.22)',  color: '#4ade80' } :
+            plant.lastHealthStatus === 'STRESSED'   ? { icon: '!', bg: 'rgba(251,191,36,0.25)',  color: '#fbbf24' } :
+            plant.lastHealthStatus === 'SICK'       ? { icon: '✕', bg: 'rgba(248,113,113,0.25)', color: '#f87171' } :
+            plant.lastHealthStatus === 'RECOVERING' ? { icon: '↻', bg: 'rgba(96,165,250,0.25)',  color: '#60a5fa' } :
+            null;
+
+          const phaseLabel =
+            plant.cyclePhase === 'FLORA' && plant.cycleWeek ? `Flora · S${plant.cycleWeek}` :
+            plant.cyclePhase === 'VEGA'  && plant.cycleWeek ? `Vega · S${plant.cycleWeek}`  :
+            getStrainName(plant.strainId) ?? '—';
+
+          return (
+            <Link key={plant.id} href={`/plants/${plant.id}`}>
+              <div
+                className="rounded-2xl overflow-hidden relative aspect-[3/4] active:scale-95 transition-transform duration-150"
+                style={{ background: cardBg }}
+              >
+                {/* Badge saúde */}
+                {healthBadge && (
+                  <span
+                    className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm"
+                    style={{ background: healthBadge.bg, color: healthBadge.color }}
+                  >
+                    {healthBadge.icon}
+                  </span>
+                )}
+
+                {/* Foto */}
+                {thumbUrl ? (
+                  <img src={thumbUrl} alt={plant.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Leaf className="w-8 h-8 text-white/20" />
                   </div>
                 )}
-                {plant.cyclePhase && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Leaf className="w-4 h-4 text-primary" />
-                    <span className="text-primary font-medium">{plant.cyclePhase}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+
+                {/* Gradiente + texto */}
+                <div className="absolute inset-x-0 bottom-0 pointer-events-none"
+                  style={{ height: '55%', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)' }} />
+                <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5">
+                  <p className="text-white font-bold text-xs leading-tight truncate drop-shadow">{plant.name}</p>
+                  <p className="text-white/60 text-[10px] mt-0.5 truncate">{phaseLabel}</p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
