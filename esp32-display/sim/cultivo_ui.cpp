@@ -921,6 +921,25 @@ static const struct {
   {"EC",   COL_PRP,  0, 40,  18.0f, 4.0f},   // EC * 10
 };
 
+// Fase global da animacao — incrementa no histAnimTick; aqui e no
+// preenchimento inicial usamos o mesmo valor pra nao dar "pulo" quando
+// o timer comeca a atuar.
+static float histPhase = 0.0f;
+
+// Calcula o valor de cada sample misturando 2 frequencias de sin (um
+// harmonico suave + um mais rapido com amplitude menor). Sozinho o
+// sin(i*k + phase) repete com aparencia "senoidal pura"; somando outra
+// frequencia com fase propria vira uma ondulacao com cara de voz/sinal.
+static inline float histSampleValue(int i, int metric, float phase) {
+  auto &m = HIST_METRICS[metric];
+  float base = m.base;
+  float a    = m.amp * 0.55f;   // harmonico principal
+  float b    = m.amp * 0.28f;   // detalhe
+  return base
+       + sinf(i * 0.35f + phase + metric) * a
+       + sinf(i * 0.11f + phase * 0.6f)    * b;
+}
+
 static void applyHistData() {
   if (!histChart || !histSer) return;
   auto &m = HIST_METRICS[histMetric];
@@ -928,10 +947,24 @@ static void applyHistData() {
   lv_obj_set_style_line_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_INDICATOR);
   for (int i = 0; i < 24; i++) {
-    float v = m.base + sinf(i * 0.35f + histMetric) * m.amp
-              + ((rand() % 100) - 50) / 100.0f * m.amp * 0.3f;
-    lv_chart_set_next_value(histChart, histSer, (int32_t)v);
+    lv_chart_set_value_by_id(histChart, histSer, i,
+      (int32_t)histSampleValue(i, histMetric, histPhase));
   }
+  lv_chart_refresh(histChart);
+}
+
+// Timer de animacao da onda — avanca a fase e re-escreve os 24 pontos.
+// So trabalha quando a tela Historico esta ativa (activeScreen==4) pra
+// nao comer CPU do ESP32 enquanto o usuario esta em outra tela.
+static void histAnimTick(lv_timer_t *t) {
+  (void)t;
+  if (activeScreen != 4 || !histChart || !histSer) return;
+  histPhase += 0.16f;
+  for (int i = 0; i < 24; i++) {
+    lv_chart_set_value_by_id(histChart, histSer, i,
+      (int32_t)histSampleValue(i, histMetric, histPhase));
+  }
+  lv_chart_refresh(histChart);
 }
 
 static lv_obj_t *histMetricBtns[4] = {nullptr};
@@ -1204,4 +1237,6 @@ extern "C" void buildCultivoUI(void) {
 
   pulseTimer = lv_timer_create(pulseTimerCb, 300, NULL);
   mockTimer  = lv_timer_create(mockTimerCb,  500, NULL);
+  // Onda sonora do Historico: ~12fps, early-return se nao esta na tela.
+  lv_timer_create(histAnimTick, 80, NULL);
 }
