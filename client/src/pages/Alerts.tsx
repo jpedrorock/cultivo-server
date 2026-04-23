@@ -151,7 +151,7 @@ export default function Alerts() {
                   size="icon"
                   onClick={() => markAllAsSeen.mutate({ tentId: selectedTentId })}
                   disabled={markAllAsSeen.isPending}
-                  className="sm:hidden h-9 w-9"
+                  className="sm:hidden h-11 w-11"
                   aria-label="Marcar todos como vistos"
                 >
                   {markAllAsSeen.isPending ? (
@@ -161,7 +161,7 @@ export default function Alerts() {
                   )}
                 </Button>
               )}
-              <Button asChild variant="outline" size="icon" className="h-9 w-9" aria-label="Configurar alertas">
+              <Button asChild variant="outline" size="icon" className="h-11 w-11" aria-label="Configurar alertas">
                 <Link href="/settings">
                   <Settings className="w-4 h-4" />
                 </Link>
@@ -238,9 +238,9 @@ export default function Alerts() {
                           <div
                             onClick={() => handleMarkAsSeen(alert.id, alert.status)}
                             className={cn(
-                              "p-4 rounded-lg border transition-all duration-200",
+                              "p-4 rounded-lg border transition-all duration-200 active:scale-[0.99]",
                               isNew
-                                ? "bg-primary/5 border-primary/20 cursor-pointer hover:bg-primary/10 hover:border-primary/40 hover:shadow-sm active:scale-[0.99]"
+                                ? "bg-primary/5 border-primary/20 cursor-pointer hover:bg-primary/10 hover:border-primary/40 hover:shadow-sm"
                                 : "bg-muted/30 border-border cursor-default opacity-70"
                             )}
                             title={isNew ? "Clique para marcar como visto" : "Já visualizado"}

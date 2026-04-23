@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useHomeModals } from "@/hooks/useHomeModals";
 import StartCycleModal from "@/components/StartCycleModal";
 import { InitiateCycleModal } from "@/components/InitiateCycleModal";
@@ -377,7 +377,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
-              <TentCardSkeleton key={i} />
+              <TentCardSkeleton key={`skeleton-tent-${i}`} />
             ))}
           </div>
         </main>
@@ -574,7 +574,7 @@ export default function Home() {
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
-              <TentCardSkeleton key={i} />
+              <TentCardSkeleton key={`skeleton-tent-${i}`} />
             ))}
           </div>
         ) : tents && tents.length === 0 ? (
@@ -1166,9 +1166,21 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const lastLogRh   = logRhAsc.at(-1) ?? null;
   const lastLogVpd  = logVpdAsc.at(-1) ?? null;
   const injectLive  = liveTemp !== null && (lastLogTemp === null || Math.abs(lastLogTemp - liveTemp) > 0.05);
-  const sparkTemps  = injectLive ? [...logTempsAsc, liveTemp] : logTempsAsc;
-  const sparkRh     = injectLive && liveRh !== null ? [...logRhAsc, liveRh] : (lastLogRh === null && liveRh !== null ? [liveRh] : logRhAsc);
-  const sparkVpd    = injectLive && liveVpd !== null ? [...logVpdAsc, liveVpd] : (lastLogVpd === null && liveVpd !== null ? [liveVpd] : logVpdAsc);
+  const sparkTemps  = useMemo(
+    () => injectLive ? [...logTempsAsc, liveTemp] : logTempsAsc,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [injectLive, liveTemp, logTempsAsc.join(',')]
+  );
+  const sparkRh     = useMemo(
+    () => injectLive && liveRh !== null ? [...logRhAsc, liveRh] : (lastLogRh === null && liveRh !== null ? [liveRh] : logRhAsc),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [injectLive, liveRh, lastLogRh, logRhAsc.join(',')]
+  );
+  const sparkVpd    = useMemo(
+    () => injectLive && liveVpd !== null ? [...logVpdAsc, liveVpd] : (lastLogVpd === null && liveVpd !== null ? [liveVpd] : logVpdAsc),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [injectLive, liveVpd, lastLogVpd, logVpdAsc.join(',')]
+  );
 
   // VPD atual para exibição no KPI
   const currentVpd = liveVpd ?? (lastLogVpd ?? null);

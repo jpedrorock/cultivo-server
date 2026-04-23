@@ -44,20 +44,25 @@ function CredentialField({ label, value, onChange, placeholder, mono, secret }: 
   placeholder: string; mono?: boolean; secret?: boolean;
 }) {
   const [show, setShow] = useState(!secret);
+  const inputId = `smartlife-${label.toLowerCase().replace(/\s+/g, '-')}`;
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-muted-foreground mb-1">{label}</p>
+        <label htmlFor={inputId} className="block text-xs text-muted-foreground mb-1">{label}</label>
         <input
+          id={inputId}
           type={show ? 'text' : 'password'}
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50 ${mono ? 'font-mono' : ''}`}
+          className={`w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50 focus:outline-none ${mono ? 'font-mono' : ''}`}
         />
       </div>
       {secret && (
-        <button onClick={() => setShow(v => !v)}
+        <button
+          onClick={() => setShow(v => !v)}
+          aria-label={show ? 'Ocultar valor' : 'Mostrar valor'}
+          aria-pressed={show}
           className="shrink-0 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg bg-muted"
         >
           {show ? 'Ocultar' : 'Ver'}

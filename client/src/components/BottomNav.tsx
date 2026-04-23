@@ -227,11 +227,13 @@ export function BottomNav() {
 
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
 
-  if (isHidden) return null;
+  if (HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display") || location.endsWith("/training")) return null;
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-[100] md:hidden"
+      className={`fixed bottom-0 left-0 right-0 z-[100] md:hidden transition-[opacity,transform] duration-200 ease-in-out ${
+        keyboardOpen ? 'opacity-0 pointer-events-none translate-y-2' : 'opacity-100 pointer-events-auto translate-y-0'
+      }`}
       style={{
         transform: 'translateZ(0)',
         WebkitTransform: 'translateZ(0)',
