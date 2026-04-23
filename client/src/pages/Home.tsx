@@ -1139,17 +1139,31 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   // Badge "A" aparece sempre que o sensor estiver mapeado (hasSensor), independente de ter leitura
   const isSensorAuto = !!(sensorReading?.hasSensor);
 
+  // VPD helper — Vapor Pressure Deficit em kPa
+  const calcVpd = (tempC: number, rhPct: number) =>
+    parseFloat((0.6108 * Math.exp(17.27 * tempC / (tempC + 237.3)) * (1 - rhPct / 100)).toFixed(2));
+
   // Sparkline: média diária dos últimos 14 dias (GROUP BY DATE) → variação real dia a dia
   const logTempsAsc = (sparklineData ?? []).map(r => r.tempC).filter((v): v is number => v !== null);
   const logRhAsc    = (sparklineData ?? []).map(r => r.rhPct).filter((v): v is number => v !== null);
+  const logVpdAsc   = (sparklineData ?? [])
+    .map(r => r.tempC != null && r.rhPct != null ? calcVpd(r.tempC, r.rhPct) : null)
+    .filter((v): v is number => v !== null);
+
   // Injeta leitura ao vivo no final se diferir do último avg diário — garante ponto atual
   const liveTemp = (sensorReading?.tempC != null && sensorReading.hasSensor) ? sensorReading.tempC : null;
   const liveRh   = (sensorReading?.rhPct  != null && sensorReading.hasSensor) ? sensorReading.rhPct  : null;
+  const liveVpd  = liveTemp != null && liveRh != null ? calcVpd(liveTemp, liveRh) : null;
   const lastLogTemp = logTempsAsc.at(-1) ?? null;
   const lastLogRh   = logRhAsc.at(-1) ?? null;
+  const lastLogVpd  = logVpdAsc.at(-1) ?? null;
   const injectLive  = liveTemp !== null && (lastLogTemp === null || Math.abs(lastLogTemp - liveTemp) > 0.05);
   const sparkTemps  = injectLive ? [...logTempsAsc, liveTemp] : logTempsAsc;
   const sparkRh     = injectLive && liveRh !== null ? [...logRhAsc, liveRh] : (lastLogRh === null && liveRh !== null ? [liveRh] : logRhAsc);
+  const sparkVpd    = injectLive && liveVpd !== null ? [...logVpdAsc, liveVpd] : (lastLogVpd === null && liveVpd !== null ? [liveVpd] : logVpdAsc);
+
+  // VPD atual para exibição no KPI
+  const currentVpd = liveVpd ?? (lastLogVpd ?? null);
 
   // Função para determinar cor baseada no valor e target
   const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
@@ -1516,17 +1530,30 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-cyan-400 opacity-80"><Wifi className="w-3 h-3" /></span>
               )}
             </button>
-            {/* PPFD */}
-            <div className="kpi-ppfd flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-amber-500/20 dark:border-yellow-500/15">
-              <Sun className="w-5 h-5 text-amber-500 dark:text-yellow-400 mb-0.5"
-                style={{ animation: 'ppfd-breathe 3.5s ease-in-out infinite' }} />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PPFD</p>
+            {/* VPD */}
+            <button
+              type="button"
+              disabled={!isSensorAuto || readNow.isPending}
+              className={`kpi-vpd flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-emerald-500/20 dark:border-emerald-500/20 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
+              onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
+            >
+              <Wind className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mb-0.5" />
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">VPD</p>
               <div className="flex items-center gap-0.5">
-                <p className="text-lg font-bold tracking-tight leading-none text-foreground">
-                  {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
+                <p className="text-base font-bold tracking-tight leading-none text-foreground">
+                  {readNow.isPending
+                    ? <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
+                    : currentVpd != null
+                      ? <AnimatedCounter value={currentVpd} decimals={2} suffix=" kPa" />
+                      : <span className="text-muted-foreground/40">--</span>
+                  }
                 </p>
               </div>
-            </div>
+              <MiniSparkline values={sparkVpd} color="#10b981" chartId={`t${tent.id}-vpd`} />
+              {isSensorAuto && (
+                <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-emerald-400 opacity-80"><Wifi className="w-3 h-3" /></span>
+              )}
+            </button>
           </div>
 
         </div>
