@@ -237,15 +237,15 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_t *btnCfg = lv_label_create(tab);
   lv_label_set_text(btnCfg, LV_SYMBOL_SETTINGS);
   lv_obj_set_style_text_color(btnCfg, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_14, 0);
-  lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(36), sh(6));
+  lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_24, 0);
+  lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(44), sh(2));
 
   // Botao flip: alterna a Home entre face A (sensores) e face B (nutrientes/ciclo)
   lv_obj_t *btnFlip = lv_label_create(tab);
   lv_label_set_text(btnFlip, LV_SYMBOL_REFRESH);
   lv_obj_set_style_text_color(btnFlip, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(btnFlip, &lv_font_montserrat_14, 0);
-  lv_obj_align(btnFlip, LV_ALIGN_TOP_RIGHT, -sw(56), sh(6));
+  lv_obj_set_style_text_font(btnFlip, &lv_font_montserrat_24, 0);
+  lv_obj_align(btnFlip, LV_ALIGN_TOP_RIGHT, -sw(76), sh(2));
   lv_obj_add_flag(btnFlip, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_ext_click_area(btnFlip, sw(8));  // hit area maior pro touch
   lv_obj_add_event_cb(btnFlip, [](lv_event_t *e) {
