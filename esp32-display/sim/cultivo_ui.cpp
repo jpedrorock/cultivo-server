@@ -238,11 +238,13 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(36), sh(6));
 
   // Corpo: arc grande a esquerda + coluna de mini-cards a direita.
-  // Reservamos stripH + gap no rodape pro strip de ciclo (fase/semana).
-  int stripH = sh(26);
-  int stripGap = sh(4);
+  // Reservamos stripH + gaps pro strip de ciclo no rodape; aumentei o
+  // bottomGap pra dar respiro entre strip e navbar (antes colavam).
+  int stripH    = sh(26);
+  int stripGap  = sh(4);
+  int bottomGap = sh(12);
   int bodyY = sh(42);
-  int bodyH = TAB_H - bodyY - stripH - stripGap - sh(4);
+  int bodyH = TAB_H - bodyY - stripH - stripGap - bottomGap;
   int halfW = SCREEN_W / 2;
 
   int arcSize = (bodyH < halfW - sw(8)) ? bodyH : halfW - sw(8);
@@ -304,32 +306,38 @@ static void buildHome(lv_obj_t *tab) {
     // de piscar junto.
     applyRingPulse(c, color, 2800, pulseDelayMs);
 
-    // Layout horizontal: [icone][LABEL]  [--sparkline--]  [VALOR]
-    // Icone + label viram um bloco a esquerda; sparkline NUNCA passa por
-    // baixo do valor (antes o numero ficava ilegivel sobre a linha).
-    int iconW  = sw(20);
-    int labelW = sw(52);     // cabe "UMIDADE"/"PPFD"/"VPD" em FONT_CAPTION
-    int valueW = sw(52);     // cabe "58%"/"1.27"/"1500"
-    int sparkGap = sw(6);
-    int sparkX = iconW + labelW + sparkGap;
-    int sparkW = cardW - sparkX - valueW - sparkGap - sw(8);  // -pad
-    int chartH = sh(14);
+    // Layout em 2 linhas:
+    //   topo:    [icone]              [VALOR grande]
+    //   rodape:  [LABEL] [-- sparkline ----------]
+    // Sparkline fica restrito ao rodape, longe do valor; label ganha
+    // respiro do icone, ja que cada um ocupa uma linha propria.
+    int labelW = sw(48);
+    int chartH = sh(10);
 
     lv_obj_t *ico = lv_image_create(c);
     lv_image_set_src(ico, icon);
     lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
     lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    lv_obj_t *v = lv_label_create(c);
+    lv_label_set_text(v, initVal);
+    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
+    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
+    lv_obj_align(v, LV_ALIGN_TOP_RIGHT, 0, 0);
+    applyBloom(v, color);
 
     lv_obj_t *lb = lv_label_create(c);
     lv_label_set_text(lb, label);
     lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
     lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
-    lv_obj_align(lb, LV_ALIGN_LEFT_MID, iconW, 0);
+    lv_obj_align(lb, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
+    int sparkX = labelW + sw(4);
+    int sparkW = cardW - sparkX - sw(10);  // -pad direito
     lv_obj_t *ch = lv_chart_create(c);
     lv_obj_set_size(ch, sparkW, chartH);
-    lv_obj_align(ch, LV_ALIGN_LEFT_MID, sparkX, 0);
+    lv_obj_align(ch, LV_ALIGN_BOTTOM_LEFT, sparkX, -sh(2));
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ch, 20);
     lv_chart_set_div_line_count(ch, 0, 0);
@@ -345,12 +353,6 @@ static void buildHome(lv_obj_t *tab) {
     *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
     *sparkOut = ch;
 
-    lv_obj_t *v = lv_label_create(c);
-    lv_label_set_text(v, initVal);
-    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
-    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
-    lv_obj_align(v, LV_ALIGN_RIGHT_MID, 0, 0);
-    applyBloom(v, color);
     return v;
   };
 
