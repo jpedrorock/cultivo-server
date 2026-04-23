@@ -307,37 +307,39 @@ static void buildHome(lv_obj_t *tab) {
     applyRingPulse(c, color, 2800, pulseDelayMs);
 
     // Layout em 2 linhas:
-    //   topo:    [icone]              [VALOR grande]
-    //   rodape:  [LABEL] [-- sparkline ----------]
-    // Sparkline fica restrito ao rodape, longe do valor; label ganha
-    // respiro do icone, ja que cada um ocupa uma linha propria.
-    int labelW = sw(48);
-    int chartH = sh(10);
+    //   topo:    [icone][LABEL]              [VALOR grande]
+    //   rodape:  [------ sparkline ------]
+    // Icone + nome viram uma linha so (nao sobra espaco vertical pra
+    // empilhar os 3); valor fica na direita centralizado pra dominar
+    // visualmente; sparkline ocupa todo o rodape a esquerda, longe do
+    // valor, sem cruzar com nada.
+    int iconW      = sw(22);    // x-offset do label depois do icone
+    int valueRoomW = sw(60);    // largura reservada pro VALOR na direita
+    int chartH     = sh(10);
+    int sparkW     = cardW - valueRoomW - sw(6);
 
     lv_obj_t *ico = lv_image_create(c);
     lv_image_set_src(ico, icon);
     lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
     lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, 0);
-
-    lv_obj_t *v = lv_label_create(c);
-    lv_label_set_text(v, initVal);
-    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
-    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
-    lv_obj_align(v, LV_ALIGN_TOP_RIGHT, 0, 0);
-    applyBloom(v, color);
+    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, sh(2));
 
     lv_obj_t *lb = lv_label_create(c);
     lv_label_set_text(lb, label);
     lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
     lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
-    lv_obj_align(lb, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    lv_obj_align(lb, LV_ALIGN_TOP_LEFT, iconW, sh(4));
 
-    int sparkX = labelW + sw(4);
-    int sparkW = cardW - sparkX - sw(10);  // -pad direito
+    lv_obj_t *v = lv_label_create(c);
+    lv_label_set_text(v, initVal);
+    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
+    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
+    lv_obj_align(v, LV_ALIGN_RIGHT_MID, 0, 0);
+    applyBloom(v, color);
+
     lv_obj_t *ch = lv_chart_create(c);
     lv_obj_set_size(ch, sparkW, chartH);
-    lv_obj_align(ch, LV_ALIGN_BOTTOM_LEFT, sparkX, -sh(2));
+    lv_obj_align(ch, LV_ALIGN_BOTTOM_LEFT, 0, -sh(2));
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ch, 20);
     lv_chart_set_div_line_count(ch, 0, 0);
