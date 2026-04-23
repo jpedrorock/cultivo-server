@@ -1,7 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef } from "react";
 import { useHomeModals } from "@/hooks/useHomeModals";
-import { WeatherWidget } from "@/components/WeatherWidget";
 import StartCycleModal from "@/components/StartCycleModal";
 import { InitiateCycleModal } from "@/components/InitiateCycleModal";
 import { EditCycleModal } from "@/components/EditCycleModal";
@@ -30,7 +29,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, Bot } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, Bot, ClipboardList, Circle } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
@@ -674,10 +674,6 @@ export default function Home() {
           </button>
         )}
 
-        {/* Weather Widget */}
-        <div className="mt-8">
-          <WeatherWidget />
-        </div>
 
 
 
@@ -1099,6 +1095,18 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     { tentId: tent.id, days: 14 },
     { staleTime: 5 * 60 * 1000 }
   );
+
+  // Tarefas desta estufa — Sheet de notas
+  const [tasksSheetOpen, setTasksSheetOpen] = useState(false);
+  const { data: allWeekTasks } = trpc.tasks.getCurrentWeekTasks.useQuery(
+    undefined,
+    { staleTime: 2 * 60 * 1000, enabled: tasksSheetOpen }
+  );
+  const tentTasksList = (allWeekTasks ?? []).filter(t => t.tentId === tent.id);
+  const pendingCount = tentTasksList.filter(t => !t.isDone).length;
+  const markTaskDone = trpc.tasks.markAsDone.useMutation({
+    onSuccess: () => utils.tasks.getCurrentWeekTasks.invalidate(),
+  });
 
   // Buscar targets ideais - usa média das strains das plantas na estufa
   const currentWeek = cycle ? (() => {
@@ -1622,18 +1630,93 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
 
     {/* ── Acesso rápido à estufa ── */}
     {cycle && (
-      <Link href={`/tent/${tent.id}`}>
-        <div className="mx-1 mt-1">
-          <div className="w-full flex items-center justify-between px-5 py-2.5 rounded-b-xl bg-muted/20 border border-t-0 border-border/30 hover:bg-muted/40 active:scale-[0.99] transition-all duration-150">
-            <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Ver tarefas e detalhes da estufa
+      <div className="mx-1 mt-1 flex gap-0 rounded-b-xl overflow-hidden border border-t-0 border-border/30">
+        {/* Tarefas — abre Sheet de notas */}
+        <button
+          type="button"
+          onClick={() => setTasksSheetOpen(true)}
+          className="relative flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-muted/20 hover:bg-amber-50/60 dark:hover:bg-amber-900/10 active:scale-[0.98] transition-all duration-150 border-r border-border/30"
+        >
+          <ClipboardList className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Tarefas</span>
+          {pendingCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-amber-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+              {pendingCount}
             </span>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+          )}
+        </button>
+        {/* Detalhes */}
+        <Link href={`/tent/${tent.id}`} className="flex-1">
+          <div className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-muted/20 hover:bg-muted/40 active:scale-[0.98] transition-all duration-150">
+            <BarChart2 className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground">Detalhes</span>
+            <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
           </div>
-        </div>
-      </Link>
+        </Link>
+      </div>
     )}
+
+    {/* Sheet de tarefas estilo nota */}
+    <Sheet open={tasksSheetOpen} onOpenChange={setTasksSheetOpen}>
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] overflow-y-auto pb-safe">
+        <SheetHeader className="mb-4">
+          <SheetTitle className="flex items-center gap-2 text-base">
+            <ClipboardList className="w-4 h-4 text-amber-500" />
+            Tarefas da semana
+            {tentTasksList.length > 0 && (
+              <span className="text-xs font-normal text-muted-foreground">
+                · {tentTasksList.filter(t => t.isDone).length}/{tentTasksList.length} concluídas
+              </span>
+            )}
+          </SheetTitle>
+        </SheetHeader>
+
+        {tentTasksList.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-center">
+            <ClipboardList className="w-10 h-10 text-muted-foreground/20" />
+            <p className="text-sm text-muted-foreground">Nenhuma tarefa para esta semana</p>
+            <p className="text-xs text-muted-foreground/60">Configure templates em Tarefas → Gerenciar</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5 pb-4">
+            {tentTasksList.map((task, i) => {
+              // rotação leve alternada para efeito sticky note
+              const rot = i % 2 === 0 ? 'rotate-[-0.3deg]' : 'rotate-[0.3deg]';
+              return (
+                <button
+                  key={task.id || task.title}
+                  type="button"
+                  disabled={task.isDone || task.id === 0}
+                  onClick={() => { if (!task.isDone && task.id > 0) markTaskDone.mutate({ taskId: task.id }); }}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3.5 rounded-xl border shadow-sm transition-all duration-200 active:scale-[0.98] ${rot} ${
+                    task.isDone
+                      ? 'bg-muted/40 border-border/30 opacity-60'
+                      : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40 hover:border-amber-400/60 dark:hover:border-amber-600/40'
+                  }`}
+                >
+                  <span className="mt-0.5 shrink-0">
+                    {task.isDone
+                      ? <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      : <Circle className="w-5 h-5 text-amber-400 dark:text-amber-500" />
+                    }
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium leading-snug ${task.isDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                      {task.title}
+                    </p>
+                    {task.description && (
+                      <p className={`text-xs mt-0.5 leading-snug ${task.isDone ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                        {task.description}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
 
       </div>
     </ListItemAnimation>

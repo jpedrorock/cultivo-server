@@ -369,13 +369,8 @@ export default function TentDetails() {
 
   // Plants — loaded at page level so the PDF export has access
   const { data: tentPlants } = trpc.plants.list.useQuery({ tentId });
-
-  // Tarefas desta estufa
-  const { data: allTasks } = trpc.tasks.getCurrentWeekTasks.useQuery();
-  const tentTasks = (allTasks ?? []).filter(t => t.tentId === tentId);
-  const markTaskDone = trpc.tasks.markAsDone.useMutation({
-    onSuccess: () => { utils.tasks.getCurrentWeekTasks.invalidate(); },
-  });
+  const { data: strainsList } = trpc.strains.list.useQuery();
+  const getStrainName = (strainId: number) => strainsList?.find(s => s.id === strainId)?.name ?? null;
 
   // Filter logs by dateRange client-side for charts/averages (must be before conditional returns — Rules of Hooks)
   const filteredLogs = useMemo(() => {
@@ -1096,22 +1091,11 @@ export default function TentDetails() {
             <TabsTrigger value="charts" className="flex-1">
               Gráficos
             </TabsTrigger>
-            <Button asChild size="sm" className="flex-1 h-8 gap-1.5 rounded-sm font-semibold shadow-none">
-              <Link href={`/tent/${tentId}/log`}>
-                <Plus className="w-4 h-4" />
-                Registrar
-              </Link>
-            </Button>
             <TabsTrigger value="history" className="flex-1">
               Histórico
             </TabsTrigger>
-            <TabsTrigger value="tasks" className="flex-1 relative">
-              Tarefas
-              {tentTasks.filter(t => !t.isDone).length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center">
-                  {tentTasks.filter(t => !t.isDone).length}
-                </span>
-              )}
+            <TabsTrigger value="plants" className="flex-1">
+              Plantas
             </TabsTrigger>
           </TabsList>
 
@@ -1624,95 +1608,61 @@ export default function TentDetails() {
             )}
           </TabsContent>
 
-          {/* ── Aba Tarefas ── */}
-          <TabsContent value="tasks" className="space-y-4">
-            {tentTasks.length === 0 ? (
+          {/* ── Aba Plantas ── */}
+          <TabsContent value="plants" className="space-y-3">
+            {!tentPlants || tentPlants.length === 0 ? (
               <Card className="bg-card/90 backdrop-blur-sm">
                 <CardContent className="py-12 flex flex-col items-center gap-3 text-center">
-                  <ListChecks className="w-10 h-10 text-muted-foreground/30" />
-                  <p className="text-sm font-medium text-muted-foreground">Nenhuma tarefa para esta semana</p>
-                  <p className="text-xs text-muted-foreground/60">Configure templates em Configurações → Tarefas</p>
+                  <Leaf className="w-10 h-10 text-muted-foreground/30" />
+                  <p className="text-sm font-medium text-muted-foreground">Nenhuma planta nesta estufa</p>
                 </CardContent>
               </Card>
             ) : (
-              <>
-                {/* Progresso */}
-                <Card className="bg-card/90 backdrop-blur-sm">
-                  <CardContent className="pt-4 pb-4 space-y-2">
-                    {(() => {
-                      const done = tentTasks.filter(t => t.isDone).length;
-                      const total = tentTasks.length;
-                      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                      return (
-                        <>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground font-medium">Progresso da semana</span>
-                            <span className="font-bold text-green-600">{pct}%</span>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {tentPlants.map((plant) => (
+                  <Link key={plant.id} href={`/plants/${plant.id}`}>
+                    <div className="bg-card/90 backdrop-blur-sm border border-border rounded-2xl overflow-hidden hover:border-primary/40 active:scale-95 transition-all duration-150 cursor-pointer">
+                      {/* Foto */}
+                      <div className="relative w-full aspect-square bg-muted">
+                        {(plant.lastHealthPhotoUrl ?? plant.photoUrl) ? (
+                          <img
+                            src={(plant.lastHealthPhotoUrl ?? plant.photoUrl).startsWith('/uploads/')
+                              ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl ?? plant.photoUrl)}&w=200&h=200&q=55`
+                              : (plant.lastHealthPhotoUrl ?? plant.photoUrl)}
+                            alt={plant.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Leaf className="w-8 h-8 text-muted-foreground/20" />
                           </div>
-                          <div className="w-full bg-muted rounded-full h-2">
-                            <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>{done} concluídas</span>
-                            <span>{total - done} pendentes</span>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-
-                {/* Lista de tarefas */}
-                <Card className="bg-card/90 backdrop-blur-sm">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <ListChecks className="w-4 h-4 text-primary" />
-                      {tentTasks[0]?.phase === "VEGA" ? "Vegetativa" : tentTasks[0]?.phase === "FLORA" ? "Floração" : "Manutenção"}
-                      {tentTasks[0]?.weekNumber ? ` · Semana ${tentTasks[0].weekNumber}` : ""}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2">
-                      {tentTasks.map((task) => (
-                        <div
-                          key={task.id || task.title}
-                          className={`flex items-start gap-3 px-3 py-3 rounded-lg border transition-all min-h-[52px] ${
-                            task.isDone
-                              ? "bg-primary/10 border-primary/20"
-                              : "bg-background border-border hover:border-green-300"
-                          }`}
-                        >
-                          <button
-                            onClick={() => { if (!task.isDone && task.id > 0) markTaskDone.mutate({ taskId: task.id }); }}
-                            disabled={task.isDone || task.id === 0}
-                            className="mt-0.5 shrink-0 p-1 -m-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            {task.isDone
-                              ? <CheckCircle2 className="w-5 h-5 text-green-600" />
-                              : <Circle className="w-5 h-5 text-muted-foreground" />
-                            }
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium leading-snug ${task.isDone ? "text-muted-foreground line-through" : "text-foreground"}`}>
-                              {task.title}
-                            </p>
-                            {task.description && (
-                              <p className={`text-xs mt-0.5 leading-snug ${task.isDone ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
-                                {task.description}
-                              </p>
-                            )}
-                            {task.completedAt && (
-                              <p className="text-xs text-muted-foreground/60 mt-1">
-                                Concluída em {new Date(task.completedAt).toLocaleDateString("pt-BR")}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        )}
+                        {/* Status badge (saúde da planta) */}
+                        {plant.lastHealthStatus && (
+                          <span className={`absolute top-1.5 right-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            plant.lastHealthStatus === 'healthy' ? 'bg-green-500/90 text-white' :
+                            plant.lastHealthStatus === 'attention' ? 'bg-amber-500/90 text-white' :
+                            plant.lastHealthStatus === 'sick' ? 'bg-red-500/90 text-white' :
+                            'bg-muted/80 text-muted-foreground'
+                          }`}>
+                            {plant.lastHealthStatus === 'healthy' ? 'Saudável' :
+                             plant.lastHealthStatus === 'attention' ? 'Atenção' :
+                             plant.lastHealthStatus === 'sick' ? 'Doente' : plant.lastHealthStatus}
+                          </span>
+                        )}
+                      </div>
+                      {/* Info */}
+                      <div className="p-2.5">
+                        <p className="text-xs font-semibold text-foreground truncate">{plant.name}</p>
+                        {plant.strainId && getStrainName(plant.strainId) && (
+                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">{getStrainName(plant.strainId)}</p>
+                        )}
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </>
+                  </Link>
+                ))}
+              </div>
             )}
           </TabsContent>
         </Tabs>
