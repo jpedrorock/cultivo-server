@@ -1635,12 +1635,12 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
         <button
           type="button"
           onClick={() => setTasksSheetOpen(true)}
-          className="relative flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-muted/20 hover:bg-amber-50/60 dark:hover:bg-amber-900/10 active:scale-[0.98] transition-all duration-150 border-r border-border/30"
+          className="relative flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-muted/20 hover:bg-muted/40 active:scale-[0.98] transition-all duration-150 border-r border-border/30"
         >
-          <ClipboardList className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Tarefas</span>
+          <ClipboardList className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">Tarefas</span>
           {pendingCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-amber-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+            <span className="absolute top-1 right-1 w-4 h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center">
               {pendingCount}
             </span>
           )}
@@ -1661,7 +1661,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] overflow-y-auto pb-safe">
         <SheetHeader className="mb-4">
           <SheetTitle className="flex items-center gap-2 text-base">
-            <ClipboardList className="w-4 h-4 text-amber-500" />
+            <ClipboardList className="w-4 h-4 text-muted-foreground" />
             Tarefas da semana
             {tentTasksList.length > 0 && (
               <span className="text-xs font-normal text-muted-foreground">
@@ -1691,13 +1691,13 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                   className={`w-full text-left flex items-start gap-3 px-4 py-3.5 rounded-xl border shadow-sm transition-all duration-200 active:scale-[0.98] ${rot} ${
                     task.isDone
                       ? 'bg-muted/40 border-border/30 opacity-60'
-                      : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40 hover:border-amber-400/60 dark:hover:border-amber-600/40'
+                      : 'bg-card border-border hover:border-border/80'
                   }`}
                 >
                   <span className="mt-0.5 shrink-0">
                     {task.isDone
                       ? <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      : <Circle className="w-5 h-5 text-amber-400 dark:text-amber-500" />
+                      : <Circle className="w-5 h-5 text-muted-foreground/40" />
                     }
                   </span>
                   <div className="flex-1 min-w-0">
