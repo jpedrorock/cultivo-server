@@ -952,9 +952,10 @@ function MiniSparkline({
   const uid = `spark-${chartId || color.replace(/[^a-z0-9]/gi, "")}`;
 
   // Pontos da linha — mapeados na metade superior (h*0.12 … h*0.88)
+  // Quando todos os valores são iguais (range=0), centraliza a linha no meio do SVG
   const pts = values.map((v, i) => ({
     x: (i / (values.length - 1)) * w,
-    y: h * 0.88 - ((v - min) / range) * h * 0.76,
+    y: range === 0 ? h * 0.5 : h * 0.88 - ((v - min) / range) * h * 0.76,
   }));
 
   // Path da linha principal
@@ -967,7 +968,8 @@ function MiniSparkline({
   const fillPath = `${linePath} L ${w},${h} L 0,${h} Z`;
 
   // Path espelhado na metade inferior (reflexo): y invertido em relação ao centro h
-  const reflPts = pts.map(p => ({ x: p.x, y: h - p.y + h * 0.12 }));
+  // Quando range=0 (linha central), reflexo coincide com a linha — sutil mas presente
+  const reflPts = pts.map(p => ({ x: p.x, y: range === 0 ? h * 0.5 : h - p.y + h * 0.12 }));
   const reflPath = reflPts.reduce(
     (acc, p, i) => (i === 0 ? `M ${p.x.toFixed(1)},${p.y.toFixed(1)}` : `${acc} L ${p.x.toFixed(1)},${p.y.toFixed(1)}`),
     ""
