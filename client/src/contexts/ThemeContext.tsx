@@ -46,7 +46,7 @@ export function ThemeProvider({
     root.classList.add('no-transitions');
 
     // Remove all theme classes (include legacy names to clean old localStorage)
-    root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "positivus", "highcontrast", "highcontrast-dark");
+    root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "jardim", "positivus", "highcontrast", "highcontrast-dark");
     // Add current theme class
     root.classList.add(theme);
     // dark: utilitários do Tailwind dependem da classe .dark no <html>
