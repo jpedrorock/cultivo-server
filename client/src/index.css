@@ -604,6 +604,13 @@
 }
 
 
+/* ── Hamburguer sidebar: só no tablet (768px–1023px) ────────────────────────
+   CSS puro fora do @layer para garantir precedência sobre utilities Tailwind.
+   Esconde no mobile (BottomNav activo) e no desktop (sidebar dockado).       */
+.sidebar-hamburger { display: none !important; }
+@media (min-width: 768px)  { .sidebar-hamburger { display: flex !important; } }
+@media (min-width: 1024px) { .sidebar-hamburger { display: none !important; } }
+
 /* ============================================================
    VISION UI THEME — Dark glassmorphism, paleta verde/âmbar Cultivo
    Inspirado no Vision UI Dashboard (Creative Tim), re-skinned

@@ -450,7 +450,7 @@ export default function Home() {
             <div className="flex items-center gap-2.5">
               {/* Hamburguer — só no iPad (md < lg) */}
               <button
-                className="flex max-md:hidden lg:hidden items-center justify-center w-9 h-9 rounded-xl hover:bg-primary/10 text-foreground/70 hover:text-primary transition-colors"
+                className="sidebar-hamburger items-center justify-center w-9 h-9 rounded-xl hover:bg-primary/10 text-foreground/70 hover:text-primary transition-colors"
                 onClick={openSidebar}
                 aria-label="Abrir menu"
               >
