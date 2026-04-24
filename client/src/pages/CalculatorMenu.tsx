@@ -124,7 +124,7 @@ export default function CalculatorMenu() {
                   style={{
                     animationDelay: `${index * 80}ms`,
                     animationFillMode: 'backwards',
-                    background: `linear-gradient(145deg, ${calc.glow} 0%, hsl(var(--card)) 55%)`,
+                    background: `linear-gradient(145deg, ${calc.glow} 0%, var(--card) 55%)`,
                   }}
                 >
                   {/* Mobile: horizontal layout — fixed h-[88px] = 56px icon + 16px padding each side */}

@@ -1507,7 +1507,7 @@ export default function SmartLife() {
       <div className="min-h-screen bg-background">
 
         {/* Header fixo */}
-        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe">
+        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 md:left-64 z-20 pt-safe">
           <div className="container py-4 max-w-2xl">
             {/* Título + status */}
             <div className="flex items-center gap-3">

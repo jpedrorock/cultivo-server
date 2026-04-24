@@ -16,6 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Flower2, Wrench, Check } from "lucide-react";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
@@ -49,6 +51,7 @@ const getFitnessScore = (status: string | null | undefined) => {
 };
 
 export default function PlantsList() {
+  const { collapsed } = useSidebar();
   const [, navigate] = useLocation();
   const haptic = useTactileFeedback();
   const [searchTerm, setSearchTerm] = useState("");
@@ -318,7 +321,7 @@ export default function PlantsList() {
     <PageTransition>
       <div className="min-h-screen bg-background">
       {/* Header — fixed para funcionar dentro do scroll do iOS */}
-      <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-40 pt-safe">
+      <header className={cn("bg-card border-b border-border fixed top-0 left-0 right-0 z-40 pt-safe transition-[left] duration-200 ease-in-out", collapsed ? "lg:left-16" : "lg:left-64")}>
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -514,7 +517,7 @@ export default function PlantsList() {
 
                   {isExpanded && (
                     <div>
-                      <StaggerList className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                      <StaggerList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                         {tentPlants.map((plant: any) => {
                           const isSelected = selectedPlants.has(plant.id);
 
@@ -563,7 +566,7 @@ export default function PlantsList() {
                                 onClick={e => { e.preventDefault(); e.stopPropagation(); togglePlantSelection(plant.id); }}
                                 className="absolute top-2 left-2 z-30 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 shadow-sm"
                                 style={isSelected
-                                  ? { background: 'hsl(var(--primary))', color: '#fff' }
+                                  ? { background: 'var(--primary)', color: '#fff' }
                                   : healthBadge
                                   ? { background: healthBadge.bg, color: healthBadge.color }
                                   : { background: 'rgba(0,0,0,0.30)', color: 'rgba(255,255,255,0.55)' }

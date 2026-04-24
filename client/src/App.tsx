@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
@@ -8,6 +9,7 @@ import { InstallPWA } from "./components/InstallPWA";
 import { AddToHomeScreenPrompt } from "./components/AddToHomeScreenPrompt";
 import { BottomNav } from "./components/BottomNav";
 import { Sidebar } from "./components/Sidebar";
+import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { SplashScreen } from "./components/SplashScreen";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -117,9 +119,10 @@ function Router() {
   );
 }
 
-function AuthenticatedApp() {
+function AuthenticatedAppInner() {
   const { isAuthenticated, loading, user } = useAuth();
   const [location, setLocation] = useLocation();
+  const { collapsed } = useSidebar();
   const isDisplayMode = location.endsWith("/display");
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem('hasSeenSplash');
@@ -162,10 +165,10 @@ function AuthenticatedApp() {
       )}
       {!isDisplayMode && <Sidebar />}
       <div
-        className={isDisplayMode ? "" : "md:pl-64"}
-        style={isDisplayMode ? {} : {
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem)',
-        }}
+        className={cn(
+          isDisplayMode ? "" : "pb-20 md:pb-0 transition-[padding-left] duration-200 ease-in-out",
+          !isDisplayMode && (collapsed ? "lg:pl-16" : "lg:pl-64"),
+        )}
       >
         <PullToRefresh>
           <Router />
@@ -175,6 +178,14 @@ function AuthenticatedApp() {
       <InstallPWA />
       <AddToHomeScreenPrompt />
     </>
+  );
+}
+
+function AuthenticatedApp() {
+  return (
+    <SidebarProvider>
+      <AuthenticatedAppInner />
+    </SidebarProvider>
   );
 }
 

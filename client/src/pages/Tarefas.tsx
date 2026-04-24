@@ -99,7 +99,7 @@ export default function Tarefas() {
         }
       />
 
-      <div className="container mx-auto px-4 py-5">
+      <div className="container mx-auto px-4 py-5 max-w-4xl">
         <Tabs defaultValue="tasks" className="space-y-5">
           <TabsList className="grid w-full grid-cols-2 h-11">
             <TabsTrigger value="tasks" className="text-sm">

@@ -1,5 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { cn } from "@/lib/utils";
 import { useHomeModals } from "@/hooks/useHomeModals";
 import StartCycleModal from "@/components/StartCycleModal";
 import { InitiateCycleModal } from "@/components/InitiateCycleModal";
@@ -29,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, Bot, ClipboardList, Circle } from "lucide-react";
+import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, Bot, ClipboardList, Circle, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
@@ -46,6 +48,13 @@ import { ErrorState } from "@/components/ErrorState";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const { collapsed, openSidebar } = useSidebar();
+  const headerCls = cn(
+    "bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe transition-[left] duration-200 ease-in-out",
+    // iPad (md < lg): sem deslocamento — sidebar é overlay
+    // Desktop (lg+): desloca conforme estado collapsed
+    collapsed ? "lg:left-16" : "lg:left-64",
+  );
   const [pendingLogsCount, setPendingLogsCount] = useState(0);
 
   // utils DEVE ser declarado antes de qualquer mutation que o usa em callbacks
@@ -356,7 +365,7 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe">
+        <header className={headerCls}>
           <div className="container py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -370,7 +379,7 @@ export default function Home() {
         </header>
         {/* Spacer = header height (py-4 = 16px × 2 + h-9 = 36px = 68px) + safe area */}
         <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '68px' }} />
-        <main className="container py-8">
+        <main className="container mx-auto max-w-7xl py-8">
           <div className="mb-6 flex items-center justify-between">
             <div className="h-8 w-24 bg-muted rounded animate-pulse" />
             <div className="h-9 w-36 bg-muted rounded animate-pulse" />
@@ -435,10 +444,18 @@ export default function Home() {
     <PageTransition>
       <div className="min-h-screen bg-background">
         {/* Header — fixed para funcionar independente do PullToRefresh */}
-        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe">
+        <header className={headerCls}>
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
+              {/* Hamburguer — só no iPad (md < lg) */}
+              <button
+                className="hidden md:flex lg:hidden items-center justify-center w-9 h-9 rounded-xl hover:bg-primary/10 text-foreground/70 hover:text-primary transition-colors"
+                onClick={openSidebar}
+                aria-label="Abrir menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
               <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
                 <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
               </div>
@@ -513,7 +530,7 @@ export default function Home() {
       )}
 
       {/* Main Content */}
-      <main className="container py-4">
+      <main className="container mx-auto max-w-7xl py-4">
 
         {/* ── Widget "Missão de hoje" ── */}
         {!isLoading && tents && tents.length > 0 && (() => {
@@ -1279,7 +1296,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
           </div>
         </Link>
       )}
-      <Card className="relative z-10 py-0 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'hsl(var(--card))' }}>
+      <Card className="relative z-10 py-0 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'var(--card)' }}>
         {/* Fundo gradiente da fase */}
         {phaseBg !== 'none' && (
           <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
@@ -1337,76 +1354,76 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
                 <MoreVertical className="w-4 h-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuContent align="end" className="w-64">
               {!cycle ? (
                 <>
-                  <DropdownMenuItem onClick={() => onInitiateCycle(tent.id, tent.name)}>
-                    <Sprout className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base" onClick={() => onInitiateCycle(tent.id, tent.name)}>
+                    <Sprout className="w-5 h-5 mr-3" />
                     Novo Ciclo
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate(`/tent/${tent.id}`)}>
-                    <ArrowRight className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base" onClick={() => navigate(`/tent/${tent.id}`)}>
+                    <ArrowRight className="w-5 h-5 mr-3" />
                     Ver Detalhes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEditTent(tent)}>
-                    <Wrench className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base" onClick={() => onEditTent(tent)}>
+                    <Wrench className="w-5 h-5 mr-3" />
                     Editar Estufa
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onDeleteTent(tent.id, tent.name)} className="text-red-600 focus:text-red-600">
-                    <Trash2 className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base text-red-600 focus:text-red-600" onClick={() => onDeleteTent(tent.id, tent.name)}>
+                    <Trash2 className="w-5 h-5 mr-3" />
                     Excluir Estufa
                   </DropdownMenuItem>
                 </>
               ) : (
                 <>
-                  <DropdownMenuItem onClick={() => navigate(`/quick-log?tentId=${tent.id}`)}>
-                    <Zap className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base" onClick={() => navigate(`/quick-log?tentId=${tent.id}`)}>
+                    <Zap className="w-5 h-5 mr-3" />
                     Registrar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate(`/tent/${tent.id}`)}>
-                    <ArrowRight className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base" onClick={() => navigate(`/tent/${tent.id}`)}>
+                    <ArrowRight className="w-5 h-5 mr-3" />
                     Ver Detalhes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEditCycle(cycle, tent)}>
-                    <Wrench className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base" onClick={() => onEditCycle(cycle, tent)}>
+                    <Wrench className="w-5 h-5 mr-3" />
                     Editar Ciclo
                   </DropdownMenuItem>
                   {tent.category === "MAINTENANCE" && (
-                    <DropdownMenuItem onClick={() => openPhaseConfirm("CLONING")}>
-                      <Sprout className="w-4 h-4 mr-2 text-blue-500" />
+                    <DropdownMenuItem className="py-3 text-base" onClick={() => openPhaseConfirm("CLONING")}>
+                      <Sprout className="w-5 h-5 mr-3 text-blue-500" />
                       Tirar Clones
                     </DropdownMenuItem>
                   )}
                   {tent.category === "VEGA" && (
-                    <DropdownMenuItem onClick={() => openPhaseConfirm("FLORA")}>
-                      <Flower2 className="w-4 h-4 mr-2 text-green-500" />
+                    <DropdownMenuItem className="py-3 text-base" onClick={() => openPhaseConfirm("FLORA")}>
+                      <Flower2 className="w-5 h-5 mr-3 text-green-500" />
                       Avançar para Floração
                     </DropdownMenuItem>
                   )}
                   {tent.category === "FLORA" && (
                     <>
-                      <DropdownMenuItem onClick={() => setHarvestQueueOpen(true)}>
-                        <Wind className="w-4 h-4 mr-2 text-orange-500" />
-                        Colher → Aguardando Secagem
+                      <DropdownMenuItem className="py-3 text-base" onClick={() => setHarvestQueueOpen(true)}>
+                        <Wind className="w-5 h-5 mr-3 text-orange-500" />
+                        Colher → Secagem
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openPhaseConfirm("DRYING")}>
-                        <Wind className="w-4 h-4 mr-2 text-amber-500" />
+                      <DropdownMenuItem className="py-3 text-base" onClick={() => openPhaseConfirm("DRYING")}>
+                        <Wind className="w-5 h-5 mr-3 text-amber-500" />
                         Ir direto para Secagem
                       </DropdownMenuItem>
                     </>
                   )}
                   {cycle.cloningStartDate && tent.category === "CLONING" && (
-                    <DropdownMenuItem onClick={() => setFinishCloningOpen(true)}>
-                      <ArrowRight className="w-4 h-4 mr-2 text-blue-500" />
+                    <DropdownMenuItem className="py-3 text-base" onClick={() => setFinishCloningOpen(true)}>
+                      <ArrowRight className="w-5 h-5 mr-3 text-blue-500" />
                       Finalizar Clonagem
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onFinalizeCycle(cycle.id, tent.name)} className="text-red-600 focus:text-red-600">
-                    <X className="w-4 h-4 mr-2" />
+                  <DropdownMenuItem className="py-3 text-base text-red-600 focus:text-red-600" onClick={() => onFinalizeCycle(cycle.id, tent.name)}>
+                    <X className="w-5 h-5 mr-3" />
                     Finalizar Ciclo
                   </DropdownMenuItem>
                 </>

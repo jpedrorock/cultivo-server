@@ -1093,8 +1093,8 @@ export default function TentDetails() {
                         <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                         <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[15, 35]} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "var(--foreground)" }}
                         />
                         <Area
                           type="monotone"
@@ -1141,8 +1141,8 @@ export default function TentDetails() {
                         <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                         <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[30, 90]} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "var(--foreground)" }}
                         />
                         <Area
                           type="monotone"
@@ -1187,8 +1187,8 @@ export default function TentDetails() {
                         <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                         <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 1200]} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "var(--foreground)" }}
                         />
                         <Area
                           type="monotone"
@@ -1235,8 +1235,8 @@ export default function TentDetails() {
                           <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                           <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[4.5, 8]} tickCount={8} />
                           <Tooltip
-                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                            labelStyle={{ color: "hsl(var(--foreground))" }}
+                            contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                            labelStyle={{ color: "var(--foreground)" }}
                           />
                           <Area
                             type="monotone"
@@ -1285,8 +1285,8 @@ export default function TentDetails() {
                           <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                           <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 4]} tickCount={9} />
                           <Tooltip
-                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                            labelStyle={{ color: "hsl(var(--foreground))" }}
+                            contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                            labelStyle={{ color: "var(--foreground)" }}
                           />
                           <Area
                             type="monotone"
@@ -1335,7 +1335,7 @@ export default function TentDetails() {
                           <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="ml" width={48} />
                           <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="%" width={36} domain={[0, 100]} />
                           <Tooltip
-                            contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                            contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
                             formatter={(value: any, name: any) => name === "Rega" ? [`${value} ml`, name] : [`${value}%`, name]}
                           />
                           <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />

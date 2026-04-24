@@ -266,7 +266,7 @@ export default function StrainTargets() {
       <div
         key={key}
         className={`rounded-2xl border ${config.border} overflow-hidden`}
-        style={{ background: `linear-gradient(145deg, ${config.glow} 0%, hsl(var(--card)) 60%)` }}
+        style={{ background: `linear-gradient(145deg, ${config.glow} 0%, var(--card) 60%)` }}
       >
         {/* Week header */}
         <button
@@ -426,7 +426,7 @@ export default function StrainTargets() {
           {/* Phase info banner */}
           <div
             className={`rounded-2xl border ${activeConfig.border} px-4 py-3 flex items-center gap-3`}
-            style={{ background: `linear-gradient(135deg, ${activeConfig.glow} 0%, hsl(var(--card)) 60%)` }}
+            style={{ background: `linear-gradient(135deg, ${activeConfig.glow} 0%, var(--card) 60%)` }}
           >
             <div className={`w-9 h-9 rounded-xl ${activeConfig.gradient} flex items-center justify-center shadow-md shrink-0`}>
               <ActiveIcon className="w-5 h-5 text-white" />

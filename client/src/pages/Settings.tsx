@@ -26,7 +26,7 @@ export default function Settings() {
       <div className="min-h-screen bg-background">
         <PageHeader backHref="/" title="Configurações" />
 
-        <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl">
+        <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl md:max-w-3xl">
           <StaggerList className="space-y-6">
 
             {/* Perfil resumido */}

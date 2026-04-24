@@ -252,7 +252,7 @@ export default function Calculators() {
       </header>
 
       {/* Main Content */}
-      <main className="container py-4 md:py-8">
+      <main className="container py-4 md:py-8 max-w-4xl">
         {calculatorId === "watering-runoff" && <WateringRunoffCalculator />}
         {calculatorId === "irrigation-schedule" && (
           <ErrorBoundary>

@@ -21,6 +21,8 @@ import { uploadImage } from "@/lib/uploadImage";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { PageTransition } from "@/components/PageTransition";
 import { savePendingLog, isOnline } from "@/lib/offlineStorage";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { cn } from "@/lib/utils";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
 
@@ -35,6 +37,7 @@ function getValidationColor(value: string, min?: number | null, max?: number | n
 }
 
 export default function QuickLog() {
+  const { collapsed } = useSidebar();
   const [, setLocation] = useLocation();
 
   // Read ?mode= URL param to pre-select mode (from FAB mini menu)
@@ -655,7 +658,7 @@ export default function QuickLog() {
   return (
     <PageTransition>
         <div
-          className="fixed inset-0 overflow-hidden bg-background flex flex-col isolate"
+          className={cn("fixed inset-0 overflow-hidden bg-background flex flex-col isolate", collapsed ? "lg:left-16" : "lg:left-64")}
           style={{
             paddingTop: 'env(safe-area-inset-top, 0px)',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -689,7 +692,7 @@ export default function QuickLog() {
                 <button
                   onClick={() => { triggerHaptic('light'); setLogMode('status'); }}
                   className="w-full rounded-2xl border border-teal-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-teal-500/40 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.08) 0%, hsl(var(--card)) 60%)' }}
+                  style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.08) 0%, var(--card) 60%)' }}
                 >
                   <div className="p-4 flex items-center gap-4 w-full">
                     <div className="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center shadow-lg shrink-0">
@@ -707,7 +710,7 @@ export default function QuickLog() {
                 <button
                   onClick={() => { triggerHaptic('light'); setLogMode('plant'); setCurrentStep(0); setRecordPlantHealth(true); }}
                   className="w-full rounded-2xl border border-rose-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-rose-500/40 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.08) 0%, hsl(var(--card)) 60%)' }}
+                  style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.08) 0%, var(--card) 60%)' }}
                 >
                   <div className="p-4 flex items-center gap-4 w-full">
                     <div className="w-12 h-12 rounded-xl bg-rose-600 flex items-center justify-center shadow-lg shrink-0">
@@ -723,9 +726,18 @@ export default function QuickLog() {
 
                 {/* Tricomas */}
                 <button
-                  onClick={() => { triggerHaptic('light'); setLogMode('trichome'); setCurrentStep(0); setRecordTrichomes(true); }}
+                  onClick={() => {
+                    if (floraTents.length === 0) {
+                      toast.info("Nenhuma planta em floração no momento");
+                      return;
+                    }
+                    triggerHaptic('light');
+                    setLogMode('trichome');
+                    setCurrentStep(0);
+                    setRecordTrichomes(true);
+                  }}
                   className="w-full rounded-2xl border border-violet-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-violet-500/40 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, hsl(var(--card)) 60%)' }}
+                  style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, var(--card) 60%)' }}
                 >
                   <div className="p-4 flex items-center gap-4 w-full">
                     <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shrink-0">
@@ -877,7 +889,7 @@ export default function QuickLog() {
                       }`}
                       style={{ background: isSelected
                         ? `linear-gradient(135deg, rgba(${accentRgba},0.25) 0%, rgba(${accentRgba},0.12) 100%)`
-                        : `linear-gradient(135deg, rgba(${accentRgba},0.05) 0%, hsl(var(--card)) 65%)`
+                        : `linear-gradient(135deg, rgba(${accentRgba},0.05) 0%, var(--card) 65%)`
                       }}
                     >
                       <div className="px-5 py-4 flex items-center gap-3">
@@ -1384,6 +1396,40 @@ export default function QuickLog() {
               </>
             )}
 
+            {/* Trichome: loading plants */}
+            {recordTrichomes === true && plantsLoading && (
+              <div className="flex flex-col items-center justify-center py-12 gap-4 animate-[fade-in_0.4s_ease-out]">
+                <div className="w-20 h-20 rounded-full bg-violet-500/15 flex items-center justify-center">
+                  <Sparkles className="w-10 h-10 text-violet-400 animate-pulse" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-foreground">Carregando plantas…</p>
+                  <p className="text-sm text-muted-foreground mt-1">Buscando plantas da estufa de floração</p>
+                </div>
+                <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
+              </div>
+            )}
+
+            {/* Trichome: no plants in tent */}
+            {recordTrichomes === true && !plantsLoading && plants.length === 0 && (
+              <div className="flex flex-col items-center gap-4 py-6 animate-[slide-in-from-bottom_0.6s_ease-out]">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                  <Sprout className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-foreground">Nenhuma planta ativa</p>
+                  <p className="text-sm text-muted-foreground mt-1">Esta estufa não tem plantas ativas para registrar tricomas.</p>
+                </div>
+                <Button
+                  onClick={() => { resetForm(); setLocation("/"); }}
+                  className="h-14 px-8 text-lg font-medium rounded-xl"
+                >
+                  <Check className="mr-2 h-5 w-5" />
+                  Finalizar
+                </Button>
+              </div>
+            )}
+
             {/* Formulário de tricomas por planta */}
             {recordTrichomes === true && plants[currentTrichomeIndex] && (() => {
               const plant = plants[currentTrichomeIndex];
@@ -1565,7 +1611,12 @@ export default function QuickLog() {
         })()}
 
         {/* Trichome navigation */}
-        {recordTrichomes === true && plants[currentTrichomeIndex] && (
+        {recordTrichomes === true && plantsLoading && (
+          <div className="flex-1 h-14 flex items-center justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
+          </div>
+        )}
+        {recordTrichomes === true && !plantsLoading && plants[currentTrichomeIndex] && (
           <>
             <AnimatedButton
               onClick={handleSkipTrichome}

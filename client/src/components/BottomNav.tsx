@@ -243,6 +243,12 @@ export function BottomNav() {
         overflow: 'visible',
       }}
     >
+      {/* Gradient fade acima da barra — dissolve a transição entre conteúdo e nav */}
+      <div
+        className="absolute left-0 right-0 h-8 pointer-events-none bg-gradient-to-b from-transparent to-card"
+        style={{ top: '-32px' }}
+      />
+
       {/* Curved SVG background — cobre apenas a área da barra (65px) */}
       {/* SVG não consegue resolver CSS vars confiável no iOS: usamos um rect bg-card por baixo */}
       <div className="absolute top-0 left-0 w-full bg-card pointer-events-none" style={{ height: '65px' }} />

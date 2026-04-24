@@ -115,7 +115,7 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
                 ? "linear-gradient(135deg, #10b981, #34d399)"
                 : isReady
                 ? "linear-gradient(135deg, #8b5cf6, #6366f1, #3b82f6)"
-                : `linear-gradient(135deg, hsl(var(--muted-foreground)/0.3), hsl(var(--muted-foreground)/0.15))`,
+                : `linear-gradient(135deg, color-mix(in oklch, var(--muted-foreground) 30%, transparent), color-mix(in oklch, var(--muted-foreground) 15%, transparent))`,
               width: `${pillW}px`,
               transition: "width 150ms ease, background 300ms ease",
             }}
@@ -188,8 +188,8 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
                     color: phase === "success"
                       ? "#10b981"
                       : isReady
-                      ? "hsl(var(--foreground))"
-                      : "hsl(var(--muted-foreground))",
+                      ? "var(--foreground)"
+                      : "var(--muted-foreground)",
                     transition: "color 250ms ease",
                     opacity: Math.min((pillW - 80) / 40, 1),
                   }}

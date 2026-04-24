@@ -701,7 +701,7 @@ export default function PlantChat() {
         )}
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto container mx-auto px-4 py-4 max-w-2xl">
+        <div className="flex-1 overflow-y-auto container mx-auto px-4 py-4 max-w-2xl md:max-w-3xl">
           {historyLoading && <HistorySkeleton />}
 
           {/* Empty state */}
@@ -748,7 +748,7 @@ export default function PlantChat() {
 
         {/* Input bar */}
         <div className="bg-card border-t border-border pb-safe">
-          <div className="container mx-auto px-3 py-2.5 max-w-2xl">
+          <div className="container mx-auto px-3 py-2.5 max-w-2xl md:max-w-3xl">
             {imagePreview && (
               <div className="relative inline-block mb-2 ml-1">
                 <img src={imagePreview} alt="preview" className="h-16 w-16 rounded-lg object-cover border border-border" />
