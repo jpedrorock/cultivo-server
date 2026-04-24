@@ -63,7 +63,7 @@ export function PageHeader({
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 shrink-0 hidden md:flex lg:hidden"
+          className="h-10 w-10 shrink-0 flex max-md:hidden lg:hidden"
           onClick={openSidebar}
           aria-label="Abrir menu"
         >
