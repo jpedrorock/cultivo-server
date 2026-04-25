@@ -637,7 +637,7 @@ function WateringRunoffCalculator() {
           {/* ── Dicas ── */}
           <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-yellow-400/80 flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/>Dicas de Uso</p>
-            <p className="text-xs text-muted-foreground"><span className="text-foreground font-medium">Runoff Ideal:</span> Entre 15–25%. Muito baixo acumula sais, muito alto desperdiça nutrientes.</p>
+            <p className="text-xs text-muted-foreground"><span className="text-foreground font-medium">Runoff Ideal por fase:</span> Stretch (sem 1–3): 30–50% · Bulking (sem 4–7): 20–30% · Finalização (sem 8+): 20–40%. Muito baixo acumula sais, muito alto desperdiça nutrientes.</p>
             <p className="text-xs text-muted-foreground"><span className="text-foreground font-medium">Ajuste Automático:</span> Informe o runoff da última rega para o sistema corrigir o volume.</p>
           </div>
 
@@ -1020,7 +1020,7 @@ function PPMECConverter() {
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              <span className="inline-flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5 text-blue-400"/><strong>Referência:</strong></span> Vega: 1.0-1.8 EC | Flora: 1.8-2.4 EC
+              <span className="inline-flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5 text-blue-400"/><strong>Referência:</strong></span> Vega: 1.8–2.2 EC | Flora: 2.5–3.2 EC | Finalização: ~1.0 EC
             </p>
           </div>
         )}
@@ -1035,11 +1035,15 @@ function PPMECConverter() {
             </div>
             <div className="flex justify-between">
               <span>Vegetativo:</span>
-              <span className="font-medium">1.0-1.8 EC ({scale === "500" ? "500-900" : "700-1260"} PPM)</span>
+              <span className="font-medium">1.8-2.2 EC ({scale === "500" ? "900-1100" : "1260-1540"} PPM)</span>
             </div>
             <div className="flex justify-between">
-              <span>Floração:</span>
-              <span className="font-medium">1.8-2.4 EC ({scale === "500" ? "900-1200" : "1260-1680"} PPM)</span>
+              <span>Floração (Stretch/Bulking):</span>
+              <span className="font-medium">2.5-3.2 EC ({scale === "500" ? "1250-1600" : "1750-2240"} PPM)</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Floração (Finalização):</span>
+              <span className="font-medium">~1.0 EC ({scale === "500" ? "~500" : "~700"} PPM)</span>
             </div>
             <div className="flex justify-between">
               <span>Flush Final:</span>
