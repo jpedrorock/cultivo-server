@@ -51,8 +51,7 @@ if (ENV.isProduction) {
   }
 
   if (!ENV.encryptionKey) {
-    console.error('[ENV] ENCRYPTION_KEY é obrigatório em produção para criptografar as API keys dos usuários.');
-    console.error('[ENV] Gere uma chave segura com: openssl rand -base64 32');
-    process.exit(1);
+    console.warn('[ENV] AVISO: ENCRYPTION_KEY não configurado — usando JWT_SECRET como fallback para criptografia.');
+    console.warn('[ENV] Para máxima segurança, adicione ENCRYPTION_KEY=<openssl rand -base64 32> nas variáveis de ambiente.');
   }
 }
