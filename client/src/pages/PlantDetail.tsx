@@ -49,6 +49,7 @@ import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 import { PressButton } from "@/components/PressButton";
 import { PressDropdownMenuItem } from "@/components/PressDropdownMenuItem";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Tabs carregadas sob demanda para reduzir bundle inicial de PlantDetail
 const PlantHealthTab       = lazy(() => import("@/components/PlantHealthTab"));
@@ -600,15 +601,19 @@ export default function PlantDetail() {
             </div>
 
             <TabsContent value="health">
-              <Suspense fallback={<TabSkeleton />}>
-                <PlantHealthTab plantId={plantId} />
-              </Suspense>
+              <ErrorBoundary inline message="Erro ao carregar histórico de saúde.">
+                <Suspense fallback={<TabSkeleton />}>
+                  <PlantHealthTab plantId={plantId} />
+                </Suspense>
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="environment">
-              <Suspense fallback={<TabSkeleton />}>
-                <PlantEnvironmentTab plantId={plantId} />
-              </Suspense>
+              <ErrorBoundary inline message="Erro ao carregar dados de ambiente.">
+                <Suspense fallback={<TabSkeleton />}>
+                  <PlantEnvironmentTab plantId={plantId} />
+                </Suspense>
+              </ErrorBoundary>
             </TabsContent>
 
             {isPlant && (
@@ -629,28 +634,36 @@ export default function PlantDetail() {
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="observations">
-                    <Suspense fallback={<TabSkeleton />}>
-                      <PlantObservationsTab plantId={plantId} />
-                    </Suspense>
+                    <ErrorBoundary inline message="Erro ao carregar observações.">
+                      <Suspense fallback={<TabSkeleton />}>
+                        <PlantObservationsTab plantId={plantId} />
+                      </Suspense>
+                    </ErrorBoundary>
                   </TabsContent>
                   <TabsContent value="lst">
-                    <Suspense fallback={<TabSkeleton />}>
-                      <PlantTrainingSummary plantId={plantId} />
-                    </Suspense>
+                    <ErrorBoundary inline message="Erro ao carregar dados de treino.">
+                      <Suspense fallback={<TabSkeleton />}>
+                        <PlantTrainingSummary plantId={plantId} />
+                      </Suspense>
+                    </ErrorBoundary>
                   </TabsContent>
                   <TabsContent value="trichomes">
-                    <Suspense fallback={<TabSkeleton />}>
-                      <PlantTrichomesTab plantId={plantId} />
-                    </Suspense>
+                    <ErrorBoundary inline message="Erro ao carregar análise de tricomas.">
+                      <Suspense fallback={<TabSkeleton />}>
+                        <PlantTrichomesTab plantId={plantId} />
+                      </Suspense>
+                    </ErrorBoundary>
                   </TabsContent>
                 </Tabs>
               </TabsContent>
             )}
 
             <TabsContent value="archive">
-              <Suspense fallback={<TabSkeleton />}>
-                <PlantArchiveTab plantId={plantId} plantName={plant?.name ?? "Planta"} />
-              </Suspense>
+              <ErrorBoundary inline message="Erro ao carregar arquivo da planta.">
+                <Suspense fallback={<TabSkeleton />}>
+                  <PlantArchiveTab plantId={plantId} plantName={plant?.name ?? "Planta"} />
+                </Suspense>
+              </ErrorBoundary>
             </TabsContent>
           </Tabs>
         </main>
