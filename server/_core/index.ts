@@ -454,18 +454,13 @@ async function startServer() {
     next();
   });
 
-  // CORS — whitelist baseada no próprio domínio + ALLOWED_ORIGINS opcional
+  // CORS — auto-detecta o próprio host + ALLOWED_ORIGINS opcional
   // Dev: aceita localhost em qualquer porta
-  // Prod: aceita o próprio domínio (ENV.domain) + entradas de ALLOWED_ORIGINS
+  // Prod: aceita qualquer origin que bata com o Host da requisição (funciona em qualquer domínio)
+  //       + entradas extras de ALLOWED_ORIGINS
   const extraOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
     : [];
-  // Auto-incluir o próprio domínio da app como origem permitida
-  const selfOrigins = [
-    `https://${ENV.domain}`,
-    `http://${ENV.domain}`,
-  ];
-  const allowedOrigins = Array.from(new Set([...selfOrigins, ...extraOrigins]));
   const isProd = process.env.NODE_ENV === 'production';
 
   app.use((req, res, next) => {
@@ -479,8 +474,10 @@ async function startServer() {
       // Dev: aceita qualquer localhost/127.0.0.1
       allowed = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
     } else {
-      // Prod: aceita o próprio domínio + ALLOWED_ORIGINS
-      allowed = allowedOrigins.includes(origin);
+      // Prod: auto-detecta o próprio host via header (funciona atrás de proxy/Coolify)
+      const host = (req.headers['x-forwarded-host'] as string || req.headers.host || '').split(':')[0];
+      const selfOrigins = host ? [`https://${host}`, `http://${host}`] : [];
+      allowed = [...selfOrigins, ...extraOrigins].includes(origin);
     }
 
     if (allowed) {
