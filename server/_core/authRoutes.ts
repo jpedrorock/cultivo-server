@@ -74,8 +74,8 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      if (password.length < 6) {
-        res.status(400).json({ error: 'Senha deve ter no mínimo 6 caracteres' });
+      if (password.length < 12) {
+        res.status(400).json({ error: 'Senha deve ter no mínimo 12 caracteres' });
         return;
       }
 

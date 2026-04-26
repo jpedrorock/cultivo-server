@@ -526,7 +526,7 @@ const tuyaRouter = router({
    * Usar no Config tab: usuário cola o UID que encontrou no API Explorer.
    */
   resolveHomeId: protectedProcedure
-    .input(z.object({ smartlifeUid: z.string().min(1).max(200) }))
+    .input(z.object({ smartlifeUid: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_-]+$/, "UID inválido") }))
     .mutation(async ({ ctx, input }) => {
       const cfg = await getTuyaConfig(ctx.user.id);
       const { listHomesForUid } = await import("./lib/tuya");
@@ -7185,6 +7185,24 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         // Rate limit: 20 mensagens/hora por usuário
         checkAiRateLimit(ctx.user.id);
+
+        // Validar base64 de imagem se fornecida
+        if (input.imageBase64) {
+          try {
+            const decoded = Buffer.from(input.imageBase64, "base64");
+            // Verificar magic bytes para JPEG, PNG e WebP
+            const magic = decoded.subarray(0, 4);
+            const isJpeg = magic[0] === 0xFF && magic[1] === 0xD8;
+            const isPng  = magic[0] === 0x89 && magic[1] === 0x50 && magic[2] === 0x4E && magic[3] === 0x47;
+            const isWebp = decoded.subarray(0, 12).toString("ascii", 8, 12) === "WEBP";
+            if (!isJpeg && !isPng && !isWebp) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Imagem inválida — envie JPEG, PNG ou WebP." });
+            }
+          } catch (e) {
+            if (e instanceof TRPCError) throw e;
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Base64 de imagem inválido." });
+          }
+        }
 
         const database = await getDb();
         if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });

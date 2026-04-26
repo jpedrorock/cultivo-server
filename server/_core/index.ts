@@ -430,16 +430,28 @@ async function startServer() {
   startTuyaPollerCron();
 
   // Security headers inline (sem dependência de pacote externo)
-  if (process.env.NODE_ENV === 'production') {
-    app.use((_req, res, next) => {
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-      res.setHeader('X-XSS-Protection', '0');
-      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-      res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
-      next();
-    });
-  }
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '0');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
+    // CSP: permite scripts/styles inline (necessário para Vite/React) + imagens externas para fotos
+    res.setHeader('Content-Security-Policy',
+      "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data: blob: https:; " +
+      "connect-src 'self' https:; " +
+      "font-src 'self' data:; " +
+      "frame-ancestors 'none';"
+    );
+    if (process.env.NODE_ENV === 'production') {
+      // HSTS: força HTTPS por 1 ano (só em produção para não bloquear dev HTTP)
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
 
   // CORS — whitelist restritiva por padrão
   // Dev: permite localhost em qualquer porta + sem origin (same-origin)

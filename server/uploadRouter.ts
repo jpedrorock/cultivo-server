@@ -29,9 +29,13 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-  fileFilter: (_req, _file, cb) => {
-    // Aceitar qualquer arquivo — o frontend já garante que é imagem
-    cb(null, true);
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.mimetype)) {
+      cb(new Error(`Tipo de arquivo não permitido: ${file.mimetype}. Use JPEG, PNG ou WebP.`));
+    } else {
+      cb(null, true);
+    }
   },
 });
 
@@ -80,7 +84,7 @@ router.post(
       const errStack = error instanceof Error ? error.stack : undefined;
       console.error("[upload] Error:", errMsg);
       if (errStack) console.error("[upload] Stack:", errStack);
-      return res.status(500).json({ error: "Erro ao processar o upload da imagem.", detail: errMsg });
+      return res.status(500).json({ error: "Erro ao processar o upload da imagem." });
     }
   }
 );
@@ -104,8 +108,9 @@ router.get("/thumbnail", async (req: Request, res: Response) => {
     const relativePath = url.replace(/^\/uploads\//, "");
     const filePath = path.resolve(uploadsDir, relativePath);
 
-    // Prevent path traversal
-    if (!filePath.startsWith(uploadsDir)) {
+    // Prevent path traversal — path.relative é mais robusto que startsWith
+    const rel = path.relative(uploadsDir, filePath);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
       return res.status(403).json({ error: "Forbidden" });
     }
 
