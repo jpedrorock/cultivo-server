@@ -426,7 +426,7 @@ function AiSettingsCard() {
     const p = (settings.provider as Provider | null) ?? 'gemini';
     setProvider(p);
     setModel(settings.model ?? PROVIDER_MODELS[p]?.models[0] ?? PROVIDER_MODELS.gemini.models[0]);
-  }, [settings?.provider, settings?.model]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settings]); // depende de settings inteiro para detectar qualquer mudança
 
   // Quando modelos live carregam e o modelo atual não está na lista, seleciona o primeiro
   useEffect(() => {

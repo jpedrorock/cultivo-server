@@ -95,7 +95,7 @@ export default function Backup() {
       toast.info("Fazendo backup automático semanal…", { duration: 3000 });
       doExport(true).catch(() => {});
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoBackupEnabled, lastAutoBackup, doExport]);
 
   const handleImport = () => {
     const input = document.createElement("input");

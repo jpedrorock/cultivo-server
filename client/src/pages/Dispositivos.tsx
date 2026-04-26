@@ -55,7 +55,8 @@ export default function Dispositivos() {
 
   const createToken = trpc.device.createToken.useMutation({
     onSuccess: ({ token }) => {
-      const tentId = parseInt(newTentId);
+      const tentId = parseInt(newTentId, 10);
+      if (isNaN(tentId)) return;
       const tent = tents.find((t) => t.id === tentId);
       setRevealed({
         token,
