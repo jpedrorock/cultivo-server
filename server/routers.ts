@@ -431,7 +431,14 @@ async function getTuyaConfig(userId: number, opts: { requireEnabled?: boolean } 
     [userId]
   );
   if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-  return rows[0] as { accessId: string; accessSecret: string; region: import("./lib/tuya").TuyaRegion; homeId: string | null };
+  const row = rows[0] as { accessId: string; accessSecret: string; region: import("./lib/tuya").TuyaRegion; homeId: string | null };
+  try {
+    const { decryptApiKey } = await import("./aiCrypto");
+    row.accessSecret = decryptApiKey(row.accessSecret);
+  } catch {
+    // Segredo ainda em plaintext (migração): usa como está
+  }
+  return row;
 }
 
 const tuyaRouter = router({
@@ -439,7 +446,8 @@ const tuyaRouter = router({
   saveConfig: protectedProcedure
     .input(z.object({
       accessId: z.string().min(1).max(100),
-      accessSecret: z.string().min(1).max(100),
+      // Vazio = manter segredo existente no banco (não sobrescrever)
+      accessSecret: z.string().max(100).optional(),
       region: z.enum(["eu", "us", "cn", "in"]),
       pollIntervalMin: z.number().refine(v => POLL_INTERVAL_OPTIONS.includes(v as any)),
       enabled: z.boolean(),
@@ -447,22 +455,40 @@ const tuyaRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const pool = getMysqlPool();
-      await pool.execute(
-        `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled, homeId)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           accessId = VALUES(accessId),
-           accessSecret = VALUES(accessSecret),
-           region = VALUES(region),
-           pollIntervalMin = VALUES(pollIntervalMin),
-           enabled = VALUES(enabled),
-           homeId = VALUES(homeId)`,
-        [ctx.user.id, input.accessId, input.accessSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0, input.homeId ?? null]
-      );
+      if (input.accessSecret) {
+        // Novo segredo fornecido: criptografar e salvar
+        const { encryptApiKey } = await import("./aiCrypto");
+        const encryptedSecret = encryptApiKey(input.accessSecret);
+        await pool.execute(
+          `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled, homeId)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             accessId = VALUES(accessId),
+             accessSecret = VALUES(accessSecret),
+             region = VALUES(region),
+             pollIntervalMin = VALUES(pollIntervalMin),
+             enabled = VALUES(enabled),
+             homeId = VALUES(homeId)`,
+          [ctx.user.id, input.accessId, encryptedSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0, input.homeId ?? null]
+        );
+      } else {
+        // Sem novo segredo: atualizar tudo exceto accessSecret
+        await pool.execute(
+          `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled, homeId)
+           VALUES (?, ?, '', ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             accessId = VALUES(accessId),
+             region = VALUES(region),
+             pollIntervalMin = VALUES(pollIntervalMin),
+             enabled = VALUES(enabled),
+             homeId = VALUES(homeId)`,
+          [ctx.user.id, input.accessId, input.region, input.pollIntervalMin, input.enabled ? 1 : 0, input.homeId ?? null]
+        );
+      }
       return { ok: true };
     }),
 
-  /** Busca credenciais salvas */
+  /** Busca credenciais salvas — accessSecret retorna mascarado ao client */
   getConfig: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
     const [rows]: any = await pool.execute(
@@ -471,9 +497,11 @@ const tuyaRouter = router({
     );
     if (rows.length === 0) return null;
     const r = rows[0];
+    // Nunca retornar o segredo descriptografado ao client; apenas indicar se está configurado
+    const hasSecret = Boolean(r.accessSecret);
     return {
       accessId: r.accessId as string,
-      accessSecret: r.accessSecret as string,
+      accessSecretMasked: hasSecret ? "••••••••••••" : "",
       region: r.region as string,
       pollIntervalMin: r.pollIntervalMin as number,
       enabled: Boolean(r.enabled),

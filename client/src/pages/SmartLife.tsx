@@ -91,7 +91,8 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     if (config) {
       setAccessId(config.accessId);
-      setAccessSecret(config.accessSecret);
+      // Nunca popular com o segredo — usuário digita novo apenas se quiser trocar
+      setAccessSecret('');
       setRegion(config.region as Region);
       setPollInterval(config.pollIntervalMin as PollInterval);
       setIntegrationEnabled(config.enabled);
@@ -175,7 +176,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
           placeholder="Ex: 9gk3qwi8nf2mxxx" mono secret />
         <CredentialField label="Access Secret" value={accessSecret}
           onChange={(v) => { setAccessSecret(v); setConnStatus(null); setConnMsg(''); }}
-          placeholder="Ex: a1b2c3d4e5f6..." mono secret />
+          placeholder={config?.accessSecretMasked ? "Segredo salvo — deixe vazio para manter" : "Ex: a1b2c3d4e5f6..."} mono secret />
       </div>
 
       {/* Região */}

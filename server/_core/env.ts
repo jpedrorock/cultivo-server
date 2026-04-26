@@ -29,6 +29,10 @@ export const ENV = {
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
 
+  // Chave de criptografia para API keys dos usuários (AES-256-GCM)
+  // Gere com: openssl rand -base64 32
+  encryptionKey: process.env.ENCRYPTION_KEY ?? '',
+
   // Helpers
   isProduction: process.env.NODE_ENV === 'production',
   isDevelopment: process.env.NODE_ENV !== 'production',
@@ -43,6 +47,12 @@ if (ENV.isProduction) {
 
   if (!ENV.jwtSecret || ENV.jwtSecret === 'cultivo-secret-change-in-production-32chars') {
     console.error('[ENV] JWT_SECRET deve ser alterado para um valor seguro em produção');
+    process.exit(1);
+  }
+
+  if (!ENV.encryptionKey) {
+    console.error('[ENV] ENCRYPTION_KEY é obrigatório em produção para criptografar as API keys dos usuários.');
+    console.error('[ENV] Gere uma chave segura com: openssl rand -base64 32');
     process.exit(1);
   }
 }

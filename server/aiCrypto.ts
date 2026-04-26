@@ -1,14 +1,25 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import { ENV } from "./_core/env";
 
 const ALGO = "aes-256-gcm";
-const KEY_ENV = process.env.ENCRYPTION_KEY ?? "";
 
-// Derivar chave de 32 bytes a partir da env var (padding/trim se necessário)
+/**
+ * Deriva chave de 32 bytes a partir de ENCRYPTION_KEY.
+ * Em dev sem a variável: usa derivação do JWT_SECRET como fallback (nunca zero-fill).
+ * Em produção: ENCRYPTION_KEY é obrigatório (env.ts faz process.exit se ausente).
+ */
 function getKey(): Buffer {
-  if (!KEY_ENV) return Buffer.alloc(32, 0); // fallback dev: chave zerada
-  const raw = Buffer.from(KEY_ENV, "utf8");
+  const raw = ENV.encryptionKey || ENV.jwtSecret;
+  if (!ENV.encryptionKey && ENV.isDevelopment) {
+    // Aviso único em dev para lembrar de configurar a chave
+    if (!(getKey as any)._warned) {
+      console.warn("[aiCrypto] ENCRYPTION_KEY não configurado — usando JWT_SECRET como fallback (somente dev)");
+      (getKey as any)._warned = true;
+    }
+  }
+  const buf = Buffer.from(raw, "utf8");
   const key = Buffer.alloc(32);
-  raw.copy(key);
+  buf.copy(key);
   return key;
 }
 
