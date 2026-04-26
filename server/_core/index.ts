@@ -441,22 +441,30 @@ async function startServer() {
     });
   }
 
-  // CORS inline — se ALLOWED_ORIGINS estiver definida, restringir; caso contrário, permitir tudo
-  // (proteção CSRF principal vem do cookie sameSite:lax + httpOnly)
+  // CORS — whitelist restritiva por padrão
+  // Dev: permite localhost em qualquer porta + sem origin (same-origin)
+  // Prod: ALLOWED_ORIGINS obrigatório; sem ele só aceita requests sem origin (same-origin via proxy)
   const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
     : [];
+  const isProd = process.env.NODE_ENV === 'production';
+
   app.use((req, res, next) => {
     const origin = req.headers.origin as string | undefined;
-    const isProd = process.env.NODE_ENV === 'production';
 
-    // Determinar se origin é permitida
-    let allowed = true;
-    if (origin && isProd && allowedOrigins.length > 0) {
+    // Sem origin = same-origin ou curl/server-to-server → sempre permitido
+    if (!origin) { next(); return; }
+
+    let allowed = false;
+    if (!isProd) {
+      // Dev: aceita qualquer localhost/127.0.0.1
+      allowed = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    } else if (allowedOrigins.length > 0) {
       allowed = allowedOrigins.includes(origin);
     }
+    // isProd sem ALLOWED_ORIGINS → nenhuma cross-origin permitida
 
-    if (allowed && origin) {
+    if (allowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
@@ -464,12 +472,12 @@ async function startServer() {
     }
 
     if (req.method === 'OPTIONS') {
-      res.sendStatus(204);
+      res.sendStatus(allowed ? 204 : 403);
       return;
     }
 
     if (!allowed) {
-      res.status(403).json({ error: `CORS: origem não permitida — ${origin}` });
+      res.status(403).json({ error: 'CORS: origem não permitida' });
       return;
     }
 

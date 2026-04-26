@@ -6976,7 +6976,32 @@ export const appRouter = router({
   // AI Chat — Assistente especialista em cannabis indoor
   // Cada usuário configura sua própria chave de API (OpenAI / Anthropic / Gemini)
   // ──────────────────────────────────────────────────────────────────────────
-  aiChat: router({
+
+  // Rate limiting em memória: 20 mensagens por hora por usuário
+  // (reinicia com o servidor — Redis seria melhor em multi-instância)
+  aiChat: (() => {
+    const AI_RATE_LIMIT = 20;            // máx mensagens por janela
+    const AI_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hora
+    const aiRateMap = new Map<number, { count: number; windowStart: number }>();
+
+    function checkAiRateLimit(userId: number): void {
+      const now = Date.now();
+      const entry = aiRateMap.get(userId);
+      if (!entry || now - entry.windowStart > AI_RATE_WINDOW_MS) {
+        aiRateMap.set(userId, { count: 1, windowStart: now });
+        return;
+      }
+      if (entry.count >= AI_RATE_LIMIT) {
+        const resetIn = Math.ceil((AI_RATE_WINDOW_MS - (now - entry.windowStart)) / 60000);
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: `Limite de ${AI_RATE_LIMIT} mensagens por hora atingido. Tente novamente em ${resetIn} min.`,
+        });
+      }
+      entry.count++;
+    }
+
+    return router({
 
     // Salvar configurações de API do usuário
     saveSettings: protectedProcedure
@@ -7158,6 +7183,9 @@ export const appRouter = router({
         imageMime:   z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        // Rate limit: 20 mensagens/hora por usuário
+        checkAiRateLimit(ctx.user.id);
+
         const database = await getDb();
         if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
 
@@ -7315,7 +7343,8 @@ export const appRouter = router({
 
         return { reply };
       }),
-  }),
+    }); // fim do router({ ... }) interno do aiChat IIFE
+  })(), // fim do IIFE (() => { ... })()
 });
 
 export type AppRouter = typeof appRouter;
