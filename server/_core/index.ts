@@ -11,6 +11,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import uploadRouter from "../uploadRouter";
 import { initializeStorageDirectories } from "../storageLocal";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -453,12 +454,18 @@ async function startServer() {
     next();
   });
 
-  // CORS — whitelist restritiva por padrão
-  // Dev: permite localhost em qualquer porta + sem origin (same-origin)
-  // Prod: ALLOWED_ORIGINS obrigatório; sem ele só aceita requests sem origin (same-origin via proxy)
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
+  // CORS — whitelist baseada no próprio domínio + ALLOWED_ORIGINS opcional
+  // Dev: aceita localhost em qualquer porta
+  // Prod: aceita o próprio domínio (ENV.domain) + entradas de ALLOWED_ORIGINS
+  const extraOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
     : [];
+  // Auto-incluir o próprio domínio da app como origem permitida
+  const selfOrigins = [
+    `https://${ENV.domain}`,
+    `http://${ENV.domain}`,
+  ];
+  const allowedOrigins = Array.from(new Set([...selfOrigins, ...extraOrigins]));
   const isProd = process.env.NODE_ENV === 'production';
 
   app.use((req, res, next) => {
@@ -471,10 +478,10 @@ async function startServer() {
     if (!isProd) {
       // Dev: aceita qualquer localhost/127.0.0.1
       allowed = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-    } else if (allowedOrigins.length > 0) {
+    } else {
+      // Prod: aceita o próprio domínio + ALLOWED_ORIGINS
       allowed = allowedOrigins.includes(origin);
     }
-    // isProd sem ALLOWED_ORIGINS → nenhuma cross-origin permitida
 
     if (allowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
