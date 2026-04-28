@@ -14,7 +14,7 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle, Target, Smartphone, Sparkles, Wifi } from "lucide-react";
-import { RangeSlider } from "@/components/ui/range-slider";
+import { CalcSlider } from "@/components/ui/calc-slider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
@@ -25,6 +25,16 @@ import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
+
+function getPHColor(ph: number): string {
+  if (ph < 4) return "#dc2626";
+  if (ph < 5.5) return "#f97316";
+  if (ph < 6) return "#eab308";
+  if (ph <= 7) return "#22c55e";
+  if (ph <= 8) return "#3b82f6";
+  if (ph <= 10) return "#8b5cf6";
+  return "#ec4899";
+}
 
 function getValidationColor(value: string, min?: number | null, max?: number | null): string {
   if (!value || !min || !max) return "";
@@ -982,7 +992,7 @@ export default function QuickLog() {
                   return (
                     <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border" style={{ borderColor: color + "55", background: color + "12" }}>
                       <span className="text-sm font-medium" style={{ color }}>VPD · {label}</span>
-                      <span className="font-bold text-lg tabular-nums" style={{ color }}>{v} kPa</span>
+                      <span className="font-bold text-lg mono" style={{ color }}>{v} kPa</span>
                     </div>
                   );
                 })()}
@@ -1033,20 +1043,15 @@ export default function QuickLog() {
                   )}
                 </div>
                 <div className="pt-4 pb-2">
-                  <RangeSlider
+                  <CalcSlider
+                    label="pH da solução"
+                    value={parseFloat(ph) || 7}
+                    setValue={(v) => setPh(v.toFixed(1))}
                     min={0}
                     max={14}
                     step={0.1}
-                    value={parseFloat(ph) || 7}
-                    onChange={(v) => setPh(v.toFixed(1))}
-                    trackGradient="linear-gradient(to right, #dc2626 0%, #f97316 28.5%, #eab308 42.8%, #22c55e 50%, #3b82f6 64.2%, #8b5cf6 100%)"
-                    formatTooltip={(v) => `pH ${v.toFixed(1)}`}
-                    size="lg"
-                    labels={[
-                      { position: 0, label: "0", sublabel: "Ácido", color: "#dc2626" },
-                      { position: 50, label: "7", sublabel: "Neutro", color: "#22c55e" },
-                      { position: 100, label: "14", sublabel: "Alcalino", color: "#8b5cf6" },
-                    ]}
+                    suffix="pH"
+                    accent={getPHColor(parseFloat(ph) || 7)}
                   />
                 </div>
               </div>
@@ -1089,15 +1094,15 @@ export default function QuickLog() {
                       placeholder="600"
                     />
                     <div className="pb-2">
-                      <RangeSlider
+                      <CalcSlider
+                        label="PPFD"
+                        value={ppfd}
+                        setValue={(val) => setPpfd(val)}
                         min={0}
                         max={1200}
                         step={10}
-                        value={ppfd}
-                        onChange={(val) => setPpfd(val)}
-                        trackGradient="linear-gradient(to right, #3b82f6 0%, #10b981 33%, #eab308 66%, #ef4444 100%)"
-                        formatTooltip={(v) => `${v} μmol/m²/s`}
-                        size="lg"
+                        suffix="μmol/m²/s"
+                        accent="var(--color-kpi-ppfd)"
                       />
                     </div>
                   </div>
@@ -1121,18 +1126,18 @@ export default function QuickLog() {
                       />
                     </div>
                     <div className="pb-2">
-                      <RangeSlider
-                        min={0}
-                        max={100000}
-                        step={1000}
+                      <CalcSlider
+                        label="Intensidade de luz"
                         value={luxValue}
-                        onChange={(val) => {
+                        setValue={(val) => {
                           setLuxValue(val);
                           setPpfd(Math.round(val * 0.0185));
                         }}
-                        trackGradient="linear-gradient(to right, #3b82f6 0%, #10b981 33%, #eab308 66%, #ef4444 100%)"
-                        formatTooltip={(v) => `${(v / 1000).toFixed(0)}k lux`}
-                        size="lg"
+                        min={0}
+                        max={100000}
+                        step={1000}
+                        suffix="lux"
+                        accent="var(--color-kpi-ppfd)"
                       />
                     </div>
                     {luxValue > 0 && (
@@ -1149,7 +1154,7 @@ export default function QuickLog() {
                 {tempC && (
                   <div className="p-4 bg-orange-500/10 rounded-xl border-l-4 border-orange-500">
                     <div className="text-sm text-muted-foreground">Temperatura</div>
-                    <div className="text-2xl font-bold text-foreground flex items-center gap-1.5">
+                    <div className="text-2xl font-semibold mono text-foreground flex items-center gap-1.5">
                       {tempC}°C
                       {sensorReading?.isFresh && <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
                     </div>
@@ -1158,7 +1163,7 @@ export default function QuickLog() {
                 {rhPct && (
                   <div className="p-4 bg-blue-500/10 rounded-xl border-l-4 border-blue-500">
                     <div className="text-sm text-muted-foreground">Umidade</div>
-                    <div className="text-2xl font-bold text-foreground flex items-center gap-1.5">
+                    <div className="text-2xl font-semibold mono text-foreground flex items-center gap-1.5">
                       {rhPct}%
                       {sensorReading?.isFresh && <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
                     </div>
@@ -1173,7 +1178,7 @@ export default function QuickLog() {
                   return (
                     <div className="p-4 rounded-xl border-l-4" style={{ borderColor: color, background: color + "18" }}>
                       <div className="text-sm text-muted-foreground">VPD</div>
-                      <div className="text-2xl font-bold tabular-nums" style={{ color }}>{v} kPa</div>
+                      <div className="text-2xl font-semibold mono" style={{ color }}>{v} kPa</div>
                       <div className="text-xs mt-0.5" style={{ color, opacity: 0.75 }}>{label}</div>
                     </div>
                   );
@@ -1181,31 +1186,31 @@ export default function QuickLog() {
                 {wateringVolume && (
                   <div className="p-4 bg-green-500/10 rounded-xl border-l-4 border-green-500">
                     <div className="text-sm text-muted-foreground">Volume de Rega</div>
-                    <div className="text-2xl font-bold text-foreground">{wateringVolume} ml</div>
+                    <div className="text-2xl font-semibold mono text-foreground">{wateringVolume} ml</div>
                   </div>
                 )}
                 {runoffCollected && (
                   <div className="p-4 bg-teal-500/10 rounded-xl border-l-4 border-teal-500">
                     <div className="text-sm text-muted-foreground">Runoff Coletado</div>
-                    <div className="text-2xl font-bold text-foreground">{runoffCollected} ml ({runoffPercentage}%)</div>
+                    <div className="text-2xl font-semibold mono text-foreground">{runoffCollected} ml ({runoffPercentage}%)</div>
                   </div>
                 )}
                 {ph && (
                   <div className="p-4 bg-purple-500/10 rounded-xl border-l-4 border-purple-500">
                     <div className="text-sm text-muted-foreground">pH</div>
-                    <div className="text-2xl font-bold text-foreground">{ph}</div>
+                    <div className="text-2xl font-semibold mono text-foreground">{ph}</div>
                   </div>
                 )}
                 {ec && (
                   <div className="p-4 bg-yellow-500/10 rounded-xl border-l-4 border-yellow-500">
                     <div className="text-sm text-muted-foreground">EC</div>
-                    <div className="text-2xl font-bold text-foreground">{ec} mS/cm</div>
+                    <div className="text-2xl font-semibold mono text-foreground">{ec} mS/cm</div>
                   </div>
                 )}
                 {ppfd > 0 && (
                   <div className="p-4 bg-amber-500/10 rounded-xl border-l-4 border-amber-500">
                     <div className="text-sm text-muted-foreground">PPFD ({turn})</div>
-                    <div className="text-2xl font-bold text-foreground">{ppfd} μmol/m²/s</div>
+                    <div className="text-2xl font-semibold mono text-foreground">{ppfd} μmol/m²/s</div>
                   </div>
                 )}
               </div>
