@@ -636,7 +636,7 @@ export default function PlantChat() {
             </div>
 
             <div className="flex-1 min-w-0">
-              <h1 className="text-sm font-bold text-foreground leading-tight">IA Especialista</h1>
+              <h1 className="text-sm font-bold text-foreground leading-tight">Doctor Jáh</h1>
               <p className="text-xs text-muted-foreground">Cannabis Indoor</p>
             </div>
 
@@ -718,7 +718,7 @@ export default function PlantChat() {
               </div>
 
               <div className="text-center">
-                <p className="font-bold text-foreground text-base">IA Especialista em Cannabis</p>
+                <p className="font-bold text-foreground text-base">Doctor Jáh</p>
                 <p className="text-sm text-muted-foreground mt-1 max-w-xs leading-relaxed">
                   {plant
                     ? `Pronto para ajudar com ${plant.name}. Envie uma foto ou pergunta.`

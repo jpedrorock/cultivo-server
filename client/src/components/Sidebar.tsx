@@ -50,7 +50,7 @@ const SECONDARY_NAV = [
   { href: "/calculators",    icon: Calculator, label: "Calculadoras"       },
   { href: "/manage-strains", icon: Leaf,       label: "Strains"            },
   { href: "/harvest-queue",  icon: Wind,       label: "Aguardando Secagem" },
-  { href: "/chat",           icon: Bot,        label: "IA Especialista"    },
+  { href: "/chat",           icon: Bot,        label: "Doctor Jáh"    },
 ];
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
