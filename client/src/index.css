@@ -102,6 +102,21 @@
   --sidebar-accent-foreground: oklch(0.22 0.010 148);
   --sidebar-border: oklch(0.878 0.007 140);
   --sidebar-ring: oklch(0.35 0.11 148);
+
+  /* ── Tokens das calculadoras (light) ── */
+  --color-primary-fg: var(--primary-foreground);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-fg-dim: oklch(0.58 0.010 148);
+  --color-bg-elevated: oklch(0.918 0.006 140);
+  --color-border-strong: oklch(0.78 0.008 140);
+  --color-kpi-temp: oklch(0.58 0.18 45);
+  --color-kpi-rh: oklch(0.50 0.14 220);
+  --color-kpi-ppfd: oklch(0.60 0.18 85);
+  --color-phase-maint: oklch(0.48 0.17 245);
+  --color-phase-vega: oklch(0.46 0.17 145);
+  --color-phase-flora: oklch(0.48 0.20 305);
+  --color-phase-dry: oklch(0.55 0.16 75);
 }
 
 .dark {
@@ -160,6 +175,21 @@
   --sidebar-accent-foreground: oklch(0.97 0 0);
   --sidebar-border: oklch(0.18 0.008 240);
   --sidebar-ring: oklch(0.62 0.17 145);
+
+  /* ── Tokens das calculadoras (aliases + semânticos) ── */
+  --color-primary-fg: var(--primary-foreground);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-fg-dim: oklch(0.36 0.008 240);
+  --color-bg-elevated: oklch(0.12 0.008 240);
+  --color-border-strong: oklch(0.32 0.012 240);
+  --color-kpi-temp: oklch(0.72 0.18 45);
+  --color-kpi-rh: oklch(0.70 0.13 220);
+  --color-kpi-ppfd: oklch(0.85 0.16 95);
+  --color-phase-maint: oklch(0.62 0.17 245);
+  --color-phase-vega: oklch(0.70 0.20 145);
+  --color-phase-flora: oklch(0.65 0.22 305);
+  --color-phase-dry: oklch(0.74 0.17 75);
 }
 
 /* ─── Phase palette — cores semânticas por fase do ciclo ──────────────────────
@@ -1741,6 +1771,20 @@ header[class*="sticky"],
 div[class*="sticky"][class*="bg-card"],
 div[class*="sticky"][class*="bg-background"] {
   background-color: var(--card);
+}
+
+/* ── Utilitários das calculadoras ─────────────────────────────────────────── */
+.mono {
+  font-family: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: "ss01", "tnum";
+}
+
+@keyframes pulse-num {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+.pulse-dot {
+  animation: pulse-num 2.4s ease-in-out infinite;
 }
 
 /* No iOS Safari, backdrop-blur em sticky headers quebra position:fixed.

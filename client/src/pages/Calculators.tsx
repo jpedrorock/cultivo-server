@@ -10,6 +10,7 @@ import { Calculator, Droplets, Sprout, Sun, Download, AlertCircle, CheckCircle2,
 import { trpc } from "@/lib/trpc";
 import { PageTransition } from "@/components/PageTransition";
 import { RangeSlider } from "@/components/ui/range-slider";
+import { CalcSlider } from "@/components/ui/calc-slider";
 
 // Funções de exportação de receitas
 function exportIrrigationRecipe(potVolume: string, substrate: string, result: { volume: number; frequency: string }) {
@@ -189,6 +190,24 @@ function CalcHistoryPanel({ entries, onClear }: { entries: CalcEntry[]; onClear:
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ── Visual helpers das calculadoras ──────────────────────────────────────────
+function CalcEyebrow({ text }: { text: string }) {
+  return (
+    <div className="mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground mb-1.5">
+      ↳ {text}
+    </div>
+  );
+}
+
+function CalcRunning() {
+  return (
+    <div className="absolute top-4 right-4 mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground/50 flex items-center gap-1.5 pointer-events-none">
+      <span className="h-1.5 w-1.5 rounded-full bg-primary pulse-dot" />
+      ao vivo
     </div>
   );
 }
@@ -424,8 +443,15 @@ function WateringRunoffCalculator() {
 
         <TabsContent value="calculator" className="space-y-4 mt-4">
 
+          {/* Editorial header */}
+          <div>
+            <CalcEyebrow text="rega · runoff · volume ideal" />
+            <div className="text-2xl font-semibold tracking-tight">Volume de rega.</div>
+          </div>
+
           {/* ── Bloco principal: parâmetros ── */}
-          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden relative">
+            <CalcRunning />
             {/* Header do bloco */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(45,212,191,0.12) 0%, rgba(6,182,212,0.05) 100%)' }}>
               <div className="w-8 h-8 rounded-lg bg-cyan-600 flex items-center justify-center shadow-sm">
@@ -526,16 +552,22 @@ function WateringRunoffCalculator() {
             {/* Resultado — dentro do mesmo card, separado */}
             <div className="mx-4 mb-4 rounded-xl overflow-hidden border border-cyan-500/20" style={{ background: 'linear-gradient(135deg, rgba(34,211,238,0.12) 0%, rgba(6,182,212,0.06) 100%)' }}>
               <div className="px-4 py-2 border-b border-cyan-500/15">
-                <p className="text-xs font-semibold uppercase tracking-wider text-cyan-400/80">Resultado</p>
+                <p className="mono text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-400/80">Resultado</p>
               </div>
               <div className="grid grid-cols-2 divide-x divide-cyan-500/15">
                 <div className="p-4 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Por Planta</p>
-                  <p className="text-3xl font-bold text-cyan-300" style={{ textShadow: '0 0 20px rgba(34,211,238,0.4)' }}>{wateringResult.adjustedVolume}<span className="text-base font-medium text-cyan-400/70 ml-0.5">L</span></p>
+                  <p className="mono text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1">Por Planta</p>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="mono text-5xl font-light text-cyan-300" style={{ filter: "drop-shadow(0 0 8px rgba(34,211,238,0.5))" }}>{wateringResult.adjustedVolume}</span>
+                    <span className="mono text-sm text-cyan-400/70">L</span>
+                  </div>
                 </div>
                 <div className="p-4 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Total · {numPlants} plantas</p>
-                  <p className="text-3xl font-bold text-cyan-300" style={{ textShadow: '0 0 20px rgba(34,211,238,0.4)' }}>{wateringResult.totalVolume}<span className="text-base font-medium text-cyan-400/70 ml-0.5">L</span></p>
+                  <p className="mono text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1">Total · {numPlants}pl</p>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="mono text-5xl font-light text-cyan-300" style={{ filter: "drop-shadow(0 0 8px rgba(34,211,238,0.5))" }}>{wateringResult.totalVolume}</span>
+                    <span className="mono text-sm text-cyan-400/70">L</span>
+                  </div>
                 </div>
               </div>
               {wateringResult.adjustment && (
@@ -777,142 +809,132 @@ function LuxPPFDCalculator() {
     { position: 83, label: "Máximo", sublabel: "1000-1200", color: "#ef4444" },
   ];
 
+  const luxNum = parseInt(lux || "0");
+  const ppfdNum = parseInt(ppfd || "0");
+
   return (
-    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden" data-tour="calculator-lux-ppfd">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.12) 0%, rgba(202,138,4,0.05) 100%)' }}>
-        <div className="w-8 h-8 rounded-lg bg-amber-600 flex items-center justify-center shadow-sm">
-          <Sun className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-foreground">Calculadora Lux ↔ PPFD</p>
-          <p className="text-[11px] text-muted-foreground">Converta entre Lux (luxímetro) e PPFD (µmol/m²/s) baseado no tipo de luz</p>
-        </div>
+    <div className="space-y-6 pb-8" data-tour="calculator-lux-ppfd">
+      {/* Editorial header */}
+      <div>
+        <CalcEyebrow text="lux → ppfd · conversão de fluxo luminoso" />
+        <div className="text-2xl font-semibold tracking-tight">Conversão de fluxo.</div>
       </div>
-      <div className="p-4 space-y-6">
-        {/* Seletor de modo */}
-        <div className="flex gap-2 p-1 bg-muted rounded-lg">
-          <button
-            onClick={() => { setConversionMode("lux-to-ppfd"); setPpfd(""); setResult(null); }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              conversionMode === "lux-to-ppfd" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Lux → PPFD
-          </button>
-          <button
-            onClick={() => { setConversionMode("ppfd-to-lux"); setLux(""); setResult(null); }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              conversionMode === "ppfd-to-lux" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            PPFD → Lux
-          </button>
+
+      {/* Main panel */}
+      <div
+        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--color-kpi-ppfd) 5%, var(--card)), var(--card))" }}
+      >
+        <CalcRunning />
+
+        {/* Mode toggle */}
+        <div className="flex gap-1 p-1 rounded-full border border-border w-fit mb-6">
+          {([["lux-to-ppfd", "Lux → PPFD"], ["ppfd-to-lux", "PPFD → Lux"]] as const).map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => { setConversionMode(k); k === "lux-to-ppfd" ? setPpfd("") : setLux(""); setResult(null); }}
+              className={`mono text-xs uppercase tracking-widest px-4 py-1.5 rounded-full transition ${
+                conversionMode === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
         </div>
 
-        {conversionMode === "lux-to-ppfd" ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center gap-4">
-              <Input
-                id="lux-input"
-                type="number"
-                inputMode="numeric"
-                placeholder="35000"
-                value={lux}
-                onChange={(e) => setLux(e.target.value)}
-                className={`w-44 md:w-52 text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                  parseInt(lux || "0") > 0 ? "border-yellow-500 ring-2 ring-yellow-500/20" : "border-border"
-                }`}
-                data-tour="lux-input"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Controls */}
+          <div className="space-y-6">
+            {conversionMode === "lux-to-ppfd" ? (
+              <CalcSlider
+                label="Lux medido"
+                value={luxNum}
+                setValue={(v) => setLux(String(v))}
+                min={1000} max={100000} step={500}
+                suffix="lux"
+                accent="var(--color-kpi-ppfd)"
               />
-              <span className="text-2xl md:text-3xl font-bold text-muted-foreground">lux</span>
-            </div>
-            <RangeSlider
-              min={0}
-              max={100000}
-              step={1000}
-              value={parseInt(lux || "0")}
-              onChange={(v) => setLux(String(v))}
-              trackGradient={lightGradient}
-              formatTooltip={(v) => `${(v / 1000).toFixed(0)}k lux`}
-            />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center gap-4">
-              <Input
-                id="ppfd-input"
-                type="number"
-                inputMode="numeric"
-                placeholder="600"
-                value={ppfd}
-                onChange={(e) => setPpfd(e.target.value)}
-                className={`w-44 md:w-52 text-center text-3xl md:text-4xl lg:text-5xl h-16 md:h-20 border-2 rounded-2xl bg-background dark:bg-zinc-800 text-foreground shadow-lg transition-all duration-200 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                  parseInt(ppfd || "0") > 0 ? "border-yellow-500 ring-2 ring-yellow-500/20" : "border-border"
-                }`}
+            ) : (
+              <CalcSlider
+                label="PPFD medido"
+                value={ppfdNum}
+                setValue={(v) => setPpfd(String(v))}
+                min={50} max={1400} step={10}
+                suffix="µmol·m⁻²·s⁻¹"
+                accent="var(--color-kpi-ppfd)"
               />
-              <span className="text-lg md:text-xl font-bold text-muted-foreground whitespace-nowrap">µmol/m²/s</span>
-            </div>
-            <RangeSlider
-              id="ppfd-slider"
-              min={0}
-              max={1200}
-              step={10}
-              value={parseInt(ppfd || "0")}
-              onChange={(v) => setPpfd(String(v))}
-              trackGradient={lightGradient}
-              formatTooltip={(v) => `${v} µmol`}
-            />
-          </div>
-        )}
+            )}
 
-        {/* Tipo de luz */}
-        <div className="space-y-2">
-          <Label htmlFor="lightType">Tipo de Luz</Label>
-          <select
-            id="lightType"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={lightType}
-            onChange={(e) => setLightType(e.target.value)}
-          >
-            <option value="led-white">LED Branco</option>
-            <option value="led-full-spectrum">LED Full Spectrum</option>
-            <option value="hps">HPS (Alta Pressão de Sódio)</option>
-            <option value="mh">MH (Metal Halide)</option>
-            <option value="sunlight">Luz Solar</option>
-          </select>
-        </div>
-
-        {/* Resultado */}
-        {result !== null && (
-          <div className="rounded-xl border border-yellow-400/30 p-4 space-y-3" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.10) 0%, rgba(202,138,4,0.04) 100%)' }}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">
-                {conversionMode === "lux-to-ppfd" ? "PPFD estimado:" : "Lux estimado:"}
-              </span>
-              <span className="text-3xl font-bold text-yellow-400" style={{ textShadow: '0 0 16px rgba(234,179,8,0.6)' }}>
-                {conversionMode === "lux-to-ppfd"
-                  ? `${result} µmol/m²/s`
-                  : `${result.toLocaleString('pt-BR')} lux`}
-              </span>
-            </div>
-            <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground">Referências de PPFD por fase:</p>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-muted p-2 rounded"><span className="font-medium">Clonagem:</span> 100-200</div>
-                <div className="bg-muted p-2 rounded"><span className="font-medium">Vegetativa:</span> 400-600</div>
-                <div className="bg-muted p-2 rounded"><span className="font-medium">Floração:</span> 600-900</div>
-                <div className="bg-muted p-2 rounded"><span className="font-medium">Máximo:</span> 1000-1200</div>
+            {/* Fonte de luz */}
+            <div>
+              <div className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">Fonte de luz</div>
+              <div className="grid grid-cols-2 gap-1">
+                {([
+                  ["led-white",        "LED Branco"],
+                  ["led-full-spectrum","LED Full"],
+                  ["hps",             "HPS"],
+                  ["mh",              "MH"],
+                  ["sunlight",        "Solar"],
+                ] as const).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => setLightType(v)}
+                    className={`mono text-xs uppercase tracking-widest py-2 rounded-lg border transition ${
+                      lightType === v
+                        ? "border-primary text-primary bg-primary/10"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/><strong>Dica:</strong></span> Esta é uma estimativa. Para medições precisas, use um medidor PPFD (quantum sensor).
-            </p>
-            <Button onClick={() => exportLuxPPFDRecipe(lux, lightType, result)} variant="outline" className="w-full mt-4">
-              <Download className="w-4 h-4 mr-2" />
-              Exportar Receita
-            </Button>
           </div>
-        )}
+
+          {/* Result */}
+          <div className="flex flex-col justify-center">
+            <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">
+              {conversionMode === "lux-to-ppfd" ? "PPFD" : "Lux"}
+            </div>
+            {result !== null ? (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="mono text-7xl lg:text-8xl font-light tracking-tight leading-none"
+                    style={{ color: "var(--color-kpi-ppfd)", filter: "drop-shadow(0 0 10px var(--color-kpi-ppfd))" }}
+                  >
+                    {conversionMode === "lux-to-ppfd" ? result : result.toLocaleString("pt-BR")}
+                  </span>
+                  <span className="mono text-xs text-muted-foreground">
+                    {conversionMode === "lux-to-ppfd" ? "µmol·m⁻²·s⁻¹" : "lux"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+                  estimativa para a fonte selecionada · medição direta com PAR meter é mais precisa.
+                </p>
+                <Button onClick={() => exportLuxPPFDRecipe(lux, lightType, result)} variant="outline" size="sm" className="mt-4 self-start gap-1.5">
+                  <Download className="w-3.5 h-3.5" /> Exportar
+                </Button>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">Ajuste o slider para ver o resultado.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Reference table */}
+      <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-3">
+        <p className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Referência PPFD por fase</p>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {[["Clonagem", "100–200"], ["Vegetativa", "400–600"], ["Floração", "600–900"], ["Máximo", "1000–1200"]].map(([phase, range]) => (
+            <div key={phase} className="bg-muted/40 rounded-lg p-2.5">
+              <span className="font-medium block">{phase}</span>
+              <span className="mono text-muted-foreground">{range} µmol</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -937,119 +959,121 @@ function PPMECConverter() {
     }
   }, [inputValue, conversionType, scale]);
 
+  const inputNum = parseFloat(inputValue) || (conversionType === "ppm-to-ec" ? 900 : 1.8);
+
   return (
-    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden" data-tour="calculator-ppm-ec">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12) 0%, rgba(139,92,246,0.05) 100%)' }}>
-        <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-sm">
-          <Calculator className="w-4 h-4 text-white" />
+    <div className="space-y-6 pb-8" data-tour="calculator-ppm-ec">
+      {/* Editorial header */}
+      <div>
+        <CalcEyebrow text="ppm ↔ ec · solução nutritiva" />
+        <div className="text-2xl font-semibold tracking-tight">Solução nutritiva.</div>
+      </div>
+
+      {/* Main panel */}
+      <div
+        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--primary) 5%, var(--card)), var(--card))" }}
+      >
+        <CalcRunning />
+
+        {/* Mode toggle */}
+        <div className="flex gap-1 p-1 rounded-full border border-border w-fit mb-6">
+          {([["ppm-to-ec", "PPM → EC"], ["ec-to-ppm", "EC → PPM"]] as const).map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => { setConversionType(k); setInputValue(""); }}
+              className={`mono text-xs uppercase tracking-widest px-4 py-1.5 rounded-full transition ${
+                conversionType === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
         </div>
-        <div>
-          <p className="text-sm font-semibold text-foreground">Conversão PPM ↔ EC</p>
-          <p className="text-[11px] text-muted-foreground">Converta entre PPM (partes por milhão) e EC (condutividade elétrica)</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Controls */}
+          <div className="space-y-6">
+            <CalcSlider
+              label={conversionType === "ppm-to-ec" ? "PPM" : "EC"}
+              value={inputNum}
+              setValue={(v) => setInputValue(String(v))}
+              min={conversionType === "ppm-to-ec" ? 100 : 0.2}
+              max={conversionType === "ppm-to-ec" ? 2500 : 4.0}
+              step={conversionType === "ppm-to-ec" ? 10 : 0.05}
+              suffix={conversionType === "ppm-to-ec" ? "ppm" : "mS/cm"}
+              accent="hsl(var(--primary))"
+            />
+
+            {/* Escala */}
+            <div>
+              <div className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">Escala PPM</div>
+              <div className="grid grid-cols-2 gap-1">
+                {(["500", "700"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setScale(s)}
+                    className={`mono text-xs py-2 rounded-lg border transition ${
+                      scale === s
+                        ? "border-primary text-primary bg-primary/10"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    ×{s} {s === "500" ? "(EU)" : "(US)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Result */}
+          <div className="flex flex-col justify-center">
+            <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">
+              {conversionType === "ppm-to-ec" ? "EC" : "PPM"}
+            </div>
+            {result !== null ? (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="mono text-7xl lg:text-8xl font-light tracking-tight leading-none"
+                    style={{ color: "hsl(var(--primary))", filter: "drop-shadow(0 0 8px hsl(var(--primary)))" }}
+                  >
+                    {conversionType === "ppm-to-ec" ? result.toFixed(2) : Math.round(result)}
+                  </span>
+                  <span className="mono text-sm text-muted-foreground">
+                    {conversionType === "ppm-to-ec" ? "mS/cm" : `ppm ×${scale}`}
+                  </span>
+                </div>
+                <p className="mono text-xs text-muted-foreground mt-3">
+                  Veg: 1.8–2.2 EC · Flora: 2.5–3.2 EC · Flush: ~1.0 EC
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">Ajuste o slider para ver o resultado.</p>
+            )}
+          </div>
         </div>
       </div>
-      <div className="p-4 space-y-6">
-        {/* Modo */}
-        <div className="flex gap-2 p-1 bg-muted rounded-lg">
-          <button
-            onClick={() => { setConversionType("ppm-to-ec"); setInputValue(""); }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              conversionType === "ppm-to-ec" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            PPM → EC
-          </button>
-          <button
-            onClick={() => { setConversionType("ec-to-ppm"); setInputValue(""); }}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              conversionType === "ec-to-ppm" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            EC → PPM
-          </button>
-        </div>
 
-        {/* Escala */}
-        <div className="space-y-2">
-          <Label>Escala de Conversão</Label>
-          <div className="flex gap-2">
-            {(["500", "700"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setScale(s)}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium border transition-colors ${
-                  scale === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Escala {s}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {scale === "500" ? "Padrão europeu (Truncheon)" : "Padrão americano (Hanna)"}
-          </p>
-        </div>
-
-        {/* Input */}
-        <div className="space-y-2">
-          <Label htmlFor="ppm-ec-input">
-            {conversionType === "ppm-to-ec" ? "Valor em PPM" : "Valor em EC (mS/cm)"}
-          </Label>
-          <Input
-            id="ppm-ec-input"
-            type="text"
-            inputMode="decimal"
-            placeholder={conversionType === "ppm-to-ec" ? "Ex: 1000" : "Ex: 2.0"}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="text-xl h-14 text-center font-bold"
-            data-tour="ppm-input"
-          />
-        </div>
-
-        {/* Resultado */}
-        {result !== null && (
-          <div className="rounded-xl border border-purple-400/30 p-4" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.10) 0%, rgba(139,92,246,0.04) 100%)' }}>
-            <h4 className="font-semibold text-foreground mb-3">Resultado:</h4>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">
-                {conversionType === "ppm-to-ec" ? "EC (mS/cm):" : "PPM:"}
-              </span>
-              <span className="text-3xl font-bold text-purple-400" style={{ textShadow: '0 0 16px rgba(168,85,247,0.6)' }}>
-                {result} {conversionType === "ppm-to-ec" ? "mS/cm" : "PPM"}
-              </span>
+      {/* Reference table */}
+      <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-3">
+        <p className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Tabela de referência — Escala ×{scale}</p>
+        <div className="space-y-2 text-xs">
+          {[
+            ["Clonagem",              "0.4–0.8 EC", scale === "500" ? "200–400" : "280–560"],
+            ["Vegetativo",            "1.8–2.2 EC", scale === "500" ? "900–1100" : "1260–1540"],
+            ["Floração Stretch/Bulk", "2.5–3.2 EC", scale === "500" ? "1250–1600" : "1750–2240"],
+            ["Floração Finalização",  "~1.0 EC",    scale === "500" ? "~500" : "~700"],
+            ["Flush Final",           "0–0.4 EC",   scale === "500" ? "0–200" : "0–280"],
+          ].map(([phase, ec, ppm]) => (
+            <div key={phase} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
+              <span className="text-muted-foreground">{phase}</span>
+              <div className="flex items-center gap-3 text-right">
+                <span className="mono font-medium text-foreground">{ec}</span>
+                <span className="mono text-muted-foreground/60">{ppm} ppm</span>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-4">
-              <span className="inline-flex items-center gap-1"><BarChart2 className="w-3.5 h-3.5 text-blue-400"/><strong>Referência:</strong></span> Vega: 1.8–2.2 EC | Flora: 2.5–3.2 EC | Finalização: ~1.0 EC
-            </p>
-          </div>
-        )}
-
-        {/* Tabela */}
-        <div className="rounded-xl border border-border/50 p-4 bg-muted/30">
-          <h5 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-muted-foreground"/>Tabela de Referência (Escala {scale}):</h5>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Clonagem:</span>
-              <span className="font-medium">0.4-0.8 EC ({scale === "500" ? "200-400" : "280-560"} PPM)</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Vegetativo:</span>
-              <span className="font-medium">1.8-2.2 EC ({scale === "500" ? "900-1100" : "1260-1540"} PPM)</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Floração (Stretch/Bulking):</span>
-              <span className="font-medium">2.5-3.2 EC ({scale === "500" ? "1250-1600" : "1750-2240"} PPM)</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Floração (Finalização):</span>
-              <span className="font-medium">~1.0 EC ({scale === "500" ? "~500" : "~700"} PPM)</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Flush Final:</span>
-              <span className="font-medium">0.0-0.4 EC ({scale === "500" ? "0-200" : "0-280"} PPM)</span>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
@@ -1116,133 +1140,117 @@ function PHAdjustCalculator() {
   ];
 
   return (
-    <Card className="bg-card/90 backdrop-blur-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Droplets className="w-5 h-5 text-blue-500" />
-          Calculadora de Ajuste de pH
-        </CardTitle>
-        <CardDescription>
-          Calcule quanto ácido ou base adicionar para atingir o pH ideal
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        {/* Volume */}
-        <div className="space-y-3">
-          <Label htmlFor="waterVolumePH" className="text-base font-semibold">Volume de Água (litros)</Label>
-          <Input
-            id="waterVolumePH"
-            type="text"
-            inputMode="decimal"
-            placeholder="Ex: 10"
-            value={waterVolume}
-            onChange={(e) => setWaterVolume(e.target.value)}
-            className="text-xl h-14 px-4 font-bold text-center"
-          />
-        </div>
+    <div className="space-y-6 pb-8">
+      {/* Editorial header */}
+      <div>
+        <CalcEyebrow text="ph · ajuste de solução" />
+        <div className="text-2xl font-semibold tracking-tight">Equilíbrio químico.</div>
+      </div>
 
-        {/* pH Atual */}
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <Label className="text-base font-semibold">pH Atual</Label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{getPHLabel(currentPH)}</span>
-              <span
-                className="text-3xl font-bold px-3 py-1 rounded-lg tabular-nums"
-                style={{ color: getPHColor(currentPH) }}
-              >
-                {currentPH.toFixed(1)}
-              </span>
-            </div>
-          </div>
-          <RangeSlider
-            id="currentPH"
-            min={0}
-            max={14}
-            step={0.1}
-            value={currentPH}
-            onChange={setCurrentPH}
-            trackGradient={phGradient}
-            formatTooltip={(v) => `pH ${v.toFixed(1)}`}
-            labels={phLabels}
-          />
-        </div>
+      {/* Main panel */}
+      <div
+        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--primary) 5%, var(--card)), var(--card))" }}
+      >
+        <CalcRunning />
 
-        {/* pH Alvo */}
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <Label className="text-base font-semibold">pH Alvo</Label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{getPHLabel(targetPH)}</span>
-              <span
-                className="text-3xl font-bold px-3 py-1 rounded-lg tabular-nums"
-                style={{ color: getPHColor(targetPH) }}
-              >
-                {targetPH.toFixed(1)}
-              </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Controls */}
+          <div className="space-y-6">
+            {/* Volume */}
+            <div>
+              <div className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">Volume de água</div>
+              <Input
+                id="waterVolumePH"
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex: 10"
+                value={waterVolume}
+                onChange={(e) => setWaterVolume(e.target.value)}
+                className="mono text-xl h-12 font-bold text-center"
+              />
+              <p className="mono text-[10px] text-muted-foreground/60 text-center mt-1">litros (L)</p>
             </div>
-          </div>
-          <RangeSlider
-            id="targetPH"
-            min={0}
-            max={14}
-            step={0.1}
-            value={targetPH}
-            onChange={setTargetPH}
-            trackGradient={phGradient}
-            formatTooltip={(v) => `pH ${v.toFixed(1)}`}
-            labels={phLabels}
-          />
-        </div>
 
-        {/* Resultado */}
-        {result && (
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 space-y-3">
-            <h4 className="font-semibold text-foreground mb-3">Receita de Ajuste:</h4>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">Produto:</span>
-              <span className="text-base font-bold text-blue-600">{result.product}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">Quantidade:</span>
-              <span className="text-3xl font-bold text-blue-600">{result.amount} ml</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">
-              <span className="inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-amber-400"/><strong>Importante:</strong></span> Adicione aos poucos, misture bem e meça novamente. Nunca adicione tudo de uma vez!
-            </p>
-            <button
-              onClick={() => { pushPh(`${waterVolume}L · pH ${currentPH.toFixed(1)}→${targetPH.toFixed(1)}`, `${result.amount} ml ${currentPH > targetPH ? 'pH Down' : 'pH Up'}`); toast.success('Salvo no histórico!'); }}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-blue-500/30 text-sm text-blue-400 hover:bg-blue-500/10 transition-colors mt-2"
-            >
-              <Bookmark className="w-3.5 h-3.5" /> Salvar no histórico
-            </button>
-          </div>
-        )}
+            {/* pH atual */}
+            <CalcSlider
+              label="pH atual"
+              value={currentPH}
+              setValue={setCurrentPH}
+              min={0} max={14} step={0.1}
+              suffix={getPHLabel(currentPH)}
+              accent={getPHColor(currentPH)}
+            />
 
-        {/* Tabela de Referência */}
-        <div className="bg-muted border border-border rounded-lg p-4">
-          <h5 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-muted-foreground"/>pH Ideal por Substrato:</h5>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Solo/Terra:</span>
-              <span className="font-medium">6.0 - 7.0</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Fibra de Coco:</span>
-              <span className="font-medium">5.5 - 6.5</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Hidroponia:</span>
-              <span className="font-medium">5.5 - 6.0</span>
-            </div>
+            {/* pH alvo */}
+            <CalcSlider
+              label="pH alvo"
+              value={targetPH}
+              setValue={setTargetPH}
+              min={0} max={14} step={0.1}
+              suffix={getPHLabel(targetPH)}
+              accent={getPHColor(targetPH)}
+            />
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            <span className="inline-flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5 text-yellow-400"/><strong>Dica:</strong></span> pH fora da faixa ideal bloqueia absorção de nutrientes, causando deficiências mesmo com fertilização adequada.
-          </p>
+
+          {/* Result */}
+          <div className="flex flex-col justify-center">
+            {result ? (
+              <>
+                <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">
+                  {currentPH > targetPH ? "pH Down" : "pH Up"}
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="mono text-7xl lg:text-8xl font-light tracking-tight leading-none"
+                    style={{ color: getPHColor(targetPH), filter: "drop-shadow(0 0 8px currentColor)" }}
+                  >
+                    {result.amount}
+                  </span>
+                  <span className="mono text-base text-muted-foreground">ml</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">{result.product}</p>
+                <p className="text-xs text-muted-foreground/60 mt-2 leading-relaxed">
+                  Adicione aos poucos, misture bem e meça novamente.
+                </p>
+                <button
+                  onClick={() => { pushPh(`${waterVolume}L · pH ${currentPH.toFixed(1)}→${targetPH.toFixed(1)}`, `${result.amount} ml ${currentPH > targetPH ? 'pH Down' : 'pH Up'}`); toast.success('Salvo no histórico!'); }}
+                  className="mt-4 self-start flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary border border-border/40 hover:border-primary/40 rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  <Bookmark className="w-3.5 h-3.5" /> Salvar
+                </button>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">pH atual → alvo</div>
+                <div className="flex items-baseline gap-3">
+                  <span className="mono text-5xl font-light" style={{ color: getPHColor(currentPH) }}>{currentPH.toFixed(1)}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="mono text-5xl font-light" style={{ color: getPHColor(targetPH) }}>{targetPH.toFixed(1)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Informe o volume de água para calcular a dose.</p>
+              </div>
+            )}
+          </div>
         </div>
-        <CalcHistoryPanel entries={phHistory} onClear={clearPh} />
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Reference table */}
+      <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-3">
+        <p className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">pH ideal por substrato</p>
+        <div className="space-y-2 text-xs">
+          {[["Solo/Terra", "6.0–7.0"], ["Fibra de Coco", "5.5–6.5"], ["Hidroponia", "5.5–6.0"]].map(([sub, range]) => (
+            <div key={sub} className="flex justify-between py-1.5 border-b border-border/20 last:border-0">
+              <span className="text-muted-foreground">{sub}</span>
+              <span className="mono font-medium">{range}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground/60">pH fora da faixa bloqueia absorção mesmo com fertilização adequada.</p>
+      </div>
+
+      <CalcHistoryPanel entries={phHistory} onClear={clearPh} />
+    </div>
   );
 }
 
@@ -1330,70 +1338,60 @@ function VPDCalculator() {
 
   return (
     <div className="space-y-6 pb-8">
-      {/* Result hero */}
-      <div className={`rounded-2xl border p-6 text-center ${activeZone.color} ${activeZone.borderColor}`}>
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">VPD Atual</p>
-        <p className={`text-7xl font-black tabular-nums leading-none ${activeZone.textColor}`} style={{ textShadow: '0 0 30px currentColor' }}>
-          {vpdFixed}
-        </p>
-        <p className="text-sm text-muted-foreground mt-1">kPa</p>
-        <div className="mt-4 space-y-0.5">
-          <p className={`text-base font-bold ${activeZone.textColor}`}>{activeZone.label}</p>
-          <p className="text-sm text-muted-foreground">{activeZone.sub}</p>
-        </div>
+      {/* Editorial header */}
+      <div>
+        <CalcEyebrow text="vpd · vapor pressure deficit" />
+        <div className="text-2xl font-semibold tracking-tight">Pressão de vapor.</div>
       </div>
 
-      {/* Sliders */}
-      <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-6">
-        {/* Temperature */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              🌡️ Temperatura
-            </span>
-            <span className="text-lg font-bold text-orange-400">{tempC}°C</span>
+      {/* Main panel — sliders + result side by side */}
+      <div
+        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--primary) 5%, var(--card)), var(--card))" }}
+      >
+        <CalcRunning />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Controls */}
+          <div className="space-y-6">
+            <CalcSlider
+              label="Temperatura do ar"
+              value={tempC}
+              setValue={(v) => { setTempC(v); haptic.tap(); }}
+              min={15} max={35} step={0.5}
+              suffix="°C"
+              accent="var(--color-kpi-temp)"
+            />
+            <CalcSlider
+              label="Umidade relativa"
+              value={rh}
+              setValue={(v) => { setRh(v); haptic.tap(); }}
+              min={20} max={90} step={1}
+              suffix="%"
+              accent="var(--color-kpi-rh)"
+            />
+            <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-2.5 flex justify-between text-xs text-muted-foreground">
+              <span>Temp. folha estimada</span>
+              <span className="mono font-semibold text-foreground">{tLeaf.toFixed(1)}°C</span>
+            </div>
           </div>
-          <input
-            type="range"
-            min={15} max={35} step={0.5}
-            value={tempC}
-            onChange={(e) => { setTempC(parseFloat(e.target.value)); haptic.tap(); }}
-            className="w-full h-2 rounded-full appearance-none cursor-pointer"
-            style={{ accentColor: '#f97316' }}
-          />
-          <div className="flex justify-between text-[10px] text-muted-foreground/50">
-            <span>15°C</span>
-            <span>25°C</span>
-            <span>35°C</span>
-          </div>
-        </div>
 
-        {/* Humidity */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-              💧 Umidade Relativa
-            </span>
-            <span className="text-lg font-bold text-teal-400">{rh}%</span>
+          {/* Result */}
+          <div className="flex flex-col justify-center">
+            <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">VPD</div>
+            <div className="flex items-baseline gap-2">
+              <span
+                className={`mono text-7xl lg:text-8xl font-light tracking-tight leading-none ${activeZone.textColor}`}
+                style={{ filter: "drop-shadow(0 0 10px currentColor)" }}
+              >
+                {vpdFixed}
+              </span>
+              <span className="mono text-base text-muted-foreground">kPa</span>
+            </div>
+            <div className={`mt-4 inline-flex items-center self-start gap-1.5 px-3 py-1.5 rounded-full text-xs mono uppercase tracking-widest border ${activeZone.color} ${activeZone.borderColor} ${activeZone.textColor}`}>
+              ▸ {activeZone.label}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">{activeZone.sub}</p>
           </div>
-          <input
-            type="range"
-            min={20} max={90} step={1}
-            value={rh}
-            onChange={(e) => { setRh(parseInt(e.target.value)); haptic.tap(); }}
-            className="w-full h-2 rounded-full appearance-none cursor-pointer"
-            style={{ accentColor: '#2dd4bf' }}
-          />
-          <div className="flex justify-between text-[10px] text-muted-foreground/50">
-            <span>20%</span>
-            <span>55%</span>
-            <span>90%</span>
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-muted/30 border border-border/40 px-4 py-2.5 flex justify-between text-xs text-muted-foreground">
-          <span>Temp. folha estimada</span>
-          <span className="font-semibold text-foreground">{tLeaf.toFixed(1)}°C</span>
         </div>
       </div>
 
