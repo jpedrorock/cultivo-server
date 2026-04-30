@@ -55,26 +55,8 @@ services:
     # Removido --default-authentication-plugin (deprecated no MySQL 8.0.34+)
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
-  minio:
-    image: minio/minio:latest
-    container_name: cultivo-minio-prod
-    restart: always
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio-data-prod:/data
-    networks:
-      - cultivo-network
-
 volumes:
   mysql-data-prod:
-    driver: local
-  minio-data-prod:
     driver: local
 
 networks:
