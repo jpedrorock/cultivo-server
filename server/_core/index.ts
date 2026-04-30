@@ -517,6 +517,187 @@ async function startServer() {
   // Rotas de autenticação JWT (registro, login, logout, me)
   registerAuthRoutes(app);
 
+  // Landing page de redirecionamento para QR codes de plantas
+  app.get("/scan/plant/:id", (req, res) => {
+    const plantId = parseInt(req.params.id, 10);
+    if (isNaN(plantId) || plantId <= 0) {
+      res.status(400).send("QR inválido");
+      return;
+    }
+    const appUrl = `/plants/${plantId}`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Cultivo — Abrindo planta...</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: oklch(0.07 0.014 230);
+      --card: oklch(0.14 0.012 240 / 0.85);
+      --border: oklch(0.30 0.015 240 / 0.50);
+      --primary: oklch(0.65 0.20 245);
+      --primary-fg: oklch(0.97 0.01 245);
+      --green: oklch(0.68 0.20 145);
+      --text: oklch(0.97 0 0);
+      --muted: oklch(0.55 0.010 240);
+      --glow: color-mix(in oklch, oklch(0.62 0.17 245) 50%, transparent);
+    }
+    html, body {
+      min-height: 100dvh;
+      background:
+        radial-gradient(ellipse 90% 65% at 5% -10%, var(--glow) 0%, transparent 65%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      gap: 0;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 40px;
+    }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: var(--green);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .logo-text { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 340px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .plant-icon {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, oklch(0.22 0.028 155 / 0.8), oklch(0.15 0.015 240 / 0.6));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+    }
+    .card-title { font-size: 18px; font-weight: 700; text-align: center; }
+    .card-sub { font-size: 13px; color: var(--muted); text-align: center; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid oklch(0.30 0.015 240 / 0.4);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap-8px;
+      width: 100%;
+      padding: 15px 24px;
+      background: var(--primary);
+      color: var(--primary-fg);
+      border: none; border-radius: 14px;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      gap: 8px;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .btn:active { opacity: 0.85; }
+    .ios-hint {
+      display: none;
+      background: oklch(0.12 0.012 240 / 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      text-align: center;
+      width: 100%; max-width: 340px;
+      margin-top: 12px;
+    }
+    .ios-hint strong { color: var(--text); }
+    .ios-hint .share-icon {
+      display: inline-block;
+      background: oklch(0.55 0.14 245);
+      color: white;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <div class="logo-icon">🌱</div>
+    <div class="logo-text">Cultivo</div>
+  </div>
+
+  <div class="card">
+    <div class="plant-icon">🪴</div>
+    <div>
+      <div class="card-title">Abrindo planta #${plantId}</div>
+      <div class="card-sub" style="margin-top:4px">Redirecionando para o app...</div>
+    </div>
+    <div class="spinner" id="spinner"></div>
+    <a class="btn" href="${appUrl}" id="btn">
+      <span>🌿</span> Abrir no App
+    </a>
+  </div>
+
+  <div class="ios-hint" id="iosHint">
+    <strong>Abrir sempre direto no app?</strong><br/>
+    No Safari, toque em <span class="share-icon">⬆ Compartilhar</span> e selecione<br/>
+    <strong>"Adicionar à Tela de Início"</strong>
+  </div>
+
+  <script>
+    (function () {
+      var dest = "${appUrl}";
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      var isStandalone = window.navigator.standalone === true;
+      var isSafari = /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(navigator.userAgent);
+
+      // Auto-redirect depois de 1s
+      setTimeout(function () {
+        window.location.href = dest;
+      }, 1000);
+
+      // Mostrar dica de "Adicionar à Tela de Início" para iOS Safari (não PWA)
+      if (isIOS && isSafari && !isStandalone) {
+        document.getElementById('iosHint').style.display = 'block';
+      }
+
+      // Esconder spinner quando chegar a resposta
+      document.getElementById('btn').addEventListener('click', function () {
+        document.getElementById('spinner').style.display = 'none';
+      });
+    })();
+  </script>
+</body>
+</html>`);
+  });
+
   // Upload de imagens (multipart/form-data) — antes do tRPC
   app.use("/api/upload", uploadRouter);
 

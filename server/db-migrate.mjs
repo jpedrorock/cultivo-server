@@ -22,8 +22,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
-  console.error("❌ DATABASE_URL não definida no .env");
-  process.exit(1);
+  // Em build Docker não há banco disponível — migrations rodam no startup do servidor
+  console.log("ℹ️  DATABASE_URL não definida — pulando migrations (serão aplicadas no startup)");
+  process.exit(0);
 }
 
 /**

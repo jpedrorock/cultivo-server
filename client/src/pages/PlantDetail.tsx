@@ -929,10 +929,10 @@ export default function PlantDetail() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4 py-2">
-            {/* QR gerado via api.qrserver.com — sem dependência */}
+            {/* QR aponta para /scan/plant/:id — landing page com redirect automático */}
             <div className="rounded-2xl overflow-hidden border border-border p-3 bg-white">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/plants/${plantId}`)}&bgcolor=ffffff&color=111111&margin=4`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/scan/plant/${plantId}`)}&bgcolor=ffffff&color=111111&margin=4`}
                 alt={`QR Code — ${plant.name}`}
                 width={180}
                 height={180}
@@ -942,7 +942,7 @@ export default function PlantDetail() {
             <div className="text-center">
               <p className="text-sm font-semibold text-foreground">{plant.name}</p>
               {plant.code && <p className="text-xs text-muted-foreground">{plant.code}</p>}
-              <p className="text-[10px] text-muted-foreground/60 mt-1">/plants/{plantId}</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-1">/scan/plant/{plantId}</p>
             </div>
           </div>
           <DialogFooter>
@@ -956,7 +956,7 @@ export default function PlantDetail() {
                 img{border:1px solid #eee;padding:12px;border-radius:12px}
                 p{margin:6px 0;font-size:14px;color:#111}small{color:#999;font-size:11px}</style></head>
                 <body>
-                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`${window.location.origin}/plants/${plantId}`)}&bgcolor=ffffff&color=111111&margin=4" />
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`${window.location.origin}/scan/plant/${plantId}`)}&bgcolor=ffffff&color=111111&margin=4" />
                   <p><strong>${plant.name}</strong></p>
                   ${plant.code ? `<small>${plant.code}</small>` : ''}
                   <script>window.onload=()=>{window.print();window.close()}<\/script>

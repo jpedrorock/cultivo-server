@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Leaf, Sparkles, Trees, Zap } from "lucide-react";
+import { Check, Leaf, Sparkles, Trees, Zap, Telescope } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
-type ThemeValue = "forest" | "hps" | "monstera" | "vision";
+type ThemeValue = "forest" | "hps" | "monstera" | "vision" | "aurora";
 
 // Theme preview component showing visual representation
 function ThemePreview({ type }: { type: ThemeValue }) {
@@ -12,6 +12,7 @@ function ThemePreview({ type }: { type: ThemeValue }) {
     hps:      { bg: "bg-[#080f08]",  card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]", sidebar: "bg-[#050c05]" },
     monstera: { bg: "bg-[#fafffe]",  card: "bg-white",     text: "bg-[#1a3322]", accent: "bg-[#9fd9ba]", sidebar: "bg-[#1e4d34]" },
     vision:   { bg: "bg-[#0a1620]",  card: "bg-[#162228]", text: "bg-[#e0f0e8]", accent: "bg-[#40c060]", sidebar: "bg-[#080f18]" },
+    aurora:   { bg: "bg-[#0b0d12]",  card: "bg-[#141820]", text: "bg-[#f0fdf4]", accent: "bg-[#4ade80]", sidebar: "bg-[#080a0f]" },
   };
 
   const colors = previewStyles[type];
@@ -57,13 +58,19 @@ const THEMES = [
     description: "Preto absoluto + verde neon — máximo contraste sob luz HPS/LED",
     icon: <Zap className="w-4 h-4 text-green-400 shrink-0" />,
   },
+  {
+    value: "aurora" as ThemeValue,
+    label: "Aurora",
+    description: "Dark atmosférico — glow verde, cards glass e textura de grão",
+    icon: <Telescope className="w-4 h-4 text-emerald-300 shrink-0" />,
+  },
 ] as const;
 
 function applyThemeToDOM(t: ThemeValue) {
   const root = document.documentElement;
-  root.classList.remove("forest", "hps", "monstera", "vision", "jardim", "light", "dark");
+  root.classList.remove("forest", "hps", "monstera", "vision", "aurora", "jardim", "light", "dark");
   root.classList.add(t);
-  if (t === "hps" || t === "vision" || t === "forest") {
+  if (t === "hps" || t === "vision" || t === "forest" || t === "aurora") {
     root.classList.add("dark");
   }
 }

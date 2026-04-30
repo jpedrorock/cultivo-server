@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "forest" | "hps" | "monstera" | "vision";
+type Theme = "forest" | "hps" | "monstera" | "vision" | "aurora";
 
 interface ThemeContextType {
   theme: Theme;
@@ -22,7 +22,7 @@ function migrateTheme(stored: string | null, defaultTheme: Theme): Theme {
   if (!stored) return defaultTheme;
   if (stored === "light") return "monstera";
   if (stored === "dark") return "vision";
-  const valid: Theme[] = ["forest", "hps", "monstera", "vision"];
+  const valid: Theme[] = ["forest", "hps", "monstera", "vision", "aurora"];
   return valid.includes(stored as Theme) ? (stored as Theme) : defaultTheme;
 }
 
@@ -46,12 +46,12 @@ export function ThemeProvider({
     root.classList.add('no-transitions');
 
     // Remove all theme classes (include legacy names to clean old localStorage)
-    root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "jardim", "positivus", "highcontrast", "highcontrast-dark");
+    root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "aurora", "jardim", "positivus", "highcontrast", "highcontrast-dark");
     // Add current theme class
     root.classList.add(theme);
     // dark: utilitários do Tailwind dependem da classe .dark no <html>
     // Temas escuros: hps, vision, forest — temas claros: monstera
-    const isDarkTheme = theme === "hps" || theme === "vision" || theme === "forest";
+    const isDarkTheme = theme === "hps" || theme === "vision" || theme === "forest" || theme === "aurora";
     if (isDarkTheme) {
       root.classList.add("dark");
     }
@@ -79,7 +79,8 @@ export function ThemeProvider({
     ? () => {
         setTheme(prev => {
           if (prev === "monstera") return "vision";
-          if (prev === "vision") return "forest";
+          if (prev === "vision") return "aurora";
+          if (prev === "aurora") return "forest";
           if (prev === "forest") return "hps";
           return "monstera";
         });
