@@ -41,8 +41,7 @@ services:
       MYSQL_DATABASE: cultivo
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    ports:
-      - "3306:3306"
+    # Porta não exposta no host — app acessa via rede Docker interna (db:3306)
     volumes:
       - mysql-data-prod:/var/lib/mysql
     networks:
