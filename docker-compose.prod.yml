@@ -5,10 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cultivo-app-prod
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -20,45 +17,9 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DOMAIN=${DOMAIN}
-    depends_on:
-      db:
-        condition: service_started
-    networks:
-      - cultivo-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/auth/me"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  db:
-    image: mysql:8.0
-    container_name: cultivo-db-prod
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: cultivo
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    # Porta não exposta no host — app acessa via rede Docker interna (db:3306)
-    volumes:
-      - mysql-data-prod:/var/lib/mysql
-    networks:
-      - cultivo-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 10s
-      retries: 12
-      start_period: 60s
-    # Removido --default-authentication-plugin (deprecated no MySQL 8.0.34+)
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-
-volumes:
-  mysql-data-prod:
-    driver: local
-
-networks:
-  cultivo-network:
-    driver: bridge
