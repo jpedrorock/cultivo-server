@@ -15,8 +15,14 @@ RUN pnpm install --frozen-lockfile
 # Copiar código fonte
 COPY . .
 
-# Build da aplicação
-RUN pnpm build
+# Build da aplicação (sem postbuild — db-migrate roda no startup do servidor)
+RUN pnpm exec vite build && \
+    pnpm exec esbuild server/_core/index.ts \
+      --platform=node \
+      --packages=external \
+      --bundle \
+      --format=esm \
+      --outdir=dist
 
 # Runtime stage
 FROM node:22-alpine
