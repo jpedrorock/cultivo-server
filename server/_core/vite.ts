@@ -7,7 +7,6 @@ import path from "path";
 
 export async function setupVite(app: Express, server: Server) {
   const { createServer: createViteServer } = await import("vite");
-  const { default: viteConfig } = await import("../../vite.config.js");
 
   const serverOptions = {
     middlewareMode: true,
@@ -15,9 +14,9 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  // Não importamos vite.config aqui — Vite descobre o arquivo automaticamente
+  // pelo cwd. Isso evita que @tailwindcss/vite (devDep) entre no bundle de produção.
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
     server: serverOptions,
     appType: "custom",
   });
