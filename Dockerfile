@@ -29,8 +29,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Instalar pnpm
-RUN npm install -g pnpm
+# Instalar pnpm e curl
+RUN npm install -g pnpm && apk add --no-cache curl
 
 # Copiar apenas arquivos necessários do builder
 COPY --from=builder /app/dist ./dist
