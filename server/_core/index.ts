@@ -760,6 +760,15 @@ async function startServer() {
           ssl: { rejectUnauthorized: false },
           multipleStatements: true,
         });
+        // Limpar tabelas existentes antes de importar
+        await conn.query("SET FOREIGN_KEY_CHECKS=0");
+        const [tables] = await conn.query("SHOW TABLES") as any;
+        for (const row of tables) {
+          const tableName = Object.values(row)[0] as string;
+          await conn.query(`DROP TABLE IF EXISTS \`${tableName}\``);
+        }
+        await conn.query("SET FOREIGN_KEY_CHECKS=1");
+
         const sql = req.file.buffer.toString("utf8");
         await conn.query(sql);
         await conn.end();
