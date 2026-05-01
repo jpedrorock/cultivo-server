@@ -759,7 +759,7 @@ async function startServer() {
         const database = dbUrl.pathname.slice(1);
         await new Promise<void>((resolve, reject) => {
           exec(
-            `mysql -h "${host}" -P "${port}" -u "${user}" -p"${password}" "${database}" < "${tmpPath}"`,
+            `mysql --ssl=false -h "${host}" -P "${port}" -u "${user}" -p"${password}" "${database}" < "${tmpPath}"`,
             (err, _stdout, stderr) => {
               if (err) reject(new Error(stderr || err.message));
               else resolve();
