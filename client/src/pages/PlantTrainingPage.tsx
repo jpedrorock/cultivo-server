@@ -11,11 +11,14 @@ import {
   Pause,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
+  Network,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import PlantNodeMap from "@/components/PlantNodeMap";
+import PlantTopView from "@/components/PlantTopView";
 import type { PlantGraphNode } from "@/features/cannaprune/plantGraph";
 import {
   TECHNIQUE_CONFIGS,
@@ -63,6 +66,8 @@ export default function PlantTrainingPage() {
   // Auto-abre o sandbox se navegou com ?sandbox=1 (ex: via quick log)
   const autoSandbox = new URLSearchParams(window.location.search).get('sandbox') === '1';
   const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
+  const [viewMode,         setViewMode]         = useState<'map' | 'top'>('map');
+  const [topViewNodes,     setTopViewNodes]     = useState<PlantGraphNode[]>([]);
   const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
   // Técnicas aplicadas nesta sessão do sandbox
   const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
@@ -200,24 +205,49 @@ export default function PlantTrainingPage() {
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Mapa da planta
             </p>
-            <button
-              onClick={openSandbox}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Abrir em tela cheia"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Toggle vista lateral / vista de cima */}
+              <button
+                onClick={() => setViewMode('map')}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${viewMode === 'map' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                title="Vista lateral"
+              >
+                <Network className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => { setTopViewNodes([...nodeSnapshotRef.current]); setViewMode('top'); }}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${viewMode === 'top' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                title="Vista de cima"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={openSandbox}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Abrir em tela cheia"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
           {/* Preview compacto (desmontado quando fullscreen estiver aberto) */}
           {!mapFullscreen && (
             <>
-              <PlantNodeMap
-                plantId={plantId}
-                compact
-                onCompactTap={openSandbox}
-                onTechniqueApplied={handleTechniqueApplied}
-                onResetStructure={handleResetStructure}
-              />
+              {viewMode === 'map' && (
+                <PlantNodeMap
+                  plantId={plantId}
+                  compact
+                  onCompactTap={openSandbox}
+                  onTechniqueApplied={handleTechniqueApplied}
+                  onResetStructure={handleResetStructure}
+                  nodeSnapshotRef={nodeSnapshotRef}
+                />
+              )}
+              {viewMode === 'top' && (
+                <div className="flex justify-center py-3">
+                  <PlantTopView nodes={topViewNodes} size={320} />
+                </div>
+              )}
               <button
                 onClick={openSandbox}
                 className="w-full py-2 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors flex items-center justify-center gap-1.5 border-t border-border/20"
