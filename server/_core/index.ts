@@ -748,29 +748,24 @@ async function startServer() {
         res.status(400).json({ error: "Nenhum arquivo enviado" });
         return;
       }
-      const tmpPath = path.join(os.tmpdir(), `import_${Date.now()}.sql`);
       try {
-        await writeFile(tmpPath, req.file.buffer);
+        const mysql2 = await import("mysql2/promise");
         const dbUrl = new URL(ENV.databaseUrl);
-        const host = dbUrl.hostname;
-        const port = dbUrl.port || "3306";
-        const user = dbUrl.username;
-        const password = decodeURIComponent(dbUrl.password);
-        const database = dbUrl.pathname.slice(1);
-        await new Promise<void>((resolve, reject) => {
-          exec(
-            `mysql --ssl=false -h "${host}" -P "${port}" -u "${user}" -p"${password}" "${database}" < "${tmpPath}"`,
-            (err, _stdout, stderr) => {
-              if (err) reject(new Error(stderr || err.message));
-              else resolve();
-            }
-          );
+        const conn = await mysql2.createConnection({
+          host: dbUrl.hostname,
+          port: parseInt(dbUrl.port || "3306"),
+          user: dbUrl.username,
+          password: decodeURIComponent(dbUrl.password),
+          database: dbUrl.pathname.slice(1),
+          ssl: { rejectUnauthorized: false },
+          multipleStatements: true,
         });
+        const sql = req.file.buffer.toString("utf8");
+        await conn.query(sql);
+        await conn.end();
         res.json({ message: "✅ Banco importado com sucesso!" });
       } catch (err: any) {
         res.status(500).json({ error: err.message });
-      } finally {
-        unlink(tmpPath).catch(() => {});
       }
     });
   }
