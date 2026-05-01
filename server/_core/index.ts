@@ -771,8 +771,11 @@ async function startServer() {
         }
         await conn.query("SET FOREIGN_KEY_CHECKS=1");
 
-        // MySQL 8.0 não aceita DEFAULT não-nulo em colunas TEXT/BLOB/JSON
         const sql = req.file.buffer.toString("utf8")
+          // MariaDB collation não suportada pelo MySQL 8.0
+          .replace(/utf8mb4_uca1400_ai_ci/g, "utf8mb4_unicode_ci")
+          .replace(/utf8mb3_uca1400_ai_ci/g, "utf8_unicode_ci")
+          // MySQL 8.0 não aceita DEFAULT não-nulo em colunas TEXT/BLOB/JSON
           .replace(
             /\b(text|blob|longtext|mediumtext|tinytext|json|longblob|mediumblob|tinyblob)\b(\s+NOT NULL)?\s+DEFAULT\s+'[^']*'/gi,
             (_m, type, notNull) => `${type}${notNull ?? ''} DEFAULT NULL`
