@@ -30,7 +30,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 # Instalar pnpm e curl
-RUN npm install -g pnpm && apk add --no-cache curl
+RUN npm install -g pnpm && apk add --no-cache curl mysql-client
 
 # Copiar apenas arquivos necessários do builder
 COPY --from=builder /app/dist ./dist

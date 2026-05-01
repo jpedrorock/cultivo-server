@@ -701,6 +701,80 @@ async function startServer() {
   // Upload de imagens (multipart/form-data) — antes do tRPC
   app.use("/api/upload", uploadRouter);
 
+  // Rota temporária de importação de banco (protegida por JWT_SECRET)
+  {
+    const multer = (await import("multer")).default;
+    const { exec } = await import("child_process");
+    const { writeFile, unlink } = await import("fs/promises");
+    const os = await import("os");
+
+    const sqlUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+
+    app.get("/admin/import", (req, res) => {
+      if (req.query.secret !== ENV.jwtSecret) {
+        res.status(401).send("Unauthorized");
+        return;
+      }
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+        <title>Importar Banco — Cultivo</title>
+        <style>body{font-family:sans-serif;background:#0d0d0d;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+        .box{background:#1a1a1a;padding:2rem;border-radius:12px;min-width:340px;text-align:center}
+        h2{margin:0 0 1.5rem}input[type=file]{margin:1rem 0;width:100%}
+        button{background:#2563eb;color:#fff;border:none;padding:.75rem 2rem;border-radius:8px;cursor:pointer;font-size:1rem;width:100%}
+        #status{margin-top:1rem;font-size:.9rem}</style></head>
+      <body><div class="box"><h2>🌱 Importar SQL</h2>
+        <form id="f" enctype="multipart/form-data">
+          <input type="file" name="sql" accept=".sql" required>
+          <button type="submit">Importar</button>
+        </form>
+        <div id="status"></div>
+        <script>
+          const f=document.getElementById('f'),s=document.getElementById('status');
+          f.onsubmit=async e=>{e.preventDefault();s.textContent='Importando...';
+            const fd=new FormData(f);
+            const r=await fetch('/admin/import?secret=${encodeURIComponent(ENV.jwtSecret)}',{method:'POST',body:fd});
+            const j=await r.json();
+            s.textContent=j.message||j.error;s.style.color=r.ok?'#4ade80':'#f87171';};
+        </script></div></body></html>`);
+    });
+
+    app.post("/admin/import", sqlUpload.single("sql"), async (req: any, res) => {
+      if (req.query.secret !== ENV.jwtSecret) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ error: "Nenhum arquivo enviado" });
+        return;
+      }
+      const tmpPath = path.join(os.tmpdir(), `import_${Date.now()}.sql`);
+      try {
+        await writeFile(tmpPath, req.file.buffer);
+        const dbUrl = new URL(ENV.databaseUrl);
+        const host = dbUrl.hostname;
+        const port = dbUrl.port || "3306";
+        const user = dbUrl.username;
+        const password = decodeURIComponent(dbUrl.password);
+        const database = dbUrl.pathname.slice(1);
+        await new Promise<void>((resolve, reject) => {
+          exec(
+            `mysql -h "${host}" -P "${port}" -u "${user}" -p"${password}" "${database}" < "${tmpPath}"`,
+            (err, _stdout, stderr) => {
+              if (err) reject(new Error(stderr || err.message));
+              else resolve();
+            }
+          );
+        });
+        res.json({ message: "✅ Banco importado com sucesso!" });
+      } catch (err: any) {
+        res.status(500).json({ error: err.message });
+      } finally {
+        unlink(tmpPath).catch(() => {});
+      }
+    });
+  }
+
   // tRPC API
   app.use(
     "/api/trpc",
