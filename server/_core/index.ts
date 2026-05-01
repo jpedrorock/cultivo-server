@@ -771,7 +771,12 @@ async function startServer() {
         }
         await conn.query("SET FOREIGN_KEY_CHECKS=1");
 
-        const sql = req.file.buffer.toString("utf8");
+        // MySQL 8.0 não aceita DEFAULT não-nulo em colunas TEXT/BLOB/JSON
+        const sql = req.file.buffer.toString("utf8")
+          .replace(
+            /\b(text|blob|longtext|mediumtext|tinytext|json|longblob|mediumblob|tinyblob)\b(\s+NOT NULL)?\s+DEFAULT\s+'[^']*'/gi,
+            (_m, type, notNull) => `${type}${notNull ?? ''} DEFAULT NULL`
+          );
         await conn.query(sql);
         await conn.end();
         res.json({ message: "✅ Banco importado com sucesso!" });
