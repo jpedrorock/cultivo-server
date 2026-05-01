@@ -760,6 +760,8 @@ async function startServer() {
           ssl: { rejectUnauthorized: false },
           multipleStatements: true,
         });
+        // Modo permissivo para compatibilidade com dumps de versões antigas
+        await conn.query("SET sql_mode = ''");
         // Limpar tabelas existentes antes de importar
         await conn.query("SET FOREIGN_KEY_CHECKS=0");
         const [tables] = await conn.query("SHOW TABLES") as any;
