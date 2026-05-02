@@ -15,13 +15,13 @@ import {
   PlantGraphNode, LayoutNode, GraphAction,
   createInitialGraph, isLegacyFormat,
   applyTopping, applyFIM, applyLST, applySuperCrop,
-  growPlant, addLateralBranch, removeSubtree,
-  getAvailableActions, getPlantStats, computeLayout,
+  growPlant, addLateralBranch, insertNodeBefore, removeSubtree,
+  getAvailableActions, getPlantStats, computeLayout, computeRadialLayout, computeIsoLayout,
   resolveEdgeState, setEdgeRecovering, setEdgeDefoliated, setEdgeActive,
 } from "@/features/cannaprune/plantGraph";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
-  Scissors, Zap, Leaf, ArrowUp, GitBranch,
+  Scissors, Zap, Leaf, ArrowUp, GitBranch, GitMerge,
   Trash2, Undo2, Redo2, RotateCcw, Save, Loader2, X,
   ZoomIn, ZoomOut, Maximize2,
 } from "lucide-react";
@@ -101,15 +101,17 @@ function getRadius(n: PlantGraphNode, compact = false): number {
 
 // ── Menu de ações ─────────────────────────────────────────────────────────────
 
-const ACTION_META: Record<GraphAction, {
+const ACTION_META: Partial<Record<GraphAction, {
   label: string; shortDesc: string; color: string;
   Icon: React.ElementType; destructive?: boolean; separator?: boolean;
-}> = {
+}>> = {
   topping:      { label: 'Topping',    shortDesc: '→ 2 topos',       color: '#fbbf24', Icon: Scissors },
   fim:          { label: 'FIM',        shortDesc: '→ 3–4 brotos',    color: '#fb923c', Icon: Scissors },
+  lst:          { label: 'LST',        shortDesc: 'inclina galho',   color: '#8b5cf6', Icon: Leaf     },
   grow:         { label: 'Crescer',    shortDesc: '+ nó acima',      color: '#4ade80', Icon: ArrowUp  },
-  'add-branch': { label: '+ Galho',   shortDesc: 'ramo lateral',    color: '#34d399', Icon: GitBranch },
-  'super-crop': { label: 'Super Crop',shortDesc: '→ 2 topos',       color: '#c084fc', Icon: Zap      },
+  'add-branch': { label: '+ Galho',    shortDesc: 'ramo lateral',    color: '#34d399', Icon: GitBranch },
+  'add-before': { label: 'Inserir nó', shortDesc: 'entre este e o pai', color: '#60a5fa', Icon: GitMerge },
+  'super-crop': { label: 'Super Crop', shortDesc: '→ 2 topos',       color: '#c084fc', Icon: Zap      },
   remove:       { label: 'Remover',    shortDesc: 'nó + filhos',     color: '#f87171', Icon: Trash2,
                   destructive: true, separator: true },
 };
@@ -142,6 +144,8 @@ interface Props {
   cancelSaveRef?:      React.MutableRefObject<boolean>;
   onTechniqueApplied?: (technique: string, nodeLabel: string) => void;
   onResetStructure?:   (clearHistory: boolean) => void;
+  /** 'side' = lateral (padrão), 'top' = de cima (radial), 'iso' = isométrica 30° */
+  viewMode?:           'side' | 'top' | 'iso';
 }
 
 function Chip({ value, label, color }: { value: number; label: string; color: string }) {
@@ -256,7 +260,7 @@ function NodeActionMenu({
 
 export default function PlantNodeMap({
   plantId, compact = false, onCompactTap, staticNodes, nodeSnapshotRef,
-  cancelSaveRef, onTechniqueApplied, onResetStructure,
+  cancelSaveRef, onTechniqueApplied, onResetStructure, viewMode = 'side',
 }: Props) {
   // Modo estático: só renderiza o snapshot, sem DB, sem interação
   const isStatic = !!staticNodes;
@@ -318,6 +322,7 @@ export default function PlantNodeMap({
 
   // ── tRPC ───────────────────────────────────────────────────────────────────
 
+  const utils = trpc.useUtils();
   const { data: saved } = trpc.plantStructure.get.useQuery(
     { plantId },
     { enabled: !!plantId, refetchOnWindowFocus: false },
@@ -328,6 +333,8 @@ export default function PlantNodeMap({
       setIsSaved(true);
       if (savedTimer.current) clearTimeout(savedTimer.current);
       savedTimer.current = setTimeout(() => setIsSaved(false), 2000);
+      // Invalida o cache para que o Plant3DView (e outras views) vejam o estado atual
+      if (plantId) utils.plantStructure.get.invalidate({ plantId });
     },
     onError: () => { setIsSaving(false); toast.error('Erro ao salvar'); },
   });
@@ -400,12 +407,17 @@ export default function PlantNodeMap({
   // ── Layout ──────────────────────────────────────────────────────────────────
 
   const { layoutNodes, svgHeight, svgActualWidth } = useMemo(
-    () => computeLayout(
-      nodes, svgWidth,
-      compact ? SVG_MIN_H_COMPACT : SVG_MIN_H,
-      compact ? 50 : undefined,
-    ),
-    [nodes, svgWidth, compact],
+    () => {
+      const minH = compact ? SVG_MIN_H_COMPACT : SVG_MIN_H;
+      if (viewMode === 'top') {
+        return computeRadialLayout(nodes, svgWidth, minH, compact ? 60 : 80);
+      }
+      if (viewMode === 'iso') {
+        return computeIsoLayout(nodes, svgWidth, minH, compact ? 55 : 70, compact ? 50 : 65);
+      }
+      return computeLayout(nodes, svgWidth, minH, compact ? 50 : undefined);
+    },
+    [nodes, svgWidth, compact, viewMode],
   );
 
   const nodeMap = useMemo(() => {
@@ -776,6 +788,7 @@ export default function PlantNodeMap({
         return;
       }
       setNodes(res.nodes);
+      saveNow(res.nodes);
       toast.success('Nó removido');
       return;
     }
@@ -790,6 +803,7 @@ export default function PlantNodeMap({
       case 'super-crop': res = applySuperCrop(nodes, nodeId);   break;
       case 'grow':       res = growPlant(nodes, nodeId);        break;
       case 'add-branch': res = addLateralBranch(nodes, nodeId); break;
+      case 'add-before': res = insertNodeBefore(nodes, nodeId); break;
       default: return;
     }
 
@@ -798,10 +812,12 @@ export default function PlantNodeMap({
     pushHistory(nodes);
     const selNode = nodes.find(n => n.id === nodeId);
     setNodes(res.nodes);
+    saveNow(res.nodes);
 
     const techLabels: Partial<Record<GraphAction, string>> = {
       topping: 'Topping', fim: 'FIM', lst: 'LST',
-      'super-crop': 'Super Cropping', grow: 'Crescimento', 'add-branch': 'Galho lateral',
+      'super-crop': 'Super Cropping', grow: 'Crescimento',
+      'add-branch': 'Galho lateral', 'add-before': 'Nó inserido',
     };
     if (techLabels[action]) onTechniqueApplied?.(techLabels[action]!, selNode ? `N${selNode.nodeNumber}` : '');
 
@@ -812,6 +828,7 @@ export default function PlantNodeMap({
       'super-crop': '⚡ Super Cropping — estrutura acima removida, 2 novos topos',
       grow:         '🌱 Crescimento aplicado',
       'add-branch': '🌿 Galho lateral adicionado',
+      'add-before': '➕ Nó inserido entre o pai e este',
     };
     if (msgs[action]) toast.success(msgs[action]!);
   }

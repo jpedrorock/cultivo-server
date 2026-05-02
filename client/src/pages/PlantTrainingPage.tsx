@@ -12,13 +12,13 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
-  Network,
+  Boxes,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import PlantNodeMap from "@/components/PlantNodeMap";
-import PlantTopView from "@/components/PlantTopView";
+import Plant3DView from "@/components/Plant3DView";
 import type { PlantGraphNode } from "@/features/cannaprune/plantGraph";
 import {
   TECHNIQUE_CONFIGS,
@@ -66,8 +66,17 @@ export default function PlantTrainingPage() {
   // Auto-abre o sandbox se navegou com ?sandbox=1 (ex: via quick log)
   const autoSandbox = new URLSearchParams(window.location.search).get('sandbox') === '1';
   const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
-  const [viewMode,         setViewMode]         = useState<'map' | 'top'>('map');
+  const [viewMode,         setViewMode]         = useState<'top' | '3d'>('top');
   const [topViewNodes,     setTopViewNodes]     = useState<PlantGraphNode[]>([]);
+  // Tamanho do vaso em litros — persistido em localStorage por planta
+  const [potSizeL, setPotSizeL] = useState<number>(() => {
+    if (!plantId) return 5;
+    const saved = localStorage.getItem(`plant-${plantId}-potSize`);
+    return saved ? parseFloat(saved) || 5 : 5;
+  });
+  useEffect(() => {
+    if (plantId) localStorage.setItem(`plant-${plantId}-potSize`, String(potSizeL));
+  }, [plantId, potSizeL]);
   const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
   // Técnicas aplicadas nesta sessão do sandbox
   const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
@@ -206,21 +215,40 @@ export default function PlantTrainingPage() {
               Mapa da planta
             </p>
             <div className="flex items-center gap-1">
-              {/* Toggle vista lateral / vista de cima */}
-              <button
-                onClick={() => setViewMode('map')}
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${viewMode === 'map' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                title="Vista lateral"
-              >
-                <Network className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => { setTopViewNodes([...nodeSnapshotRef.current]); setViewMode('top'); }}
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${viewMode === 'top' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                title="Vista de cima"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-              </button>
+              {/* Toggle único que cicla entre vistas (futuro: 3D, isométrica…) */}
+              {(() => {
+                const VIEWS = [
+                  { id: 'top' as const, label: '2D',  icon: LayoutGrid },
+                  { id: '3d'  as const, label: '3D',  icon: Boxes },
+                ];
+                const current = VIEWS.find(v => v.id === viewMode) ?? VIEWS[0];
+                const next    = VIEWS[(VIEWS.indexOf(current) + 1) % VIEWS.length];
+                const Icon    = current.icon;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode(next.id)}
+                    className="h-7 px-2 rounded-lg flex items-center gap-1.5 text-[11px] font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+                    title={`Trocar para ${next.label}`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{current.label}</span>
+                  </button>
+                );
+              })()}
+              {viewMode === '3d' && (
+                <div className="flex items-center gap-1 ml-1">
+                  <input
+                    type="number"
+                    min="0.5" step="0.5" max="100"
+                    value={potSizeL}
+                    onChange={(e) => setPotSizeL(Math.max(0.5, parseFloat(e.target.value) || 5))}
+                    className="w-12 h-7 px-1.5 text-[11px] font-medium bg-muted/50 border border-border/40 rounded-md text-center focus:outline-none focus:border-primary"
+                    title="Tamanho do vaso (litros)"
+                  />
+                  <span className="text-[10px] text-muted-foreground">L</span>
+                </div>
+              )}
               <button
                 onClick={openSandbox}
                 className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -233,20 +261,24 @@ export default function PlantTrainingPage() {
           {/* Preview compacto (desmontado quando fullscreen estiver aberto) */}
           {!mapFullscreen && (
             <>
-              {viewMode === 'map' && (
+              {viewMode === 'top' && (
                 <PlantNodeMap
                   plantId={plantId}
                   compact
+                  viewMode="top"
                   onCompactTap={openSandbox}
                   onTechniqueApplied={handleTechniqueApplied}
                   onResetStructure={handleResetStructure}
                   nodeSnapshotRef={nodeSnapshotRef}
                 />
               )}
-              {viewMode === 'top' && (
-                <div className="flex justify-center py-3">
-                  <PlantTopView nodes={topViewNodes} size={320} />
-                </div>
+              {viewMode === '3d' && (
+                <Plant3DView
+                  plantId={plantId}
+                  height={360}
+                  potSizeL={potSizeL}
+                  onTechniqueApplied={handleTechniqueApplied}
+                />
               )}
               <button
                 onClick={openSandbox}
@@ -298,13 +330,22 @@ export default function PlantTrainingPage() {
             </div>
             {/* Canvas com pan/zoom — overflow:hidden é intencional */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              <PlantNodeMap
-                plantId={plantId}
-                cancelSaveRef={sandboxCancelRef}
-                nodeSnapshotRef={nodeSnapshotRef}
-                onTechniqueApplied={handleTechniqueApplied}
-                onResetStructure={handleResetStructure}
-              />
+              {viewMode === '3d' ? (
+                <Plant3DView
+                  plantId={plantId}
+                  potSizeL={potSizeL}
+                  onTechniqueApplied={handleTechniqueApplied}
+                />
+              ) : (
+                <PlantNodeMap
+                  plantId={plantId}
+                  viewMode="top"
+                  cancelSaveRef={sandboxCancelRef}
+                  nodeSnapshotRef={nodeSnapshotRef}
+                  onTechniqueApplied={handleTechniqueApplied}
+                  onResetStructure={handleResetStructure}
+                />
+              )}
             </div>
           </div>
         )}
@@ -347,6 +388,7 @@ export default function PlantTrainingPage() {
                 key={safeTimelineIndex}
                 staticNodes={snapshots[safeTimelineIndex].nodes}
                 compact={false}
+                viewMode="top"
               />
             </div>
 
