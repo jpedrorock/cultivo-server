@@ -911,11 +911,10 @@ export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   tuya: tuyaRouter,
-  auth: router({
-    // Simplified auth for standalone deployment
-    me: protectedProcedure.query(() => ({ id: 1, name: "Local User", email: "user@local" })),
-    logout: protectedProcedure.mutation(() => ({ success: true })),
-  }),
+  // Auth real está em /api/auth/* (REST) — registerAuthRoutes em _core/authRoutes.ts.
+  // O sub-router tRPC `auth` foi removido: retornava { id:1, name:"Local User" }
+  // hardcoded mesmo dentro de protectedProcedure (bug latente — qualquer caller
+  // que chamasse trpc.auth.me.query() recebia dados fictícios em vez do user real).
 
   // Weather (Clima)
   weather: router({
