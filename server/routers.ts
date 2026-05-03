@@ -670,10 +670,16 @@ const tuyaRouter = router({
       if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum sensor ativo para esta estufa" });
       const cfg = cfgRows[0];
 
+      // accessSecret está cifrado no banco — decifra e migra para v1 se for legado
+      const { decryptAndMigrate } = await import("./aiCrypto");
+      const accessSecret = await decryptAndMigrate(cfg.accessSecret, async (newCipher) => {
+        await pool.execute(`UPDATE tuyaConfig SET accessSecret = ? WHERE userId = ?`, [newCipher, ctx.user.id]);
+      });
+
       const { readTuyaDeviceStatus } = await import("./lib/tuya");
       let reading: { tempC: number | null; rhPct: number | null };
       try {
-        reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+        reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, accessSecret, cfg.region);
       } catch (err: any) {
         const msg = err?.message ?? String(err);
         // "permission deny" → orientar o usuário a vincular o dispositivo no portal

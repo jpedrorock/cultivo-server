@@ -49,10 +49,16 @@ async function pollAllUsers() {
       if (now - lastRead < intervalMs) continue; // ainda não é hora
 
       try {
+        // accessSecret está cifrado no banco — decifra (e migra v1 se legado)
+        const { decryptAndMigrate } = await import("../aiCrypto");
+        const accessSecret = await decryptAndMigrate(row.accessSecret, async (newCipher) => {
+          await pool.execute(`UPDATE tuyaConfig SET accessSecret = ? WHERE userId = ?`, [newCipher, row.userId]);
+        });
+
         const reading = await readTuyaDeviceStatus(
           row.deviceId,
           row.accessId,
-          row.accessSecret,
+          accessSecret,
           row.region as TuyaRegion
         );
 
