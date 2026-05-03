@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
@@ -18,7 +18,14 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import PlantNodeMap from "@/components/PlantNodeMap";
-import Plant3DView from "@/components/Plant3DView";
+// Lazy: Three.js (~600KB) só carrega quando user abre a vista 3D
+const Plant3DView = lazy(() => import("@/components/Plant3DView"));
+
+const View3DFallback = () => (
+  <div className="flex items-center justify-center text-xs text-muted-foreground" style={{ height: "100%", minHeight: 200 }}>
+    Carregando 3D…
+  </div>
+);
 import type { PlantGraphNode } from "@/features/cannaprune/plantGraph";
 import {
   TECHNIQUE_CONFIGS,
@@ -276,12 +283,14 @@ export default function PlantTrainingPage() {
                 />
               )}
               {viewMode === '3d' && (
-                <Plant3DView
-                  plantId={plantId}
-                  height={360}
-                  potSizeL={potSizeL}
-                  onTechniqueApplied={handleTechniqueApplied}
-                />
+                <Suspense fallback={<View3DFallback />}>
+                  <Plant3DView
+                    plantId={plantId}
+                    height={360}
+                    potSizeL={potSizeL}
+                    onTechniqueApplied={handleTechniqueApplied}
+                  />
+                </Suspense>
               )}
               <button
                 onClick={openSandbox}
@@ -343,11 +352,13 @@ export default function PlantTrainingPage() {
             {/* Canvas com pan/zoom — overflow:hidden é intencional */}
             <div className="flex-1 min-h-0 overflow-hidden">
               {viewMode === '3d' ? (
-                <Plant3DView
-                  plantId={plantId}
-                  potSizeL={potSizeL}
-                  onTechniqueApplied={handleTechniqueApplied}
-                />
+                <Suspense fallback={<View3DFallback />}>
+                  <Plant3DView
+                    plantId={plantId}
+                    potSizeL={potSizeL}
+                    onTechniqueApplied={handleTechniqueApplied}
+                  />
+                </Suspense>
               ) : (
                 <PlantNodeMap
                   plantId={plantId}
