@@ -18,7 +18,7 @@ import { config } from "dotenv";
 
 config();
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const _dirname = dirname(fileURLToPath(import.meta.url));   // disponível se algum import futuro precisar
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
