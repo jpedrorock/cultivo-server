@@ -433,10 +433,13 @@ async function getTuyaConfig(userId: number, opts: { requireEnabled?: boolean } 
   if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
   const row = rows[0] as { accessId: string; accessSecret: string; region: import("./lib/tuya").TuyaRegion; homeId: string | null };
   try {
-    const { decryptApiKey } = await import("./aiCrypto");
-    row.accessSecret = decryptApiKey(row.accessSecret);
-  } catch {
-    // Segredo ainda em plaintext (migração): usa como está
+    const { decryptAndMigrate } = await import("./aiCrypto");
+    row.accessSecret = await decryptAndMigrate(row.accessSecret, async (newCipher) => {
+      await pool.execute(`UPDATE tuyaConfig SET accessSecret = ? WHERE userId = ?`, [newCipher, userId]);
+    });
+  } catch (err) {
+    console.warn("[Tuya] decrypt accessSecret failed", (err as Error).message);
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao decifrar credenciais Tuya. Reconfigure no Settings." });
   }
   return row;
 }
@@ -7084,8 +7087,13 @@ export const appRouter = router({
           .limit(1);
         if (!settings) return { models: [] };
 
-        const { decryptApiKey } = await import("./aiCrypto");
-        const apiKey = decryptApiKey(settings.apiKey);
+        const { decryptAndMigrate } = await import("./aiCrypto");
+        const apiKey = await decryptAndMigrate(settings.apiKey, async (newCipher) => {
+          await database
+            .update(userAiSettings)
+            .set({ apiKey: newCipher })
+            .where(eq(userAiSettings.userId, ctx.user.id));
+        });
         const provider = settings.provider;
 
         if (provider === "gemini") {
@@ -7116,8 +7124,13 @@ export const appRouter = router({
           .limit(1);
         if (!settings) throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma chave configurada" });
 
-        const { decryptApiKey } = await import("./aiCrypto");
-        const apiKey = decryptApiKey(settings.apiKey);
+        const { decryptAndMigrate } = await import("./aiCrypto");
+        const apiKey = await decryptAndMigrate(settings.apiKey, async (newCipher) => {
+          await database
+            .update(userAiSettings)
+            .set({ apiKey: newCipher })
+            .where(eq(userAiSettings.userId, ctx.user.id));
+        });
         const provider = settings.provider;
         const defaultModels: Record<string, string> = {
           openai: "gpt-4o-mini", anthropic: "claude-haiku-4-5-20251001",
@@ -7229,8 +7242,13 @@ export const appRouter = router({
           message: "Configure sua chave de API em Configurações → Conta → IA Especialista",
         });
 
-        const { decryptApiKey } = await import("./aiCrypto");
-        const apiKey = decryptApiKey(settings.apiKey);
+        const { decryptAndMigrate } = await import("./aiCrypto");
+        const apiKey = await decryptAndMigrate(settings.apiKey, async (newCipher) => {
+          await database
+            .update(userAiSettings)
+            .set({ apiKey: newCipher })
+            .where(eq(userAiSettings.userId, ctx.user.id));
+        });
         const provider = settings.provider;
         const defaultModels: Record<string, string> = {
           openai: "gpt-4o-mini",
