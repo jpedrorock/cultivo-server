@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getUserByEmail,
   getUserByOpenId,
@@ -18,31 +19,24 @@ import {
 import { ENV } from './env';
 
 // ---------------------------------------------------------------------------
-// Rate limiter in-memory simples — sem dependência externa
-// Protege login e register de brute force
+// Rate limiters por endpoint sensível
+// Inclui Retry-After + X-RateLimit-* headers padrão
 // ---------------------------------------------------------------------------
-interface RateLimitEntry { count: number; resetAt: number }
-const rateLimitStore = new Map<string, RateLimitEntry>();
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,           // 15 minutos
+  limit: 10,                          // 10 tentativas por janela
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+});
 
-function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return true; // dentro do limite
-  }
-  entry.count++;
-  if (entry.count > maxRequests) return false; // bloqueado
-  return true;
-}
-
-// Limpar entradas expiradas a cada 10 minutos
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore) {
-    if (now > entry.resetAt) rateLimitStore.delete(key);
-  }
-}, 10 * 60 * 1000);
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,           // 1 hora
+  limit: 5,                           // 5 registros por hora
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de registro. Tente novamente em 1 hora.' },
+});
 
 // ---------------------------------------------------------------------------
 
@@ -55,13 +49,7 @@ export function registerAuthRoutes(app: Express) {
    * POST /api/auth/register
    * Registra um novo usuário com email e senha
    */
-  app.post('/api/auth/register', async (req: Request, res: Response) => {
-    // Rate limit: 5 registros por hora por IP
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-    if (!checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000)) {
-      res.status(429).json({ error: 'Muitas tentativas de registro. Tente novamente em 1 hora.' });
-      return;
-    }
+  app.post('/api/auth/register', registerLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password, name } = req.body as {
         email: string;
@@ -139,13 +127,7 @@ export function registerAuthRoutes(app: Express) {
    * POST /api/auth/login
    * Autentica um usuário com email e senha
    */
-  app.post('/api/auth/login', async (req: Request, res: Response) => {
-    // Rate limit: 10 tentativas de login por 15 minutos por IP
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-    if (!checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000)) {
-      res.status(429).json({ error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' });
-      return;
-    }
+  app.post('/api/auth/login', loginLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body as { email: string; password: string };
 

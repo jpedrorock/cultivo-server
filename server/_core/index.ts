@@ -385,6 +385,13 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // Em produção, app fica atrás de proxy (Traefik/Coolify) — confiar nos
+  // headers X-Forwarded-* para que req.ip retorne o IP real do cliente.
+  // Sem isso, rate-limit veria todos os requests vindo do mesmo IP (proxy).
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);   // 1 hop = só o proxy mais próximo (Traefik)
+  }
+
   // Garantir que a tabela pushSubscriptions existe (migration incremental)
   await ensurePushSubscriptionsTable();
 
@@ -506,6 +513,21 @@ async function startServer() {
 
   // Cookie parser para autenticação JWT
   app.use(cookieParser());
+
+  // Rate limit global para a API — 200 req/min por IP
+  // Protege contra abuso/scraping; rotas de auth têm limites mais estritos próprios.
+  const { default: rateLimit } = await import("express-rate-limit");
+  app.use("/api/", rateLimit({
+    windowMs: 60 * 1000,             // 1 minuto
+    limit: 200,                      // 200 requisições por minuto
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    skip: (req) => {
+      // /api/auth/me é chamado em todo render — não conta para o limite global
+      return req.path === '/auth/me';
+    },
+    message: { error: 'Muitas requisições. Aguarde um instante.' },
+  }));
 
   // Servir arquivos estáticos da pasta /uploads
   const uploadsPath = path.join(process.cwd(), 'uploads');
