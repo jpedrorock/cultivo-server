@@ -212,14 +212,14 @@ export function BottomNav() {
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/plants", icon: Leaf, label: "Plantas" },
-    { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
+    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
 
   const moreMenuItems: NavItem[] = [
+    { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
     { href: "/smartlife", icon: Wifi, label: "SmartLife" },
-    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
     { href: "/manage-strains", icon: Sprout, label: "Strains" },
     { href: "/help", icon: BookOpen, label: "Guia do Usuário" },
     { href: "/settings", icon: Settings, label: "Configurações" },
@@ -495,18 +495,16 @@ export function BottomNav() {
             </button>
           </div>
 
-          {/* Nav items — Alertas (após o FAB) */}
+          {/* Nav items — terceiro slot (após o FAB) */}
           {navItems.slice(2).map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
-            const isAlertsItem = item.href === "/alerts";
             const showBadge = item.badge !== undefined && item.badge > 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={triggerHapticFeedback}
-                data-tour={item.href === "/alerts" ? "alerts-menu" : undefined}
                 aria-label={item.label}
                 className={cn(
                   "flex items-center justify-center p-3 rounded-xl transition-colors relative",
@@ -520,7 +518,7 @@ export function BottomNav() {
                   <span
                     className={cn(
                       "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
-                      isAlertsItem && badgeShaking ? "animate-badge-shake" : "animate-pulse"
+                      "animate-pulse"
                     )}
                   >
                     {item.badge! > 9 ? '9+' : item.badge}
@@ -535,8 +533,9 @@ export function BottomNav() {
             <SheetTrigger asChild>
               <button
                 onClick={triggerHapticFeedback}
+                aria-label="Mais opções"
                 className={cn(
-                  "flex items-center justify-center p-3 rounded-xl transition-colors",
+                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
                   "hover:bg-primary/10",
                   isMoreMenuActive
                     ? "text-primary bg-primary/10"
@@ -544,6 +543,17 @@ export function BottomNav() {
                 )}
               >
                 <MoreHorizontal className={cn("w-6 h-6", isMoreMenuActive && "stroke-[2.5]")} />
+                {/* Badge agregado: soma alertas + secagem (qualquer item do Mais com badge) */}
+                {((alertCount ?? 0) + (harvestQueueCount ?? 0)) > 0 && (
+                  <span
+                    className={cn(
+                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
+                      badgeShaking ? "animate-badge-shake" : "animate-pulse",
+                    )}
+                  >
+                    {((alertCount ?? 0) + (harvestQueueCount ?? 0)) > 9 ? "9+" : ((alertCount ?? 0) + (harvestQueueCount ?? 0))}
+                  </span>
+                )}
               </button>
             </SheetTrigger>
             <SheetContent side="bottom" className="h-auto pb-safe">
@@ -564,7 +574,11 @@ export function BottomNav() {
                         triggerHapticFeedback();
                         setMoreMenuOpen(false);
                       }}
-                      data-tour={item.href === "/history" ? "history-menu" : undefined}
+                      data-tour={
+                        item.href === "/history" ? "history-menu" :
+                        item.href === "/alerts" ? "alerts-menu" :
+                        undefined
+                      }
                       className={cn(
                         "flex items-center gap-4 px-4 py-4 rounded-lg transition-colors relative",
                         "hover:bg-primary/10",
