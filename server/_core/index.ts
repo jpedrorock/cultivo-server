@@ -12,6 +12,7 @@ import { serveStatic, setupVite } from "./vite";
 import uploadRouter from "../uploadRouter";
 import { initializeStorageDirectories } from "../storageLocal";
 import { ENV } from "./env";
+import { httpLogger, logger } from "./logger";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -391,6 +392,20 @@ async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     app.set('trust proxy', 1);   // 1 hop = só o proxy mais próximo (Traefik)
   }
+
+  // Logger HTTP estruturado — anexa req.log e gera linha por request
+  // com requestId (UUID ou X-Request-Id do proxy). Devolve 4xx=warn, 5xx=error.
+  app.use(httpLogger);
+  // Devolve o request id no response (útil pra debug — usuário pode reportar)
+  app.use((req: any, res, next) => {
+    if (req.id) res.setHeader("X-Request-Id", String(req.id));
+    next();
+  });
+
+  // Healthcheck — útil para Docker HEALTHCHECK / k8s readiness
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", uptime: Math.floor(process.uptime()), ts: Date.now() });
+  });
 
   // Garantir que a tabela pushSubscriptions existe (migration incremental)
   await ensurePushSubscriptionsTable();
