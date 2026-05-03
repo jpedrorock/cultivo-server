@@ -74,6 +74,130 @@ const INCREMENTAL_ALTERS = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
+/**
+ * Políticas de ON DELETE para todas as FKs do schema.
+ *
+ * Antes deste patch, todas as 18 FKs eram criadas sem ON DELETE
+ * (= NO ACTION/RESTRICT padrão). Resultado: deletar uma estufa falhava
+ * silenciosamente OU deixava órfãos no banco quando alguma rota burlava
+ * a checagem.
+ *
+ * Política definida (ver schema.ts — fonte canônica):
+ * - CASCADE        : registros filhos pertencem ao pai (cycles, alerts, recipes etc.)
+ * - SET NULL       : referência opcional (motherPlant, currentTent, fromTent)
+ * - RESTRICT       : bloqueia delete se houver dependências (plant ⇒ strain)
+ *
+ * applyForeignKeyPolicies() é idempotente: lê INFORMATION_SCHEMA, dropa
+ * o FK existente (se qualquer) e re-cria com ON DELETE explícito + nome
+ * canônico (fk_<table>_<column>) para futuras manutenções.
+ */
+const FK_POLICIES = [
+  // (table, column, refTable, refColumn, action)
+  ["cycles",           "tentId",                "tents",         "id", "CASCADE"],
+  ["cycles",           "strainId",              "strains",       "id", "SET NULL"],
+  ["cycles",           "motherPlantId",         "plants",        "id", "SET NULL"],
+  ["tentAState",       "tentId",                "tents",         "id", "CASCADE"],
+  ["tentAState",       "activeCloningEventId",  "cloningEvents", "id", "SET NULL"],
+  ["cloningEvents",    "tentId",                "tents",         "id", "CASCADE"],
+  ["weeklyTargets",    "strainId",              "strains",       "id", "CASCADE"],
+  ["dailyLogs",        "tentId",                "tents",         "id", "CASCADE"],
+  ["recipes",          "tentId",                "tents",         "id", "CASCADE"],
+  ["taskInstances",    "tentId",                "tents",         "id", "CASCADE"],
+  ["taskInstances",    "taskTemplateId",        "taskTemplates", "id", "CASCADE"],
+  ["alerts",           "tentId",                "tents",         "id", "CASCADE"],
+  ["alertSettings",    "tentId",                "tents",         "id", "CASCADE"],
+  ["alertHistory",     "tentId",                "tents",         "id", "CASCADE"],
+  ["plants",           "strainId",              "strains",       "id", "RESTRICT"],
+  ["plants",           "currentTentId",         "tents",         "id", "SET NULL"],
+  ["plantTentHistory", "fromTentId",            "tents",         "id", "SET NULL"],
+  ["plantTentHistory", "toTentId",              "tents",         "id", "SET NULL"],
+];
+
+/**
+ * Aplica uma política de ON DELETE de forma idempotente.
+ *
+ * 1. Procura FK existente em (table.column → refTable.refColumn).
+ * 2. Se a regra já está correta, no-op.
+ * 3. Caso contrário: DROP FK existente + ADD com nome canônico e regra.
+ *
+ * Tolera tabelas inexistentes (skipa) — útil quando rodando antes da
+ * primeira criação de tabelas pelo `ensure*` no startup do servidor.
+ */
+async function applyForeignKeyPolicies(connection) {
+  let changedCount = 0;
+  let skippedCount = 0;
+
+  for (const [table, column, refTable, refColumn, action] of FK_POLICIES) {
+    try {
+      // Busca FK existente (qualquer nome) que faça (table.column → refTable.refColumn)
+      const [rows] = await connection.execute(
+        `SELECT k.CONSTRAINT_NAME, r.DELETE_RULE
+         FROM information_schema.KEY_COLUMN_USAGE k
+         JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+           ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA
+          AND r.CONSTRAINT_NAME   = k.CONSTRAINT_NAME
+         WHERE k.CONSTRAINT_SCHEMA = DATABASE()
+           AND k.TABLE_NAME            = ?
+           AND k.COLUMN_NAME           = ?
+           AND k.REFERENCED_TABLE_NAME = ?
+           AND k.REFERENCED_COLUMN_NAME= ?
+         LIMIT 1`,
+        [table, column, refTable, refColumn]
+      );
+
+      const existing = rows[0];
+      const desiredCanonicalName = `fk_${table}_${column}`;
+
+      // Já está correto: nome canônico + regra correta → no-op
+      if (existing && existing.CONSTRAINT_NAME === desiredCanonicalName && existing.DELETE_RULE === action) {
+        skippedCount++;
+        continue;
+      }
+
+      // Drop FK existente (se houver) — não usa prepared statement pois
+      // identificadores não podem ser parametrizados no MySQL
+      if (existing) {
+        await connection.query(
+          `ALTER TABLE \`${table}\` DROP FOREIGN KEY \`${existing.CONSTRAINT_NAME}\``
+        );
+      }
+
+      await connection.query(
+        `ALTER TABLE \`${table}\`
+         ADD CONSTRAINT \`${desiredCanonicalName}\`
+         FOREIGN KEY (\`${column}\`) REFERENCES \`${refTable}\`(\`${refColumn}\`)
+         ON DELETE ${action}`
+      );
+
+      console.log(`✅ FK ${table}.${column} → ${refTable}.${refColumn} ON DELETE ${action}`);
+      changedCount++;
+    } catch (e) {
+      // errno 1146 = table doesn't exist (ainda não criada por ensure* do server)
+      // errno 1452 = foreign key constraint fails (existem órfãos)
+      if (e.errno === 1146) {
+        // tabela não existe ainda — server vai criá-la com ensure*; FK fica para próxima
+        continue;
+      }
+      if (e.errno === 1452) {
+        console.error(
+          `⚠️  FK ${table}.${column} → ${refTable}.${refColumn} ON DELETE ${action} ` +
+          `falhou: existem registros órfãos em ${table}. Limpe-os e re-rode db:migrate.`
+        );
+        // não trava o deploy — outras migrations podem prosseguir
+        continue;
+      }
+      console.error(`❌ Erro em FK ${table}.${column}: ${e.message}`);
+      throw e;
+    }
+  }
+
+  if (changedCount === 0 && skippedCount === FK_POLICIES.length) {
+    console.log(`✅ Todas as ${FK_POLICIES.length} FKs já estão com política ON DELETE correta.`);
+  } else if (changedCount > 0) {
+    console.log(`✅ ${changedCount} FK(s) atualizada(s) com política ON DELETE.`);
+  }
+}
+
 async function runMigrations() {
   console.log("🔄 Verificando schema do banco de dados...");
 
@@ -103,6 +227,9 @@ async function runMigrations() {
     } else {
       console.log(`✅ ${appliedCount} alteração(ões) de schema aplicada(s).`);
     }
+
+    // Após migrations de coluna, garante políticas de ON DELETE nas FKs
+    await applyForeignKeyPolicies(connection);
   } catch (err) {
     console.error("❌ Erro crítico nas migrations:", err.message);
     process.exit(1);
