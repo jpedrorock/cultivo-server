@@ -68,6 +68,43 @@ export async function getPendingUsers(): Promise<User[]> {
   return db.select().from(users).where(eq(users.approved, false));
 }
 
+/**
+ * Registra usuário fazendo a decisão "primeiro = admin" atomicamente.
+ *
+ * Sem transação, dois POSTs simultâneos em /api/auth/register com banco vazio
+ * resultariam em DOIS admins (race em SELECT COUNT). Aqui usamos GET_LOCK do
+ * MySQL como advisory lock — apenas uma requisição executa o SELECT+INSERT
+ * por vez. O lock é solto automaticamente ao fim da sessão (try/finally).
+ */
+export async function registerUserAtomic(userData: {
+  email: string;
+  passwordHash?: string;
+  name: string | null;
+  lastSignedIn: Date;
+  openId?: string;
+  loginMethod?: string;
+  avatarUrl?: string | null;
+}): Promise<{ user: User; isFirst: boolean }> {
+  const db = await getDb();
+  if (!db) throw new Error('Database not available');
+
+  // Lock de 5s para evitar race do "primeiro usuário"
+  await db.execute(sql`SELECT GET_LOCK('cultivo_first_user_lock', 5)`);
+  try {
+    const total = Number((await db.select({ c: sql<number>`COUNT(*)` }).from(users))[0]?.c ?? 0);
+    const isFirst = total === 0;
+
+    const user = await createUser({
+      ...userData,
+      role: isFirst ? 'admin' : 'user',
+      approved: isFirst,
+    });
+    return { user, isFirst };
+  } finally {
+    await db.execute(sql`SELECT RELEASE_LOCK('cultivo_first_user_lock')`).catch(() => { /* ignore */ });
+  }
+}
+
 export async function createUser(userData: {
   email: string;
   passwordHash?: string;

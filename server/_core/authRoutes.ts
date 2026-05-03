@@ -9,7 +9,7 @@ import {
   updateUserAvatar,
   updateUserPassword,
   linkUserOpenId,
-  countUsers,
+  registerUserAtomic,
 } from '../db-auth';
 import {
   hashPassword,
@@ -78,16 +78,12 @@ export function registerAuthRoutes(app: Express) {
 
       const passwordHash = await hashPassword(password);
 
-      // Primeiro usuário → admin aprovado automaticamente; demais aguardam aprovação
-      const total = await countUsers();
-      const isFirst = total === 0;
-
-      const user = await createUser({
+      // Decisão "primeiro = admin aprovado" feita atomicamente (lock MySQL)
+      // para evitar race com 2 POSTs simultâneos virando 2 admins.
+      const { user, isFirst } = await registerUserAtomic({
         email,
         passwordHash,
         name: name || null,
-        role: isFirst ? 'admin' : 'user',
-        approved: isFirst,
         lastSignedIn: new Date(),
       });
 
@@ -350,19 +346,16 @@ export function registerAuthRoutes(app: Express) {
           return;
         }
 
-        // Email novo — cria conta normalmente
-        const total = await countUsers();
-        const isFirst = total === 0;
-        user = await createUser({
+        // Email novo — cria conta atomicamente (mesma proteção contra race do "primeiro = admin")
+        const created = await registerUserAtomic({
           email: googleUser.email,
           name: googleUser.name ?? null,
-          role: isFirst ? 'admin' : 'user',
-          approved: isFirst,
           lastSignedIn: new Date(),
           openId: googleUser.id,
           loginMethod: 'google',
           avatarUrl: googleUser.picture ?? null,
         });
+        user = created.user;
       }
 
       // Bloquear login de usuários não aprovados
