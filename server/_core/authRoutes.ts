@@ -6,6 +6,7 @@ import {
   createUser,
   updateUserLastSignedIn,
   updateUserAvatar,
+  updateUserPassword,
   countUsers,
 } from '../db-auth';
 import {
@@ -142,8 +143,8 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      const valid = await comparePassword(password, user.passwordHash);
-      if (!valid) {
+      const { ok, needsRehash } = await comparePassword(password, user.passwordHash);
+      if (!ok) {
         res.status(401).json({ error: 'Email ou senha incorretos' });
         return;
       }
@@ -151,6 +152,16 @@ export function registerAuthRoutes(app: Express) {
       if (!user.approved) {
         res.status(403).json({ error: 'Sua conta ainda não foi aprovada por um administrador.', code: 'PENDING_APPROVAL' });
         return;
+      }
+
+      // Migração transparente: hashes legados (bcrypt) → argon2 ao logar
+      if (needsRehash) {
+        try {
+          const newHash = await hashPassword(password);
+          await updateUserPassword(user.id, newHash);
+        } catch (e) {
+          console.warn('[Auth] Falha ao migrar hash para argon2 (login continua OK)', String(e));
+        }
       }
 
       await updateUserLastSignedIn(user.id);

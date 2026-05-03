@@ -6897,8 +6897,8 @@ export const appRouter = router({
         const user = await getUserById(ctx.user.id);
         if (!user) throw new Error('Usuário não encontrado');
         if (user.passwordHash) {
-          const valid = await comparePassword(input.currentPassword, user.passwordHash);
-          if (!valid) throw new Error('Senha atual incorreta');
+          const { ok } = await comparePassword(input.currentPassword, user.passwordHash);
+          if (!ok) throw new Error('Senha atual incorreta');
         }
         const hash = await hashPassword(input.newPassword);
         await updateUserPassword(ctx.user.id, hash);
