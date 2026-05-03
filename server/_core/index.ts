@@ -813,19 +813,30 @@ async function startServer() {
       <body><div class="box"><h2>📷 Importar Fotos (zip remoto)</h2>
         <label>URL do .zip</label>
         <input type="text" id="url" placeholder="http://host.example.com/fotos.zip">
-        <button id="b">Baixar e extrair</button>
+        <button id="bd" style="background:#475569;margin-top:.5rem">📋 Listar conteúdo (dry run)</button>
+        <button id="b">⬇️ Baixar e extrair</button>
         <div id="status"></div>
         <script>
-          const u=document.getElementById('url'),b=document.getElementById('b'),s=document.getElementById('status');
-          b.onclick=async()=>{if(!u.value)return;b.disabled=true;s.textContent='⏳ Baixando e extraindo (pode demorar alguns minutos)…';s.style.color='#aaa';
+          const u=document.getElementById('url'),b=document.getElementById('b'),bd=document.getElementById('bd'),s=document.getElementById('status');
+          async function run(dry){
+            if(!u.value)return;b.disabled=true;bd.disabled=true;
+            s.textContent= dry ? '⏳ Baixando para listar…' : '⏳ Baixando e extraindo (pode demorar)…';
+            s.style.color='#aaa';
             try{
-              const r=await fetch('/admin/import-photos?secret=${encodeURIComponent(ENV.jwtSecret)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u.value})});
+              const r=await fetch('/admin/import-photos?secret=${encodeURIComponent(ENV.jwtSecret)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u.value,dryRun:dry})});
               const j=await r.json();
-              s.textContent=r.ok?'✅ '+j.message:'❌ '+j.error;
-              s.style.color=r.ok?'#4ade80':'#f87171';
+              if(r.ok){
+                let txt='✅ '+j.message;
+                if(j.zipEntries) txt+='\\n\\nTotal no zip: '+j.zipEntries;
+                if(j.sample) txt+='\\n\\nAmostra:\\n'+j.sample.join('\\n');
+                if(j.sampleSkipped&&j.sampleSkipped.length) txt+='\\n\\nIgnorados (amostra):\\n'+j.sampleSkipped.join('\\n');
+                s.textContent=txt;s.style.color='#4ade80';
+              }else{ s.textContent='❌ '+j.error;s.style.color='#f87171'; }
             }catch(e){s.textContent='❌ '+e.message;s.style.color='#f87171';}
-            finally{b.disabled=false;}
-          };
+            finally{b.disabled=false;bd.disabled=false;}
+          }
+          bd.onclick=()=>run(true);
+          b.onclick=()=>run(false);
         </script></div></body></html>`);
     });
 
@@ -835,6 +846,7 @@ async function startServer() {
         return;
       }
       const url = req.body?.url as string | undefined;
+      const dryRun = req.body?.dryRun === true;
       if (!url || !/^https?:\/\//.test(url)) {
         res.status(400).json({ error: "URL inválida" });
         return;
@@ -856,23 +868,66 @@ async function startServer() {
           return;
         }
 
-        // 3) Detectar prefixo: se primeira entrada começa com 'uploads/', extrai em /app
-        // senão, extrai em /app/uploads
-        const firstName = entries[0].name;
-        const baseDest = firstName.startsWith('uploads/') ? '/app' : '/app/uploads';
+        // 3) Mapear cada entry para um destino dentro de /app/uploads
+        //    - Procura "plant-photos/" no path → usa daí em diante
+        //    - Senão, se é arquivo de imagem na raiz, usa basename em plant-photos/
+        //    - Senão, ignora
+        const UPLOADS_DIR = "/app/uploads";
+        const plan: { src: string; dest: string }[] = [];
+        const skipped: string[] = [];
+        for (const entry of entries) {
+          const name = entry.name.replace(/\\/g, '/').replace(/\.\./g, '');
+          if (name.startsWith('__MACOSX/') || name.endsWith('.DS_Store')) {
+            skipped.push(name);
+            continue;
+          }
+          // Se contém "plant-photos/", extrai a partir daí preservando subdir
+          const idx = name.toLowerCase().indexOf('plant-photos/');
+          if (idx >= 0) {
+            const rel = name.slice(idx);  // ex: plant-photos/foo.jpg
+            plan.push({ src: name, dest: path.join(UPLOADS_DIR, rel) });
+            continue;
+          }
+          // Se contém "uploads/" extrai relativo a essa pasta
+          const idxU = name.toLowerCase().indexOf('uploads/');
+          if (idxU >= 0) {
+            const rel = name.slice(idxU + 'uploads/'.length); // sem 'uploads/'
+            plan.push({ src: name, dest: path.join(UPLOADS_DIR, rel) });
+            continue;
+          }
+          // Imagem na raiz → assume plant-photos
+          if (/\.(jpe?g|png|webp|gif|heic)$/i.test(name)) {
+            plan.push({ src: name, dest: path.join(UPLOADS_DIR, 'plant-photos', path.basename(name)) });
+            continue;
+          }
+          skipped.push(name);
+        }
 
-        // 4) Extrair preservando estrutura
+        if (dryRun) {
+          res.json({
+            message: `${plan.length} arquivos serão extraídos, ${skipped.length} ignorados`,
+            zipEntries: entries.length,
+            sample: plan.slice(0, 5).map(p => `${p.src} → ${p.dest}`),
+            sampleSkipped: skipped.slice(0, 5),
+          });
+          return;
+        }
+
+        // 4) Extrair
         let count = 0;
         for (const entry of entries) {
-          const safe = entry.name.replace(/\.\./g, '');     // sanitize
-          const dest = path.join(baseDest, safe);
-          // garante diretório
-          await fsp.mkdir(path.dirname(dest), { recursive: true });
+          const item = plan.find(p => p.src === entry.name);
+          if (!item) continue;
+          await fsp.mkdir(path.dirname(item.dest), { recursive: true });
           const data = await entry.async("nodebuffer");
-          await fsp.writeFile(dest, data);
+          await fsp.writeFile(item.dest, data);
           count++;
         }
-        res.json({ message: `${count} arquivos extraídos em ${baseDest}` });
+        res.json({
+          message: `${count} arquivos extraídos em ${UPLOADS_DIR}`,
+          skipped: skipped.length,
+          sample: plan.slice(0, 3).map(p => p.dest),
+        });
       } catch (err: any) {
         console.error("[import-photos]", err);
         res.status(500).json({ error: err.message });
