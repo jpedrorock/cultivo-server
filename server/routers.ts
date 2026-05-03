@@ -4048,7 +4048,7 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
 
-        let conditions = [];
+        const conditions = [];
 
         // Filter by group
         if (ctx.user.groupId != null) {
@@ -4072,7 +4072,7 @@ export const appRouter = router({
           conditions.push(eq(plants.strainId, input.strainId));
         }
 
-        let query = database.select().from(plants).where(and(...conditions));
+        const query = database.select().from(plants).where(and(...conditions));
         
         const plantsList = await query as any;
 
@@ -4948,7 +4948,7 @@ export const appRouter = router({
               eq(plants.status, "DEAD")
             );
 
-        let query = database
+        const query = database
           .select()
           .from(plants)
           .where(and(statusCondition, eq(plants.groupId, ctx.user.groupId)))

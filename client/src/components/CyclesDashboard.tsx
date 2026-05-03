@@ -52,7 +52,7 @@ export function CyclesDashboard() {
           let phaseBg = 'bg-green-500/10';
           let phaseBorder = 'border-green-500/30';
           let phaseProgressBg = 'bg-green-500/20';
-          let phaseProgressBar = '';
+          const phaseProgressBar = '';
           let phaseProgressStyle: React.CSSProperties = {
             background: 'linear-gradient(90deg, #34d399, #22c55e, #16a34a)',
             boxShadow: '0 0 8px rgba(34,197,94,0.7), 0 0 18px rgba(34,197,94,0.3)',

@@ -371,7 +371,7 @@ export default function PlantNodeMap({
     if (compact) return;
     // Ao desmontar o modo fullscreen: salva silenciosamente
     return () => { saveFnRef.current(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [compact]);
 
   // ── Load ────────────────────────────────────────────────────────────────────

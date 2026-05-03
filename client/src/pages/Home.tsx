@@ -14,11 +14,8 @@ import { FinishCloningDialog } from "@/components/FinishCloningDialog";
 import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
 import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
 import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AnimatedButton } from "@/components/AnimatedButton";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -31,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, Bot, ClipboardList, Circle, Menu } from "lucide-react";
+import { Loader2, Sprout, Droplets, ThermometerSun, Wind, CheckCircle2, CheckCircle, Bell, Trash2, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, ClipboardList, Circle, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
@@ -40,8 +37,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { startMissingReadingsMonitor, getNotificationPermission } from "@/lib/notifications";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import { countPendingLogs, syncPendingLogs, onConnectionRestored } from "@/lib/offlineStorage";
-import { PageTransition, StaggerList, ListItemAnimation, CardAnimation, AnimatedCounter } from "@/components/PageTransition";
-import { SkeletonLoader } from "@/components/SkeletonLoader";
+import { PageTransition, StaggerList, ListItemAnimation, AnimatedCounter } from "@/components/PageTransition";
 import { TentCardSkeleton } from "@/components/TentCardSkeleton";
 import { ErrorState } from "@/components/ErrorState";
 
@@ -1075,13 +1071,13 @@ function MiniSparkline({
 }
 
 // Separate component for Tent Card
-function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlora, onInitiateCycle, onEditCycle, onFinalizeCycle, onEditTent, onDeleteTent }: any) {
+function TentCard({ tent, cycle, PhaseIcon, onInitiateCycle, onEditCycle, onFinalizeCycle, onEditTent, onDeleteTent }: any) {
   const [, navigate] = useLocation();
 
   const [selectMotherOpen, setSelectMotherOpen] = useState(false);
   const [selectedMotherId, setSelectedMotherId] = useState<number | null>(null);
   const [selectedMotherName, setSelectedMotherName] = useState<string>("");
-  const [selectedClonesCount, setSelectedClonesCount] = useState<number>(10);
+  const [selectedClonesCount] = useState<number>(10);
   const [finishCloningOpen, setFinishCloningOpen] = useState(false);
   const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
   const [harvestQueueOpen, setHarvestQueueOpen] = useState(false);
@@ -1125,30 +1121,10 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
     onSuccess: () => utils.tasks.getCurrentWeekTasks.invalidate(),
   });
 
-  // Buscar targets ideais - usa média das strains das plantas na estufa
-  const currentWeek = cycle ? (() => {
-    const now = new Date();
-    const start = new Date(cycle.startDate);
-    if (isNaN(start.getTime())) return null;
-    const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-    if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
-      return Math.max(1, Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-    }
-    return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-  })() : null;
-  
-  const currentPhase = cycle ? (cycle.floraStartDate ? "FLORA" : "VEGA") : null;
-  
-  const { data: targets } = trpc.weeklyTargets.getTargetsByTent.useQuery(
-    { tentId: tent.id, phase: currentPhase! as any, weekNumber: currentWeek! },
-    { enabled: !!cycle && !!currentPhase && !!currentWeek }
-  );
-
   const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
     { tentId: tent.id },
     { staleTime: 2 * 60 * 1000 }
   );
-  const markAllSeen = trpc.alerts.markAllAsSeen.useMutation();
   const newAlerts = alertCount != null ? Number(alertCount) : 0;
 
   const { data: streak } = trpc.dailyLogs.streak.useQuery(
@@ -1157,7 +1133,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   );
 
   // Leitura do sensor SmartLife para badge automático
-  const { data: sensorReading, refetch: refetchSensor } = trpc.tuya.getLatestReadingForTent.useQuery(
+  const { data: sensorReading } = trpc.tuya.getLatestReadingForTent.useQuery(
     { tentId: tent.id },
     { staleTime: 5 * 60 * 1000, retry: false }
   );
@@ -1203,7 +1179,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   const currentVpd = liveVpd ?? (lastLogVpd ?? null);
 
   // Função para determinar cor baseada no valor e target
-  const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
+  const _getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
     if (!value || !min || !max) return "text-foreground";
     
     // Converter strings para números
@@ -1231,7 +1207,7 @@ function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlor
   };
 
   // Função para determinar ícone de status
-  const getStatusIcon = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
+  const _getStatusIcon = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
     if (!value || !min || !max) return null;
     
     const minNum = typeof min === 'string' ? parseFloat(min) : min;

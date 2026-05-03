@@ -383,7 +383,7 @@ export async function getAlerts(tentId?: number, status?: "NEW" | "SEEN"): Promi
   const db = await getDb();
   if (!db) return [];
   
-  let conditions = [];
+  const conditions = [];
   if (tentId) conditions.push(eq(alerts.tentId, tentId));
   if (status) conditions.push(eq(alerts.status, status));
   

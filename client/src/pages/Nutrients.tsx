@@ -484,7 +484,7 @@ export default function Nutrients() {
       const weeks = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
       setWeek(weeks);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [activeCycles, effectiveTentId]);
 
   const applications = trpc.nutrients.listApplications.useQuery(

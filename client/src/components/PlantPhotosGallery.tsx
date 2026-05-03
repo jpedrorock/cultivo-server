@@ -58,7 +58,7 @@ async function downloadPhotoWithExif(
       // Dynamic import to avoid CJS module breaking React singleton in Vite
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const piexifMod: any = await import('piexifjs');
       const piexif = piexifMod.default ?? piexifMod;
 
