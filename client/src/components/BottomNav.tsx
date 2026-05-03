@@ -407,14 +407,9 @@ export function BottomNav() {
                 ) : (
                   <div className="space-y-2 max-h-72 overflow-y-auto pb-2">
                     {activePlants.map((plant: any) => (
-                      <button
+                      <div
                         key={plant.id}
-                        onClick={() => {
-                          triggerHapticFeedback();
-                          setTrainingPickerOpen(false);
-                          navigate(`/plants/${plant.id}/training?sandbox=1`);
-                        }}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
+                        className="flex items-center gap-2 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors"
                       >
                         <span className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-emerald-500">
                           {(plant.name ?? '?')[0].toUpperCase()}
@@ -425,8 +420,29 @@ export function BottomNav() {
                             <p className="text-xs text-muted-foreground truncate">{plant.strain}</p>
                           )}
                         </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />
-                      </button>
+                        <button
+                          onClick={() => {
+                            triggerHapticFeedback();
+                            setTrainingPickerOpen(false);
+                            navigate(`/plants/${plant.id}/training?sandbox=1&view=top`);
+                          }}
+                          className="px-2.5 h-7 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          title="Editar em 2D (vista de cima)"
+                        >
+                          2D
+                        </button>
+                        <button
+                          onClick={() => {
+                            triggerHapticFeedback();
+                            setTrainingPickerOpen(false);
+                            navigate(`/plants/${plant.id}/training?sandbox=1&view=3d`);
+                          }}
+                          className="px-2.5 h-7 rounded-md text-[11px] font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          title="Editar em 3D"
+                        >
+                          3D
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

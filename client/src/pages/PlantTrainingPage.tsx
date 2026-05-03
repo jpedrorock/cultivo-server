@@ -64,9 +64,12 @@ export default function PlantTrainingPage() {
     onError: (e) => toast.error(`Erro ao apagar histórico: ${e.message}`),
   });
   // Auto-abre o sandbox se navegou com ?sandbox=1 (ex: via quick log)
-  const autoSandbox = new URLSearchParams(window.location.search).get('sandbox') === '1';
+  // ?view=3d ou ?view=2d (top) define a vista inicial
+  const _qs = new URLSearchParams(window.location.search);
+  const autoSandbox = _qs.get('sandbox') === '1';
+  const initialView: 'top' | '3d' = _qs.get('view') === '3d' ? '3d' : 'top';
   const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
-  const [viewMode,         setViewMode]         = useState<'top' | '3d'>('top');
+  const [viewMode,         setViewMode]         = useState<'top' | '3d'>(initialView);
   const [topViewNodes,     setTopViewNodes]     = useState<PlantGraphNode[]>([]);
   // Tamanho do vaso em litros — persistido em localStorage por planta
   const [potSizeL, setPotSizeL] = useState<number>(() => {
@@ -321,6 +324,15 @@ export default function PlantTrainingPage() {
                   <p className="text-xs text-muted-foreground truncate">{plant.name}</p>
                 )}
               </div>
+              {/* Toggle 2D/3D dentro do fullscreen */}
+              <button
+                onClick={() => setViewMode(viewMode === '3d' ? 'top' : '3d')}
+                className="h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors shrink-0"
+                title={`Trocar para ${viewMode === '3d' ? '2D' : '3D'}`}
+              >
+                {viewMode === '3d' ? <Boxes className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
+                <span>{viewMode === '3d' ? '3D' : '2D'}</span>
+              </button>
               {/* Badge de técnicas aplicadas na sessão */}
               {sessionTechniques.length > 0 && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">

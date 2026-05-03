@@ -789,6 +789,97 @@ async function startServer() {
     });
   }
 
+  // Rota temporária de importação de fotos (zip remoto → /app/uploads)
+  {
+    const JSZip = (await import("jszip")).default;
+    const fsp   = await import("fs/promises");
+
+    app.get("/admin/import-photos", (req, res) => {
+      if (req.query.secret !== ENV.jwtSecret) {
+        res.status(401).send("Unauthorized");
+        return;
+      }
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+        <title>Importar Fotos — Cultivo</title>
+        <style>body{font-family:sans-serif;background:#0d0d0d;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+        .box{background:#1a1a1a;padding:2rem;border-radius:12px;min-width:380px;max-width:90vw}
+        h2{margin:0 0 1.5rem;text-align:center}
+        label{display:block;font-size:.85rem;color:#aaa;margin-bottom:.4rem}
+        input[type=text]{width:100%;background:#0a0a0a;border:1px solid #333;color:#eee;padding:.6rem;border-radius:8px;font-size:.85rem;box-sizing:border-box}
+        button{background:#2563eb;color:#fff;border:none;padding:.75rem 2rem;border-radius:8px;cursor:pointer;font-size:1rem;width:100%;margin-top:1rem}
+        button:disabled{opacity:.5;cursor:not-allowed}
+        #status{margin-top:1rem;font-size:.9rem;text-align:center;white-space:pre-wrap}</style></head>
+      <body><div class="box"><h2>📷 Importar Fotos (zip remoto)</h2>
+        <label>URL do .zip</label>
+        <input type="text" id="url" placeholder="http://host.example.com/fotos.zip">
+        <button id="b">Baixar e extrair</button>
+        <div id="status"></div>
+        <script>
+          const u=document.getElementById('url'),b=document.getElementById('b'),s=document.getElementById('status');
+          b.onclick=async()=>{if(!u.value)return;b.disabled=true;s.textContent='⏳ Baixando e extraindo (pode demorar alguns minutos)…';s.style.color='#aaa';
+            try{
+              const r=await fetch('/admin/import-photos?secret=${encodeURIComponent(ENV.jwtSecret)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u.value})});
+              const j=await r.json();
+              s.textContent=r.ok?'✅ '+j.message:'❌ '+j.error;
+              s.style.color=r.ok?'#4ade80':'#f87171';
+            }catch(e){s.textContent='❌ '+e.message;s.style.color='#f87171';}
+            finally{b.disabled=false;}
+          };
+        </script></div></body></html>`);
+    });
+
+    app.post("/admin/import-photos", express.json(), async (req: any, res) => {
+      if (req.query.secret !== ENV.jwtSecret) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      const url = req.body?.url as string | undefined;
+      if (!url || !/^https?:\/\//.test(url)) {
+        res.status(400).json({ error: "URL inválida" });
+        return;
+      }
+      try {
+        // 1) Baixar o zip
+        const dl = await fetch(url);
+        if (!dl.ok) {
+          res.status(400).json({ error: `Erro ao baixar: HTTP ${dl.status}` });
+          return;
+        }
+        const buf = Buffer.from(await dl.arrayBuffer());
+
+        // 2) Abrir o zip
+        const zip = await JSZip.loadAsync(buf);
+        const entries = Object.values(zip.files).filter(f => !f.dir);
+        if (entries.length === 0) {
+          res.status(400).json({ error: "Zip vazio" });
+          return;
+        }
+
+        // 3) Detectar prefixo: se primeira entrada começa com 'uploads/', extrai em /app
+        // senão, extrai em /app/uploads
+        const firstName = entries[0].name;
+        const baseDest = firstName.startsWith('uploads/') ? '/app' : '/app/uploads';
+
+        // 4) Extrair preservando estrutura
+        let count = 0;
+        for (const entry of entries) {
+          const safe = entry.name.replace(/\.\./g, '');     // sanitize
+          const dest = path.join(baseDest, safe);
+          // garante diretório
+          await fsp.mkdir(path.dirname(dest), { recursive: true });
+          const data = await entry.async("nodebuffer");
+          await fsp.writeFile(dest, data);
+          count++;
+        }
+        res.json({ message: `${count} arquivos extraídos em ${baseDest}` });
+      } catch (err: any) {
+        console.error("[import-photos]", err);
+        res.status(500).json({ error: err.message });
+      }
+    });
+  }
+
   // tRPC API
   app.use(
     "/api/trpc",
