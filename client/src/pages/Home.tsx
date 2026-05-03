@@ -399,7 +399,7 @@ export default function Home() {
   }
 
   const getTentCycle = (tentId: number) => {
-    return activeCycles?.find((c) => c.tentId === tentId);
+    return activeCycles?.find((c: any) => c.tentId === tentId);
   };
 
   const getPhaseInfo = (category: string, cycle: any) => {

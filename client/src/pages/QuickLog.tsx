@@ -190,7 +190,7 @@ export default function QuickLog() {
     { status: "ACTIVE" },
     {
       enabled: !!tentId && currentStep >= 9,
-      select: (data) => data.filter(p => p.currentTentId === tentId)
+      select: (data) => data.filter((p: any) => p.currentTentId === tentId)
     }
   );
 
@@ -798,7 +798,7 @@ export default function QuickLog() {
                     /* Círculo normal com gradiente animado */
                     <motion.div
                       className="w-32 h-32 rounded-full flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]"
-                      animate={getCircleStyle()}
+                      animate={getCircleStyle() as any}
                       transition={{ duration: 0.45, ease: "easeInOut" }}
                     >
                       <currentStepData.icon className="w-16 h-16 text-white" />
@@ -1110,9 +1110,10 @@ export default function QuickLog() {
                   <div className="space-y-4 pt-4">
                     <div>
                       <BigStepper
-                        value={luxValue}
+                        value={String(luxValue)}
                         onChange={(val) => {
-                          const v = Math.min(100000, Math.max(0, val));
+                          const num = parseFloat(val) || 0;
+                          const v = Math.min(100000, Math.max(0, num));
                           setLuxValue(v);
                           setPpfd(Math.round(v * 0.0185));
                         }}

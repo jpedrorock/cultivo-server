@@ -338,7 +338,7 @@ export default function Backup() {
                 setImportConfirm(false);
                 setIsImporting(true);
                 try {
-                  await importBackup.mutateAsync(pendingFile);
+                  await importBackup.mutateAsync(pendingFile as any);
                 } catch (e) {
                   // handled by onError
                 }

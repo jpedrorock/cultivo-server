@@ -135,7 +135,7 @@ export default function PlantPhotosTab({ plantId }: Props) {
     return () => el.removeEventListener("touchmove", onMove);
   }, [scale]);
 
-  const getPinchDist = (t: TouchList) => {
+  const getPinchDist = (t: React.TouchList) => {
     const dx = t[0].clientX - t[1].clientX;
     const dy = t[0].clientY - t[1].clientY;
     return Math.sqrt(dx * dx + dy * dy);

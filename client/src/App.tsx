@@ -56,7 +56,6 @@ const DisplayMode          = lazy(() => import("./pages/DisplayMode"));
 const MorningCheck         = lazy(() => import("./pages/MorningCheck"));
 const PlantChat            = lazy(() => import("./pages/PlantChat"));
 const TuyaSettings         = lazy(() => import("./pages/TuyaSettings"));
-const Dispositivos         = lazy(() => import("./pages/Dispositivos"));
 const SmartLife            = lazy(() => import("./pages/SmartLife"));
 // QuickLog removido daqui — agora é eager (import estático acima)
 
@@ -91,7 +90,6 @@ function Router() {
         <Route path={"/settings/notifications"} component={NotificationSettings} />
         <Route path={"/settings/alerts"} component={AlertSettings} />
         <Route path={"/settings/sensors"} component={TuyaSettings} />
-        <Route path={"/settings/dispositivos"} component={Dispositivos} />
         <Route path={"/smartlife"} component={SmartLife} />
         <Route path={"/alerts/history"} component={AlertHistory} />
         <Route path={"/strains/:id/targets"} component={StrainTargets} />

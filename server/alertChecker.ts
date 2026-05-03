@@ -210,7 +210,7 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
 
   // Chave = "METRIC_HIGH" ou "METRIC_LOW" — deriva direção do valor vs targetMax
   const recentMetrics = new Set(
-    recentAlerts.map(a => {
+    recentAlerts.map((a: any) => {
       const v = parseFloat(a.value);
       const tMax = a.targetMax ? parseFloat(a.targetMax) : null;
       const dir = tMax !== null && v > tMax ? "HIGH" : "LOW";

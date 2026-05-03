@@ -60,7 +60,6 @@ export default function Settings() {
             <ListItemAnimation>
               <SettingsSection title="Integrações">
                 <SettingsRow href="/smartlife" icon={<Wifi className="w-4 h-4" />} label="SmartLife / Tuya" description="Dispositivos, cenas e sensores" />
-                <SettingsRow href="/settings/dispositivos" icon={<Cpu className="w-4 h-4" />} label="Dispositivos ESP32" description="Tokens de acesso para displays e sensores" />
               </SettingsSection>
             </ListItemAnimation>
 

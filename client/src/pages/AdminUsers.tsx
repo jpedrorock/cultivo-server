@@ -45,8 +45,8 @@ export default function AdminUsers() {
     return null;
   }
 
-  const approvedUsers = users?.filter(u => u.approved) ?? [];
-  const pendingUsers = users?.filter(u => !u.approved) ?? [];
+  const approvedUsers = users?.filter((u: any) => u.approved) ?? [];
+  const pendingUsers = users?.filter((u: any) => !u.approved) ?? [];
 
   const handleDelete = (userId: number, email: string) => {
     setDeleteConfirm({ userId, email });
@@ -116,7 +116,7 @@ export default function AdminUsers() {
           ) : tab === 'approved' ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground mb-4">{approvedUsers.length} usuário(s) aprovado(s)</p>
-              {approvedUsers.map(u => (
+              {approvedUsers.map((u: any) => (
                 <Card key={u.id}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -179,7 +179,7 @@ export default function AdminUsers() {
               ) : (
                 <>
                   <p className="text-sm text-muted-foreground mb-4">{pendingUsers.length} usuário(s) aguardando aprovação</p>
-                  {pendingUsers.map(u => (
+                  {pendingUsers.map((u: any) => (
                     <Card key={u.id} className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/10">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">

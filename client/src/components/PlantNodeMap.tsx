@@ -213,6 +213,7 @@ function NodeActionMenu({
           <div className="py-1.5">
             {mainActions.map(action => {
               const meta = ACTION_META[action];
+              if (!meta) return null;
               const Icon = meta.Icon;
               return (
                 <button
@@ -324,7 +325,7 @@ export default function PlantNodeMap({
 
   const utils = trpc.useUtils();
   const { data: saved } = trpc.plantStructure.get.useQuery(
-    { plantId },
+    { plantId: plantId! },
     { enabled: !!plantId, refetchOnWindowFocus: false },
   );
   const saveMutation = trpc.plantStructure.save.useMutation({
@@ -640,7 +641,7 @@ export default function PlantNodeMap({
         const newDist  = Math.hypot(g.ptrs[idx].x - other.x, g.ptrs[idx].y - other.y);
         if (oldDist < 1) return;
         const ratio = newDist / oldDist;
-        const rect  = el.getBoundingClientRect();
+        const rect  = el!.getBoundingClientRect();
         const cx    = (g.ptrs[0].x + g.ptrs[1].x) / 2 - rect.left;
         const cy    = (g.ptrs[0].y + g.ptrs[1].y) / 2 - rect.top;
         setVP(v => {
@@ -675,7 +676,7 @@ export default function PlantNodeMap({
 
     function onWheel(e: WheelEvent) {
       e.preventDefault();
-      const rect   = el.getBoundingClientRect();
+      const rect   = el!.getBoundingClientRect();
       const cx     = e.clientX - rect.left;
       const cy     = e.clientY - rect.top;
       const factor = e.deltaY < 0 ? 1.13 : 1 / 1.13;

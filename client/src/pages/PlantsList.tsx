@@ -215,7 +215,7 @@ export default function PlantsList() {
   const phaseOrder: Record<string, number> = { FLORA: 0, VEGA: 1, CLONING: 2, SEEDLING: 3, MAINTENANCE: 4 };
 
   const filteredPlants = useMemo(() => {
-    const filtered = plants?.filter((plant) =>
+    const filtered = plants?.filter((plant: any) =>
       plant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       plant.code?.toLowerCase().includes(searchTerm.toLowerCase())
     ) ?? [];
@@ -1020,7 +1020,7 @@ export default function PlantsList() {
             </div>
 
             {/* Actions — grid of cells with dividers */}
-            <div className="flex" style={{ divideColor: 'rgba(255,255,255,0.05)' }}>
+            <div className="flex">
               {/* Promover (condicional) */}
               {filteredPlants?.filter(p => selectedPlants.has(p.id)).every(p => p.plantStage === "SEEDLING") && (
                 <button

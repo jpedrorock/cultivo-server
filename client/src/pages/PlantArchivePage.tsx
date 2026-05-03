@@ -319,9 +319,9 @@ export default function PlantArchivePage() {
 
   const stats = {
     total: archivedPlants?.length || 0,
-    harvested: archivedPlants?.filter((p) => p.status === "HARVESTED").length || 0,
-    discarded: archivedPlants?.filter((p) => p.status === "DISCARDED").length || 0,
-    dead: archivedPlants?.filter((p) => p.status === "DEAD").length || 0,
+    harvested: archivedPlants?.filter((p: any) => p.status === "HARVESTED").length || 0,
+    discarded: archivedPlants?.filter((p: any) => p.status === "DISCARDED").length || 0,
+    dead: archivedPlants?.filter((p: any) => p.status === "DEAD").length || 0,
   };
 
   return (
@@ -404,7 +404,7 @@ export default function PlantArchivePage() {
             </div>
           ) : archivedPlants && archivedPlants.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {archivedPlants.map((plant) => (
+              {archivedPlants.map((plant: any) => (
                 <Card key={plant.id} className="overflow-hidden">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">

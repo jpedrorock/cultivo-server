@@ -326,7 +326,7 @@ function GroupCard() {
         <div>
           <p className="text-xs text-muted-foreground mb-2">{group.members.length} membro(s)</p>
           <div className="space-y-1.5">
-            {group.members.map(m => (
+            {group.members.map((m: any) => (
               <div key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50">
                 <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
                   <span className="text-white text-xs font-bold">{(m.name || m.email).charAt(0).toUpperCase()}</span>
@@ -412,7 +412,7 @@ function AiSettingsCard() {
 
   const [provider, setProvider] = useState<Provider>('gemini');
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState(PROVIDER_MODELS.gemini.models[0]);
+  const [model, setModel] = useState<string>(PROVIDER_MODELS.gemini.models[0]);
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 

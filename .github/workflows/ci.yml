@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Lint + build são obrigatórios — bloqueiam merge se falharem
+  # Lint + typecheck + build — todos obrigatórios, bloqueiam merge se falharem
   build:
-    name: Lint & Build
+    name: Lint, Type check & Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,31 +32,12 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Type check
+        run: pnpm check
+
       - name: Build
         run: pnpm build
         env:
           # Build não precisa de DB real — db-migrate.mjs sai cedo se DATABASE_URL vazio
           DATABASE_URL: ""
           JWT_SECRET: "ci-build-only-not-secret"
-
-  # Type check é advisory por enquanto (existem ~77 erros legados a limpar)
-  # Não bloqueia merge mas fica visível em cada PR
-  typecheck:
-    name: Type Check (advisory)
-    runs-on: ubuntu-latest
-    continue-on-error: true     # warning, não erro
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check
-        run: pnpm check

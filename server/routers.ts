@@ -1178,7 +1178,7 @@ export const appRouter = router({
         
         // Tudo dentro de uma transação — se qualquer delete falhar,
         // o banco volta ao estado original automaticamente.
-        await database.transaction(async (tx) => {
+        await database.transaction(async (tx: any) => {
           await tx.delete(dailyLogs).where(eq(dailyLogs.tentId, input.id));
           await tx.delete(taskInstances).where(eq(taskInstances.tentId, input.id));
           await tx.delete(cycles).where(eq(cycles.tentId, input.id));
@@ -1366,7 +1366,7 @@ export const appRouter = router({
         .from(cycles)
         .leftJoin(tents, eq(cycles.tentId, tents.id))
         .where(eq(cycles.status, "ACTIVE"));
-      return allCycles.filter(c =>
+      return allCycles.filter((c: any) =>
         ctx.user.groupId == null || c.tentGroupId == null || c.tentGroupId === ctx.user.groupId
       );
     }),
@@ -1402,7 +1402,7 @@ export const appRouter = router({
         .where(groupConditions);
 
       // Filtrar pelo grupo do usuário
-      const filtered = activeCycles.filter(c =>
+      const filtered = activeCycles.filter((c: any) =>
         ctx.user.groupId == null || c.tentGroupId == null || c.tentGroupId === ctx.user.groupId
       );
       
@@ -2659,7 +2659,7 @@ export const appRouter = router({
           return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
         };
 
-        const uniqueDays = Array.from(new Set(rows.map((r: { logDate: Date | string }) => toDay(r.logDate))));
+        const uniqueDays: string[] = Array.from(new Set(rows.map((r: { logDate: Date | string }) => toDay(r.logDate))));
 
         const today = toDay(new Date());
         const yesterday = toDay(new Date(Date.now() - 86400_000));
@@ -2671,8 +2671,14 @@ export const appRouter = router({
         let longest = 0;
         let streak = 0;
 
+        // Sem dias = sem streak
+        const firstDay = uniqueDays[0];
+        if (!firstDay) {
+          return { current, longest, todayDone: false };
+        }
+
         // Construir array de dias consecutivos
-        let refDay = new Date(uniqueDays[0]);
+        let refDay = new Date(firstDay);
         for (const day of uniqueDays) {
           const refStr = toDay(refDay);
           if (day === refStr) {
@@ -3582,7 +3588,7 @@ export const appRouter = router({
       // 1. Batch-fetch all tents in a single query
       const tentIds = [...new Set(activeCycles.map((c: any) => c.tentId as number))];
       const allTentsArr = await database.select().from(tents).where(inArray(tents.id, tentIds));
-      const tentMap = new Map(allTentsArr.map(t => [t.id, t]));
+      const tentMap = new Map<number, any>(allTentsArr.map((t: any) => [t.id, t]));
 
       const now = new Date();
       const startOfWeek = new Date(now);
@@ -3652,15 +3658,15 @@ export const appRouter = router({
         );
 
       // Build lookup: `${tentId}-${templateId}` → instance
-      const instanceMap = new Map(
-        existingInstances.map(inst => [`${inst.tentId}-${inst.taskTemplateId}`, inst])
+      const instanceMap = new Map<string, any>(
+        existingInstances.map((inst: any) => [`${inst.tentId}-${inst.taskTemplateId}`, inst])
       );
 
       // 5. Determine which instances need to be created (batch insert)
       const toInsert: Array<{ tentId: number; taskTemplateId: number; occurrenceDate: Date; isDone: boolean }> = [];
 
       for (const { cycle, currentPhase, weekNumber, context } of cycleInfos) {
-        const templates = allTemplatesArr.filter(t => {
+        const templates = allTemplatesArr.filter((t: any) => {
           if (t.context !== context || t.phase !== currentPhase) return false;
           if (currentPhase === "MAINTENANCE" || currentPhase === "DRYING") return true;
           return t.weekNumber === weekNumber;
@@ -3693,7 +3699,7 @@ export const appRouter = router({
       // 7. Build final task list
       const allTasks: any[] = [];
       for (const { cycle, tent, currentPhase, weekNumber, context } of cycleInfos) {
-        const templates = allTemplatesArr.filter(t => {
+        const templates = allTemplatesArr.filter((t: any) => {
           if (t.context !== context || t.phase !== currentPhase) return false;
           if (currentPhase === "MAINTENANCE" || currentPhase === "DRYING") return true;
           return t.weekNumber === weekNumber;
@@ -4616,7 +4622,7 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await database.transaction(async (tx) => {
+        await database.transaction(async (tx: any) => {
           await tx.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
           await tx.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
           await tx.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
@@ -5018,7 +5024,7 @@ export const appRouter = router({
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
 
         // Deletar todos os registros relacionados + planta em transação (cascade manual atômico)
-        await database.transaction(async (tx) => {
+        await database.transaction(async (tx: any) => {
           await tx.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
           await tx.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
           await tx.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
@@ -5154,8 +5160,8 @@ export const appRouter = router({
 
         // Unificar com source tag
         const unified = [
-          ...galleryPhotos.map(p => ({ ...p, source: "gallery" as const, cycleId: p.cycleId ?? null, weekNumber: p.weekNumber ?? null, healthStatus: null })),
-          ...healthPhotos.map(p => ({ ...p, source: "health" as const, cycleId: null, weekNumber: null })),
+          ...galleryPhotos.map((p: any) => ({ ...p, source: "gallery" as const, cycleId: p.cycleId ?? null, weekNumber: p.weekNumber ?? null, healthStatus: null })),
+          ...healthPhotos.map((p: any) => ({ ...p, source: "health" as const, cycleId: null, weekNumber: null })),
         ].sort((a, b) => new Date(b.photoDate).getTime() - new Date(a.photoDate).getTime());
 
         return unified;
@@ -5629,7 +5635,7 @@ export const appRouter = router({
           .orderBy(desc(plantLSTLogs.logDate));
 
         // Parse JSON text columns
-        return rows.map((r) => ({
+        return rows.map((r: any) => ({
           ...r,
           techniqueConfig: r.techniqueConfig ? JSON.parse(r.techniqueConfig as string) : null,
           actualResult:    r.actualResult    ? JSON.parse(r.actualResult    as string) : null,
@@ -6436,7 +6442,7 @@ export const appRouter = router({
 
         // Tudo dentro de uma transação: se qualquer operação falhar,
         // o banco volta ao estado original automaticamente.
-        await database.transaction(async (tx) => {
+        await database.transaction(async (tx: any) => {
           // Deletar dados existentes (ordem reversa de dependências)
           await tx.delete(wateringApplications);
           await tx.delete(nutrientApplications);
@@ -7328,11 +7334,11 @@ export const appRouter = router({
               strainName: strain?.name ?? "Desconhecida",
               daysOld, weekNumber, phase,
               tentName: tent?.name ?? "—",
-              avgTemp: avg(envLogs.map(l => l.tempC)),
-              avgRh: avg(envLogs.map(l => l.rhPct)),
-              avgPpfd: avg(envLogs.map(l => l.ppfd)),
-              avgPh: avg(envLogs.map(l => l.ph)),
-              avgEc: avg(envLogs.map(l => l.ec)),
+              avgTemp: avg(envLogs.map((l: any) => l.tempC)),
+              avgRh: avg(envLogs.map((l: any) => l.rhPct)),
+              avgPpfd: avg(envLogs.map((l: any) => l.ppfd)),
+              avgPh: avg(envLogs.map((l: any) => l.ph)),
+              avgEc: avg(envLogs.map((l: any) => l.ec)),
               healthLogs,
             });
           }

@@ -833,7 +833,7 @@ async function startServer() {
           // MySQL 8.0 não aceita DEFAULT não-nulo em colunas TEXT/BLOB/JSON
           .replace(
             /\b(text|blob|longtext|mediumtext|tinytext|json|longblob|mediumblob|tinyblob)\b(\s+NOT NULL)?\s+DEFAULT\s+'[^']*'/gi,
-            (_m, type, notNull) => `${type}${notNull ?? ''} DEFAULT NULL`
+            (_m: string, type: string, notNull: string | undefined) => `${type}${notNull ?? ''} DEFAULT NULL`
           );
         await conn.query(sql);
         await conn.end();
