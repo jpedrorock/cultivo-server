@@ -67,7 +67,12 @@ export default function NotificationSettings() {
     return registerPushSubscription(
       vapidData.publicKey,
       async (sub) => {
-        await subscribeMutation.mutateAsync({ subscription: sub as any });
+        // Detecta o timezone IANA do dispositivo (ex: America/Sao_Paulo)
+        // Garante que lembretes diários disparem na hora local correta.
+        const timezone = typeof Intl !== "undefined"
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : undefined;
+        await subscribeMutation.mutateAsync({ subscription: sub as any, timezone });
       }
     );
   };

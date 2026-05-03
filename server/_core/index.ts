@@ -42,7 +42,7 @@ async function ensurePushSubscriptionsTable() {
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS \`pushSubscriptions\` (
         \`id\`              INT AUTO_INCREMENT PRIMARY KEY,
-        \`endpoint\`        TEXT NOT NULL,
+        \`endpoint\`        VARCHAR(512) NOT NULL UNIQUE,
         \`keysJson\`        TEXT NOT NULL,
         \`reminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0,
         \`reminderTimes\`   TEXT,
@@ -50,6 +50,44 @@ async function ensurePushSubscriptionsTable() {
         \`updatedAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    // Migration incremental: adiciona userId/groupId/timezone (não destrutivo)
+    const [rows]: any = await conn.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pushSubscriptions'`
+    );
+    const existing = new Set(rows.map((r: any) => r.COLUMN_NAME));
+
+    if (!existing.has('userId')) {
+      // Subscriptions antigas (sem userId) viram órfãs e são apagadas — usuário precisa
+      // reaprovar push notifications na próxima visita ao app.
+      // É segurança: hoje TODA subscription antiga recebe TODOS os pushes (vaza dados).
+      const [pre]: any = await conn.execute(`SELECT COUNT(*) as n FROM \`pushSubscriptions\``);
+      const existingCount = pre[0]?.n ?? 0;
+      if (existingCount > 0) {
+        await conn.execute(`DELETE FROM \`pushSubscriptions\``);
+        console.log(`[DB] Removidas ${existingCount} subscription(s) push antigas sem userId — usuários precisarão reaprovar push.`);
+      }
+      await conn.execute(`ALTER TABLE \`pushSubscriptions\` ADD COLUMN \`userId\` INT NOT NULL`);
+      // FK para users.id com cascade — garante limpeza ao apagar usuário
+      try {
+        await conn.execute(`ALTER TABLE \`pushSubscriptions\` ADD CONSTRAINT \`fk_push_user\` FOREIGN KEY (\`userId\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE`);
+      } catch (e: any) {
+        // Se a FK não puder ser criada (tabela users não existe ainda etc.), continua —
+        // a integridade é melhor ter mas não é bloqueante.
+        console.warn(`[DB] Não foi possível criar FK pushSubscriptions.userId → users.id: ${e?.message ?? e}`);
+      }
+      console.log("[DB] Coluna userId adicionada a pushSubscriptions");
+    }
+    if (!existing.has('groupId')) {
+      await conn.execute(`ALTER TABLE \`pushSubscriptions\` ADD COLUMN \`groupId\` INT NULL`);
+      console.log("[DB] Coluna groupId adicionada a pushSubscriptions");
+    }
+    if (!existing.has('timezone')) {
+      await conn.execute(`ALTER TABLE \`pushSubscriptions\` ADD COLUMN \`timezone\` VARCHAR(64) NULL`);
+      console.log("[DB] Coluna timezone adicionada a pushSubscriptions");
+    }
+
     await conn.end();
     console.log("[DB] Tabela pushSubscriptions OK");
   } catch (err: any) {

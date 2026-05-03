@@ -832,10 +832,12 @@ export async function checkAlertsForTent(tentId: number): Promise<{
     if (insertedCount > 0) {
       console.log(`[Alerts] ${insertedCount} alerta(s) registrado(s) para ${tent.name} — visíveis no app`);
 
-      // Push notification — deep link direto para o QuickLog do tent afetado
+      // Push notification — APENAS para o grupo dono da estufa
+      // (estufa sem groupId = visível só ao admin global → usa sendPushToAll? não.
+      //  Decisão: estufa sem groupId NÃO dispara push para evitar vazamento entre grupos.)
       try {
-        const { sendPushToAll, isPushConfigured } = await import("./pushService");
-        if (isPushConfigured()) {
+        const { sendPushToGroup, isPushConfigured } = await import("./pushService");
+        if (isPushConfigured() && tent.groupId != null) {
           const firstAlert = alertsToInsert[0];
           const metricEmoji: Record<string, string> = { TEMP: "🌡️", RH: "💧", PH: "🧪", VPD: "💨", CO2: "🌫️", EC: "⚡" };
           const emoji = metricEmoji[firstAlert?.metric ?? ""] ?? "⚠️";
@@ -843,12 +845,14 @@ export async function checkAlertsForTent(tentId: number): Promise<{
             insertedCount === 1
               ? firstAlert.message
               : `${firstAlert.message} (+${insertedCount - 1} alerta${insertedCount > 2 ? "s" : ""})`;
-          await sendPushToAll({
+          await sendPushToGroup(tent.groupId, {
             title: `${emoji} Alerta — ${tent.name}`,
             body,
             url: `/quick-log?tentId=${tentId}`,
             tag: `alert-tent-${tentId}`,
           });
+        } else if (isPushConfigured() && tent.groupId == null) {
+          console.warn(`[Alerts] Estufa ${tent.name} (id=${tentId}) sem groupId — push não enviado (evita vazamento)`);
         }
       } catch (err) {
         // Push é opcional — nunca bloquear a inserção de alertas

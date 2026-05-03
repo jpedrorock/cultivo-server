@@ -983,6 +983,11 @@ export type InsertWateringApplication = typeof wateringApplications.$inferInsert
  */
 export const pushSubscriptions = mysqlTable("pushSubscriptions", {
   id: int("id").autoincrement().primaryKey(),
+  // Dono da subscription — para isolamento de notificações por usuário
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Grupo do usuário no momento da subscription (cache para queries rápidas)
+  // Pode ficar null se o usuário não estiver em grupo
+  groupId: int("groupId"),
   // Endpoint único da subscription (identifica o dispositivo)
   endpoint: varchar("endpoint", { length: 512 }).notNull().unique(),
   // Chaves da subscription (JSON serializado)
@@ -991,6 +996,8 @@ export const pushSubscriptions = mysqlTable("pushSubscriptions", {
   reminderTimes: text("reminderTimes"),
   // Lembrete diário ativado
   reminderEnabled: boolean("reminderEnabled").default(false).notNull(),
+  // Timezone IANA do dispositivo (ex: "America/Sao_Paulo") — usado para lembretes
+  timezone: varchar("timezone", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

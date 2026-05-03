@@ -90,9 +90,9 @@ export function registerAuthRoutes(app: Express) {
       });
 
       if (!isFirst) {
-        // Notificar admins via push notification (fire-and-forget)
-        import('../pushService').then(({ sendPushToAll }) => {
-          sendPushToAll({
+        // Notificar APENAS admins via push notification (fire-and-forget)
+        import('../pushService').then(({ sendPushToAdmins }) => {
+          sendPushToAdmins({
             title: 'Novo usuário aguardando aprovação',
             body: `${name || email} solicitou acesso ao app Cultivo`,
             url: '/settings',

@@ -6736,13 +6736,19 @@ export const appRouter = router({
           }),
           reminderEnabled: z.boolean().optional(),
           reminderTimes: z.array(z.string()).optional(),
+          timezone: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         await saveSubscription(
           input.subscription as any,
-          input.reminderEnabled,
-          input.reminderTimes
+          ctx.user.id,
+          ctx.user.groupId ?? null,
+          {
+            reminderEnabled: input.reminderEnabled,
+            reminderTimes: input.reminderTimes,
+            timezone: input.timezone,
+          },
         );
         return { success: true };
       }),
@@ -6795,13 +6801,12 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Enviar notificação de teste
-    sendTest: protectedProcedure.mutation(async () => {
+    // Enviar notificação de teste — APENAS para o usuário autenticado
+    sendTest: protectedProcedure.mutation(async ({ ctx }) => {
       if (!isPushConfigured()) {
         throw new Error("Web Push não configurado. Adicione VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no .env");
       }
-      const { sendPushToAll } = await import("./pushService");
-      await sendPushToAll({
+      await sendPushToUser(ctx.user.id, {
         title: "🧪 Teste — App Cultivo",
         body: "Notificações Push funcionando! Toque para registrar. 🌱",
         url: "/quick-log",
