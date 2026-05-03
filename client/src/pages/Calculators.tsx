@@ -6,14 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, Droplets, Sprout, Sun, Download, AlertCircle, CheckCircle2, Target, Lightbulb, AlertTriangle, BarChart2, ClipboardList } from "lucide-react";
+import { Calculator, Droplets, Download, AlertCircle, CheckCircle2, Target, Lightbulb } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PageTransition } from "@/components/PageTransition";
-import { RangeSlider } from "@/components/ui/range-slider";
 import { CalcSlider } from "@/components/ui/calc-slider";
 
-// Funções de exportação de receitas
-function exportIrrigationRecipe(potVolume: string, substrate: string, result: { volume: number; frequency: string }) {
+// Funções de exportação de receitas (não usadas atualmente, mantidas para futuro)
+function _exportIrrigationRecipe(potVolume: string, substrate: string, result: { volume: number; frequency: string }) {
   const substrateNames: Record<string, string> = {
     soil: "Solo/Terra",
     coco: "Fibra de Coco",
@@ -45,7 +44,7 @@ para evitar acúmulo de sais.
   downloadTextFile(content, `receita-rega-${Date.now()}.txt`);
 }
 
-function exportFertilizationRecipe(waterVolume: string, targetEC: string, result: { calciumNitrate: number; potassiumNitrate: number; mkp: number; magnesiumSulfate: number; micronutrients: number; totalPPM: number }) {
+function _exportFertilizationRecipe(waterVolume: string, targetEC: string, result: { calciumNitrate: number; potassiumNitrate: number; mkp: number; magnesiumSulfate: number; micronutrients: number; totalPPM: number }) {
   const content = `
 ===========================================
    RECEITA DE FERTILIZAÇÃO - APP CULTIVO
