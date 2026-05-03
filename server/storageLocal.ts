@@ -13,21 +13,26 @@
  *
  * As imagens são servidas como arquivos estáticos via Express:
  *   GET /uploads/plant-photos/123456.jpg
+ *
+ * Implementação 100% async (fs/promises) — `writeFileSync` no path quente
+ * de upload bloqueava o event loop e degradava throughput sob carga.
+ * Apenas `initializeStorageDirectories` segue síncrono pois roda 1x no boot
+ * antes do servidor aceitar conexões.
  */
 
 import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
 
 // Diretório base para uploads (relativo à raiz do projeto)
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 
 /**
- * Garante que o diretório de uploads (e subdiretórios) existe
+ * Garante que o diretório existe (async).
+ * mkdir com recursive=true é idempotente — não falha se já existir.
  */
-function ensureDirExists(dirPath: string): void {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
+async function ensureDirExistsAsync(dirPath: string): Promise<void> {
+  await fsp.mkdir(dirPath, { recursive: true });
 }
 
 /**
@@ -47,13 +52,14 @@ function normalizeKey(relKey: string): string {
 export async function storageLocalPut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = 'application/octet-stream'
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _contentType = 'application/octet-stream'
 ): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
   const filePath = path.join(UPLOADS_DIR, key);
 
   // Criar diretórios intermediários se não existirem
-  ensureDirExists(path.dirname(filePath));
+  await ensureDirExistsAsync(path.dirname(filePath));
 
   // Converter dados para Buffer se necessário
   let buffer: Buffer;
@@ -65,8 +71,8 @@ export async function storageLocalPut(
     buffer = data;
   }
 
-  // Salvar arquivo no disco
-  fs.writeFileSync(filePath, buffer);
+  // Salvar arquivo no disco — async, não bloqueia event loop
+  await fsp.writeFile(filePath, buffer);
 
   console.log(`[StorageLocal] Saved: ${key} (${buffer.length} bytes)`);
 
@@ -97,11 +103,15 @@ export async function storageLocalDelete(relKey: string): Promise<void> {
   const key = normalizeKey(relKey);
   const filePath = path.join(UPLOADS_DIR, key);
 
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  try {
+    await fsp.unlink(filePath);
     console.log(`[StorageLocal] Deleted: ${key}`);
-  } else {
-    console.warn(`[StorageLocal] File not found for deletion: ${key}`);
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') {
+      console.warn(`[StorageLocal] File not found for deletion: ${key}`);
+      return;
+    }
+    throw err;
   }
 }
 
@@ -116,78 +126,88 @@ export async function storageLocalList(
   const normalizedPrefix = normalizeKey(prefix);
   const dirPath = path.join(UPLOADS_DIR, normalizedPrefix);
 
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-
+  // readdir com withFileTypes evita um stat por entrada
   const files: Array<{ key: string; url: string }> = [];
 
-  function walkDir(dir: string, basePrefix: string) {
-    const items = fs.readdirSync(dir);
+  async function walkDir(dir: string, basePrefix: string) {
+    let items: import('fs').Dirent[];
+    try {
+      items = await fsp.readdir(dir, { withFileTypes: true });
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') return;
+      throw err;
+    }
     for (const item of items) {
-      const fullPath = path.join(dir, item);
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        walkDir(fullPath, path.join(basePrefix, item));
+      const fullPath = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        await walkDir(fullPath, path.join(basePrefix, item.name));
       } else {
-        const key = path.join(basePrefix, item).replace(/\\/g, '/');
+        const key = path.join(basePrefix, item.name).replace(/\\/g, '/');
         files.push({ key, url: `/uploads/${key}` });
       }
     }
   }
 
-  walkDir(dirPath, normalizedPrefix);
+  await walkDir(dirPath, normalizedPrefix);
   return files;
 }
 
 /**
- * Verifica se um arquivo existe no disco
- * @param relKey - Caminho relativo do arquivo
+ * Verifica se um arquivo existe no disco (async).
+ * Usa stat em vez de existsSync (deprecated por race conditions e bloqueio).
  */
-export function storageLocalExists(relKey: string): boolean {
+export async function storageLocalExists(relKey: string): Promise<boolean> {
   const key = normalizeKey(relKey);
-  return fs.existsSync(path.join(UPLOADS_DIR, key));
+  try {
+    await fsp.access(path.join(UPLOADS_DIR, key), fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Retorna o tamanho total em bytes do diretório de uploads
+ * Retorna o tamanho total em bytes do diretório de uploads (async).
  */
-export function storageLocalGetTotalSize(): number {
+export async function storageLocalGetTotalSize(): Promise<number> {
   let total = 0;
 
-  function calcSize(dir: string) {
-    if (!fs.existsSync(dir)) return;
-    const items = fs.readdirSync(dir);
+  async function calcSize(dir: string): Promise<void> {
+    let items: import('fs').Dirent[];
+    try {
+      items = await fsp.readdir(dir, { withFileTypes: true });
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') return;
+      throw err;
+    }
     for (const item of items) {
-      const fullPath = path.join(dir, item);
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        calcSize(fullPath);
+      const fullPath = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        await calcSize(fullPath);
       } else {
+        const stat = await fsp.stat(fullPath);
         total += stat.size;
       }
     }
   }
 
-  calcSize(UPLOADS_DIR);
+  await calcSize(UPLOADS_DIR);
   return total;
 }
 
 /**
- * Inicializa a estrutura de diretórios de uploads
+ * Inicializa a estrutura de diretórios de uploads.
+ *
+ * SÍNCRONO de propósito: roda 1x no boot, antes do server.listen.
+ * Garantir que os diretórios existam antes de qualquer request faz
+ * código upstream mais simples (sem race entre boot e primeiro upload).
  */
 export function initializeStorageDirectories(): void {
-  const dirs = [
-    'plant-photos',
-    'health-logs',
-    'daily-logs',
-    'exports',
-  ];
+  const dirs = ['plant-photos', 'health-logs', 'daily-logs', 'exports'];
 
-  ensureDirExists(UPLOADS_DIR);
-
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   for (const dir of dirs) {
-    ensureDirExists(path.join(UPLOADS_DIR, dir));
+    fs.mkdirSync(path.join(UPLOADS_DIR, dir), { recursive: true });
   }
 
   console.log(`[StorageLocal] Storage initialized at: ${UPLOADS_DIR}`);

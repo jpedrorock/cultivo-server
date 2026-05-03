@@ -15,7 +15,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
+import fsp from "fs/promises";
 import rateLimit from "express-rate-limit";
 import { storagePut } from "./storage";
 import { authenticateRequest } from "./_core/auth";
@@ -166,7 +166,9 @@ router.get("/thumbnail", async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    if (!fs.existsSync(filePath)) {
+    try {
+      await fsp.access(filePath);
+    } catch {
       return res.status(404).json({ error: "File not found" });
     }
 
