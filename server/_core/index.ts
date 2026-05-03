@@ -794,239 +794,26 @@ async function startServer() {
   // Upload de imagens (multipart/form-data) — antes do tRPC
   app.use("/api/upload", uploadRouter);
 
-  // Rota temporária de importação de banco (protegida por JWT_SECRET)
-  {
-    const multer = (await import("multer")).default;
-    const { exec } = await import("child_process");
-    const { writeFile, unlink } = await import("fs/promises");
-    const os = await import("os");
-
-    const sqlUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
-
-    app.get("/admin/import", (req, res) => {
-      if (req.query.secret !== ENV.jwtSecret) {
-        res.status(401).send("Unauthorized");
-        return;
-      }
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-        <title>Importar Banco — Cultivo</title>
-        <style>body{font-family:sans-serif;background:#0d0d0d;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-        .box{background:#1a1a1a;padding:2rem;border-radius:12px;min-width:340px;text-align:center}
-        h2{margin:0 0 1.5rem}input[type=file]{margin:1rem 0;width:100%}
-        button{background:#2563eb;color:#fff;border:none;padding:.75rem 2rem;border-radius:8px;cursor:pointer;font-size:1rem;width:100%}
-        #status{margin-top:1rem;font-size:.9rem}</style></head>
-      <body><div class="box"><h2>🌱 Importar SQL</h2>
-        <form id="f" enctype="multipart/form-data">
-          <input type="file" name="sql" accept=".sql" required>
-          <button type="submit">Importar</button>
-        </form>
-        <div id="status"></div>
-        <script>
-          const f=document.getElementById('f'),s=document.getElementById('status');
-          f.onsubmit=async e=>{e.preventDefault();s.textContent='Importando...';
-            const fd=new FormData(f);
-            const r=await fetch('/admin/import?secret=${encodeURIComponent(ENV.jwtSecret)}',{method:'POST',body:fd});
-            const j=await r.json();
-            s.textContent=j.message||j.error;s.style.color=r.ok?'#4ade80':'#f87171';};
-        </script></div></body></html>`);
-    });
-
-    app.post("/admin/import", sqlUpload.single("sql"), async (req: any, res) => {
-      if (req.query.secret !== ENV.jwtSecret) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
-      if (!req.file) {
-        res.status(400).json({ error: "Nenhum arquivo enviado" });
-        return;
-      }
-      try {
-        const mysql2 = await import("mysql2/promise");
-        const dbUrl = new URL(ENV.databaseUrl);
-        const conn = await mysql2.createConnection({
-          host: dbUrl.hostname,
-          port: parseInt(dbUrl.port || "3306"),
-          user: dbUrl.username,
-          password: decodeURIComponent(dbUrl.password),
-          database: dbUrl.pathname.slice(1),
-          ssl: { rejectUnauthorized: false },
-          multipleStatements: true,
-        });
-        // Modo permissivo para compatibilidade com dumps de versões antigas
-        await conn.query("SET sql_mode = ''");
-        // Limpar tabelas existentes antes de importar
-        await conn.query("SET FOREIGN_KEY_CHECKS=0");
-        const [tables] = await conn.query("SHOW TABLES") as any;
-        for (const row of tables) {
-          const tableName = Object.values(row)[0] as string;
-          await conn.query(`DROP TABLE IF EXISTS \`${tableName}\``);
-        }
-        await conn.query("SET FOREIGN_KEY_CHECKS=1");
-
-        const sql = req.file.buffer.toString("utf8")
-          // MariaDB collation não suportada pelo MySQL 8.0
-          .replace(/utf8mb4_uca1400_ai_ci/g, "utf8mb4_unicode_ci")
-          .replace(/utf8mb3_uca1400_ai_ci/g, "utf8_unicode_ci")
-          // MySQL 8.0 não aceita DEFAULT não-nulo em colunas TEXT/BLOB/JSON
-          .replace(
-            /\b(text|blob|longtext|mediumtext|tinytext|json|longblob|mediumblob|tinyblob)\b(\s+NOT NULL)?\s+DEFAULT\s+'[^']*'/gi,
-            (_m: string, type: string, notNull: string | undefined) => `${type}${notNull ?? ''} DEFAULT NULL`
-          );
-        await conn.query(sql);
-        await conn.end();
-        res.json({ message: "✅ Banco importado com sucesso!" });
-      } catch (err: any) {
-        res.status(500).json({ error: err.message });
-      }
-    });
-  }
-
-  // Rota temporária de importação de fotos (zip remoto → /app/uploads)
-  {
-    const JSZip = (await import("jszip")).default;
-    const fsp   = await import("fs/promises");
-
-    app.get("/admin/import-photos", (req, res) => {
-      if (req.query.secret !== ENV.jwtSecret) {
-        res.status(401).send("Unauthorized");
-        return;
-      }
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.send(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-        <title>Importar Fotos — Cultivo</title>
-        <style>body{font-family:sans-serif;background:#0d0d0d;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-        .box{background:#1a1a1a;padding:2rem;border-radius:12px;min-width:380px;max-width:90vw}
-        h2{margin:0 0 1.5rem;text-align:center}
-        label{display:block;font-size:.85rem;color:#aaa;margin-bottom:.4rem}
-        input[type=text]{width:100%;background:#0a0a0a;border:1px solid #333;color:#eee;padding:.6rem;border-radius:8px;font-size:.85rem;box-sizing:border-box}
-        button{background:#2563eb;color:#fff;border:none;padding:.75rem 2rem;border-radius:8px;cursor:pointer;font-size:1rem;width:100%;margin-top:1rem}
-        button:disabled{opacity:.5;cursor:not-allowed}
-        #status{margin-top:1rem;font-size:.9rem;text-align:center;white-space:pre-wrap}</style></head>
-      <body><div class="box"><h2>📷 Importar Fotos (zip remoto)</h2>
-        <label>URL do .zip</label>
-        <input type="text" id="url" placeholder="http://host.example.com/fotos.zip">
-        <button id="bd" style="background:#475569;margin-top:.5rem">📋 Listar conteúdo (dry run)</button>
-        <button id="b">⬇️ Baixar e extrair</button>
-        <div id="status"></div>
-        <script>
-          const u=document.getElementById('url'),b=document.getElementById('b'),bd=document.getElementById('bd'),s=document.getElementById('status');
-          async function run(dry){
-            if(!u.value)return;b.disabled=true;bd.disabled=true;
-            s.textContent= dry ? '⏳ Baixando para listar…' : '⏳ Baixando e extraindo (pode demorar)…';
-            s.style.color='#aaa';
-            try{
-              const r=await fetch('/admin/import-photos?secret=${encodeURIComponent(ENV.jwtSecret)}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u.value,dryRun:dry})});
-              const j=await r.json();
-              if(r.ok){
-                let txt='✅ '+j.message;
-                if(j.zipEntries) txt+='\\n\\nTotal no zip: '+j.zipEntries;
-                if(j.sample) txt+='\\n\\nAmostra:\\n'+j.sample.join('\\n');
-                if(j.sampleSkipped&&j.sampleSkipped.length) txt+='\\n\\nIgnorados (amostra):\\n'+j.sampleSkipped.join('\\n');
-                s.textContent=txt;s.style.color='#4ade80';
-              }else{ s.textContent='❌ '+j.error;s.style.color='#f87171'; }
-            }catch(e){s.textContent='❌ '+e.message;s.style.color='#f87171';}
-            finally{b.disabled=false;bd.disabled=false;}
-          }
-          bd.onclick=()=>run(true);
-          b.onclick=()=>run(false);
-        </script></div></body></html>`);
-    });
-
-    app.post("/admin/import-photos", express.json(), async (req: any, res) => {
-      if (req.query.secret !== ENV.jwtSecret) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
-      const url = req.body?.url as string | undefined;
-      const dryRun = req.body?.dryRun === true;
-      if (!url || !/^https?:\/\//.test(url)) {
-        res.status(400).json({ error: "URL inválida" });
-        return;
-      }
-      try {
-        // 1) Baixar o zip
-        const dl = await fetch(url);
-        if (!dl.ok) {
-          res.status(400).json({ error: `Erro ao baixar: HTTP ${dl.status}` });
-          return;
-        }
-        const buf = Buffer.from(await dl.arrayBuffer());
-
-        // 2) Abrir o zip
-        const zip = await JSZip.loadAsync(buf);
-        const entries = Object.values(zip.files).filter(f => !f.dir);
-        if (entries.length === 0) {
-          res.status(400).json({ error: "Zip vazio" });
-          return;
-        }
-
-        // 3) Mapear cada entry para um destino dentro de /app/uploads
-        //    - Procura "plant-photos/" no path → usa daí em diante
-        //    - Senão, se é arquivo de imagem na raiz, usa basename em plant-photos/
-        //    - Senão, ignora
-        const UPLOADS_DIR = "/app/uploads";
-        const plan: { src: string; dest: string }[] = [];
-        const skipped: string[] = [];
-        for (const entry of entries) {
-          const name = entry.name.replace(/\\/g, '/').replace(/\.\./g, '');
-          if (name.startsWith('__MACOSX/') || name.endsWith('.DS_Store')) {
-            skipped.push(name);
-            continue;
-          }
-          // Se contém "plant-photos/", extrai a partir daí preservando subdir
-          const idx = name.toLowerCase().indexOf('plant-photos/');
-          if (idx >= 0) {
-            const rel = name.slice(idx);  // ex: plant-photos/foo.jpg
-            plan.push({ src: name, dest: path.join(UPLOADS_DIR, rel) });
-            continue;
-          }
-          // Se contém "uploads/" extrai relativo a essa pasta
-          const idxU = name.toLowerCase().indexOf('uploads/');
-          if (idxU >= 0) {
-            const rel = name.slice(idxU + 'uploads/'.length); // sem 'uploads/'
-            plan.push({ src: name, dest: path.join(UPLOADS_DIR, rel) });
-            continue;
-          }
-          // Imagem na raiz → assume plant-photos
-          if (/\.(jpe?g|png|webp|gif|heic)$/i.test(name)) {
-            plan.push({ src: name, dest: path.join(UPLOADS_DIR, 'plant-photos', path.basename(name)) });
-            continue;
-          }
-          skipped.push(name);
-        }
-
-        if (dryRun) {
-          res.json({
-            message: `${plan.length} arquivos serão extraídos, ${skipped.length} ignorados`,
-            zipEntries: entries.length,
-            sample: plan.slice(0, 5).map(p => `${p.src} → ${p.dest}`),
-            sampleSkipped: skipped.slice(0, 5),
-          });
-          return;
-        }
-
-        // 4) Extrair
-        let count = 0;
-        for (const entry of entries) {
-          const item = plan.find(p => p.src === entry.name);
-          if (!item) continue;
-          await fsp.mkdir(path.dirname(item.dest), { recursive: true });
-          const data = await entry.async("nodebuffer");
-          await fsp.writeFile(item.dest, data);
-          count++;
-        }
-        res.json({
-          message: `${count} arquivos extraídos em ${UPLOADS_DIR}`,
-          skipped: skipped.length,
-          sample: plan.slice(0, 3).map(p => p.dest),
-        });
-      } catch (err: any) {
-        console.error("[import-photos]", err);
-        res.status(500).json({ error: err.message });
-      }
-    });
-  }
+  // ❌ REMOVIDO: rotas /admin/import e /admin/import-photos
+  //
+  // Eram backdoors administrativos autenticados por ?secret=$JWT_SECRET na
+  // querystring — secret vazava em logs de proxy (nginx/Traefik), header
+  // Referer, histórico do browser, screenshots de operação, etc. Quem
+  // descobre o secret pode forjar JWTs de qualquer usuário, dropar todo o
+  // banco, e descriptografar API keys de IA dos usuários (mesmo secret).
+  //
+  // Para importar dump SQL ou ZIP de fotos em produção, use a Terminal do
+  // Coolify (ou SSH) e execute scripts CLI direto no container. Exemplos:
+  //
+  //   # SQL:
+  //   docker exec -i $APP_CONTAINER mysql -u user -p$MYSQL_PASSWORD cultivo < dump.sql
+  //
+  //   # Fotos (zip → /app/uploads):
+  //   docker cp fotos.zip $APP_CONTAINER:/tmp/
+  //   docker exec $APP_CONTAINER sh -c 'cd /tmp && unzip -o fotos.zip -d /app/uploads/'
+  //
+  // Em ambos os casos, o operador tem que ter acesso ao servidor — não dá
+  // para escalar privilégio a partir do navegador.
 
   // tRPC API
   app.use(

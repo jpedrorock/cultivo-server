@@ -120,7 +120,13 @@ export function decryptApiKey(ciphertext: string): DecryptResult {
     return { plaintext: tryDecrypt(LEGACY_ZERO_KEY, ciphertext), needsReencrypt: true };
   } catch { /* falhou tudo */ }
 
-  throw new Error("[aiCrypto] Falha ao descriptografar API key — nenhum esquema legado funcionou");
+  // Último fallback: registros que NUNCA passaram por criptografia
+  // (Tuya accessSecret em algumas instalações foi gravado em plaintext).
+  // Se não tem prefixo v1 e nenhuma chave decifra, assumimos plaintext legado
+  // e sinalizamos para re-criptografar na próxima leitura.
+  // Loud warning no log para destacar instalações nessa situação.
+  console.warn("[aiCrypto] Cipher não decifrável com nenhuma chave — assumindo plaintext legado (precisa migrar)");
+  return { plaintext: ciphertext, needsReencrypt: true };
 }
 
 /**
