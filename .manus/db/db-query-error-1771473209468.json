@@ -1,8 +1,0 @@
-{
-  "query": "INSERT INTO alertSettings (tentId, alertsEnabled, tempEnabled, rhEnabled, ppfdEnabled) VALUES (1, false, true, true, true);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute INSERT INTO alertSettings (tentId, alertsEnabled, tempEnabled, rhEnabled, ppfdEnabled) VALUES (1, false, true, true, true);",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1452 (23000) at line 1: Cannot add or update a child row: a foreign key constraint fails (`ahybxv9cdav4csfrqphbxc`.`alertsettings`, CONSTRAINT `fk_1` FOREIGN KEY (`tentId`) REFERENCES `tents` (`id`))"
-  ]
-}

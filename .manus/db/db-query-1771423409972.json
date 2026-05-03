@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS plants (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  code VARCHAR(50),\n  strainId INT NOT NULL,\n  currentTentId INT NOT NULL,\n  germDate TIMESTAMP NOT NULL,\n  status ENUM('ACTIVE', 'HARVESTED', 'DEAD') NOT NULL DEFAULT 'ACTIVE',\n  notes TEXT,\n  createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  FOREIGN KEY (strainId) REFERENCES strains(id),\n  FOREIGN KEY (currentTentId) REFERENCES tents(id),\n  INDEX strainIdx (strainId),\n  INDEX tentIdx (currentTentId),\n  INDEX statusIdx (status)\n);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute CREATE TABLE IF NOT EXISTS plants (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  code VARCHAR(50),\n  strainId INT NOT NULL,\n  currentTentId INT NOT NULL,\n  germDate TIMESTAMP NOT NULL,\n  status ENUM('ACTIVE', 'HARVESTED', 'DEAD') NOT NULL DEFAULT 'ACTIVE',\n  notes TEXT,\n  createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  FOREIGN KEY (strainId) REFERENCES strains(id),\n  FOREIGN KEY (currentTentId) REFERENCES tents(id),\n  INDEX strainIdx (strainId),\n  INDEX tentIdx (currentTentId),\n  INDEX statusIdx (status)\n);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 910
-}

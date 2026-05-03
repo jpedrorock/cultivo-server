@@ -1,8 +1,0 @@
-{
-  "query": "ALTER TABLE plants ADD COLUMN plantStage ENUM('CLONE', 'SEEDLING', 'PLANT') NOT NULL DEFAULT 'SEEDLING' AFTER currentTentId;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute ALTER TABLE plants ADD COLUMN plantStage ENUM('CLONE', 'SEEDLING', 'PLANT') NOT NULL DEFAULT 'SEEDLING' AFTER currentTentId;",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1060 (42S21) at line 1: Duplicate column name 'plantStage'"
-  ]
-}

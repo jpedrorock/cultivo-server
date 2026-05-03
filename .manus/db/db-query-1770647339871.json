@@ -1,9 +1,0 @@
-{
-  "query": "\nCREATE TABLE IF NOT EXISTS alertSettings (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  tentId INT NOT NULL,\n  alertType VARCHAR(50) NOT NULL,\n  isEnabled BOOLEAN DEFAULT TRUE NOT NULL,\n  threshold DECIMAL(10,2),\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,\n  FOREIGN KEY (tentId) REFERENCES tents(id),\n  UNIQUE KEY tentAlertTypeUnique (tentId, alertType)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nCREATE TABLE IF NOT EXISTS alertSettings (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  tentId INT NOT NULL,\n  alertType VARCHAR(50) NOT NULL,\n  isEnabled BOOLEAN DEFAULT TRUE NOT NULL,\n  threshold DECIMAL(10,2),\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,\n  FOREIGN KEY (tentId) REFERENCES tents(id),\n  UNIQUE KEY tentAlertTypeUnique (tentId, alertType)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 93
-}

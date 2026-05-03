@@ -1,8 +1,0 @@
-{
-  "query": "SELECT id, tentId, startDate, floraStartDate, endDate FROM cycles WHERE endDate IS NULL ORDER BY tentId;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute SELECT id, tentId, startDate, floraStartDate, endDate FROM cycles WHERE endDate IS NULL ORDER BY tentId;",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1054 (42S22) at line 1: Unknown column 'enddate' in 'where clause'"
-  ]
-}

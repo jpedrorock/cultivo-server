@@ -1,8 +1,0 @@
-{
-  "query": "ALTER TABLE weeklyTargets DROP COLUMN tentId;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute ALTER TABLE weeklyTargets DROP COLUMN tentId;",
-  "returncode": 1,
-  "logs": [
-    "ERROR 8200 (HY000) at line 1: can't drop column tentid with composite index covered or Primary Key covered now"
-  ]
-}

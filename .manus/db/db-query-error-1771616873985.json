@@ -1,8 +1,0 @@
-{
-  "query": "SET FOREIGN_KEY_CHECKS = 0;\n\nDELETE FROM trichomaRecords;\nDELETE FROM lstRecords;\nDELETE FROM plants;\nDELETE FROM weeklyTargets;\nDELETE FROM taskInstances;\nDELETE FROM taskTemplates;\nDELETE FROM logs;\nDELETE FROM cycles;\nDELETE FROM tents;\nDELETE FROM strains;\nDELETE FROM alertPreferences;\nDELETE FROM alerts;\nDELETE FROM nutrientPresets;\nDELETE FROM wateringHistory;\n\nSET FOREIGN_KEY_CHECKS = 1;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute SET FOREIGN_KEY_CHECKS = 0;\n\nDELETE FROM trichomaRecords;\nDELETE FROM lstRecords;\nDELETE FROM plants;\nDELETE FROM weeklyTargets;\nDELETE FROM taskInstances;\nDELETE FROM taskTemplates;\nDELETE FROM logs;\nDELETE FROM cycles;\nDELETE FROM tents;\nDELETE FROM strains;\nDELETE FROM alertPreferences;\nDELETE FROM alerts;\nDELETE FROM nutrientPresets;\nDELETE FROM wateringHistory;\n\nSET FOREIGN_KEY_CHECKS = 1;",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1146 (42S02) at line 3: Table 'ahybxv9cdav4csfrqphbxc.trichomaRecords' doesn't exist"
-  ]
-}

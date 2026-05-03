@@ -1,8 +1,0 @@
-{
-  "query": "\nALTER TABLE plantHealthLogs \nADD COLUMN photoUrl TEXT,\nADD COLUMN photoKey TEXT;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nALTER TABLE plantHealthLogs \nADD COLUMN photoUrl TEXT,\nADD COLUMN photoKey TEXT;\n",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1060 (42S21) at line 2: Duplicate column name 'photoUrl'"
-  ]
-}
