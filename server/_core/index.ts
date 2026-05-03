@@ -402,6 +402,49 @@ async function startServer() {
     next();
   });
 
+  // Security headers via Helmet — DEVE vir antes de qualquer route handler
+  // para que os headers sejam aplicados a todas as respostas.
+  // Em prod: CSP estrita (sem 'unsafe-eval'). Em dev: liberta 'unsafe-eval'
+  // para o HMR do Vite e React Refresh funcionarem.
+  const { default: helmet } = await import("helmet");
+  const isProd = process.env.NODE_ENV === 'production';
+  app.use(helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: isProd
+          ? ["'self'", "'unsafe-inline'"]
+          : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https:", ...(isProd ? [] : ["ws:", "wss:"])],
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: isProd ? [] : null,
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-site" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    strictTransportSecurity: isProd
+      ? { maxAge: 31536000, includeSubDomains: true, preload: false }
+      : false,
+    xPermittedCrossDomainPolicies: { permittedPolicies: "none" },
+    xFrameOptions: { action: "sameorigin" },
+    xContentTypeOptions: true,
+    xPoweredBy: true,                           // remove X-Powered-By: Express
+    xXssProtection: false,                      // header deprecado, melhor não enviar
+  }));
+  app.use((_req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()');
+    next();
+  });
+
   // Healthcheck — útil para Docker HEALTHCHECK / k8s readiness
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", uptime: Math.floor(process.uptime()), ts: Date.now() });
@@ -452,30 +495,6 @@ async function startServer() {
   const { startTuyaPollerCron } = await import("../cron/tuyaPoller");
   startTuyaPollerCron();
 
-  // Security headers inline (sem dependência de pacote externo)
-  app.use((_req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('X-XSS-Protection', '0');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
-    // CSP: permite scripts/styles inline (necessário para Vite/React) + imagens externas para fotos
-    res.setHeader('Content-Security-Policy',
-      "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-      "style-src 'self' 'unsafe-inline'; " +
-      "img-src 'self' data: blob: https:; " +
-      "connect-src 'self' https:; " +
-      "font-src 'self' data:; " +
-      "frame-ancestors 'none';"
-    );
-    if (process.env.NODE_ENV === 'production') {
-      // HSTS: força HTTPS por 1 ano (só em produção para não bloquear dev HTTP)
-      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    }
-    next();
-  });
-
   // CORS — auto-detecta o próprio host + ALLOWED_ORIGINS opcional
   // Dev: aceita localhost em qualquer porta
   // Prod: aceita qualquer origin que bata com o Host da requisição (funciona em qualquer domínio)
@@ -483,7 +502,6 @@ async function startServer() {
   const extraOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
     : [];
-  const isProd = process.env.NODE_ENV === 'production';
 
   app.use((req, res, next) => {
     const origin = req.headers.origin as string | undefined;
