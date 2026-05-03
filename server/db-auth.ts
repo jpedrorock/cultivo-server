@@ -198,6 +198,23 @@ export async function updateUserAvatar(userId: number, avatarUrl: string): Promi
 }
 
 /**
+ * Vincula um openId externo (ex: Google) a um usuário existente.
+ * Usado quando usuário criado por email/senha vincula Google pela primeira vez.
+ */
+export async function linkUserOpenId(userId: number, openId: string, loginMethod?: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(users)
+    .set({
+      openId,
+      ...(loginMethod ? { loginMethod } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+}
+
+/**
  * Atualiza a senha de um usuário
  */
 export async function updateUserPassword(userId: number, passwordHash: string): Promise<void> {

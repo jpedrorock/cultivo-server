@@ -20,10 +20,19 @@ export default function Login() {
   // Mostrar erro vindo do callback do Google
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('error') === 'google_cancelled') {
+    const err = params.get('error');
+    if (err === 'google_cancelled') {
       setError('Login com Google cancelado.');
-    } else if (params.get('error') === 'google_failed') {
+    } else if (err === 'google_failed') {
       setError('Erro ao autenticar com Google. Tente novamente.');
+    } else if (err === 'google_state_invalid') {
+      setError('Sessão expirou ou link inválido. Tente entrar com Google novamente.');
+    } else if (err === 'google_email_not_verified') {
+      setError('Este email Google ainda não foi verificado. Confirme no Gmail antes de entrar.');
+    } else if (err === 'google_email_exists') {
+      setError('Já existe uma conta com este email. Entre com email/senha e vincule o Google nas configurações.');
+    } else if (err === 'google_account_conflict') {
+      setError('Este email já está vinculado a outra conta Google. Entre em contato com o suporte.');
     }
   }, []);
 

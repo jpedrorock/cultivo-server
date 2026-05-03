@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
+import { randomBytes } from 'node:crypto';
 import {
   getUserByEmail,
   getUserByOpenId,
@@ -7,6 +8,7 @@ import {
   updateUserLastSignedIn,
   updateUserAvatar,
   updateUserPassword,
+  linkUserOpenId,
   countUsers,
 } from '../db-auth';
 import {
@@ -220,6 +222,18 @@ export function registerAuthRoutes(app: Express) {
       res.status(503).json({ error: 'Google OAuth não configurado. Adicione GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no .env' });
       return;
     }
+    // CSRF: gera state aleatório e armazena em cookie httpOnly. Callback compara
+    // o state da query (vindo do Google) com o do cookie. Sem isso, atacante
+    // pode levar a vítima ao callback com seu próprio code → vítima loga na conta dele.
+    const state = randomBytes(32).toString('hex');
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: ENV.isProduction,
+      sameSite: 'lax',         // precisa lax — Strict não volta no redirect cross-domain
+      maxAge: 10 * 60 * 1000,  // 10 minutos é suficiente
+      path: '/api/auth/google',
+    });
+
     const protocol = ENV.isProduction ? 'https' : 'http';
     const redirectUri = `${protocol}://${ENV.domain}/api/auth/google/callback`;
     const params = new URLSearchParams({
@@ -228,6 +242,7 @@ export function registerAuthRoutes(app: Express) {
       response_type: 'code',
       scope: 'openid email profile',
       access_type: 'online',
+      state,
     });
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   });
@@ -237,10 +252,20 @@ export function registerAuthRoutes(app: Express) {
    * Recebe o código do Google e autentica o usuário
    */
   app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
-    const { code, error } = req.query as { code?: string; error?: string };
+    const { code, error, state } = req.query as { code?: string; error?: string; state?: string };
+    const cookieState = req.cookies?.oauth_state as string | undefined;
+    // Limpa cookie em qualquer fluxo subsequente — é single-use
+    res.clearCookie('oauth_state', { path: '/api/auth/google' });
 
     if (error || !code) {
       res.redirect('/login?error=google_cancelled');
+      return;
+    }
+
+    // Validação CSRF: state da query DEVE igualar state do cookie
+    if (!state || !cookieState || state !== cookieState) {
+      console.warn('[Auth] Google OAuth state mismatch — possível ataque CSRF');
+      res.redirect('/login?error=google_state_invalid');
       return;
     }
 
@@ -269,7 +294,7 @@ export function registerAuthRoutes(app: Express) {
 
       const tokenData = await tokenRes.json() as { access_token: string };
 
-      // Buscar dados do usuário no Google
+      // Buscar dados do usuário no Google (inclui verified_email)
       const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
@@ -282,31 +307,62 @@ export function registerAuthRoutes(app: Express) {
       const googleUser = await userRes.json() as {
         id: string;
         email: string;
+        verified_email?: boolean;
         name?: string;
         picture?: string;
       };
 
-      // Buscar ou criar usuário
+      // Bloqueia se Google diz que email não foi verificado
+      // (Sem isso, atacante poderia usar email de terceiros não verificado.)
+      if (googleUser.verified_email === false) {
+        console.warn(`[Auth] Google email não verificado: ${googleUser.email}`);
+        res.redirect('/login?error=google_email_not_verified');
+        return;
+      }
+
+      // Buscar usuário pelo openId (Google ID estável)
       let user = await getUserByOpenId(googleUser.id);
 
       if (!user) {
-        // Verificar se já existe conta com o mesmo email
-        user = await getUserByEmail(googleUser.email);
-        if (!user) {
-          // Primeiro usuário → admin aprovado; demais aguardam aprovação
-          const total = await countUsers();
-          const isFirst = total === 0;
-          user = await createUser({
-            email: googleUser.email,
-            name: googleUser.name ?? null,
-            role: isFirst ? 'admin' : 'user',
-            approved: isFirst,
-            lastSignedIn: new Date(),
-            openId: googleUser.id,
-            loginMethod: 'google',
-            avatarUrl: googleUser.picture ?? null,
-          });
+        // Não existe vinculação com Google. Verificar se há conta com mesmo email.
+        const existingByEmail = await getUserByEmail(googleUser.email);
+
+        if (existingByEmail) {
+          // CASO PERIGOSO: conta com o email já existe MAS não tem openId vinculado.
+          //
+          // Cenário de ataque:
+          //   1. Atacante cria conta vitima@gmail.com com email/senha
+          //   2. Vítima entra com Google (mesmo email)
+          //   3. Sem proteção, código faria merge silencioso → vítima loga na conta do atacante
+          //
+          // Bloqueamos o merge automático. Para vincular Google a uma conta
+          // existente, o usuário deve fazer login com email/senha primeiro
+          // e usar a opção "Vincular Google" no perfil (a implementar).
+          if (existingByEmail.openId && existingByEmail.openId !== googleUser.id) {
+            // Conta já vinculada a OUTRO Google ID — definitivamente não é a mesma pessoa
+            console.warn(`[Auth] Tentativa de login Google para email com openId diferente: ${googleUser.email}`);
+            res.redirect('/login?error=google_account_conflict');
+            return;
+          }
+
+          // Sem openId vinculado — bloqueia e instrui o usuário
+          res.redirect('/login?error=google_email_exists');
+          return;
         }
+
+        // Email novo — cria conta normalmente
+        const total = await countUsers();
+        const isFirst = total === 0;
+        user = await createUser({
+          email: googleUser.email,
+          name: googleUser.name ?? null,
+          role: isFirst ? 'admin' : 'user',
+          approved: isFirst,
+          lastSignedIn: new Date(),
+          openId: googleUser.id,
+          loginMethod: 'google',
+          avatarUrl: googleUser.picture ?? null,
+        });
       }
 
       // Bloquear login de usuários não aprovados
@@ -332,3 +388,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 }
+
+// linkUserOpenId é usado pelo procedure de "Vincular Google" no perfil (a implementar).
+// Mantido aqui para que o import sobreviva ao tree-shaking quando o procedure for criado.
+export { linkUserOpenId };
