@@ -26,6 +26,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
     environment:
       - DATABASE_URL=mysql://cultivo:${MYSQL_PASSWORD}@db:3306/cultivo
       - JWT_SECRET=${JWT_SECRET}
@@ -41,3 +43,4 @@ services:
 
 volumes:
   mysql_data:
+  uploads_data:
