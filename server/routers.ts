@@ -7,7 +7,7 @@ import { hashPassword, comparePassword } from "./_core/auth";
 import { users, userAiSettings, aiChatMessages } from "../drizzle/schema";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
 import { z } from "zod";
-import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray, getTableColumns } from "drizzle-orm";
 import * as db from "./db";
 import { getDb, applyPhaseTransitionLimits } from "./db";
 import {
@@ -1779,18 +1779,21 @@ export const appRouter = router({
             throw new Error("Estufa destino é obrigatória ao criar mudas");
           }
 
-          // Buscar nome da strain do ciclo
-          let strainName = 'Sem strain';
-          if (cycle.strainId) {
-            const [strain] = await database.select({ name: strains.name }).from(strains).where(eq(strains.id, cycle.strainId));
-            strainName = strain?.name || 'Sem strain';
+          // plants.strainId é NOT NULL — exigir strain do ciclo para criar clones
+          if (!cycle.strainId) {
+            throw new Error("Ciclo sem strain definida — não é possível criar mudas. Defina a strain do ciclo antes.");
           }
+
+          // Buscar nome da strain do ciclo
+          const [strain] = await database.select({ name: strains.name }).from(strains).where(eq(strains.id, cycle.strainId));
+          const strainName = strain?.name || 'Sem strain';
+          const strainIdForClones = cycle.strainId;
 
           const seedlings = [];
           for (let i = 1; i <= input.clonesProduced; i++) {
             seedlings.push({
               name: `Clone ${i} - ${strainName}`,
-              strainId: cycle.strainId,
+              strainId: strainIdForClones,
               currentTentId: input.targetTentId, // Mudas vão para estufa selecionada
               plantStage: "SEEDLING" as const,
               status: "ACTIVE" as const,
@@ -3573,12 +3576,12 @@ export const appRouter = router({
 
         for (const task of incompleteTasks) {
           pendingTasks.push({
-            id: task.task_instances.id,
+            id: task.taskInstances.id,
             tentId: cycle.tentId,
             tentName: tent[0].name,
-            title: task.task_templates?.title || "Tarefa",
-            description: task.task_templates?.description || "",
-            occurrenceDate: task.task_instances.occurrenceDate,
+            title: task.taskTemplates?.title || "Tarefa",
+            description: task.taskTemplates?.description || "",
+            occurrenceDate: task.taskInstances.occurrenceDate,
           });
         }
       }
@@ -3982,7 +3985,7 @@ export const appRouter = router({
         if (!database) throw new Error("Database not available");
         await validateTentOwnership(input.currentTentId, ctx.user.groupId);
 
-        const result = await database.insert(plants).values({
+        const [result] = await database.insert(plants).values({
           name: input.name,
           code: input.code,
           strainId: input.strainId,
@@ -3993,7 +3996,7 @@ export const appRouter = router({
         });
 
         // Retornar o ID inserido
-        return { id: result.insertId };
+        return { id: (result as { insertId: number }).insertId };
       }),
 
     // Clonar planta existente
@@ -4035,7 +4038,7 @@ export const appRouter = router({
         if (original.currentTentId) {
           await database.insert(plantTentHistory).values({
             plantId: newPlantId,
-            tentId: original.currentTentId,
+            toTentId: original.currentTentId,
             movedAt: new Date(),
             reason: `Clone criado de "${original.name}"`,
           });
@@ -4158,7 +4161,33 @@ export const appRouter = router({
           .from(plants)
           .where(eq(plants.id, input.id));
 
-        return plant;
+        if (!plant) return null;
+
+        // Enriquecer com fase e semana do ciclo ativo da estufa atual
+        // (cliente usa em PlantDetail para colorir hero, label de fase, semana)
+        let cyclePhase: 'CLONING' | 'VEGA' | 'FLORA' | 'MAINTENANCE' | 'DRYING' | null = null;
+        let cycleWeek: number | null = null;
+
+        if (plant.currentTentId) {
+          const [cycle] = await database
+            .select()
+            .from(cycles)
+            .where(and(eq(cycles.tentId, plant.currentTentId), eq(cycles.status, 'ACTIVE')))
+            .orderBy(desc(cycles.startDate))
+            .limit(1);
+
+          if (cycle) {
+            const isFlora = cycle.floraStartDate != null;
+            cyclePhase = isFlora ? 'FLORA' : 'VEGA';
+            const refDate = isFlora && cycle.floraStartDate
+              ? new Date(cycle.floraStartDate)
+              : new Date(cycle.startDate);
+            const daysSince = Math.floor((Date.now() - refDate.getTime()) / 86400000);
+            cycleWeek = Math.floor(daysSince / 7) + 1;
+          }
+        }
+
+        return { ...plant, cyclePhase, cycleWeek };
       }),
 
     // Atualizar planta
@@ -4815,15 +4844,21 @@ export const appRouter = router({
         const { url } = await storagePut(fileKey, buffer, input.mimeType);
         
         // Salvar no banco
-        const [photo] = await database
+        const [insertResult] = await database
           .insert(plantPhotos)
           .values({
             plantId: input.plantId,
-            url,
-            fileKey,
-          })
-          .returning();
-        
+            photoUrl: url,
+            photoKey: fileKey,
+          });
+        const insertedId = (insertResult as { insertId: number }).insertId;
+
+        const [photo] = await database
+          .select()
+          .from(plantPhotos)
+          .where(eq(plantPhotos.id, insertedId))
+          .limit(1);
+
         return photo;
       }),
 
@@ -5520,9 +5555,10 @@ export const appRouter = router({
           }
         }
         
+        // Nota: weekNumber não é persistido (schema não tem essa coluna).
+        // Pode ser derivado de logDate vs cycle.startDate quando precisar.
         await database.insert(plantTrichomeLogs).values({
           plantId: input.plantId,
-          weekNumber: input.weekNumber,
           trichomeStatus: input.trichomeStatus,
           clearPercent: input.clearPercent,
           cloudyPercent: input.cloudyPercent,
@@ -6037,7 +6073,7 @@ export const appRouter = router({
         z.object({
           title: z.string().min(1),
           description: z.string().max(2000).optional(),
-          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
+          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })
@@ -6055,7 +6091,7 @@ export const appRouter = router({
           groupId: ctx.user.groupId ?? null,
         });
 
-        return { success: true, id: newTemplate.insertId };
+        return { success: true, id: (newTemplate as { insertId: number }).insertId };
       }),
 
     update: protectedProcedure
@@ -6064,7 +6100,7 @@ export const appRouter = router({
           id: z.number(),
           title: z.string().min(1),
           description: z.string().max(2000).optional(),
-          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
+          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })
@@ -6321,9 +6357,13 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
-        let query = database
+        const conditions = [];
+        if (input?.tentId) conditions.push(eq(wateringApplications.tentId, input.tentId));
+        if (input?.cycleId) conditions.push(eq(wateringApplications.cycleId, input.cycleId));
+
+        const base = database
           .select({
-            ...wateringApplications,
+            ...getTableColumns(wateringApplications),
             cycleStartDate: cycles.startDate,
             cycleFloraStartDate: cycles.floraStartDate,
             tentName: tents.name,
@@ -6332,15 +6372,9 @@ export const appRouter = router({
           .leftJoin(cycles, eq(wateringApplications.cycleId, cycles.id))
           .leftJoin(tents, eq(wateringApplications.tentId, tents.id));
 
-        const conditions = [];
-        if (input?.tentId) conditions.push(eq(wateringApplications.tentId, input.tentId));
-        if (input?.cycleId) conditions.push(eq(wateringApplications.cycleId, input.cycleId));
+        const filtered = conditions.length > 0 ? base.where(and(...conditions)) : base;
 
-        if (conditions.length > 0) {
-          query = query.where(and(...conditions)) as any;
-        }
-
-        return query
+        return filtered
           .orderBy(desc(wateringApplications.applicationDate))
           .limit(input?.limit || 50);
       }),
@@ -6772,7 +6806,7 @@ export const appRouter = router({
           keysJson: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         const { pushSubscriptions } = await import("../drizzle/schema");
@@ -6797,6 +6831,8 @@ export const appRouter = router({
         } else if (input.keysJson) {
           // Inserir novo registro (UPSERT) — só possível se temos as chaves
           await database.insert(pushSubscriptions).values({
+            userId: ctx.user.id,
+            groupId: ctx.user.groupId ?? null,
             endpoint: input.endpoint,
             keysJson: input.keysJson,
             reminderEnabled: input.reminderEnabled,

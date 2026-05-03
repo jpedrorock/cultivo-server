@@ -1,5 +1,5 @@
 import { eq, and, desc, sql, isNotNull, or, inArray, max, count, gte } from "drizzle-orm";
-import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
+import { drizzle as drizzleMysql, type MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import {
   InsertUser,
@@ -38,34 +38,95 @@ import {
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: any = null;
+/**
+ * Cliente Drizzle tipado + lazy init.
+ *
+ * - Em produção: falha alta (process.exit(1)) se DB não conectar.
+ *   Banco indisponível em produção é falha fatal — melhor crash + restart
+ *   pelo orchestrator do que UI fantasma "Você não tem nenhuma estufa".
+ * - Em desenvolvimento: retorna null se DATABASE_URL ausente, permitindo
+ *   tooling local (drizzle-kit, scripts) sem banco.
+ * - Lock de inicialização (Promise compartilhada) evita corrida que
+ *   criaria múltiplos pools sob alta concorrência inicial.
+ */
+type DrizzleDb = MySql2Database<Record<string, never>>;
+
+let _db: DrizzleDb | null = null;
+let _pool: mysql.Pool | null = null;
+let _initPromise: Promise<DrizzleDb | null> | null = null;
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+async function initDb(): Promise<DrizzleDb | null> {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    if (isProduction) {
+      console.error('[Database] FATAL: DATABASE_URL não definido em produção.');
+      process.exit(1);
+    }
+    console.warn('[Database] DATABASE_URL não definido. Configure no arquivo .env');
+    return null;
+  }
+
+  try {
+    _pool = mysql.createPool({
+      uri: connectionString,
+      waitForConnections: true,
+      connectionLimit: 10,
+      idleTimeout: 60_000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 30_000,
+    });
+
+    // Em produção, valida a conexão imediatamente para falhar cedo
+    if (isProduction) {
+      const conn = await _pool.getConnection();
+      await conn.ping();
+      conn.release();
+    }
+
+    _db = drizzleMysql(_pool);
+    console.log('[Database] Conectado ao MySQL');
+    return _db;
+  } catch (error) {
+    console.error('[Database] Falha ao conectar:', error);
+    _pool = null;
+    _db = null;
+    if (isProduction) {
+      console.error('[Database] FATAL: banco de dados indisponível em produção. Encerrando.');
+      process.exit(1);
+    }
+    return null;
+  }
+}
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
-export async function getDb() {
-  if (!_db) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) {
-      console.warn("[Database] DATABASE_URL não definido. Configure no arquivo .env");
-      return null;
-    }
-    try {
-      // MySQL connection - using pool for auto-reconnection
-      const pool = mysql.createPool({
-        uri: connectionString,
-        waitForConnections: true,
-        connectionLimit: 10,
-        idleTimeout: 60000,
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 30000,
-      });
-      _db = drizzleMysql(pool);
-      console.log(`[Database] Conectado ao MySQL`);
-    } catch (error) {
-      console.warn("[Database] Falha ao conectar:", error);
-      _db = null;
-    }
+export async function getDb(): Promise<DrizzleDb | null> {
+  if (_db) return _db;
+  if (!_initPromise) {
+    _initPromise = initDb().finally(() => {
+      // Mantém a promise apenas se falhou — para permitir retry no próximo getDb()
+      if (!_db) _initPromise = null;
+    });
   }
-  return _db;
+  return _initPromise;
+}
+
+/**
+ * Fecha o pool MySQL — chamado no shutdown gracioso (SIGTERM/SIGINT).
+ */
+export async function closeDb(): Promise<void> {
+  if (_pool) {
+    try {
+      await _pool.end();
+      console.log('[Database] Pool MySQL fechado');
+    } catch (err) {
+      console.warn('[Database] Erro ao fechar pool:', (err as Error)?.message);
+    }
+    _pool = null;
+    _db = null;
+    _initPromise = null;
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -397,14 +458,16 @@ export async function getAlerts(tentId?: number, status?: "NEW" | "SEEN"): Promi
 export async function getNewAlertsCount(tentId?: number): Promise<number> {
   const db = await getDb();
   if (!db) return 0;
-  
-  let query = db.select({ count: sql<number>`count(*)` }).from(alerts).where(eq(alerts.status, "NEW"));
-  
-  if (tentId) {
-    query = query.where(and(eq(alerts.status, "NEW"), eq(alerts.tentId, tentId))) as any;
-  }
-  
-  const result = await query;
+
+  const condition = tentId
+    ? and(eq(alerts.status, "NEW"), eq(alerts.tentId, tentId))
+    : eq(alerts.status, "NEW");
+
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(alerts)
+    .where(condition);
+
   return Number(result[0]?.count ?? 0);
 }
 
@@ -816,12 +879,11 @@ export async function checkAlertsForTent(tentId: number): Promise<{
       await db.insert(alerts).values(alert);
 
       // Inserir em alertHistory (histórico permanente)
+      // Schema de alertHistory difere de alerts: sem alertType/logDate/turn,
+      // tem targetMin/targetMax/notificationSent/isRead.
       await db.insert(alertHistory).values({
         tentId: alert.tentId,
-        alertType: alert.alertType,
         metric: alert.metric,
-        logDate: alert.logDate,
-        turn: alert.turn,
         value: alert.value,
         message: alert.message,
       });

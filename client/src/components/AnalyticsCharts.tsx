@@ -6,14 +6,14 @@ import { TrendingUp, Droplets, Sun, FlaskConical } from "lucide-react";
 
 interface LogData {
   id: number;
-  logDate: string;
+  logDate: string | Date;
   turn: string;
-  tentName: string;
-  tempC: number | null;
-  rhPct: number | null;
+  tentName: string | null;
+  tempC: number | string | null;
+  rhPct: number | string | null;
   ppfd: number | null;
-  ph: number | null;
-  ec: number | null;
+  ph: number | string | null;
+  ec: number | string | null;
 }
 
 interface AnalyticsChartsProps {

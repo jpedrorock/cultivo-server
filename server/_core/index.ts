@@ -845,6 +845,41 @@ async function startServer() {
     console.log(`⏰ AlertsChecker: Cron job ativo`);
   console.log(`🔔 DailyReminder: Cron job ativo\n`);
   });
+
+  // Shutdown gracioso — fecha pools MySQL antes de encerrar
+  // para evitar conexões zumbis e dar chance das queries em andamento finalizarem.
+  let shuttingDown = false;
+  const gracefulShutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n[Shutdown] Recebido ${signal} — encerrando graciosamente...`);
+
+    // Para de aceitar novas conexões HTTP
+    server.close((err) => {
+      if (err) console.warn('[Shutdown] Erro ao fechar HTTP server:', err.message);
+      else console.log('[Shutdown] HTTP server fechado');
+    });
+
+    // Fecha pools de banco (Drizzle + raw)
+    try {
+      const { closeDb } = await import('../db');
+      const { closeMysqlPool } = await import('../mysql-pool');
+      await Promise.allSettled([closeDb(), closeMysqlPool()]);
+    } catch (err: any) {
+      console.warn('[Shutdown] Erro ao fechar pools:', err?.message);
+    }
+
+    // Force-exit após 10s caso algo trave (cron, requests pendurados)
+    setTimeout(() => {
+      console.warn('[Shutdown] Timeout — forçando saída');
+      process.exit(1);
+    }, 10_000).unref();
+
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => { void gracefulShutdown('SIGTERM'); });
+  process.on('SIGINT',  () => { void gracefulShutdown('SIGINT'); });
 }
 
 startServer().catch(console.error);
