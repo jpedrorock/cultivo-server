@@ -289,15 +289,18 @@ export default function Plant3DView({
     setNodes(raw && raw.length > 0 ? raw : createInitialGraph());
   }, [saved]);
 
-  // Auto-fit no primeiro carregamento (depois que cena+nós estão prontos)
+  // Quando potSizeL muda → libera auto-fit para enquadrar com o novo vaso
+  useEffect(() => { didFitRef.current = false; }, [potSizeL]);
+
+  // Auto-fit no primeiro carregamento e ao trocar potSizeL (depois que cena+nós prontos)
   useEffect(() => {
     if (didFitRef.current) return;
     if (nodes.length === 0 || !cameraRef.current || !controlsRef.current) return;
-    // Pequeno delay para garantir que o vaso foi criado
+    // Pequeno delay para garantir que o vaso foi reconstruído
     const t = setTimeout(() => {
       fitToPlant();
       didFitRef.current = true;
-    }, 100);
+    }, 120);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes.length, potSizeL]);
