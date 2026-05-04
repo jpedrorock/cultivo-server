@@ -3,17 +3,13 @@ import { motion } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/AnimatedButton";
-import { LazyImage } from "@/components/LazyImage";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { BigStepper } from "@/components/BigStepper";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, Camera, Upload, X, CheckCircle2, AlertTriangle, XCircle, Target, Smartphone, Sparkles, Wifi } from "lucide-react";
+import { Loader2, Home, ThermometerSun, Droplets, Sprout, GlassWater, Droplet, TestTube, Zap, Sun, Check, ArrowLeft, ArrowRight, Heart, SkipForward, Activity, X, CheckCircle2, AlertTriangle, Target, Smartphone, Sparkles, Wifi } from "lucide-react";
 import { CalcSlider } from "@/components/ui/calc-slider";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -23,6 +19,10 @@ import { PageTransition } from "@/components/PageTransition";
 import { savePendingLog, isOnline } from "@/lib/offlineStorage";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
+import { getCircleStyle } from "@/lib/quickLogColors";
+import { QuickLogModeSelector } from "@/components/QuickLogModeSelector";
+import { PlantHealthForm } from "@/components/PlantHealthForm";
+import { TrichomeForm } from "@/components/TrichomeForm";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
 
@@ -573,84 +573,6 @@ export default function QuickLog() {
 
   const currentStepData = steps[currentStep];
 
-  // ── Interpolação contínua de cor ─────────────────────────────────────────
-  function hexToRgb(hex: string): [number, number, number] {
-    return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
-  }
-  function lerpRgb(a: [number,number,number], b: [number,number,number], t: number): string {
-    return `rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;
-  }
-  function colorAtStops(v: number, stops: [number, string][]): string {
-    if (v <= stops[0][0]) return lerpRgb(hexToRgb(stops[0][1]), hexToRgb(stops[0][1]), 0);
-    if (v >= stops[stops.length-1][0]) return lerpRgb(hexToRgb(stops[stops.length-1][1]), hexToRgb(stops[stops.length-1][1]), 0);
-    for (let i = 0; i < stops.length-1; i++) {
-      const [v0, c0] = stops[i];
-      const [v1, c1] = stops[i+1];
-      if (v >= v0 && v <= v1) return lerpRgb(hexToRgb(c0), hexToRgb(c1), (v-v0)/(v1-v0));
-    }
-    return lerpRgb(hexToRgb(stops[0][1]), hexToRgb(stops[0][1]), 0);
-  }
-  function darkenRgb(rgb: string, amt = 28): string {
-    const m = rgb.match(/\d+/g)!;
-    return `rgb(${Math.max(0,+m[0]-amt)},${Math.max(0,+m[1]-amt)},${Math.max(0,+m[2]-amt)})`;
-  }
-
-  // ── Gradiente dinâmico do círculo ────────────────────────────────────────
-  function getDynamicCircleGradient(): string {
-    switch (currentStep) {
-      case 1: { // Temperatura — interpolação contínua frio→quente
-        const c = colorAtStops(parseFloat(tempC) || 20, [
-          [10, "#60a5fa"], [17, "#34d399"], [22, "#4ade80"], [28, "#fbbf24"], [36, "#f87171"],
-        ]);
-        return `linear-gradient(135deg, ${c}, ${darkenRgb(c)})`;
-      }
-      case 2: { // Umidade — cinza seco → azul saturado
-        const c = colorAtStops(parseFloat(rhPct) || 50, [
-          [0, "#94a3b8"], [40, "#93c5fd"], [65, "#60a5fa"], [100, "#3b82f6"],
-        ]);
-        return `linear-gradient(135deg, ${c}, ${darkenRgb(c)})`;
-      }
-      case 3: // Water — azul (tratado como fill na JSX)
-        return "linear-gradient(135deg, #60a5fa, #2563eb)";
-      case 4: // Runoff — teal (tratado como fill na JSX)
-        return "linear-gradient(135deg, #2dd4bf, #0d9488)";
-      case 5: { // pH — espectro contínuo
-        const c = colorAtStops(parseFloat(ph) || 6.5, [
-          [0, "#ef4444"], [4, "#f97316"], [6, "#eab308"],
-          [6.8, "#22c55e"], [8, "#14b8a6"], [10, "#3b82f6"], [14, "#a855f7"],
-        ]);
-        return `linear-gradient(135deg, ${c}, ${darkenRgb(c)})`;
-      }
-      case 6: // EC — âmbar/laranja fixo
-        return "linear-gradient(135deg, #fbbf24, #f97316)";
-      case 7: { // PPFD — amarelo cada vez mais quente
-        const c = colorAtStops(ppfd, [
-          [0, "#fde68a"], [400, "#fbbf24"], [800, "#f59e0b"], [1200, "#f97316"],
-        ]);
-        return `linear-gradient(135deg, ${c}, ${darkenRgb(c, 20)})`;
-      }
-      case 0:  return "linear-gradient(135deg, #60a5fa, #0891b2)";
-      case 8:  return "linear-gradient(135deg, #4ade80, #10b981)";
-      default: return "linear-gradient(135deg, #4ade80, #10b981)";
-    }
-  }
-
-  // ── Estilo completo do círculo (inclui glow para PPFD e fill para água) ──
-  function getCircleStyle(): React.CSSProperties {
-    const base = getDynamicCircleGradient();
-    if (currentStep === 7) {
-      const ratio = Math.min(1, ppfd / 1200);
-      const blur  = Math.round(ratio * 48);
-      const spread = Math.round(ratio * 20);
-      const alpha = (ratio * 0.75).toFixed(2);
-      return {
-        background: base,
-        boxShadow: `0 0 ${blur}px ${spread}px rgba(251,191,36,${alpha}), 0 0 ${Math.round(blur*1.8)}px ${Math.round(spread*1.5)}px rgba(249,115,22,${(ratio*0.35).toFixed(2)})`,
-      };
-    }
-    return { background: base };
-  }
-
   // fill % para steps de água
   const waterFillPct = Math.min(100, ((parseFloat(wateringVolume) || 0) / 3000) * 100);
   const runoffFillPct = Math.min(100, ((parseFloat(runoffCollected) || 0) / Math.max(parseFloat(wateringVolume) || 600, 600)) * 100);
@@ -692,76 +614,21 @@ export default function QuickLog() {
           </button>
           {/* Seleção de tipo — aparece antes do step 0 */}
           {logMode === null && (
-            <div className="flex-1 flex flex-col items-center justify-center px-5 gap-8 animate-[fade-in_0.4s_ease-out]">
-              <div className="text-center space-y-1.5">
-                <h2 className="text-2xl font-bold text-foreground">O que deseja registrar?</h2>
-                <p className="text-sm text-muted-foreground">Escolha o tipo de registro</p>
-              </div>
-              <div className="w-full space-y-3">
-                {/* Status da Estufa */}
-                <button
-                  onClick={() => { triggerHaptic('light'); setLogMode('status'); }}
-                  className="w-full rounded-2xl border border-teal-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-teal-500/40 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.08) 0%, var(--card) 60%)' }}
-                >
-                  <div className="p-4 flex items-center gap-4 w-full">
-                    <div className="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center shadow-lg shrink-0">
-                      <ThermometerSun className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-bold text-foreground text-base">Status da Estufa</div>
-                      <div className="text-sm text-muted-foreground">Temperatura, umidade, pH, EC, luz</div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-teal-400/60 shrink-0" />
-                  </div>
-                </button>
-
-                {/* Saúde de Planta */}
-                <button
-                  onClick={() => { triggerHaptic('light'); setLogMode('plant'); setCurrentStep(0); setRecordPlantHealth(true); }}
-                  className="w-full rounded-2xl border border-rose-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-rose-500/40 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, rgba(244,63,94,0.08) 0%, var(--card) 60%)' }}
-                >
-                  <div className="p-4 flex items-center gap-4 w-full">
-                    <div className="w-12 h-12 rounded-xl bg-rose-600 flex items-center justify-center shadow-lg shrink-0">
-                      <Heart className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-bold text-foreground text-base">Saúde de Planta</div>
-                      <div className="text-sm text-muted-foreground">Status, sintomas e observações por planta</div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-rose-400/60 shrink-0" />
-                  </div>
-                </button>
-
-                {/* Tricomas */}
-                <button
-                  onClick={() => {
-                    if (floraTents.length === 0) {
-                      toast.info("Nenhuma planta em floração no momento");
-                      return;
-                    }
-                    triggerHaptic('light');
-                    setLogMode('trichome');
-                    setCurrentStep(0);
-                    setRecordTrichomes(true);
-                  }}
-                  className="w-full rounded-2xl border border-violet-500/20 text-left flex items-center gap-4 overflow-hidden transition-all duration-200 hover:border-violet-500/40 active:scale-[0.98]"
-                  style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, var(--card) 60%)' }}
-                >
-                  <div className="p-4 flex items-center gap-4 w-full">
-                    <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shrink-0">
-                      <Sparkles className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-bold text-foreground text-base">Tricomas</div>
-                      <div className="text-sm text-muted-foreground">Maturação, percentagens por planta · Flora</div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-violet-400/60 shrink-0" />
-                  </div>
-                </button>
-              </div>
-            </div>
+            <QuickLogModeSelector
+              hasFloraTents={floraTents.length > 0}
+              onTrichomeUnavailable={() => toast.info("Nenhuma planta em floração no momento")}
+              onSelectMode={(mode) => {
+                triggerHaptic('light');
+                setLogMode(mode);
+                if (mode === 'plant') {
+                  setCurrentStep(0);
+                  setRecordPlantHealth(true);
+                } else if (mode === 'trichome') {
+                  setCurrentStep(0);
+                  setRecordTrichomes(true);
+                }
+              }}
+            />
           )}
 
           {/* Step content */}
@@ -798,7 +665,7 @@ export default function QuickLog() {
                     /* Círculo normal com gradiente animado */
                     <motion.div
                       className="w-32 h-32 rounded-full flex items-center justify-center shadow-xl animate-[slide-in-from-bottom_0.6s_ease-out]"
-                      animate={getCircleStyle() as any}
+                      animate={getCircleStyle({ step: currentStep, tempC, rhPct, ph, ppfd }) as any}
                       transition={{ duration: 0.45, ease: "easeInOut" }}
                     >
                       <currentStepData.icon className="w-16 h-16 text-white" />
@@ -1274,97 +1141,14 @@ export default function QuickLog() {
 
             {/* Step 10+: Plant health form (expanded) */}
             {currentStep >= 9 && recordPlantHealth === true && plants[currentPlantIndex] && (
-              <div className="space-y-4">
-                {/* Status buttons */}
-                <div className="flex flex-col gap-3">
-                  {[
-                    { value: "healthy",   label: "Saudável", Icon: CheckCircle2, active: "bg-green-500 text-white shadow-lg border-transparent" },
-                    { value: "attention", label: "Atenção",  Icon: AlertTriangle, active: "bg-yellow-500 text-white shadow-lg border-transparent" },
-                    { value: "sick",      label: "Doente",   Icon: XCircle,       active: "bg-red-500 text-white shadow-lg border-transparent" },
-                  ].map(({ value, label, Icon, active }) => {
-                    const selected = (plantHealthRecords.get(plants[currentPlantIndex].id)?.status || "healthy") === value;
-                    return (
-                      <button
-                        key={value}
-                        onClick={() => updatePlantHealthRecord(plants[currentPlantIndex].id, "status", value)}
-                        className={`flex items-center gap-5 w-full px-6 rounded-2xl font-bold text-lg transition-all duration-300 border-2 min-h-[72px] ${selected ? active : "bg-card text-card-foreground border-border active:scale-[0.98]"}`}
-                      >
-                        <Icon className="w-7 h-7 shrink-0" />
-                        <span>{label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Foto — primeiro, destaque */}
-                {(plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl) ? (
-                  <div className="relative">
-                    <LazyImage
-                      src={plantHealthRecords.get(plants[currentPlantIndex].id)?.photoPreview || plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl!}
-                      alt="Preview"
-                      aspectRatio="16/9"
-                      className="w-full h-48 rounded-xl"
-                    />
-                    {plantHealthRecords.get(plants[currentPlantIndex].id)?.photoUrl && (
-                      <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">✓ Enviada</div>
-                    )}
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        updatePlantHealthRecord(plants[currentPlantIndex].id, "photoPreview", undefined);
-                        updatePlantHealthRecord(plants[currentPlantIndex].id, "photoUrl", undefined);
-                      }}
-                      className="absolute top-2 right-2"
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                ) : uploadProgress.isUploading ? (
-                  <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-green-500 rounded-xl bg-green-500/10">
-                    <Loader2 className="h-8 w-8 text-green-500 animate-spin mb-2" />
-                    <span className="text-sm text-green-500 font-medium">Enviando foto...</span>
-                    <span className="text-xs text-green-500 mt-1">{uploadProgress.progress}%</span>
-                  </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-500/5 transition-colors">
-                    <Camera className="h-7 w-7 text-muted-foreground mb-1" />
-                    <span className="text-sm text-muted-foreground">Adicionar Foto</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handlePhotoCapture}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-
-                {/* Observações — visível direto */}
-                <Textarea
-                  value={plantHealthRecords.get(plants[currentPlantIndex].id)?.notes || ""}
-                  onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "notes", e.target.value)}
-                  placeholder="Observações gerais..."
-                  className="min-h-[80px] border-2 border-input rounded-xl bg-card text-foreground shadow-sm"
-                />
-
-                {/* Sintomas — colapsado por padrão */}
-                <Accordion type="multiple" defaultValue={[]} className="space-y-0">
-                  <AccordionItem value="symptoms" className="border border-border rounded-xl bg-card shadow-sm">
-                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                      <span className="text-sm font-medium text-muted-foreground">Sintomas</span>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                      <Input
-                        value={plantHealthRecords.get(plants[currentPlantIndex].id)?.symptoms || ""}
-                        onChange={(e) => updatePlantHealthRecord(plants[currentPlantIndex].id, "symptoms", e.target.value)}
-                        placeholder="Ex: Folhas amareladas, manchas..."
-                        className="h-12 border-2 border-input rounded-xl bg-card text-foreground shadow-sm"
-                      />
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </div>
+              <PlantHealthForm
+                record={plantHealthRecords.get(plants[currentPlantIndex].id)}
+                onChange={(field, value) =>
+                  updatePlantHealthRecord(plants[currentPlantIndex].id, field, value)
+                }
+                onPhotoCapture={handlePhotoCapture}
+                uploadProgress={uploadProgress}
+              />
             )}
             {/* Pergunta: registrar tricomas? — só no modo planta, nunca no modo status/estufa */}
             {recordTrichomes === null && isFloraPhase && logMode === 'plant' && (
@@ -1437,88 +1221,17 @@ export default function QuickLog() {
             )}
 
             {/* Formulário de tricomas por planta */}
-            {recordTrichomes === true && plants[currentTrichomeIndex] && (() => {
-              const plant = plants[currentTrichomeIndex];
-              const rec = trichomeRecords.get(plant.id) || { status: "CLOUDY" as const, clearPct: "", cloudyPct: "", amberPct: "", notes: "" };
-              const trichomeOptions: { value: "CLEAR"|"CLOUDY"|"AMBER"|"MIXED"; label: string; sub: string; gradient: string }[] = [
-                { value: "CLEAR",  label: "Translúcidos",   sub: "Cedo demais",    gradient: "bg-sky-400" },
-                { value: "CLOUDY", label: "Opacos",         sub: "Maturação ideal",gradient: "bg-slate-500" },
-                { value: "AMBER",  label: "Âmbar",          sub: "Efeito sedativo",gradient: "bg-amber-500" },
-                { value: "MIXED",  label: "Misturado",      sub: "Equilibrado",    gradient: "bg-violet-500" },
-              ];
-              return (
-                <div className="space-y-4 animate-[slide-in-from-bottom_0.6s_ease-out]">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground/60 font-medium">
-                        Planta {currentTrichomeIndex + 1} de {plants.length}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold">
-                        Tricomas
-                      </span>
-                    </div>
-                    <div className="text-2xl font-black text-foreground truncate">{plant.name}</div>
-                  </div>
-
-                  {/* Status buttons */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {trichomeOptions.map(({ value, label, sub, gradient }) => (
-                      <button
-                        key={value}
-                        onClick={() => updateTrichomeRecord(plant.id, "status", value)}
-                        className={`flex flex-col items-center justify-center gap-1 p-4 rounded-2xl border-2 font-bold transition-all duration-200 ${
-                          rec.status === value
-                            ? `${gradient} text-white border-transparent shadow-lg scale-[1.02]`
-                            : "bg-card text-card-foreground border-border active:scale-[0.98]"
-                        }`}
-                      >
-                        <span className="text-base font-bold">{label}</span>
-                        <span className={`text-[11px] font-normal ${rec.status === value ? "text-white/80" : "text-muted-foreground"}`}>{sub}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Percentagens — colapsável */}
-                  <Accordion type="multiple" defaultValue={[]} className="space-y-0">
-                    <AccordionItem value="pcts" className="border border-border rounded-xl bg-card shadow-sm">
-                      <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                        <span className="text-sm font-medium text-muted-foreground">Percentagens por tipo (opcional)</span>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-4 pb-4">
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { field: "clearPct",  label: "Transl. %",  val: rec.clearPct },
-                            { field: "cloudyPct", label: "Opacos %",   val: rec.cloudyPct },
-                            { field: "amberPct",  label: "Âmbar %",    val: rec.amberPct },
-                          ].map(({ field, label, val }) => (
-                            <div key={field}>
-                              <label className="text-[11px] text-muted-foreground block mb-1">{label}</label>
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                min={0} max={100}
-                                value={val}
-                                onChange={(e) => updateTrichomeRecord(plant.id, field, e.target.value)}
-                                placeholder="0"
-                                className="h-10 text-center border-2 border-input rounded-xl"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-
-                  {/* Notas */}
-                  <Input
-                    value={rec.notes}
-                    onChange={(e) => updateTrichomeRecord(plant.id, "notes", e.target.value)}
-                    placeholder="Observações (opcional)"
-                    className="h-12 border-2 border-input rounded-xl bg-card"
-                  />
-                </div>
-              );
-            })()}
+            {recordTrichomes === true && plants[currentTrichomeIndex] && (
+              <TrichomeForm
+                plant={plants[currentTrichomeIndex]}
+                currentIndex={currentTrichomeIndex}
+                totalPlants={plants.length}
+                record={trichomeRecords.get(plants[currentTrichomeIndex].id)}
+                onChange={(field, value) =>
+                  updateTrichomeRecord(plants[currentTrichomeIndex].id, field, value)
+                }
+              />
+            )}
 
           </div>
           </div>}
