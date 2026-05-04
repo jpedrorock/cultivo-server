@@ -5737,6 +5737,11 @@ export const appRouter = router({
   }),
 
   // CannaPrune — Plant Structure (nós interativos da planta)
+
+  // ── Zod schema para PlantGraphNode (validação server-side) ──────────────────
+  // Previne stored-XSS: z.array(z.any()) aceitaria qualquer payload
+  // ───────────────────────────────────────────────────────────────────────────
+
   plantStructure: router({
     /** Retorna a estrutura salva da planta, ou null se ainda não foi criada */
     get: protectedProcedure
@@ -5763,7 +5768,40 @@ export const appRouter = router({
     save: protectedProcedure
       .input(z.object({
         plantId: z.number(),
-        nodes: z.array(z.any()),
+        // Validação tipada previne stored-XSS (substituiu z.array(z.any()))
+        nodes: z.array(z.object({
+          id:             z.string().min(1).max(128),
+          parentId:       z.string().min(1).max(128).nullable(),
+          type:           z.enum(['root', 'internode', 'top']),
+          state:          z.enum(['active', 'topped', 'fimmed', 'lst', 'super-cropped']),
+          nodeNumber:     z.number().int().min(0).max(9999),
+          technique:      z.enum(['topping', 'fim', 'lst', 'super-crop']).optional(),
+          edgeCtrl:       z.object({ dx1: z.number(), dy1: z.number(), dx2: z.number(), dy2: z.number() }).optional(),
+          edgeState:      z.enum(['active', 'defoliated', 'recovering']).optional(),
+          edgeModifiedAt: z.string().max(64).optional(),
+          posX:           z.number().optional(),
+          posY:           z.number().optional(),
+          pos3D:          z.object({ x: z.number(), y: z.number(), z: z.number() }).optional(),
+          branchBend:     z.object({ x: z.number(), y: z.number(), z: z.number() }).optional(),
+          lstAppliedAt:   z.string().max(64).optional(),
+        }))
+        .max(500, 'Máximo de 500 nós por planta')
+        .superRefine((nodes, ctx) => {
+          const ids = new Set(nodes.map(n => n.id));
+          if (ids.size !== nodes.length) {
+            ctx.addIssue({ code: 'custom', message: 'IDs de nós duplicados' });
+            return;
+          }
+          const roots = nodes.filter(n => n.parentId === null);
+          if (roots.length > 1) {
+            ctx.addIssue({ code: 'custom', message: 'Apenas um nó raiz é permitido' });
+          }
+          for (const node of nodes) {
+            if (node.parentId !== null && !ids.has(node.parentId)) {
+              ctx.addIssue({ code: 'custom', message: `parentId "${node.parentId}" não existe nos nós` });
+            }
+          }
+        }),
       }))
       .mutation(async ({ input, ctx }) => {
         await validatePlantOwnership(input.plantId, ctx.user.groupId);

@@ -40,8 +40,7 @@ export interface PlantGraphNode {
 
 // ── ID helpers ────────────────────────────────────────────────────────────────
 
-let _c = 0;
-function uid(): string { return `g${++_c}-${Date.now().toString(36)}`; }
+function uid(): string { return crypto.randomUUID(); }
 
 function maxNum(nodes: PlantGraphNode[]): number {
   return nodes.reduce((m, n) => Math.max(m, n.nodeNumber), 0);

@@ -525,6 +525,8 @@ export default function PlantNodeMap({
             origDx: handleNum === 1 ? ctrl.dx1 : ctrl.dx2,
             origDy: handleNum === 1 ? ctrl.dy1 : ctrl.dy2,
           };
+          // Captura o ponteiro para receber eventos mesmo fora do elemento
+          el!.setPointerCapture(e.pointerId);
         }
         return;
       }
@@ -541,6 +543,8 @@ export default function PlantNodeMap({
             origX: ln.x, origY: ln.y,
             moved: false,
           };
+          // Captura o ponteiro para receber eventos mesmo fora do elemento
+          el!.setPointerCapture(e.pointerId);
           return;
         }
       }
@@ -566,6 +570,7 @@ export default function PlantNodeMap({
       setEdgeMenuOpen(false);
       gestureRef.current.ptrs.push({ id: e.pointerId, x: e.clientX, y: e.clientY });
       if (gestureRef.current.ptrs.length === 1) gestureRef.current.moved = false;
+      el!.setPointerCapture(e.pointerId);
     }
 
     function onPointerMove(e: PointerEvent) {
