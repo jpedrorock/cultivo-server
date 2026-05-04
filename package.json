@@ -16,7 +16,7 @@
     "db:seed": "node server/seed.mjs",
     "db:reset": "node server/seed.mjs",
     "db:restart": "node server/db-reset.mjs",
-    "db:migrate": "node server/db-migrate.mjs",
+    "db:migrate": "tsx server/_core/dbMigrations.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
