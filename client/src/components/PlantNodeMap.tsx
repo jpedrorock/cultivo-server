@@ -669,6 +669,9 @@ export default function PlantNodeMap({
         if (nd.moved) {
           // Marca a aresta do nó movido como recovering (linha azul por 5 dias)
           setNodes(ns => setEdgeRecovering(ns, nd.nodeId));
+          // Persiste posição arrastada com debounce de 1 s (sem spammar o DB durante drag rápido)
+          if (saveTimer.current) clearTimeout(saveTimer.current);
+          saveTimer.current = setTimeout(() => { saveFnRef.current(); }, 1000);
         } else {
           // Tap sem arrastar → abre menu de ações do nó
           setSelectedId(nd.nodeId);

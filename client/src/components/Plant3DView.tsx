@@ -50,6 +50,47 @@ function nodeColor(n: PlantGraphNode): string {
   }
 }
 
+// ── Recursos Three.js compartilhados (criados uma vez, nunca descartados) ─────
+// Evita criar/descartar centenas de geometrias e materiais a cada setNodes.
+
+const R_INNER = 0.018;
+const R_TOP   = 0.025;
+
+/** Geometrias fixas (forma não muda entre nós) */
+const GEO = {
+  nodeInner: new THREE.SphereGeometry(R_INNER, 24, 24),
+  nodeTop:   new THREE.SphereGeometry(R_TOP,   24, 24),
+  bud:       new THREE.ConeGeometry(R_TOP * 0.7, R_TOP * 1.4, 12),
+  ringInner: new THREE.RingGeometry(R_INNER * 1.5, R_INNER * 1.7, 32),
+  ringTop:   new THREE.RingGeometry(R_TOP   * 1.5, R_TOP   * 1.7, 32),
+};
+
+/** Materiais compartilhados (cor não varia entre instâncias do mesmo tipo) */
+const MAT = {
+  nodeActive:  new THREE.MeshStandardMaterial({ color: COLOR.active,       emissive: COLOR.active,       emissiveIntensity: 0.18, roughness: 0.4 }),
+  nodeTop:     new THREE.MeshStandardMaterial({ color: COLOR.active,       emissive: COLOR.active,       emissiveIntensity: 0.35, roughness: 0.4 }),
+  nodeLst:     new THREE.MeshStandardMaterial({ color: COLOR.lst,          emissive: COLOR.lst,          emissiveIntensity: 0.18, roughness: 0.4 }),
+  nodeTopped:  new THREE.MeshStandardMaterial({ color: COLOR.topped,       emissive: COLOR.topped,       emissiveIntensity: 0.18, roughness: 0.4 }),
+  nodeFimmed:  new THREE.MeshStandardMaterial({ color: COLOR.fimmed,       emissive: COLOR.fimmed,       emissiveIntensity: 0.18, roughness: 0.4 }),
+  nodeSc:      new THREE.MeshStandardMaterial({ color: COLOR.superCropped, emissive: COLOR.superCropped, emissiveIntensity: 0.18, roughness: 0.4 }),
+  branchAct:   new THREE.MeshStandardMaterial({ color: COLOR.branch,    roughness: 0.6 }),
+  branchLst:   new THREE.MeshStandardMaterial({ color: COLOR.branchLst, roughness: 0.6 }),
+  hitbox:      new THREE.MeshBasicMaterial({ visible: false, transparent: true, opacity: 0 }),
+  bud:         new THREE.MeshStandardMaterial({ color: "#a3e635", emissive: "#65a30d", emissiveIntensity: 0.3, roughness: 0.6 }),
+  ring:        new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }),
+};
+
+function getNodeMat(n: PlantGraphNode, isTop: boolean): THREE.MeshStandardMaterial {
+  if (isTop) return MAT.nodeTop;
+  switch (n.state) {
+    case 'lst':           return MAT.nodeLst;
+    case 'topped':        return MAT.nodeTopped;
+    case 'fimmed':        return MAT.nodeFimmed;
+    case 'super-cropped': return MAT.nodeSc;
+    default:              return MAT.nodeActive;
+  }
+}
+
 // ── Layout 3D radial ──────────────────────────────────────────────────────────
 
 interface Pos3D { x: number; y: number; z: number }
@@ -283,7 +324,7 @@ export default function Plant3DView({
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(w, h);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
@@ -611,12 +652,12 @@ export default function Plant3DView({
     branchMeshesRef.current.clear();
     bendHandleRef.current = null;
 
-    // Limpa grupo anterior
+    // Limpa grupo anterior — só descarta TubeGeometry (gerada por curva, única por galho);
+    // geometrias e materiais compartilhados (GEO/MAT) são NUNCA descartados aqui.
     while (group.children.length > 0) {
-      const obj = group.children[0];
+      const obj = group.children[0] as THREE.Mesh;
       group.remove(obj);
-      if ((obj as any).geometry) (obj as any).geometry.dispose();
-      if ((obj as any).material) (obj as any).material.dispose();
+      if (obj.geometry instanceof THREE.TubeGeometry) obj.geometry.dispose();
     }
 
     const nodeById = new Map<string, PlantGraphNode>();
@@ -678,10 +719,9 @@ export default function Plant3DView({
       }
 
       const curve = new THREE.QuadraticBezierCurve3(fromV, mid, toV);
-      const branchColor = node.state === 'lst' ? COLOR.branchLst : COLOR.branch;
       const branch = new THREE.Mesh(
         new THREE.TubeGeometry(curve, 16, tubeRadius, 8, false),
-        new THREE.MeshStandardMaterial({ color: branchColor, roughness: 0.6 }),
+        node.state === 'lst' ? MAT.branchLst : MAT.branchAct,  // material compartilhado
       );
       branch.name = 'branch';
       branch.userData.nodeId = node.id;
@@ -692,7 +732,7 @@ export default function Plant3DView({
       const hitRadius = Math.max(0.022, tubeRadius * 3.5);   // mínimo 2.2cm para click
       const hitbox = new THREE.Mesh(
         new THREE.TubeGeometry(curve, 16, hitRadius, 6, false),
-        new THREE.MeshBasicMaterial({ visible: false, transparent: true, opacity: 0 }),
+        MAT.hitbox,  // material compartilhado
       );
       hitbox.userData.nodeId = node.id;
       hitbox.name = 'branchHitbox';
@@ -710,16 +750,10 @@ export default function Plant3DView({
       const pos = positions.get(node.id);
       if (!pos) continue;
       const isTop  = node.type === 'top' && node.state === 'active';
-      const radius = isTop ? 0.025 : 0.018;   // ~2.5cm topo, ~1.8cm internódio
-      const color  = nodeColor(node);
+      // Geometria e material compartilhados — zero alocação GPU por nó
       const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(radius, 24, 24),
-        new THREE.MeshStandardMaterial({
-          color,
-          emissive: color,
-          emissiveIntensity: isTop ? 0.35 : 0.18,
-          roughness: 0.4,
-        }),
+        isTop ? GEO.nodeTop : GEO.nodeInner,
+        getNodeMat(node, isTop),
       );
       mesh.position.set(pos.x, pos.y, pos.z);
       mesh.userData.nodeId = node.id;
@@ -729,16 +763,8 @@ export default function Plant3DView({
 
       // Bud (cone) acima dos topos ativos — visual de flor
       if (isTop) {
-        const bud = new THREE.Mesh(
-          new THREE.ConeGeometry(radius * 0.7, radius * 1.4, 12),
-          new THREE.MeshStandardMaterial({
-            color: "#a3e635",
-            emissive: "#65a30d",
-            emissiveIntensity: 0.3,
-            roughness: 0.6,
-          }),
-        );
-        bud.position.set(pos.x, pos.y + radius * 1.3, pos.z);
+        const bud = new THREE.Mesh(GEO.bud, MAT.bud);
+        bud.position.set(pos.x, pos.y + R_TOP * 1.3, pos.z);
         bud.castShadow = true;
         group.add(bud);
       }
@@ -746,8 +772,8 @@ export default function Plant3DView({
       // Halo de seleção
       if (selectedId === node.id) {
         const ring = new THREE.Mesh(
-          new THREE.RingGeometry(radius * 1.5, radius * 1.7, 32),
-          new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }),
+          isTop ? GEO.ringTop : GEO.ringInner,
+          MAT.ring,
         );
         ring.position.copy(mesh.position);
         ring.lookAt(cameraRef.current?.position ?? new THREE.Vector3(0, 1, 0));
