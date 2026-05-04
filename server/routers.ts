@@ -5760,6 +5760,7 @@ export const appRouter = router({
           id: row.id,
           plantId: row.plantId,
           nodes: JSON.parse(row.nodesJson as string),
+          potSizeL: (row.potSizeL as number | null) ?? 5,
           updatedAt: row.updatedAt,
         };
       }),
@@ -5822,6 +5823,36 @@ export const appRouter = router({
           await database.insert(plantStructures).values({
             plantId: input.plantId,
             nodesJson,
+          });
+        }
+        return { success: true };
+      }),
+
+    /** Atualiza apenas o tamanho do vaso (sem reescrever os nós) */
+    savePotSize: protectedProcedure
+      .input(z.object({
+        plantId:  z.number(),
+        potSizeL: z.number().positive().max(200),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+        const database = await getDb();
+        if (!database) throw new Error('Banco indisponível');
+        const existing = await database
+          .select({ id: plantStructures.id })
+          .from(plantStructures)
+          .where(eq(plantStructures.plantId, input.plantId))
+          .limit(1);
+        if (existing.length > 0) {
+          await database
+            .update(plantStructures)
+            .set({ potSizeL: input.potSizeL })
+            .where(eq(plantStructures.plantId, input.plantId));
+        } else {
+          await database.insert(plantStructures).values({
+            plantId:   input.plantId,
+            nodesJson: JSON.stringify([]),
+            potSizeL:  input.potSizeL,
           });
         }
         return { success: true };

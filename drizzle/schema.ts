@@ -1,5 +1,6 @@
 import {
   int,
+  float,
   mysqlEnum,
   mysqlTable,
   text,
@@ -1016,6 +1017,7 @@ export const plantStructures = mysqlTable("plantStructures", {
     .references(() => plants.id, { onDelete: "cascade" })
     .unique(),
   nodesJson: text("nodesJson").notNull(), // JSON serializado de PlantNode[]
+  potSizeL:  float("potSizeL").default(5).notNull(), // Tamanho do vaso em litros
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

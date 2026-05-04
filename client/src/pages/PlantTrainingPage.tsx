@@ -78,15 +78,29 @@ export default function PlantTrainingPage() {
   const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
   const [viewMode,         setViewMode]         = useState<'top' | '3d'>(initialView);
   const [topViewNodes,     setTopViewNodes]     = useState<PlantGraphNode[]>([]);
-  // Tamanho do vaso em litros — persistido em localStorage por planta
-  const [potSizeL, setPotSizeL] = useState<number>(() => {
-    if (!plantId) return 5;
-    const saved = localStorage.getItem(`plant-${plantId}-potSize`);
-    return saved ? parseFloat(saved) || 5 : 5;
-  });
+
+  // ── Tamanho do vaso — agora persistido no banco (antes: localStorage) ───────
+  const { data: plantStructure } = trpc.plantStructure.get.useQuery(
+    { plantId: plantId! },
+    { enabled: !!plantId, refetchOnWindowFocus: false },
+  );
+  const savePotSizeMutation = trpc.plantStructure.savePotSize.useMutation();
+  const potSizeSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [potSizeL, setPotSizeL] = useState<number>(5);
+  // Sincroniza com valor do banco quando a query retorna
   useEffect(() => {
-    if (plantId) localStorage.setItem(`plant-${plantId}-potSize`, String(potSizeL));
-  }, [plantId, potSizeL]);
+    if (plantStructure !== undefined) {
+      setPotSizeL(plantStructure?.potSizeL ?? 5);
+    }
+  }, [plantStructure]);
+  // Persiste no banco com debounce ao alterar
+  function handlePotSizeChange(newVal: number) {
+    setPotSizeL(newVal);
+    if (potSizeSaveTimer.current) clearTimeout(potSizeSaveTimer.current);
+    potSizeSaveTimer.current = setTimeout(() => {
+      if (plantId) savePotSizeMutation.mutate({ plantId, potSizeL: newVal });
+    }, 800);
+  }
   const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
   // Técnicas aplicadas nesta sessão do sandbox
   const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
@@ -252,7 +266,7 @@ export default function PlantTrainingPage() {
                     type="number"
                     min="0.5" step="0.5" max="100"
                     value={potSizeL}
-                    onChange={(e) => setPotSizeL(Math.max(0.5, parseFloat(e.target.value) || 5))}
+                    onChange={(e) => handlePotSizeChange(Math.max(0.5, parseFloat(e.target.value) || 5))}
                     className="w-12 h-7 px-1.5 text-[11px] font-medium bg-muted/50 border border-border/40 rounded-md text-center focus:outline-none focus:border-primary"
                     title="Tamanho do vaso (litros)"
                   />

@@ -502,6 +502,13 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: 'add-plantStructures-potSizeL',
+    description: 'Adiciona plantStructures.potSizeL (tamanho do vaso em litros)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'plantStructures', 'potSizeL', 'FLOAT NOT NULL DEFAULT 5');
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
