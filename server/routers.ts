@@ -5634,6 +5634,42 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    /** Insere múltiplas técnicas de uma sessão em um único request (substituiu N calls ao create) */
+    createBatch: protectedProcedure
+      .input(z.object({
+        plantId:    z.number(),
+        techniques: z.array(z.object({
+          technique:       z.string(),
+          response:        z.string().optional(),
+          notes:           z.string().optional(),
+          nodePosition:    z.string().optional(),
+          techniqueConfig: z.object({
+            expectedTops: z.number(),
+            recoveryDays: z.number(),
+          }).optional(),
+        })).min(1).max(50),
+        snapshotJson: z.string().optional(), // snapshot compartilhado por toda a sessão
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validatePlantOwnership(input.plantId, ctx.user.groupId);
+
+        const rows = input.techniques.map(t => ({
+          plantId:         input.plantId,
+          technique:       t.technique,
+          response:        t.response        ?? null,
+          notes:           t.notes           ?? null,
+          nodePosition:    t.nodePosition    ?? null,
+          techniqueConfig: t.techniqueConfig ? JSON.stringify(t.techniqueConfig) : null,
+          actualResult:    null as null,
+          snapshotJson:    input.snapshotJson ?? null,
+        }));
+
+        await database.insert(plantLSTLogs).values(rows);
+        return { success: true, count: rows.length };
+      }),
+
     update: protectedProcedure
       .input(z.object({
         id: z.number(),

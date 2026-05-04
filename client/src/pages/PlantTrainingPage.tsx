@@ -55,7 +55,7 @@ export default function PlantTrainingPage() {
 
   // Mutations
   const utils = trpc.useUtils();
-  const createMutation = trpc.plantLST.create.useMutation({
+  const createBatchMutation = trpc.plantLST.createBatch.useMutation({
     onSuccess: () => {
       refetch();
       utils.plantLST.stats.invalidate({ plantId: plantId! });
@@ -144,7 +144,7 @@ export default function PlantTrainingPage() {
     }
   }
 
-  // ── Salvar sessão: cria os logs (com snapshot) e fecha ───────────────────
+  // ── Salvar sessão: cria os logs em lote (1 request) e fecha ──────────────
   function handleSaveSession() {
     if (!plantId) return;
     setExitConfirmOpen(false);
@@ -152,20 +152,20 @@ export default function PlantTrainingPage() {
     const snapshot = nodeSnapshotRef.current.length > 0
       ? JSON.stringify(nodeSnapshotRef.current)
       : undefined;
-    // Cria um log por técnica aplicada, todos com o mesmo snapshot da sessão
-    sessionTechniques.forEach(({ technique, nodeLabel }) => {
-      const techId = normalizeTechniqueName(technique) as TechniqueId | null;
-      const cfg    = techId ? TECHNIQUE_CONFIGS[techId] : null;
-      createMutation.mutate({
-        plantId,
-        technique,
-        nodePosition: nodeLabel,
-        techniqueConfig: cfg
-          ? { expectedTops: cfg.expectedTops, recoveryDays: cfg.recoveryDays }
-          : undefined,
-        snapshotJson: snapshot,
+    if (sessionTechniques.length > 0) {
+      const techniques = sessionTechniques.map(({ technique, nodeLabel }) => {
+        const techId = normalizeTechniqueName(technique) as TechniqueId | null;
+        const cfg    = techId ? TECHNIQUE_CONFIGS[techId] : null;
+        return {
+          technique,
+          nodePosition: nodeLabel,
+          techniqueConfig: cfg
+            ? { expectedTops: cfg.expectedTops, recoveryDays: cfg.recoveryDays }
+            : undefined,
+        };
       });
-    });
+      createBatchMutation.mutate({ plantId, techniques, snapshotJson: snapshot });
+    }
     setMapFullscreen(false); // PlantNodeMap salva estrutura no unmount
   }
 
