@@ -1,19 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { LogOut } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 
 export default function Setup() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [groupName, setGroupName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) setLocation('/login');
   }, [loading, isAuthenticated, setLocation]);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await logout();
+    // Hard redirect garante que App.tsx re-avalia auth state do zero
+    window.location.href = '/login';
+  };
 
   const createGroup = trpc.groups.create.useMutation({
     onSuccess: () => { window.location.href = '/'; },
@@ -27,6 +36,17 @@ export default function Setup() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      {/* Botão "Sair" — sempre visível, evita o usuário ficar preso na tela de setup */}
+      <button
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="absolute top-4 right-4 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 px-3 py-1.5 rounded-lg hover:bg-muted"
+        style={{ top: 'max(1rem, env(safe-area-inset-top))', right: 'max(1rem, env(safe-area-inset-right))' }}
+      >
+        <LogOut className="w-3.5 h-3.5" />
+        {loggingOut ? 'Saindo...' : 'Sair'}
+      </button>
+
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto mb-4">

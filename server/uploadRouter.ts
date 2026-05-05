@@ -72,38 +72,43 @@ router.post(
   uploadLimiter,
   upload.single("file"),
   async (req: Request, res: Response) => {
+    const userId = (req as any).user?.id as number | undefined;
+
+    if (!sharpLib) {
+      return res.status(503).json({ error: "Processamento de imagens indisponível no servidor" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: "Nenhum arquivo enviado." });
+    }
+
+    const sharp = sharpLib;
+    const inputBuffer = req.file.buffer;
+
+    // 1) Detectar formato real lendo magic bytes (não confiar no mimetype do cliente).
+    //    Erros aqui são quase sempre arquivo corrompido ou tipo errado — devolve 400.
+    let metadata: import("sharp").Metadata;
     try {
-      if (!sharpLib) {
-        return res.status(503).json({ error: "Processamento de imagens indisponível no servidor" });
-      }
-      if (!req.file) {
-        return res.status(400).json({ error: "Nenhum arquivo enviado." });
-      }
+      metadata = await sharp(inputBuffer).metadata();
+    } catch (err) {
+      console.warn(`[upload] metadata fail user=${userId} size=${inputBuffer.length} mime=${req.file.mimetype}: ${(err as Error)?.message}`);
+      return res.status(400).json({ error: "Arquivo enviado não é uma imagem válida ou está corrompido." });
+    }
 
-      const sharp = sharpLib;
-      const inputBuffer = req.file.buffer;
+    const detectedFormat = (metadata.format || "").toLowerCase();
+    if (!ACCEPTED_FORMATS.has(detectedFormat)) {
+      return res.status(400).json({
+        error: `Formato "${detectedFormat || "desconhecido"}" não suportado. Use JPEG, PNG, WebP, GIF ou HEIC.`,
+      });
+    }
 
-      // 1) Detectar formato real lendo magic bytes (não confiar no mimetype do cliente)
-      let metadata: import("sharp").Metadata;
-      try {
-        metadata = await sharp(inputBuffer).metadata();
-      } catch {
-        return res.status(400).json({ error: "Arquivo enviado não é uma imagem válida" });
-      }
-      const detectedFormat = (metadata.format || "").toLowerCase();
-      if (!ACCEPTED_FORMATS.has(detectedFormat)) {
-        return res.status(400).json({ error: `Formato não suportado: ${detectedFormat || "desconhecido"}` });
-      }
+    // 2) Re-encode — força saída válida e descarta EXIF/payloads embedados.
+    //    Erros aqui podem ser sharp/libvips (HEIC sem suporte, GIF malformado, etc.) —
+    //    devolve 422 com a causa real para o usuário entender o problema.
+    let outBuffer: Buffer;
+    let outMime: string;
+    let outExt: string;
 
-      // 2) Re-encode — força saída válida e descarta EXIF/payloads embedados.
-      //    Para HEIC/AVIF/HEIF: converte para JPEG (compatibilidade browser).
-      //    Para PNG: preserva (alpha pode ser necessário).
-      //    Para GIF/WebP: preserva (animação/transparência).
-      //    Default: JPEG.
-      let outBuffer: Buffer;
-      let outMime: string;
-      let outExt: string;
-
+    try {
       if (detectedFormat === "png") {
         outBuffer = await sharp(inputBuffer).png({ compressionLevel: 8 }).toBuffer();
         outMime = "image/png"; outExt = "png";
@@ -113,28 +118,45 @@ router.post(
       } else if (detectedFormat === "gif") {
         outBuffer = await sharp(inputBuffer, { animated: true }).gif().toBuffer();
         outMime = "image/gif"; outExt = "gif";
+      } else if (detectedFormat === "heif" || detectedFormat === "heic") {
+        // HEIC do iPhone — converter explicitamente para JPEG
+        // Pode falhar se libvips foi compilada sem suporte HEIF (Alpine slim)
+        try {
+          outBuffer = await sharp(inputBuffer).rotate().jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+          outMime = "image/jpeg"; outExt = "jpg";
+        } catch (heifErr) {
+          console.error(`[upload] HEIC convert fail user=${userId} size=${inputBuffer.length}: ${(heifErr as Error)?.message}`);
+          return res.status(422).json({
+            error: "Servidor sem suporte para HEIC. Tire a foto em JPEG (Configurações iOS → Câmera → Formato → Mais Compatível) ou converta antes de enviar.",
+          });
+        }
       } else {
-        // JPEG / HEIC / HEIF / AVIF / outros → JPEG limpo, sem EXIF
+        // JPEG / AVIF / JFIF / outros → JPEG limpo, sem EXIF
         outBuffer = await sharp(inputBuffer).rotate().jpeg({ quality: 88, mozjpeg: true }).toBuffer();
         outMime = "image/jpeg"; outExt = "jpg";
       }
+    } catch (err) {
+      const errMsg = (err as Error)?.message ?? String(err);
+      console.error(`[upload] sharp encode fail user=${userId} fmt=${detectedFormat} size=${inputBuffer.length}: ${errMsg}`);
+      return res.status(422).json({
+        error: `Não foi possível processar a imagem (${detectedFormat}). Tente outra foto ou outro formato.`,
+      });
+    }
 
-      // 3) Gerar nome de arquivo seguro (NUNCA confia no originalname).
-      //    Inclui userId no path para enforcement futuro de quotas.
-      const userId = (req as any).user.id as number;
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).slice(2, 8);
-      const fileKey = `plant-photos/${userId}-${timestamp}-${random}.${outExt}`;
+    // 3) Persistir no storage. Falha aqui é problema do servidor (disco cheio,
+    //    permissão, etc.) — devolve 500 com mensagem clara e log detalhado.
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).slice(2, 8);
+    const fileKey = `plant-photos/${userId}-${timestamp}-${random}.${outExt}`;
 
-      // 4) Persistir
+    try {
       const { url } = await storagePut(fileKey, outBuffer, outMime);
-
       console.log(`[upload] user=${userId} ${detectedFormat}→${outExt} ${inputBuffer.length}B→${outBuffer.length}B → ${fileKey}`);
       return res.json({ url });
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      console.error("[upload] Error:", errMsg);
-      return res.status(500).json({ error: "Erro ao processar o upload da imagem." });
+    } catch (err) {
+      const errMsg = (err as Error)?.message ?? String(err);
+      console.error(`[upload] storage fail user=${userId} key=${fileKey}: ${errMsg}`);
+      return res.status(500).json({ error: "Falha ao salvar a imagem no servidor. Tente novamente." });
     }
   }
 );

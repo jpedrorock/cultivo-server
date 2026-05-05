@@ -109,3 +109,10 @@ temp/
 # Uploads (fotos dos usuários - ignorar conteúdo mas manter estrutura)
 uploads/*
 !uploads/.gitkeep
+
+# Releases (binários grandes — distribuir via GitHub Releases, não via repo)
+releases/
+
+# Manus / scratch (artefatos de agentes IA)
+.manus/
+todo.md

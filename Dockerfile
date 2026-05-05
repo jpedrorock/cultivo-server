@@ -1,18 +1,26 @@
-# Build stage
+# ─── Build stage ───────────────────────────────────────────────────────────
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Instalar pnpm
+# Build deps + libvips para o sharp compilar nativamente em musl (Alpine).
+# python3/make/g++ são pré-requisitos do node-gyp quando sharp recompila.
+RUN apk add --no-cache \
+      vips-dev \
+      python3 \
+      make \
+      g++
+
 RUN npm install -g pnpm
 
-# Copiar arquivos de dependências
 COPY package.json pnpm-lock.yaml ./
 
-# Instalar dependências
+# Força sharp a usar a libvips do sistema (musl), não os prebuilds glibc.
+ENV SHARP_IGNORE_GLOBAL_LIBVIPS=0
+ENV npm_config_build_from_source=true
+
 RUN pnpm install --frozen-lockfile
 
-# Copiar código fonte
 COPY . .
 
 # Build da aplicação (sem postbuild — db-migrate roda no startup do servidor)
@@ -24,24 +32,31 @@ RUN pnpm exec vite build && \
       --format=esm \
       --outdir=dist
 
-# Runtime stage
+
+# ─── Runtime stage ─────────────────────────────────────────────────────────
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Instalar pnpm e curl
-RUN npm install -g pnpm && apk add --no-cache curl mysql-client
+# Apenas a runtime libvips (sem -dev / sem build tools) — imagem menor.
+# curl: usado pelo HEALTHCHECK abaixo.
+# vips: necessário em runtime para sharp processar imagens.
+RUN apk add --no-cache curl vips && npm install -g pnpm
 
-# Copiar apenas arquivos necessários do builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/pnpm-lock.yaml ./
+# Copia node_modules JÁ COMPILADO do builder — não reinstala em musl runtime,
+# evita "Processamento de imagens indisponível" causado por sharp sem nativos.
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/dist ./dist
+COPY --from=builder --chown=node:node /app/package.json ./
+COPY --from=builder --chown=node:node /app/pnpm-lock.yaml ./
 
-# Instalar apenas dependências de produção
-RUN pnpm install --frozen-lockfile --prod
+# Roda como usuário não-privilegiado — container compromise ≠ host compromise.
+USER node
 
-# Expor porta
 EXPOSE 3000
 
-# Comando para iniciar a aplicação
+# Healthcheck via /health (faz ping no DB internamente)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://localhost:3000/health || exit 1
+
 CMD ["node", "dist/index.js"]

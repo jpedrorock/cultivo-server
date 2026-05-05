@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
-import { AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { InstallPWA } from "./components/InstallPWA";
 import { AddToHomeScreenPrompt } from "./components/AddToHomeScreenPrompt";
@@ -68,6 +67,14 @@ function PageLoader() {
   );
 }
 
+// Componente helper de redirect — extraído porque hooks não podem ser chamados
+// dentro de render-prop callbacks de <Route>.
+function Redirect({ to }: { to: string }) {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate(to, { replace: true }); }, [navigate, to]);
+  return null;
+}
+
 function Router() {
   const [location] = useLocation();
   return (
@@ -76,7 +83,10 @@ function Router() {
         <Route path={"/"} component={Home} />
 
         <Route path={"/strains"} component={ManageStrains} />
-        <Route path={"/manage-strains"} component={ManageStrains} />
+        {/* /manage-strains: legacy URL — redireciona pro canônico /strains */}
+        <Route path={"/manage-strains"}>
+          <Redirect to="/strains" />
+        </Route>
         <Route path={"/tarefas"} component={Tarefas} />
         <Route path={"/calculators"} component={CalculatorMenu} />
         <Route path={"/calculators/:id"} component={Calculators} />

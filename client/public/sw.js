@@ -1,6 +1,6 @@
 // Service Worker para App Cultivo PWA
 // Versão do cache - incrementar para forçar atualização
-const CACHE_VERSION = 'v8';
+const CACHE_VERSION = 'v9';
 const CACHE_NAME = `app-cultivo-${CACHE_VERSION}`;
 
 // Assets essenciais garantidos no install (sem hash — sempre os mesmos)
@@ -126,39 +126,62 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Retornar do cache e atualizar em background
+        // Retornar do cache e atualizar em background (silencia erros — offline é OK)
         fetch(request).then((response) => {
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, response);
+            cache.put(request, response).catch(() => {});
           });
-        });
+        }).catch(() => {});
         return cachedResponse;
       }
 
       // Se não está no cache, buscar da rede
       return fetch(request)
         .then((response) => {
-          // Não cachear respostas inválidas
           if (!response || response.status !== 200 || response.type === 'error') {
             return response;
           }
-
-          // Clonar resposta para cache
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
+            cache.put(request, responseClone).catch(() => {});
           });
-
           return response;
         })
-        .catch(() => {
-          // Se offline e não tem cache, retornar página offline
+        .catch(async () => {
+          // CRÍTICO: event.respondWith(undefined) lança "Failed to convert value to 'Response'".
+          // Sempre retornar uma Response, mesmo que de erro.
           if (request.destination === 'document') {
-            return caches.match('/index.html');
+            const indexFallback = await caches.match('/index.html');
+            if (indexFallback) return indexFallback;
           }
+          // Fallback genérico — 504 Gateway Timeout sem corpo (assets não-document)
+          return new Response('', {
+            status: 504,
+            statusText: 'Offline',
+            headers: { 'Content-Type': 'text/plain' },
+          });
         });
     })
   );
+});
+
+// Mensagens da página → SW
+// CLEAR_CACHE: usado no logout para purgar respostas de API privadas do cache
+// (sem isso, fotos/dados do usuário anterior ficavam no cache do dispositivo)
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) =>
+        Promise.all(cacheNames.map((name) => caches.delete(name)))
+      ).then(() => {
+        console.log('[SW] All caches cleared on logout');
+        // Confirma para a página que o cache foi limpo
+        if (event.source && 'postMessage' in event.source) {
+          event.source.postMessage({ type: 'CACHE_CLEARED' });
+        }
+      })
+    );
+  }
 });
 
 // Background Sync — delega para a página principal via postMessage
