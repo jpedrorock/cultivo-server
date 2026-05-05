@@ -667,22 +667,10 @@ export async function runMigrations(pool?: Pool): Promise<void> {
   console.log('[Migrations] ✅ Schema sincronizado.');
 }
 
-// ── CLI entrypoint ───────────────────────────────────────────────────────────
-// Permite rodar `tsx server/_core/dbMigrations.ts` ou `pnpm db:migrate`
-// como ferramenta manual (cria seu próprio pool e fecha no fim).
-
-const isMainModule = import.meta.url === `file://${process.argv[1]}`;
-if (isMainModule) {
-  (async () => {
-    try {
-      const { getMysqlPool, closeMysqlPool } = await import('../mysql-pool');
-      const pool = getMysqlPool();
-      await runMigrations(pool);
-      await closeMysqlPool();
-      process.exit(0);
-    } catch (err) {
-      console.error('[Migrations] ❌ Erro crítico:', (err as Error).message);
-      process.exit(1);
-    }
-  })();
-}
+// NOTA: O CLI entrypoint foi removido daqui para evitar conflito com o bundle
+// do esbuild. Quando empacotado, import.meta.url aponta para o bundle (dist/index.js),
+// então o check `isMainModule` retornava true ao subir o servidor e chamava
+// process.exit(0) — causando restart loop em produção.
+//
+// Para rodar migrations manualmente: pnpm db:migrate
+// (usa db-migrate.mjs que não depende desse arquivo)
