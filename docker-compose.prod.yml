@@ -35,9 +35,12 @@ services:
       - PORT=3000
       - DOMAIN=${DOMAIN}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      # /health faz SELECT 1 no DB e retorna 503 se ele falhar.
+      # Antes era "curl -f /" — quando dist/public/index.html sumia,
+      # healthcheck falhava → Coolify entrava em loop de restart.
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
       start_period: 40s
 
