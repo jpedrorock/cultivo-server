@@ -29,6 +29,10 @@ export default defineConfig({
           "vendor-charts": ["recharts"],
           // date-fns separado — ~80KB
           "vendor-dates": ["date-fns"],
+          // Three.js — ~600KB. Só carrega no PlantTrainingPage / Plant3DView.
+          // Sem chunk dedicado, ia parar dentro do bundle da rota e inflar
+          // qualquer chunk que importasse algo dela transitivamente.
+          "vendor-three": ["three"],
           // Radix UI (muitos pacotes pequenos juntos)
           "vendor-radix": [
             "@radix-ui/react-dialog",
