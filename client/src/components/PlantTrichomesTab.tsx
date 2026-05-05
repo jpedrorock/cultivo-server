@@ -647,7 +647,7 @@ export default function PlantTrichomesTab({
               a.click();
               document.body.removeChild(a);
               toast.success("Foto baixada!");
-            } catch (error) {
+            } catch (_error) {
               toast.error("Erro ao baixar foto");
             }
           };

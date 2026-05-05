@@ -1269,7 +1269,6 @@ function ScenesTab() {
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [expandedHomes, setExpandedHomes] = useState<Set<string>>(new Set());
   const [showManualForm, setShowManualForm] = useState(false);
-  const utils = trpc.useUtils();
 
   const { data: config } = trpc.tuya.getConfig.useQuery();
   const { data: scenes = [], isLoading, isError, refetch } = trpc.tuya.listScenes.useQuery(
@@ -1283,6 +1282,7 @@ function ScenesTab() {
       const homes = new Set(scenes.map((s: any) => s.homeName));
       setExpandedHomes(homes);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes.length]);
 
   const triggerScene = trpc.tuya.triggerScene.useMutation({

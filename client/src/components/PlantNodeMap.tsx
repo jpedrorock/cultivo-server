@@ -23,8 +23,7 @@ import {
   NODE_COLOR,
   getNodeVisual, getCircleColor, getCircleLabel, getEdgeColor, getRadius,
 } from "@/features/cannaprune/plantNodeColors";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Undo2, Redo2, RotateCcw, Loader2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { NodeActionMenu } from "./NodeActionMenu";
 import { EdgeActionMenu } from "./EdgeActionMenu";
 import { PlantNodeMapResetSheet } from "./PlantNodeMapResetSheet";
@@ -518,6 +517,7 @@ export default function PlantNodeMap({
       el.removeEventListener('pointercancel',onPointerCancel);
       el.removeEventListener('wheel',        onWheel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compact]);
 
   // ── Undo / Redo / Reset ──────────────────────────────────────────────────────
@@ -698,6 +698,7 @@ export default function PlantNodeMap({
         edgeState: resolveEdgeState(n),
       };
     }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   [layoutNodes, nodeMap]);
 
   // ── Selected node ─────────────────────────────────────────────────────────────

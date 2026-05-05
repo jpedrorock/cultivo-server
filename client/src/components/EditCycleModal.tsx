@@ -50,7 +50,7 @@ export function EditCycleModal({
   const [weekNumber, setWeekNumber] = useState(1);
   const [strainId, setStrainId] = useState<number | null>(null);
   const [motherPlantId, setMotherPlantId] = useState<number | null>(null);
-  const [clonesCount, setClonesCount] = useState<number>(10);
+  const [clonesCount, _setClonesCount] = useState<number>(10);
   const [showMotherSelector, setShowMotherSelector] = useState(false);
 
   const utils = trpc.useUtils();
@@ -88,6 +88,7 @@ export function EditCycleModal({
       }
       setWeekNumber(1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, currentFloraStartDate, tentId, currentStrainId]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -110,7 +111,7 @@ export function EditCycleModal({
     });
   };
   
-  const handleMotherSelected = (selectedMotherId: number, selectedMotherName: string) => {
+  const handleMotherSelected = (selectedMotherId: number, _selectedMotherName: string) => {
     setMotherPlantId(selectedMotherId);
     setShowMotherSelector(false);
     

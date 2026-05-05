@@ -121,7 +121,7 @@ export default function QuickLog() {
     return currentHour < 18 ? "AM" : "PM";
   };
   
-  const [turn, setTurn] = useState<"AM" | "PM">(getDefaultShift());
+  const [turn] = useState<"AM" | "PM">(getDefaultShift());
   
   // Form state - Daily Log
   const [tentId, setTentId] = useState<number | null>(null);
@@ -141,8 +141,6 @@ export default function QuickLog() {
   const [rhPct, setRhPct] = useState("");
   const [wateringVolume, setWateringVolume] = useState("");
   const [runoffCollected, setRunoffCollected] = useState("");
-  const [runoffPh, setRunoffPh] = useState("");
-  const [runoffEc, setRunoffEc] = useState("");
   const [ph, setPh] = useState("");
   const [ec, setEc] = useState("");
   const [ppfd, setPpfd] = useState(400); // Valor inicial realista: 400 μmol/m²/s
@@ -183,6 +181,7 @@ export default function QuickLog() {
       setTentId(floraTents[0].id);
       setCurrentStep(9);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logMode, floraTents.length, tentId]);
 
   // Fetch plants for selected tent (load when reaching step 9)
@@ -323,8 +322,6 @@ export default function QuickLog() {
     setRhPct("");
     setWateringVolume("");
     setRunoffCollected("");
-    setRunoffPh("");
-    setRunoffEc("");
     setPh("");
     setEc("");
     setPpfd(400); // Volta ao valor inicial realista

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";

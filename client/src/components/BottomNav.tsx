@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,6 @@ type NavItem = {
 
 // Rotas onde o BottomNav deve ficar oculto (telas de foco total)
 const HIDDEN_NAV_ROUTES = ["/quick-log"];
-const HIDDEN_NAV_PREFIXES = ["/tent/", "/display"];
 
 // Avatar colors — light usa 700 (sóbrio), dark mantém 500 (vibrante)
 const AVATAR_GRADIENTS = [
@@ -201,13 +200,6 @@ export function BottomNav() {
     vv.addEventListener('resize', handleResize);
     return () => vv.removeEventListener('resize', handleResize);
   }, []);
-
-  // Ocultar nav em telas de foco (ex: registro rápido) ou com teclado aberto — após todos os hooks
-  const isHidden =
-    HIDDEN_NAV_ROUTES.includes(location) ||
-    location.endsWith("/display") ||
-    location.endsWith("/training") ||
-    keyboardOpen;
 
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },

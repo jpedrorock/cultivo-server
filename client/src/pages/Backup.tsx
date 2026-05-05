@@ -339,7 +339,7 @@ export default function Backup() {
                 setIsImporting(true);
                 try {
                   await importBackup.mutateAsync(pendingFile as any);
-                } catch (e) {
+                } catch (_e) {
                   // handled by onError
                 }
                 setPendingFile(null);

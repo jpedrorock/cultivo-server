@@ -48,7 +48,7 @@ export default function NotificationSettings() {
       try {
         const settings = JSON.parse(savedSettings);
         setAlertsEnabled(settings.alertsEnabled || false);
-      } catch (e) {
+      } catch (_e) {
         // ignorar erro de parse
       }
     }

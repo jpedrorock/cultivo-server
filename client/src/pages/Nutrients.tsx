@@ -588,7 +588,7 @@ export default function Nutrients() {
 
     const win = window.open("", "_blank", "width=320,height=600");
     if (!win) { showToast.error("Permita pop-ups para imprimir"); return; }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receita</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:11px;line-height:1.5;background:#fff;color:#000;padding:4px;width:58mm}pre{white-space:pre-wrap;word-break:break-word}@media print{body{width:58mm;padding:0}@page{margin:2mm;size:58mm auto}}</style></head><body><pre>${lines.join("\n")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}<\/script></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receita</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:11px;line-height:1.5;background:#fff;color:#000;padding:4px;width:58mm}pre{white-space:pre-wrap;word-break:break-word}@media print{body{width:58mm;padding:0}@page{margin:2mm;size:58mm auto}}</style></head><body><pre>${lines.join("\n")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script></body></html>`);
     win.document.close();
   };
 
@@ -602,7 +602,7 @@ export default function Nutrients() {
       link.href = dataUrl;
       link.click();
       showToast.success("Imagem salva! Envie para a impressora.");
-    } catch (e) {
+    } catch (_e) {
       showToast.error("Erro ao gerar imagem");
     } finally {
       setIsSavingImage(false);

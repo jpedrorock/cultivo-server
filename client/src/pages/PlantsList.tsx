@@ -5,7 +5,6 @@ import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -15,18 +14,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Flower2, Wrench, Check } from "lucide-react";
+import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Check } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
 import { useLocation } from "wouter";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
-import { LazyImage } from "@/components/LazyImage";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 type DialogState =
@@ -38,17 +35,6 @@ type DialogState =
   | { type: 'bulkPromote' }
   | { type: 'bulkHarvest' }
   | { type: 'bulkDiscard' };
-
-const getFitnessScore = (status: string | null | undefined) => {
-  if (!status) return null;
-  const map: Record<string, { score: number; color: string }> = {
-    HEALTHY:    { score: 95, color: "#4ade80" },
-    RECOVERING: { score: 62, color: "#60a5fa" },
-    STRESSED:   { score: 38, color: "#fbbf24" },
-    SICK:       { score: 12, color: "#f87171" },
-  };
-  return map[status] ?? null;
-};
 
 export default function PlantsList() {
   const { collapsed } = useSidebar();
@@ -80,6 +66,7 @@ export default function PlantsList() {
     if (expandedInitRef.current || !tents?.length) return;
     expandedInitRef.current = true;
     if (!tentParam) setExpandedTents(new Set(tents.map(t => t.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tents]);
 
   // Hold-to-select: pressionar e segurar 400ms ativa seleção
@@ -226,6 +213,7 @@ export default function PlantsList() {
       if (sortBy === "health") return (healthOrder[a.lastHealthStatus ?? ""] ?? 99) - (healthOrder[b.lastHealthStatus ?? ""] ?? 99);
       return 0;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plants, searchTerm, sortBy]);
 
   // Agrupar plantas por estufa

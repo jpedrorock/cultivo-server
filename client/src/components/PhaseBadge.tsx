@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * PhaseBadge — badge semântico por fase do ciclo
  * Usa tokens CSS --phase-* definidos em index.css

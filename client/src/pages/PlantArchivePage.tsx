@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,7 +102,7 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
             {/* Linha vertical da timeline */}
             <div className="absolute left-1.5 top-0 bottom-0 w-px bg-border" />
             <div className="space-y-3">
-              {tentHistory.map((entry: any, idx: number) => (
+              {tentHistory.map((entry: any, _idx: number) => (
                 <div key={entry.id} className="relative flex items-start gap-3">
                   {/* Dot da timeline */}
                   <div className="absolute -left-2.5 mt-1 w-2 h-2 rounded-full bg-primary border-2 border-background" />

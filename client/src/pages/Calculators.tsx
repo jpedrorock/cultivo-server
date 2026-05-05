@@ -321,12 +321,6 @@ function WateringRunoffCalculator() {
   const [volumeIn, setVolumeIn] = useState<string>("");
   const [volumeOut, setVolumeOut] = useState<string>("");
 
-  const handleLoadPreset = (preset: any) => {
-    setPotSize(preset.potSize);
-    setNumPlants(preset.plantCount);
-    setDesiredRunoff(preset.targetRunoff);
-  };
-
   // Cálculos da Calculadora de Rega
   const calculateWatering = () => {
     // Volume base por planta (33% da capacidade do vaso)
@@ -377,9 +371,9 @@ function WateringRunoffCalculator() {
     const runoffPercent = (volOut / volIn) * 100;
     const diff = runoffPercent - desiredRunoff;
     
-    let status: "ideal" | "low" | "high" = "ideal";
-    let recommendation = "";
-    
+    let status: "ideal" | "low" | "high";
+    let recommendation: string;
+
     if (Math.abs(diff) <= 2) {
       status = "ideal";
       recommendation = "Perfeito! Mantenha esse volume.";
@@ -423,7 +417,7 @@ function WateringRunoffCalculator() {
       });
       setNotes("");
       toast.success("Receita salva com sucesso!");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Erro ao salvar receita");
     }
   };
@@ -791,23 +785,6 @@ function LuxPPFDCalculator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lux, ppfd, lightType, conversionMode]);
 
-  // Smooth gradient for light intensity (blue → green → yellow → red)
-  const lightGradient = "linear-gradient(to right, #3b82f6 0%, #10b981 33%, #eab308 66%, #ef4444 100%)";
-
-  const luxLabels = [
-    { position: 0, label: "Clonagem", sublabel: "7k-14k", color: "#3b82f6" },
-    { position: 28, label: "Vega", sublabel: "28k-42k", color: "#10b981" },
-    { position: 50, label: "Flora", sublabel: "42k-63k", color: "#eab308" },
-    { position: 75, label: "Máximo", sublabel: "70k-84k", color: "#ef4444" },
-  ];
-
-  const ppfdLabels = [
-    { position: 0, label: "Clonagem", sublabel: "100-200", color: "#3b82f6" },
-    { position: 33, label: "Vega", sublabel: "400-600", color: "#10b981" },
-    { position: 58, label: "Flora", sublabel: "600-900", color: "#eab308" },
-    { position: 83, label: "Máximo", sublabel: "1000-1200", color: "#ef4444" },
-  ];
-
   const luxNum = parseInt(lux || "0");
   const ppfdNum = parseInt(ppfd || "0");
 
@@ -1129,15 +1106,6 @@ function PHAdjustCalculator() {
     setResult({ amount: Math.round(totalML * 10) / 10, product: productName });
   }, [waterVolume, currentPH, targetPH]);
 
-  // pH gradient (acid → neutral → alkaline)
-  const phGradient = "linear-gradient(to right, #dc2626 0%, #f97316 28.5%, #eab308 42.8%, #22c55e 50%, #3b82f6 64.2%, #8b5cf6 100%)";
-
-  const phLabels = [
-    { position: 0, label: "0", sublabel: "Ácido", color: "#dc2626" },
-    { position: 50, label: "7", sublabel: "Neutro", color: "#22c55e" },
-    { position: 100, label: "14", sublabel: "Alcalino", color: "#8b5cf6" },
-  ];
-
   return (
     <div className="space-y-6 pb-8">
       {/* Editorial header */}
@@ -1251,61 +1219,6 @@ function PHAdjustCalculator() {
       <CalcHistoryPanel entries={phHistory} onClear={clearPh} />
     </div>
   );
-}
-
-// Função auxiliar para calcular runoff (mantida para compatibilidade)
-function RunoffCalculator() {
-  const [desiredRunoff] = useState(20);
-  const [volumeIn, setVolumeIn] = useState<string>("");
-  const [volumeOut, setVolumeOut] = useState<string>("");
-
-  const calculateRunoff = () => {
-    if (!volumeIn || !volumeOut) return null;
-    const volIn = parseFloat(volumeIn);
-    const volOut = parseFloat(volumeOut);
-    if (volIn <= 0 || volOut < 0) return null;
-    const runoffPercent = (volOut / volIn) * 100;
-    const diff = runoffPercent - desiredRunoff;
-    let status: "ideal" | "low" | "high" = "ideal";
-    let recommendation = "";
-    if (Math.abs(diff) <= 2) { status = "ideal"; recommendation = "Perfeito! Mantenha esse volume."; }
-    else if (diff < 0) { status = "low"; recommendation = `Runoff abaixo do ideal. Aumente o volume em aproximadamente ${Math.abs(diff * 2).toFixed(0)}%.`; }
-    else { status = "high"; recommendation = `Runoff acima do ideal. Reduza o volume em aproximadamente ${(diff * 2).toFixed(0)}%.`; }
-    return { runoffPercent: runoffPercent.toFixed(1), status, recommendation };
-  };
-
-  const runoffResult = calculateRunoff();
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Verificar Runoff</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Volume Aplicado (L)</Label>
-            <Input type="text" inputMode="decimal" placeholder="Ex: 3.5" value={volumeIn} onChange={(e) => setVolumeIn(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Volume Coletado (L)</Label>
-            <Input type="text" inputMode="decimal" placeholder="Ex: 0.7" value={volumeOut} onChange={(e) => setVolumeOut(e.target.value)} />
-          </div>
-        </div>
-        {runoffResult && (
-          <div className={`p-4 rounded-lg ${runoffResult.status === "ideal" ? "bg-green-500/10 border border-green-500/30" : "bg-amber-500/10 border border-amber-500/30"}`}>
-            <p className="font-bold text-2xl">{runoffResult.runoffPercent}%</p>
-            <p className="text-sm mt-1">{runoffResult.recommendation}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// Calculadora de Rega legada (mantida para compatibilidade)
-function IrrigationCalculator() {
-  return <div />;
 }
 
 // ── VPD Calculator ────────────────────────────────────────────────────────────

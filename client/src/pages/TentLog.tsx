@@ -61,8 +61,8 @@ export default function TentLog() {
     const now = new Date();
     const startDate = new Date(cycle.startDate);
     const floraStartDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-    let phase: "VEGA" | "FLORA" | "MAINTENANCE" | "CLONING" = "VEGA";
-    let weekNumber = 1;
+    let phase: "VEGA" | "FLORA" | "MAINTENANCE" | "CLONING";
+    let weekNumber: number;
     if (tent.category === "MAINTENANCE") {
       phase = "MAINTENANCE";
       weekNumber = 1;
@@ -195,7 +195,7 @@ export default function TentLog() {
   const phaseInfo = getPhaseInfo();
 
   // Helpers de estilo de validação
-  const validationBorder = (s: "valid" | "warning" | "invalid" | "neutral") => ({
+  const _validationBorder = (s: "valid" | "warning" | "invalid" | "neutral") => ({
     valid:   "border-emerald-500 ring-1 ring-emerald-500/30",
     warning: "border-amber-500 ring-1 ring-amber-500/30",
     invalid: "border-red-500 ring-1 ring-red-500/30",

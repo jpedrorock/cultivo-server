@@ -110,21 +110,6 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
     });
   };
 
-  const getCategoryLabel = (cat: string) => {
-    switch (cat) {
-      case "MAINTENANCE":
-        return "Manutenção";
-      case "VEGA":
-        return "Vegetação";
-      case "FLORA":
-        return "Floração";
-      case "DRYING":
-        return "Secagem";
-      default:
-        return cat;
-    }
-  };
-
   if (!tent) return null;
 
   return (

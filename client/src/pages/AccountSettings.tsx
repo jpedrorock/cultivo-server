@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 

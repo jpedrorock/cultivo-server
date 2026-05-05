@@ -34,11 +34,6 @@ export default function AdminUsers() {
     onSuccess: () => refetch(),
     onError: (e) => toast.error(`Erro ao aprovar usuário: ${e.message}`),
   });
-  const revokeUser = trpc.admin.revokeUser.useMutation({
-    onSuccess: () => refetch(),
-    onError: (e) => toast.error(`Erro ao revogar acesso: ${e.message}`),
-  });
-
   // Redirecionar se não for admin
   if (user && user.role !== 'admin') {
     setLocation('/');

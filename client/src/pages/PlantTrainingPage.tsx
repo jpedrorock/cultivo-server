@@ -36,7 +36,7 @@ import {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PlantTrainingPage() {
   const [, params]  = useRoute("/plants/:id/training");
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const plantId = params?.id ? parseInt(params.id, 10) : null;
 
   // Data
@@ -77,7 +77,6 @@ export default function PlantTrainingPage() {
   const initialView: 'top' | '3d' = _qs.get('view') === '3d' ? '3d' : 'top';
   const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
   const [viewMode,         setViewMode]         = useState<'top' | '3d'>(initialView);
-  const [topViewNodes,     setTopViewNodes]     = useState<PlantGraphNode[]>([]);
 
   // ── Tamanho do vaso — agora persistido no banco (antes: localStorage) ───────
   const { data: plantStructure } = trpc.plantStructure.get.useQuery(

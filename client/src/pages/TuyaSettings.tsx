@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react';
+import { Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronUp, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageTransition } from '@/components/PageTransition';
 import { PageHeader } from '@/components/PageHeader';
@@ -138,7 +138,6 @@ export default function TuyaSettings() {
     persistMappings(updated);
   };
 
-  const handleSaveMappings = () => persistMappings(mappings);
 
   if (isLoading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">

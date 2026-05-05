@@ -706,7 +706,7 @@ export default function Plant3DView({
 
       const fromV = new THREE.Vector3(from.x, from.y, from.z);
       const toV   = new THREE.Vector3(to.x, to.y, to.z);
-      const len   = fromV.distanceTo(toV);
+      const _len   = fromV.distanceTo(toV);
 
       // Espessura média (TubeGeometry usa raio uniforme — variação fica entre galhos diferentes)
       const baseThickness = thicknessFor(node);
@@ -814,7 +814,7 @@ export default function Plant3DView({
       const updated = prev.map(n => {
         if (n.id !== nodeId) return n;
         if (bend === null) {
-          const { branchBend, ...rest } = n;
+          const { branchBend: _branchBend, ...rest } = n;
           return rest as PlantGraphNode;
         }
         return { ...n, branchBend: bend };
@@ -848,7 +848,7 @@ export default function Plant3DView({
     if (!confirm("Resetar posições de drag de todos os nós? Isso volta ao layout automático.")) return;
     setNodes(prev => {
       const updated = prev.map(n => {
-        const { pos3D, ...rest } = n;
+        const { pos3D: _pos3D, ...rest } = n;
         return rest as PlantGraphNode;
       });
       if (plantId) saveMutation.mutate({ plantId, nodes: updated });

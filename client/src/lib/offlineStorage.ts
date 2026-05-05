@@ -117,7 +117,7 @@ export async function syncPendingLogs(
   let synced = 0;
   for (const log of pending) {
     try {
-      const { id, savedAt, ...data } = log;
+      const { id, savedAt: _savedAt, ...data } = log;
       await createLogFn({
         ...data,
         logDate: new Date(data.logDate),

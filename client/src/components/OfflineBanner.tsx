@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { WifiOff, RefreshCw, CloudUpload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { countPendingLogs, isOnline, onConnectionRestored } from '@/lib/offlineStorage';
+import { countPendingLogs, isOnline } from '@/lib/offlineStorage';
 import { cn } from '@/lib/utils';
 
 interface OfflineBannerProps {

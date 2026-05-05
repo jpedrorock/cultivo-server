@@ -66,7 +66,7 @@ export default function ManageStrains() {
       setVegaWeeks(4);
       setFloraWeeks(8);
       refetch();
-    } catch (error) {
+    } catch (_error) {
       toast.error("Erro ao criar strain");
     }
   };
@@ -89,7 +89,7 @@ export default function ManageStrains() {
       setIsEditOpen(false);
       setSelectedStrain(null);
       refetch();
-    } catch (error) {
+    } catch (_error) {
       toast.error("Erro ao atualizar strain");
     }
   };
@@ -119,7 +119,7 @@ export default function ManageStrains() {
         await deleteStrain.mutateAsync({ id: strain.id });
         toast.success("Strain deletada com sucesso!");
         refetch();
-      } catch (error) {
+      } catch (_error) {
         toast.error("Erro ao deletar strain");
       }
     }, 5000);
@@ -173,7 +173,7 @@ export default function ManageStrains() {
       setVegaWeeks(4);
       setFloraWeeks(8);
       refetch();
-    } catch (error) {
+    } catch (_error) {
       toast.error("Erro ao duplicar strain");
     }
   };

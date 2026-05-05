@@ -189,7 +189,7 @@ export function FertilizationCalculator() {
       setCopied(true);
       toast.success("Código copiado!");
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch (_error) {
       toast.error("Erro ao copiar código");
     }
   };
@@ -207,7 +207,7 @@ export function FertilizationCalculator() {
       toast.success(`Receita "${recipeData.name}" importada com sucesso!`);
       setShowImportDialog(false);
       setImportCode("");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Código inválido! Verifique e tente novamente.");
     }
   };

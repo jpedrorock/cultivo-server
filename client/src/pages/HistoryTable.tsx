@@ -6,11 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList, Share2, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react";
+import { Loader2, Download, Filter, Table as TableIcon, Pencil, Trash2, ClipboardList, Share2, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,

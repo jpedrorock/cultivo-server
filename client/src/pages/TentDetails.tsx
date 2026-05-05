@@ -1,10 +1,9 @@
 import { useState, useMemo } from "react";
-import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -43,7 +42,6 @@ function timeAgo(date: Date): string {
 }
 
 function TentSensorCard({ tentId }: { tentId: number }) {
-  const utils = trpc.useUtils();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const { data: tuyaConfig } = trpc.tuya.getConfig.useQuery();
@@ -587,7 +585,7 @@ export default function TentDetails() {
     <span>${tent.name} &nbsp;·&nbsp; ${phase} &nbsp;·&nbsp; ${generatedAt}</span>
   </div>
 
-  <script>window.onload = () => { window.print(); }<\/script>
+  <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`;
 
@@ -1631,7 +1629,7 @@ export default function TentDetails() {
 }
 
 // Componente para lista de plantas da estufa — estilo PlantsList (cards foto full-cover)
-function TentPlantsTab({ tentId, tentName }: { tentId: number; tentName: string }) {
+function TentPlantsTab({ tentId, tentName: _tentName }: { tentId: number; tentName: string }) {
   const { data: plants, isLoading } = trpc.plants.list.useQuery({ tentId });
   const { data: strains } = trpc.strains.list.useQuery();
 

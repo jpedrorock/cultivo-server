@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  Scissors, Sprout, Loader2, Maximize2, X, Save, LayoutGrid, Boxes,
+  Sprout, Loader2, Maximize2, X, Save, LayoutGrid, Boxes,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "sonner";
@@ -19,7 +19,7 @@ interface Props {
 export default function PlantTrainingSummary({ plantId }: Props) {
   const [, navigate] = useLocation();
   const { data: logs = [], isLoading, refetch } = trpc.plantLST.list.useQuery({ plantId });
-  const { data: stats } = trpc.plantLST.stats.useQuery({ plantId });
+  trpc.plantLST.stats.useQuery({ plantId });
   const utils = trpc.useUtils();
 
   // ── Sandbox ───────────────────────────────────────────────────────────────

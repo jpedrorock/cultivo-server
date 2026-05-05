@@ -11,7 +11,6 @@ import {
   ChevronUp,
   Download,
   Home,
-  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

@@ -1,5 +1,5 @@
 import { Link } from 'wouter';
-import { Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette, Wifi, Cpu } from 'lucide-react';
+import { Database, BookOpen, ChevronRight, User, Shield, Bell, Sliders, Palette, Wifi } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { PageTransition, StaggerList, ListItemAnimation } from '@/components/PageTransition';
 import { useAuth } from '@/_core/hooks/useAuth';

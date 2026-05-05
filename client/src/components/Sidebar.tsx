@@ -83,6 +83,7 @@ export function Sidebar() {
   // Fechar overlay ao navegar
   useEffect(() => {
     closeSidebar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
   const tentCount  = tents?.length ?? 0;

@@ -93,7 +93,7 @@ const parameterConfig = {
   },
 };
 
-export function TentChartWidget({ tentId, tentName, data }: TentChartWidgetProps) {
+export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWidgetProps) {
   const [selectedParam, setSelectedParam] = useState<Parameter>("all");
 
   // Normalize data for better visualization
@@ -112,6 +112,7 @@ export function TentChartWidget({ tentId, tentName, data }: TentChartWidgetProps
     ecRaw: point.ec,
   }));
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const visibleParams =
     selectedParam === "all"
       ? (["temp", "rh", "ppfd", "ph", "ec"] as const)

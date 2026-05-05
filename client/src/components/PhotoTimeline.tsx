@@ -3,7 +3,6 @@ import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Camera, ZoomIn } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
