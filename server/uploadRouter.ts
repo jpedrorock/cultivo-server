@@ -13,6 +13,7 @@
  *    para qualquer URL externa (open redirect — vetor clássico de phishing).
  */
 import { Router, Request, Response, NextFunction } from "express";
+import { createRequire } from "module";
 import multer from "multer";
 import path from "path";
 import fsp from "fs/promises";
@@ -20,13 +21,16 @@ import rateLimit from "express-rate-limit";
 import { storagePut } from "./storage";
 import { authenticateRequest } from "./_core/auth";
 
-// Sharp: importado dinamicamente para não quebrar em ambientes sem binários nativos
+// Sharp: usa createRequire para funcionar no bundle ESM do esbuild.
+// require() nativo não existe em ESM; createRequire cria um require que
+// resolve módulos CJS/nativos a partir do caminho do bundle em runtime.
+const _require = createRequire(import.meta.url);
 let sharpLib: typeof import("sharp") | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  sharpLib = require("sharp");
-} catch {
-  console.warn("[upload] sharp não disponível — uploads de imagem ficarão indisponíveis");
+  sharpLib = _require("sharp");
+  console.log("[upload] sharp carregado — processamento de imagens ativo");
+} catch (e) {
+  console.warn("[upload] sharp não disponível — uploads de imagem ficarão indisponíveis:", (e as Error).message);
 }
 
 const router = Router();
