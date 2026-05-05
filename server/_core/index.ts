@@ -109,7 +109,13 @@ async function startServer() {
   // Aplica todas as migrations de schema (CREATE TABLE / ADD COLUMN +
   // políticas de FK ON DELETE) usando o pool MySQL compartilhado.
   // Antes: 10 chamadas `ensure*` separadas, cada uma abrindo conexão dedicada.
-  await runMigrations();
+  // Não-fatal: erro de migration não derruba o servidor — app continua,
+  // logs mostram o problema e o operador pode corrigir sem downtime total.
+  try {
+    await runMigrations();
+  } catch (migErr) {
+    console.error('[Startup] ⚠️  Migrations falharam (app continua):', (migErr as Error).message);
+  }
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();
