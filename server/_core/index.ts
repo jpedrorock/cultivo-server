@@ -69,22 +69,16 @@ async function startServer() {
       useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
-        // Google Fonts CSS é um <link> do index.html.
-        // Cloudflare Insights beacon é injetado pelo Cloudflare quando hospedado no Pages/Workers.
         scriptSrc: isProd
-          ? ["'self'", "'unsafe-inline'", "https://static.cloudflareinsights.com"]
+          ? ["'self'", "'unsafe-inline'"]
           : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        scriptSrcElem: isProd
-          ? ["'self'", "'unsafe-inline'", "https://static.cloudflareinsights.com"]
-          : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        styleSrc:     ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        imgSrc:       ["'self'", "data:", "blob:", "https:"],
-        connectSrc:   ["'self'", "https:", ...(isProd ? [] : ["ws:", "wss:"])],
-        fontSrc:      ["'self'", "data:", "https://fonts.gstatic.com"],
-        objectSrc:    ["'none'"],
-        baseUri:      ["'self'"],
-        formAction:   ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https:", ...(isProd ? [] : ["ws:", "wss:"])],
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
         frameAncestors: ["'none'"],
         upgradeInsecureRequests: isProd ? [] : null,
       },
@@ -107,34 +101,9 @@ async function startServer() {
     next();
   });
 
-  // Healthcheck — útil para Docker HEALTHCHECK / k8s readiness.
-  // Faz ping no DB porque app sem DB não atende request alguma — retornar 200
-  // sem checar o DB faria o orquestrador deixar containers quebrados em rotação.
-  app.get("/health", async (_req, res) => {
-    const startedAt = Date.now();
-    try {
-      const { getDb } = await import("../db");
-      const db = await getDb();
-      if (!db) {
-        res.status(503).json({ status: "error", reason: "db_unavailable", uptime: Math.floor(process.uptime()) });
-        return;
-      }
-      // SELECT 1 — query mais barata possível, só prova que conexão está viva
-      await (db as any).execute("SELECT 1");
-      res.json({
-        status: "ok",
-        uptime: Math.floor(process.uptime()),
-        dbLatencyMs: Date.now() - startedAt,
-        ts: Date.now(),
-      });
-    } catch (err) {
-      res.status(503).json({
-        status: "error",
-        reason: "db_ping_failed",
-        message: (err as Error)?.message,
-        uptime: Math.floor(process.uptime()),
-      });
-    }
+  // Healthcheck — útil para Docker HEALTHCHECK / k8s readiness
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", uptime: Math.floor(process.uptime()), ts: Date.now() });
   });
 
   // Aplica todas as migrations de schema (CREATE TABLE / ADD COLUMN +
