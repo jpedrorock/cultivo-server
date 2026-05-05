@@ -3,17 +3,6 @@ import { useRoute, Link, useLocation } from "wouter";
 import { ErrorState } from "@/components/ErrorState";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
@@ -46,10 +35,17 @@ import MoveTentModal from "@/components/MoveTentModal";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
-import { PressButton } from "@/components/PressButton";
 import { PressDropdownMenuItem } from "@/components/PressDropdownMenuItem";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import PlantEditModal from "@/components/PlantEditModal";
+import PlantHarvestModal from "@/components/PlantHarvestModal";
+import PlantDiscardModal from "@/components/PlantDiscardModal";
+import PlantTransplantDialog from "@/components/PlantTransplantDialog";
+import PlantCloneDialog from "@/components/PlantCloneDialog";
+import PlantQrDialog from "@/components/PlantQrDialog";
+import PlantStatsStrip from "@/components/PlantStatsStrip";
+import { exportPlantPDF } from "@/utils/plantExportPDF";
 
 // Tabs carregadas sob demanda para reduzir bundle inicial de PlantDetail
 const PlantHealthTab       = lazy(() => import("@/components/PlantHealthTab"));
@@ -57,9 +53,7 @@ const PlantEnvironmentTab  = lazy(() => import("@/components/PlantEnvironmentTab
 const PlantObservationsTab = lazy(() => import("@/components/PlantObservationsTab"));
 const PlantArchiveTab      = lazy(() => import("@/components/PlantArchiveTab"));
 const PlantTrichomesTab    = lazy(() => import("@/components/PlantTrichomesTab"));
-const PlantLSTTab          = lazy(() => import("@/components/PlantLSTTab"));
 const PlantTrainingSummary = lazy(() => import("@/components/PlantTrainingSummary"));
-const PlantPhotosTab       = lazy(() => import("@/components/PlantPhotosTab"));
 
 // Skeleton mínimo exibido enquanto os componentes de tab carregam
 function TabSkeleton() {
@@ -76,17 +70,15 @@ export default function PlantDetail() {
   const [, params] = useRoute("/plants/:id");
   const [, setLocation] = useLocation();
   const plantId = params?.id ? parseInt(params.id) : 0;
+
+  // Modal open state — form/data state lives inside each modal component
   const [moveTentModalOpen, setMoveTentModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", code: "", notes: "" });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [transplantConfirmOpen, setTransplantConfirmOpen] = useState(false);
   const [harvestModalOpen, setHarvestModalOpen] = useState(false);
-  const [harvestNotes, setHarvestNotes] = useState("");
   const [discardModalOpen, setDiscardModalOpen] = useState(false);
-  const [discardReason, setDiscardReason] = useState("");
   const [cloneDialog, setCloneDialog] = useState(false);
-  const [cloneNameInput, setCloneNameInput] = useState("");
   const [qrDialog, setQrDialog] = useState(false);
   const haptic = useTactileFeedback();
 
@@ -108,17 +100,15 @@ export default function PlantDetail() {
   );
   const lastPhoto = healthLogs?.find((l: any) => l.photoUrl)?.photoUrl ?? null;
 
-  // Mutations para ações
+  // Mutations
   const transplantMutation = trpc.plants.transplantToFlora.useMutation({
     onSuccess: (data) => {
       toast.success(`Planta transplantada para ${data.tentName} com sucesso!`);
       refetch();
     },
-    onError: (error) => {
-      toast.error(`Erro ao transplantar: ${error.message}`);
-    },
+    onError: (e) => toast.error(`Erro ao transplantar: ${e.message}`),
   });
-  
+
   const archiveMutation = trpc.plants.archive.useMutation({
     onSuccess: (_, variables) => {
       const message = variables.status === 'HARVESTED'
@@ -127,19 +117,15 @@ export default function PlantDetail() {
       toast.success(message);
       setLocation('/plants');
     },
-    onError: (error) => {
-      toast.error(`Erro ao arquivar planta: ${error.message}`);
-    },
+    onError: (e) => toast.error(`Erro ao arquivar planta: ${e.message}`),
   });
-  
+
   const deleteMutation = trpc.plants.deletePermanently.useMutation({
     onSuccess: () => {
       toast.success('Planta excluída permanentemente!');
       setLocation('/plants');
     },
-    onError: (error) => {
-      toast.error(`Erro ao excluir planta: ${error.message}`);
-    },
+    onError: (e) => toast.error(`Erro ao excluir planta: ${e.message}`),
   });
 
   const promoteToPlantMutation = trpc.plants.promoteToPlant.useMutation({
@@ -147,184 +133,18 @@ export default function PlantDetail() {
       toast.success('🌱 Muda promovida para planta com sucesso!');
       refetch();
     },
-    onError: (error) => {
-      toast.error(`Erro ao promover muda: ${error.message}`);
-    },
-  });
-
-  const updateMutation = trpc.plants.update.useMutation({
-    onSuccess: () => {
-      toast.success('Planta atualizada com sucesso!');
-      setEditModalOpen(false);
-      refetch();
-    },
-    onError: (error) => {
-      toast.error(`Erro ao atualizar planta: ${error.message}`);
-    },
-  });
-
-  const utils = trpc.useUtils();
-  const clonePlantMutation = trpc.plants.clone.useMutation({
-    onSuccess: (data) => {
-      haptic.confirm();
-      toast.success(`Clone "${data.name}" criado!`);
-      setCloneDialog(false);
-      utils.plants.list.invalidate();
-    },
-    onError: (e) => toast.error(`Erro ao clonar: ${e.message}`),
+    onError: (e) => toast.error(`Erro ao promover muda: ${e.message}`),
   });
 
   // Handlers
-  const handleTransplantToFlora = () => {
-    haptic.warning();
-    setTransplantConfirmOpen(true);
-  };
-  
-  const handleHarvest = () => {
-    haptic.confirm();
-    setHarvestNotes("");
-    setHarvestModalOpen(true);
-  };
-
-  const confirmHarvest = () => {
-    haptic.confirm();
-    archiveMutation.mutate({ 
-      plantId, 
-      status: 'HARVESTED',
-      finishReason: harvestNotes || undefined
-    });
-    setHarvestModalOpen(false);
-  };
-  
-  const handleDelete = () => {
-    haptic.destructive();
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = () => {
-    haptic.destructive();
-    if (plant) deleteMutation.mutate({ plantId: plant.id });
-  };
-  
-  const handleDiscard = () => {
-    haptic.destructive();
-    setDiscardReason("");
-    setDiscardModalOpen(true);
-  };
-
-  const confirmDiscard = () => {
-    haptic.destructive();
-    archiveMutation.mutate({ 
-      plantId, 
-      status: 'DISCARDED',
-      finishReason: discardReason || undefined
-    });
-    setDiscardModalOpen(false);
-  };
-
+  const handleTransplantToFlora = () => { haptic.warning(); setTransplantConfirmOpen(true); };
+  const handleHarvest  = () => { haptic.confirm();      setHarvestModalOpen(true); };
+  const handleDelete   = () => { haptic.destructive();  setDeleteConfirmOpen(true); };
+  const handleDiscard  = () => { haptic.destructive();  setDiscardModalOpen(true); };
   const handlePromoteToPlant = () => {
     if (!plant) return;
     haptic.confirm();
     promoteToPlantMutation.mutate({ plantId: plant.id });
-  };
-
-  const handleExportPDF = () => {
-    if (!plant) return;
-    const generatedAt = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-
-    const healthRows = (healthLogs ?? []).slice(0, 50).map((l: any) => `
-      <tr>
-        <td>${new Date(l.logDate ?? l.createdAt).toLocaleDateString("pt-BR")}</td>
-        <td>${l.symptoms ?? '—'}</td>
-        <td>${l.treatment ?? '—'}</td>
-        <td>${l.notes ?? '—'}</td>
-      </tr>`).join('');
-
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Planta — ${plant.name}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111; padding: 32px; font-size: 13px; }
-    .header { border-bottom: 2px solid #111; padding-bottom: 14px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-    .header h1 { font-size: 22px; font-weight: 700; }
-    .header .sub { font-size: 12px; color: #666; margin-top: 4px; }
-    .header-right { font-size: 11px; color: #888; text-align: right; line-height: 1.7; }
-    .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
-    .info-cell { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; }
-    .info-cell .lbl { font-size: 10px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; }
-    .info-cell .val { font-size: 14px; font-weight: 600; margin-top: 3px; }
-    h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #374151; margin: 20px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th { background: #f9fafb; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
-    td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; color: #374151; vertical-align: top; }
-    tr:nth-child(even) td { background: #fafafa; }
-    .footer { margin-top: 28px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #bbb; display: flex; justify-content: space-between; }
-    @media print { body { padding: 16px; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <h1>🌿 ${plant.name}</h1>
-      <div class="sub">${plant.code ? `Código: ${plant.code}` : ''} ${strain ? `· Strain: ${strain.name}` : ''}</div>
-    </div>
-    <div class="header-right">
-      <div>${tent ? `Estufa: ${tent.name}` : ''}</div>
-      <div>Gerado em ${generatedAt}</div>
-    </div>
-  </div>
-
-  <div class="info-grid">
-    <div class="info-cell"><div class="lbl">Estágio</div><div class="val">${plant.plantStage === 'PLANT' ? 'Planta' : plant.plantStage === 'SEEDLING' ? 'Muda' : plant.plantStage}</div></div>
-    <div class="info-cell"><div class="lbl">Semana do Ciclo</div><div class="val">${plant.cycleWeek != null ? `Semana ${plant.cycleWeek}` : '—'}</div></div>
-    <div class="info-cell"><div class="lbl">Status</div><div class="val">${plant.status ?? '—'}</div></div>
-    <div class="info-cell"><div class="lbl">Observações de Saúde</div><div class="val">${(healthLogs ?? []).length}</div></div>
-  </div>
-
-  ${(healthLogs ?? []).length > 0 ? `
-  <h2>Histórico de Saúde (últimos ${Math.min((healthLogs ?? []).length, 50)})</h2>
-  <table>
-    <thead><tr><th>Data</th><th>Sintomas</th><th>Tratamento</th><th>Notas</th></tr></thead>
-    <tbody>${healthRows}</tbody>
-  </table>` : ''}
-
-  <div class="footer">
-    <span>App Cultivo &nbsp;·&nbsp; ${window.location.origin}</span>
-    <span>${plant.name} &nbsp;·&nbsp; ${generatedAt}</span>
-  </div>
-  <script>window.onload = () => { window.print(); }<\/script>
-</body>
-</html>`;
-
-    const win = window.open('', '_blank');
-    if (!win) { toast.error('Permita pop-ups para exportar'); return; }
-    win.document.write(html);
-    win.document.close();
-  };
-
-  const handleEditClick = () => {
-    haptic.tap();
-    if (plant) {
-      setEditForm({
-        name: plant.name,
-        code: plant.code || "",
-        notes: plant.notes || "",
-      });
-      setEditModalOpen(true);
-    }
-  };
-
-  const handleEditSave = () => {
-    haptic.confirm();
-    updateMutation.mutate({
-      id: plantId,
-      name: editForm.name,
-      code: editForm.code || undefined,
-      notes: editForm.notes || undefined,
-    });
   };
 
   if (isLoading) {
@@ -360,7 +180,7 @@ export default function PlantDetail() {
     plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA' ? '#581c87' :
     tent?.category === 'DRYING'      ? '#78350f' :
     tent?.category === 'MAINTENANCE' ? '#1e3a8a' :
-    '#14532d'; // VEGA or default/seedling
+    '#14532d';
 
   const phaseLabel =
     plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA' ? 'Flora' :
@@ -382,9 +202,7 @@ export default function PlantDetail() {
         {/* ── Hero: foto full-bleed com nome sobreposto ── */}
         <div
           className="relative w-full overflow-hidden h-hero-safe"
-          style={{
-            background: heroColor,
-          }}
+          style={{ background: heroColor }}
         >
           {/* Photo as full-bleed background */}
           {lastPhoto ? (
@@ -428,11 +246,9 @@ export default function PlantDetail() {
           </button>
 
           {/* Floating action buttons — top right */}
-          <div
-            className="absolute right-4 top-safe-1rem z-30 flex items-center gap-2"
-          >
+          <div className="absolute right-4 top-safe-1rem z-30 flex items-center gap-2">
             <button
-              onClick={handleEditClick}
+              onClick={() => setEditModalOpen(true)}
               className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity active:opacity-70"
               style={{ background: 'rgba(0,0,0,0.32)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
             >
@@ -480,7 +296,7 @@ export default function PlantDetail() {
                   <MoveRight className="w-4 h-4 mr-2" />
                   Mover para Outra Estufa
                 </PressDropdownMenuItem>
-                <PressDropdownMenuItem onClick={() => { setCloneNameInput(`${plant?.name} (Clone)`); setCloneDialog(true); }}>
+                <PressDropdownMenuItem onClick={() => setCloneDialog(true)}>
                   <GitFork className="w-4 h-4 mr-2" />
                   Clonar Planta
                 </PressDropdownMenuItem>
@@ -488,7 +304,11 @@ export default function PlantDetail() {
                   <QrCode className="w-4 h-4 mr-2" />
                   Etiqueta QR Code
                 </PressDropdownMenuItem>
-                <PressDropdownMenuItem onClick={() => { haptic.tap(); handleExportPDF(); }}>
+                <PressDropdownMenuItem onClick={() => {
+                  haptic.tap();
+                  const ok = exportPlantPDF({ plant, strain, tent, healthLogs: healthLogs ?? [] });
+                  if (!ok) toast.error('Permita pop-ups para exportar');
+                }}>
                   <Download className="w-4 h-4 mr-2" />
                   Exportar Relatório PDF
                 </PressDropdownMenuItem>
@@ -536,36 +356,14 @@ export default function PlantDetail() {
         </div>
 
         {/* ── Stats: IDADE · FASE · ESTUFA ── */}
-        <div className="divide-y divide-border/50">
-          {/* Idade */}
-          <div className="px-5 py-3.5">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-3xl font-bold text-foreground tabular-nums leading-none">{daysOld}</span>
-              <span className="text-sm text-muted-foreground">dias</span>
-            </div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">IDADE</p>
-          </div>
-
-          {/* Fase */}
-          {(plant.cyclePhase || tent?.category) && (
-            <div className="px-5 py-3.5">
-              <p className="text-xl font-bold text-foreground leading-none">
-                {phaseLabel}{plant.cycleWeek ? ` · S${plant.cycleWeek}` : ''}
-              </p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">FASE</p>
-            </div>
-          )}
-
-          {/* Estufa */}
-          {tent?.name && (
-            <div className="px-5 py-3.5">
-              <p className="text-xl font-bold text-foreground leading-none">{tent.name}</p>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">
-                ESTUFA{plant.code ? ` · #${plant.code}` : ''}
-              </p>
-            </div>
-          )}
-        </div>
+        <PlantStatsStrip
+          daysOld={daysOld}
+          phaseLabel={phaseLabel}
+          cycleWeek={plant.cycleWeek}
+          tentName={tent?.name}
+          plantCode={plant.code}
+          hasCyclePhase={!!(plant.cyclePhase || tent?.category)}
+        />
 
         {/* ── Tabs ─────────────────────────────────────────────── */}
         <main className="container py-4 pb-32 md:pb-8">
@@ -667,310 +465,91 @@ export default function PlantDetail() {
             </TabsContent>
           </Tabs>
         </main>
-      
-      {/* Modal de Mover Estufa */}
-      <MoveTentModal
-        open={moveTentModalOpen}
-        onOpenChange={setMoveTentModalOpen}
-        plantId={plantId}
-        plantName={plant?.name || ""}
-        currentTentId={plant?.currentTentId || 0}
-        onSuccess={refetch}
-      />
 
-      {/* Modal de Editar Planta */}
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Planta</DialogTitle>
-            <DialogDescription>
-              Atualize as informações da planta
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Nome *</Label>
-              <Input
-                id="edit-name"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder="Nome da planta"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-code">Código</Label>
-              <Input
-                id="edit-code"
-                value={editForm.code}
-                onChange={(e) => setEditForm({ ...editForm, code: e.target.value })}
-                placeholder="Ex: NL-001"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Notas</Label>
-              <Textarea
-                id="edit-notes"
-                value={editForm.notes}
-                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                placeholder="Observações gerais sobre a planta"
-                rows={4}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <PressButton
-              variant="outline"
-              onClick={() => setEditModalOpen(false)}
-              disabled={updateMutation.isPending}
-            >
-              Cancelar
-            </PressButton>
-            <PressButton
-              onClick={handleEditSave}
-              disabled={!editForm.name || updateMutation.isPending}
-              pressIntensity="medium"
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                'Salvar'
-              )}
-            </PressButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* ── Modals & Dialogs ── */}
+        <MoveTentModal
+          open={moveTentModalOpen}
+          onOpenChange={setMoveTentModalOpen}
+          plantId={plantId}
+          plantName={plant?.name || ""}
+          currentTentId={plant?.currentTentId || 0}
+          onSuccess={refetch}
+        />
 
-      {/* Delete Confirm Dialog */}
-      <DeleteConfirmDialog
-        open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
-        title="Excluir Planta"
-        description={
-          <>
-            Tem certeza que deseja excluir permanentemente{" "}
-            <span className="font-semibold text-foreground">{plant.name}</span>?
-            Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
-            Use apenas para plantas cadastradas por engano.
-          </>
-        }
-        onConfirm={confirmDelete}
-        isPending={deleteMutation.isPending}
-      />
+        <PlantEditModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          plant={plant}
+          onSuccess={refetch}
+        />
 
-      {/* Transplant Confirm Dialog */}
-      <Dialog open={transplantConfirmOpen} onOpenChange={setTransplantConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-purple-600">
-              <MoveRight className="w-5 h-5" />
-              Transplantar para Flora
-            </DialogTitle>
-            <DialogDescription>
-              Deseja transplantar{" "}
-              <span className="font-semibold text-foreground">{plant.name}</span>{" "}
-              para a estufa de Flora? A planta será movida automaticamente para a estufa de Floração configurada.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <PressButton variant="outline" onClick={() => setTransplantConfirmOpen(false)}>
-              Cancelar
-            </PressButton>
-            <PressButton
-              className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white border-0"
-              pressIntensity="medium"
-              onClick={() => {
-                haptic.warning();
-                transplantMutation.mutate({ plantId });
-                setTransplantConfirmOpen(false);
-              }}
-            >
-              <MoveRight className="w-4 h-4 mr-2" />
-              Transplantar
-            </PressButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <DeleteConfirmDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          title="Excluir Planta"
+          description={
+            <>
+              Tem certeza que deseja excluir permanentemente{" "}
+              <span className="font-semibold text-foreground">{plant.name}</span>?
+              Esta ação não pode ser desfeita e removerá todos os registros, fotos e histórico associados.
+              Use apenas para plantas cadastradas por engano.
+            </>
+          }
+          onConfirm={() => { haptic.destructive(); if (plant) deleteMutation.mutate({ plantId: plant.id }); }}
+          isPending={deleteMutation.isPending}
+        />
 
-      {/* Harvest Modal */}
-      <Dialog open={harvestModalOpen} onOpenChange={setHarvestModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-600">
-              <Scissors className="w-5 h-5" />
-              Registrar Colheita
-            </DialogTitle>
-            <DialogDescription>
-              Colhendo{" "}
-              <span className="font-semibold text-foreground">{plant.name}</span>.
-              Adicione notas sobre a colheita (opcional).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              Notas da colheita (ex: peso, qualidade)
-            </label>
-            <textarea
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-              rows={3}
-              placeholder="Ex: 45g, qualidade excelente, terpenos intensos..."
-              value={harvestNotes}
-              onChange={(e) => setHarvestNotes(e.target.value)}
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <PressButton variant="outline" onClick={() => setHarvestModalOpen(false)}>
-              Cancelar
-            </PressButton>
-            <PressButton
-              className="bg-primary text-primary-foreground hover:bg-primary/90 border-0"
-              onClick={confirmHarvest}
-              disabled={archiveMutation.isPending}
-              pressIntensity="medium"
-            >
-              {archiveMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Colhendo...</>
-              ) : (
-                <><Scissors className="w-4 h-4 mr-2" />Confirmar Colheita</>
-              )}
-            </PressButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <PlantTransplantDialog
+          open={transplantConfirmOpen}
+          onOpenChange={setTransplantConfirmOpen}
+          plantName={plant.name}
+          onConfirm={() => {
+            haptic.warning();
+            transplantMutation.mutate({ plantId });
+            setTransplantConfirmOpen(false);
+          }}
+          isPending={transplantMutation.isPending}
+        />
 
-      {/* Discard Modal */}
-      <Dialog open={discardModalOpen} onOpenChange={setDiscardModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <XCircle className="w-5 h-5" />
-              Descartar Planta
-            </DialogTitle>
-            <DialogDescription>
-              Descartando{" "}
-              <span className="font-semibold text-foreground">{plant.name}</span>.
-              Informe o motivo do descarte (opcional).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <label className="text-sm font-medium text-foreground mb-2 block">
-              Motivo do descarte
-            </label>
-            <textarea
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-              rows={3}
-              placeholder="Ex: doente, hermafrodita, baixa qualidade..."
-              value={discardReason}
-              onChange={(e) => setDiscardReason(e.target.value)}
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <PressButton variant="outline" onClick={() => setDiscardModalOpen(false)}>
-              Cancelar
-            </PressButton>
-            <PressButton
-              variant="destructive"
-              onClick={confirmDiscard}
-              disabled={archiveMutation.isPending}
-              pressIntensity="strong"
-            >
-              {archiveMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Descartando...</>
-              ) : (
-                <><XCircle className="w-4 h-4 mr-2" />Confirmar Descarte</>
-              )}
-            </PressButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <PlantHarvestModal
+          open={harvestModalOpen}
+          onOpenChange={setHarvestModalOpen}
+          plantName={plant.name}
+          onConfirm={(notes) => {
+            haptic.confirm();
+            archiveMutation.mutate({ plantId, status: 'HARVESTED', finishReason: notes || undefined });
+            setHarvestModalOpen(false);
+          }}
+          isPending={archiveMutation.isPending}
+        />
 
-      {/* Clone Plant Dialog */}
-      <Dialog open={cloneDialog} onOpenChange={setCloneDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Clonar Planta</DialogTitle>
-            <DialogDescription>
-              Cria uma nova muda com a mesma strain e estufa de "{plant?.name}".
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>Nome do clone</Label>
-            <Input
-              value={cloneNameInput}
-              onChange={(e) => setCloneNameInput(e.target.value)}
-              placeholder="Ex: Northern Lights (Clone)"
-              onKeyDown={(e) => e.key === "Enter" && clonePlantMutation.mutate({ plantId: plant!.id, name: cloneNameInput })}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCloneDialog(false)}>Cancelar</Button>
-            <Button
-              onClick={() => clonePlantMutation.mutate({ plantId: plant!.id, name: cloneNameInput })}
-              disabled={clonePlantMutation.isPending || !cloneNameInput.trim()}
-            >
-              {clonePlantMutation.isPending ? "Clonando..." : "Criar Clone"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <PlantDiscardModal
+          open={discardModalOpen}
+          onOpenChange={setDiscardModalOpen}
+          plantName={plant.name}
+          onConfirm={(reason) => {
+            haptic.destructive();
+            archiveMutation.mutate({ plantId, status: 'DISCARDED', finishReason: reason || undefined });
+            setDiscardModalOpen(false);
+          }}
+          isPending={archiveMutation.isPending}
+        />
 
-      {/* QR Code Dialog */}
-      <Dialog open={qrDialog} onOpenChange={setQrDialog}>
-        <DialogContent className="max-w-xs">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="w-4 h-4" />
-              Etiqueta QR Code
-            </DialogTitle>
-            <DialogDescription>
-              Escaneie para abrir {plant.name} diretamente no app.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-4 py-2">
-            {/* QR aponta para /scan/plant/:id — landing page com redirect automático */}
-            <div className="rounded-2xl overflow-hidden border border-border p-3 bg-white">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/scan/plant/${plantId}`)}&bgcolor=ffffff&color=111111&margin=4`}
-                alt={`QR Code — ${plant.name}`}
-                width={180}
-                height={180}
-                className="block"
-              />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-semibold text-foreground">{plant.name}</p>
-              {plant.code && <p className="text-xs text-muted-foreground">{plant.code}</p>}
-              <p className="text-[10px] text-muted-foreground/60 mt-1">/scan/plant/{plantId}</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" className="w-full gap-2" onClick={() => {
-              // Abre janela de impressão só com o QR
-              const win = window.open('', '_blank', 'width=400,height=500');
-              if (!win) return;
-              win.document.write(`
-                <html><head><title>QR — ${plant.name}</title>
-                <style>body{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#fff}
-                img{border:1px solid #eee;padding:12px;border-radius:12px}
-                p{margin:6px 0;font-size:14px;color:#111}small{color:#999;font-size:11px}</style></head>
-                <body>
-                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`${window.location.origin}/scan/plant/${plantId}`)}&bgcolor=ffffff&color=111111&margin=4" />
-                  <p><strong>${plant.name}</strong></p>
-                  ${plant.code ? `<small>${plant.code}</small>` : ''}
-                  <script>window.onload=()=>{window.print();window.close()}<\/script>
-                </body></html>
-              `);
-              win.document.close();
-            }}>
-              <Download className="w-4 h-4" />
-              Imprimir Etiqueta
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <PlantCloneDialog
+          open={cloneDialog}
+          onOpenChange={setCloneDialog}
+          plantId={plant.id}
+          plantName={plant.name}
+        />
+
+        <PlantQrDialog
+          open={qrDialog}
+          onOpenChange={setQrDialog}
+          plantId={plantId}
+          plantName={plant.name}
+          plantCode={plant.code}
+        />
+      </div>
     </PageTransition>
   );
 }
