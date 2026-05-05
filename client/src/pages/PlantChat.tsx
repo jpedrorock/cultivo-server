@@ -566,20 +566,72 @@ export default function PlantChat() {
     navigate(`/chat/${p.id}`, { replace: true });
   };
 
-  const handleImage = (file: File) => {
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error('Use jpeg, png ou webp');
-      return;
+  const handleImage = async (file: File) => {
+    // Tipos aceitos pela IA: JPEG, PNG, WebP. HEIC do iPhone precisa converter
+    // antes de enviar (a IA não aceita HEIC). Usamos canvas para converter.
+    const acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const needsConversion = !acceptedTypes.includes(file.type);
+
+    try {
+      let blob: Blob = file;
+      let mime: 'image/jpeg' | 'image/png' | 'image/webp' = (file.type as any) || 'image/jpeg';
+
+      if (needsConversion) {
+        // Tenta converter via canvas (resolve HEIC + reduz tamanho)
+        toast.loading('Convertendo imagem…', { id: 'img-convert' });
+        try {
+          const objectUrl = URL.createObjectURL(file);
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Browser não suporta esse formato'));
+            img.src = objectUrl;
+          });
+          const maxDim = 1600;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+            else                { width  = Math.round(width  * maxDim / height); height = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Canvas indisponível');
+          ctx.drawImage(img, 0, 0, width, height);
+          URL.revokeObjectURL(objectUrl);
+          blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(b => b ? resolve(b) : reject(new Error('Falha ao converter')), 'image/jpeg', 0.85);
+          });
+          mime = 'image/jpeg';
+          toast.dismiss('img-convert');
+        } catch {
+          toast.dismiss('img-convert');
+          toast.error(`Não foi possível converter (${file.type || 'desconhecido'}). Use JPEG, PNG ou WebP.`);
+          return;
+        }
+      }
+
+      // Limite ~7MB binário (~9.4MB base64) — acima disso a IA quase sempre rejeita
+      const MAX_BYTES = 7 * 1024 * 1024;
+      if (blob.size > MAX_BYTES) {
+        toast.error(`Imagem muito grande (${(blob.size / 1024 / 1024).toFixed(1)}MB). Máximo ~7MB.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const base64 = dataUrl.split(',')[1];
+        setImageBase64(base64);
+        setImageMime(mime);
+        setImagePreview(dataUrl);
+      };
+      reader.onerror = () => toast.error('Erro ao ler a imagem');
+      reader.readAsDataURL(blob);
+    } catch (err: any) {
+      toast.dismiss('img-convert');
+      toast.error(`Erro ao processar imagem: ${err?.message ?? 'desconhecido'}`);
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      const base64 = dataUrl.split(',')[1];
-      setImageBase64(base64);
-      setImageMime(file.type as any);
-      setImagePreview(dataUrl);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSend = () => {
