@@ -1,22 +1,24 @@
 // ════════════════════════════════════════════════════════════════════════════════
-// cultivo_ui.cpp — UI completa para o simulador SDL2
+// cultivo_ui.cpp — UI compartilhada entre simulador SDL2 e firmware ESP32-S3
 //
-// Porte focado do main_lvgl.cpp (ESP32) sem nada de Arduino/WiFi/HTTP.
-// Dados de sensores sao mockados e variam via timer (lv_timer) pra o
-// comportamento visual ficar parecido com o firmware real.
+// Constroi as 5 telas principais + navbar + animacoes. Nao inclui:
+//   - splash / AP portal / modal de config (firmware-only, em main_lvgl.cpp)
+//   - WiFi / HTTP / NVS (firmware-only)
+//   - inicializacao de display/touch (hal_platform.h)
 //
-// Resolucao alvo: 480x320 (mesmo do display JC4832W535 real).
-// Tipografia: usamos as fontes "reais" (Manrope bold 40/24, sb 18/14) — as
-// Wokwi-compactas ficam sem uso aqui.
+// Resolucao escolhida via macros HAL_SCREEN_W/H em cultivo_layout.h:
+//   REAL_HARDWARE  → 480x320 (JC4832W535)
+//   CULTIVO_SIM    → 480x320 (sim Mac/SDL2)
+//   default Wokwi  → 320x240 (ILI9341)
 //
-// Pra trazer uma mudanca visual daqui pro firmware real, copie a funcao
-// buildX()/refreshX() relevante e cole em main_lvgl.cpp (a assinatura e a
-// logica das funcoes sao identicas).
+// O app (sim ou firmware) escreve sensor state nos globals tempC/rh/etc.
+// e chama refreshHomeValues() pra forcar redraw. Save handlers do usuario
+// podem ser registrados via cultivoUI_setXxxHandler() — defaults so' printf.
 // ════════════════════════════════════════════════════════════════════════════════
 
 #include "lvgl.h"
 #include "cultivo_icons.h"
-#include "fonts/cultivo_fonts.h"
+#include "cultivo_layout.h"   // HAL_SCREEN_W/H + FONT_* + cores
 #include "cultivo_ui.h"
 
 #include <cstdio>
@@ -25,59 +27,53 @@
 #include <cstdlib>
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Constantes de tela / fonte (equivalem a hal_platform.h no firmware real)
+// Aliases de tela / helpers de escala
 // ════════════════════════════════════════════════════════════════════════════════
-static const int SCREEN_W = 480;
-static const int SCREEN_H = 320;
-static const int TABBAR_H = 54;
+static const int SCREEN_W = HAL_SCREEN_W;
+static const int SCREEN_H = HAL_SCREEN_H;
+// Wokwi 320x240 -> nav 48; real 480x320 e sim -> nav 54.
+static const int TABBAR_H = (SCREEN_H >= 320) ? 54 : 48;
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
-#define FONT_VALUE   (&manrope_bold_40)
-#define FONT_TITLE   (&manrope_bold_24)
-#define FONT_BODY    (&manrope_sb_18)
-#define FONT_CAPTION (&manrope_sb_14)
-
-// Escala relativa ao design Wokwi 320x240 (mesma semantica do firmware)
+// Escala relativa ao design Wokwi 320x240
 static inline int sw(int v) { return (v * SCREEN_W) / 320; }
 static inline int sh(int v) { return (v * SCREEN_H) / 240; }
 // ss() = menor dos dois — pra elementos quadrados (botoes circulares, icones).
-// Sem isso, sw(40)+sh(40) vira 60x53 num 480x320 (nao-quadrado).
 static inline int ss(int v) { return sw(v) < sh(v) ? sw(v) : sh(v); }
 
 // Grid de layout compartilhado — evita magic numbers em cada screen
-static const int HEADER_H    = 34;    // altura padrao do header (icone+titulo)
-static const int GUTTER      = 8;     // margem lateral padrao (sw scale)
-static const int CARD_RADIUS = 10;    // raio padrao de cards
-static const int TOUCH_MIN   = 32;    // altura minima de botao clicavel
+static const int HEADER_H    = 34;
+static const int GUTTER      = 8;
+static const int CARD_RADIUS = 10;
+static const int TOUCH_MIN   = 32;
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Paleta (identica ao main_lvgl.cpp — espelha DisplayMode.tsx)
+// Sensor state — declarado em cultivo_ui.h como extern. App escreve aqui.
 // ════════════════════════════════════════════════════════════════════════════════
-#define COL_BG      0x0B0F14
-#define COL_CARD    0x111827
-#define COL_BORDER  0x1F2937
-#define COL_TEXT    0xFFFFFF
-#define COL_DIM     0x6B7280
-#define COL_GRN     0x4ADE80
-#define COL_YEL     0xFBBF24
-#define COL_RED     0xF87171
-#define COL_CYN     0x2DD4BF
-#define COL_PRP     0xA78BFA
-#define COL_BLU     0x60A5FA
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Estado mockado — sensores variam via lv_timer pra simular leituras ao vivo
-// ════════════════════════════════════════════════════════════════════════════════
-static char TENT_NAME[50] = "ESTUFA 1";
-static char FASE[20]      = "FLORACAO";
-static float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, phv = 6.2f, ecv = 1.8f;
-static int   semana = 4, totalSem = 16;
-static bool  wifiOk = true;   // sim: sempre "conectado"
-static int   currentPpfd = 430;
-static int   targetPpfd  = 450;
-static int   luxMode     = 0;  // 0=PPFD, 1=LUX
+char  TENT_NAME[50] = "ESTUFA 1";
+char  FASE[20]      = "FLORACAO";
+float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, phv = 6.2f, ecv = 1.8f;
+int   semana = 4, totalSem = 16;
+bool  wifiOk = false;        // firmware: setado pelo connectWifi(); sim: forcado p/ true em sim_main.cpp
+int   currentLux = 0;
+int   currentPpfd = 430;
+int   targetPpfd  = 450;
+int   luxMode     = 0;       // 0=PPFD, 1=LUX
 static const int LUX_PER_PPFD = 54;
 static const int STEP_PPFD    = 25;
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Save handlers (registrados pelo app; defaults imprimem via printf)
+// ════════════════════════════════════════════════════════════════════════════════
+static CultivoSaveLuxFn      onLuxSave     = nullptr;
+static CultivoSavePhEcFn     onPhEcSave    = nullptr;
+static CultivoToggleTaskFn   onTaskToggle  = nullptr;
+static CultivoOpenConfigFn   onConfigOpen  = nullptr;
+
+extern "C" void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb)         { onLuxSave    = cb; }
+extern "C" void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb)       { onPhEcSave   = cb; }
+extern "C" void cultivoUI_setTaskToggleHandler(CultivoToggleTaskFn cb)   { onTaskToggle = cb; }
+extern "C" void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb)   { onConfigOpen = cb; }
 
 // ════════════════════════════════════════════════════════════════════════════════
 // Widgets compartilhados entre screens (idem main_lvgl.cpp)
@@ -86,7 +82,7 @@ static lv_obj_t *contentArea;
 static lv_obj_t *screenHome, *screenLux, *screenPhEc, *screenTarefa, *screenGrafic;
 static lv_obj_t *navbar;
 static lv_obj_t *navIcons[5];
-static int activeScreen = 0;
+int activeScreen = 0;
 static const uint32_t NAV_COLORS[5] = { COL_GRN, COL_YEL, COL_PRP, 0xFBBF24, COL_CYN };
 static const lv_image_dsc_t *NAV_ICONS_IMG[5] = {
   &ic_home, &ic_lightbulb, &ic_flask, &ic_tasks, &ic_activity
@@ -102,7 +98,9 @@ static lv_obj_t *arcTemp;
 static lv_obj_t *sparkRh, *sparkVpd, *sparkPpfd;
 static lv_chart_series_t *serRhS, *serVpdS, *serPpfdS;
 static lv_timer_t *pulseTimer = nullptr;
+#ifdef CULTIVO_SIM
 static lv_timer_t *mockTimer  = nullptr;
+#endif
 
 static lv_obj_t *lblLuxValue, *lblLuxUnit, *luxBar;
 static lv_obj_t *btnModePpfd, *btnModeLux;
@@ -233,12 +231,18 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
   lblWifi = wifiIcon;
 
-  // Gear — no sim nao faz nada (modal nao foi portado)
+  // Gear — abre modal de config (firmware) ou no-op (sim).
   lv_obj_t *btnCfg = lv_label_create(tab);
   lv_label_set_text(btnCfg, LV_SYMBOL_SETTINGS);
   lv_obj_set_style_text_color(btnCfg, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_24, 0);
   lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(44), sh(2));
+  lv_obj_add_flag(btnCfg, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(btnCfg, sw(8));
+  lv_obj_add_event_cb(btnCfg, [](lv_event_t *e) {
+    (void)e;
+    if (onConfigOpen) onConfigOpen();
+  }, LV_EVENT_CLICKED, NULL);
 
   // Botao flip: alterna a Home entre face A (sensores) e face B (nutrientes/ciclo)
   lv_obj_t *btnFlip = lv_label_create(tab);
@@ -468,7 +472,7 @@ static void buildHome(lv_obj_t *tab) {
   }
 }
 
-static void refreshHomeValues() {
+extern "C" void refreshHomeValues() {
   char buf[24];
   snprintf(buf, sizeof(buf), "%.1f", tempC);
   lv_label_set_text(lblTemp, buf);
@@ -562,7 +566,8 @@ static void luxStepCb(lv_event_t *e) {
 static void luxSaveCb(lv_event_t *e) {
   (void)e;
   currentPpfd = targetPpfd;
-  printf("[sim] lux salvo: %d PPFD\n", targetPpfd);
+  if (onLuxSave) onLuxSave(targetPpfd);
+  else           printf("[ui] lux salvo: %d PPFD (sem handler)\n", targetPpfd);
 }
 
 static void buildLux(lv_obj_t *tab) {
@@ -793,7 +798,8 @@ static void buildPhEc(lv_obj_t *tab) {
   applyBloom(btnSave, COL_GRN);
   lv_obj_add_event_cb(btnSave, [](lv_event_t *e) {
     (void)e;
-    printf("[sim] pH/EC salvo: pH=%.1f EC=%.1f\n", phv, ecv);
+    if (onPhEcSave) onPhEcSave(phv, ecv);
+    else            printf("[ui] pH/EC salvo: pH=%.1f EC=%.1f (sem handler)\n", phv, ecv);
   }, LV_EVENT_CLICKED, NULL);
   makeLabel(btnSave, "SALVAR", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
@@ -838,6 +844,7 @@ static void tarefaToggleCb(lv_event_t *e) {
   // contraste melhor: linha feita tem bg mais escuro (nao so texto dim)
   lv_obj_set_style_bg_opa(row, simTarefas[idx].feito ? LV_OPA_40 : LV_OPA_COVER, 0);
   updateTarefaCount();
+  if (onTaskToggle) onTaskToggle(idx, simTarefas[idx].feito);
 }
 
 static void buildTarefas(lv_obj_t *tab) {
@@ -1126,8 +1133,10 @@ static void buildNavbar(lv_obj_t *parent) {
   navSetActive(0);
 }
 
+#ifdef CULTIVO_SIM
 // ════════════════════════════════════════════════════════════════════════════════
 // Timer de mock: varia tempC/rh/ph/ec em ondas senoidais — UI fica "viva"
+// (so' no simulador; no firmware quem alimenta esses globals e fetchDisplayData)
 // ════════════════════════════════════════════════════════════════════════════════
 static void mockTimerCb(lv_timer_t *t) {
   (void)t;
@@ -1153,6 +1162,7 @@ static void mockTimerCb(lv_timer_t *t) {
 
   if (activeScreen == 0) refreshHomeValues();
 }
+#endif  // CULTIVO_SIM
 
 // ════════════════════════════════════════════════════════════════════════════════
 // buildCultivoUI — entrypoint (equivalente ao buildUI() do main_lvgl.cpp)
@@ -1235,8 +1245,14 @@ extern "C" void buildCultivoUI(void) {
 
   refreshHomeValues();
 
+  // pulse das sparklines (visual): 300ms; vale tanto pra sim quanto firmware
   pulseTimer = lv_timer_create(pulseTimerCb, 300, NULL);
-  mockTimer  = lv_timer_create(mockTimerCb,  500, NULL);
   // Onda sonora do Historico: ~12fps, early-return se nao esta na tela.
   lv_timer_create(histAnimTick, 80, NULL);
+
+#ifdef CULTIVO_SIM
+  // Mock dos sensores so' no sim. No firmware quem alimenta tempC/rh/etc
+  // e o fetchDisplayData() rodando em background (netTask).
+  mockTimer  = lv_timer_create(mockTimerCb,  500, NULL);
+#endif
 }

@@ -13,28 +13,16 @@
 #define HAL_PLATFORM_H
 
 #include <Arduino.h>
-#include "fonts/cultivo_fonts.h"
+#include "cultivo_layout.h"   // HAL_SCREEN_W/H + FONT_* + cores (sem dep Arduino)
 
 #ifdef REAL_HARDWARE
   #include <Arduino_GFX_Library.h>
   extern Arduino_DataBus *bus;
   extern Arduino_GFX     *gfx;
-  #define HAL_SCREEN_W 480
-  #define HAL_SCREEN_H 320
-  #define FONT_VALUE   (&manrope_bold_40)
-  #define FONT_TITLE   (&manrope_bold_24)
-  #define FONT_BODY    (&manrope_sb_18)
-  #define FONT_CAPTION (&manrope_sb_14)
 #else
   #include <Adafruit_GFX.h>
   #include <Adafruit_ILI9341.h>
   extern Adafruit_ILI9341 tft;
-  #define HAL_SCREEN_W 320
-  #define HAL_SCREEN_H 240
-  #define FONT_VALUE   (&manrope_bold_28)
-  #define FONT_TITLE   (&manrope_bold_18)
-  #define FONT_BODY    (&manrope_sb_14)
-  #define FONT_CAPTION (&manrope_sb_12)
 #endif
 
 // Inicializa bus SPI + controlador de display. Deve ser chamado em setup()

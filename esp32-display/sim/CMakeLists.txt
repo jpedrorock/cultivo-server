@@ -50,9 +50,12 @@ endif()
 add_compile_definitions(LV_CONF_INCLUDE_SIMPLE)
 
 # ── Executavel do simulador ─────────────────────────────────────────────────
+# A UI (cultivo_ui.cpp) vem direto de src/ — mesmo arquivo que o firmware
+# ESP32 compila. CULTIVO_SIM seleciona resolucao 480x320+fontes do
+# cultivo_layout.h, ativa o mockTimer e desativa as deps Arduino-only.
 add_executable(cultivo_sim
     sim_main.cpp
-    cultivo_ui.cpp
+    ../src/cultivo_ui.cpp
     ../src/cultivo_icons.c
     ../src/fonts/manrope_bold_18.c
     ../src/fonts/manrope_bold_24.c
@@ -62,6 +65,8 @@ add_executable(cultivo_sim
     ../src/fonts/manrope_sb_14.c
     ../src/fonts/manrope_sb_18.c
 )
+
+target_compile_definitions(cultivo_sim PRIVATE CULTIVO_SIM)
 
 target_include_directories(cultivo_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
