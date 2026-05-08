@@ -20,6 +20,7 @@
 #include "cultivo_icons.h"
 #include "fonts/cultivo_fonts.h"
 #include "hal_platform.h"
+#include "cultivo_ui.h"     // UI compartilhada com sim — fase 2 da refatoracao
 
 // FONT_* macros e extern declarations vêm de hal_platform.h
 
@@ -115,7 +116,8 @@ static inline int sh(int v) { return (v * SCREEN_H) / 240; }
 static const int TABBAR_H = (SCREEN_H >= 320) ? 64 : 48;   // nav maior no hardware real
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
-// ── Cores do tema (espelham DisplayMode.tsx) ───────────────────────────────────
+// ── Cores do tema (usadas por splash/config modal/AP portal — UI builders
+//   movidos pra cultivo_ui.cpp tem suas proprias copias destes valores) ───────
 #define COL_BG      0x0B0F14
 #define COL_CARD    0x111827
 #define COL_BORDER  0x1F2937
@@ -129,11 +131,8 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
 #define COL_BLU     0x60A5FA
 
 // ── LVGL v9 draw buffers ────────────────────────────────────────────────────────
-// FULL render mode com buffer 480x320 landscape em PSRAM. Testes mostraram
-// que PARTIAL mode adiciona overhead alto da LVGL (rendering em N chunks
-// e' mais lento que 1 buffer contigo, especialmente com animacoes pulse
-// invalidando area grande). Com cache blocking + QSPI 80MHz, FULL mode
-// da ~23 fps efetivos.
+// FULL render mode com buffer 480x320 landscape em PSRAM. Cache blocking
+// 32x32 + QSPI 80MHz dao ~23 fps efetivos.
 #ifdef REAL_HARDWARE
   static uint8_t *fullBuf = nullptr;
 #else
@@ -141,71 +140,51 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
   static uint32_t buf1[320 * BUF_LINES / 2];
 #endif
 
-// ── Estado dos dados ────────────────────────────────────────────────────────────
-static char TENT_NAME[50] = "ESTUFA 1";
-static char FASE[20]      = "FLORACAO";
-static float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, phv = 6.2f, ecv = 1.8f;
-// (currentLux e currentPpfd ficam na secao LUX/PPFD)
-static int semana = 4, totalSem = 16;
+// ── Helpers usados por splash/config modal/AP portal ───────────────────────────
+// makeLabel e applyBloom foram duplicados aqui (versoes simples) porque o
+// cultivo_ui.cpp os tem como static internas — esta UI offline-state ainda
+// usa esses estilos basicos.
+static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
+                           const lv_font_t *font, lv_align_t align, int x, int y) {
+  lv_obj_t *l = lv_label_create(parent);
+  lv_label_set_text(l, text);
+  lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
+  if (font) lv_obj_set_style_text_font(l, font, 0);
+  lv_obj_align(l, align, x, y);
+  return l;
+}
 
-static bool wifiOk = false;
-static unsigned long lastFetch = 0;
-static const unsigned long FETCH_INTERVAL = 30000;
+static void applyBloom(lv_obj_t *obj, uint32_t color) {
+  lv_obj_set_style_shadow_color(obj, lv_color_hex(color), 0);
+  lv_obj_set_style_shadow_width(obj, 28, 0);
+  lv_obj_set_style_shadow_opa(obj, LV_OPA_70, 0);
+  lv_obj_set_style_shadow_spread(obj, 2, 0);
+}
 
-// Flag setada por handlers de tap (TEMP/UMIDADE) — loop() processa fora do click
+// ── State infra ────────────────────────────────────────────────────────────────
+// Flag setada por handlers de tap (UI -> infra) — loop() processa fora do click.
+// Manter local em main_lvgl: cultivo_ui.cpp seta diretamente quando precisar
+// (o jeito atual e' callbacks via cultivoUI_set*Handler — refreshPending serve
+// p/ casos de "preciso re-fetch agora", se necessario no futuro).
 static volatile bool refreshPending = false;
 
-// netTask → loop: seta quando ha' dados novos. loop() chama refreshHomeValues()
-// no thread principal (LVGL nao e thread-safe). atomic volatile basta, flag simples.
-static volatile bool uiNeedsRefresh = false;
-
-// ── Widgets HOME ────────────────────────────────────────────────────────────────
-static lv_obj_t *contentArea;
-static lv_obj_t *screenHome, *screenLux, *screenPhEc, *screenTarefa, *screenGrafic;
-static lv_obj_t *navbar;
-static lv_obj_t *navIcons[5];
-static int activeScreen = 0;
-static const uint32_t NAV_COLORS[5] = { COL_GRN, COL_YEL, COL_PRP, 0xFBBF24, COL_CYN };
-static const lv_img_dsc_t *NAV_ICONS_IMG[5] = { &ic_home, &ic_lightbulb, &ic_flask, &ic_tasks, &ic_activity };
-
-static lv_obj_t *lblTitle, *lblSub, *lblWifi;
-static lv_obj_t *lblTemp, *lblRh, *lblPh, *lblEc;
-static lv_obj_t *arcTemp;                   // arc central estilo Ebike
-static lv_obj_t *sparkRh, *sparkPh, *sparkEc;  // mini-charts pulsantes
-static lv_chart_series_t *serRhS, *serPhS, *serEcS;
-static lv_timer_t *pulseTimer = nullptr;
-
-// ── Widgets REGAR ───────────────────────────────────────────────────────────────
-// ── Widgets LUX/PPFD ────────────────────────────────────────────────────────────
-// targetPpfd = valor ajustado pelo usuario (persistido via POST /readings)
-// currentPpfd/currentLux = ultima leitura do sensor (GET /display)
-// luxMode = 0 PPFD | 1 LUX (toggle de visualizacao)
-// Conversao: 1 PPFD ~= 54 LUX (cultivo LEDs)
-static lv_obj_t *lblLuxValue, *lblLuxUnit;
-static lv_obj_t *btnModePpfd, *btnModeLux;
-static int currentLux = 0, currentPpfd = 0;
-static int targetPpfd = 450;
-static int luxMode = 0;  // 0=PPFD, 1=LUX
-static const int LUX_PER_PPFD = 54;
-static const int STEP_PPFD    = 25;
-
-// ── Widgets pH/EC ───────────────────────────────────────────────────────────────
-static lv_obj_t *taPh, *taEc, *kbNumero;
-static int activePhEcField = 0;  // 0=pH, 1=EC
-
-// ── Widgets TAREFAS ─────────────────────────────────────────────────────────────
-static lv_obj_t *tarefasList;
+// Tarefas: HTTP fetchTasks() escreve aqui, mas ainda nao integra com a UI nova
+// do cultivo_ui.cpp (que tem sua propria lista mockada). TODO: expor um setter
+// cultivoUI_setTasks() pra alimentar a UI a partir destes dados do servidor.
 struct Tarefa { char texto[80]; bool feito; int serverId; };
 static Tarefa tarefas[10];
 static int numTarefas = 0;
 
-// ── Widgets HISTORICO ───────────────────────────────────────────────────────────
-static lv_obj_t *chartHist, *mtxMetric, *mtxPeriod;
-static lv_chart_series_t *serHist;
-static int histMetric = 0;    // 0=temp, 1=rh, 2=ph, 3=ec
-static int histPeriod = 0;    // 0=24h, 1=7d, 2=30d
-static const char* METRIC_KEYS[4]   = { "temp", "rh", "ph", "ec" };
-static const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
+// ── Estado dos dados (UI + sensores) ────────────────────────────────────────────
+// Globals de estado vivem em cultivo_ui.cpp e sao importados via cultivo_ui.h:
+// TENT_NAME, FASE, tempC, rh, vpd, phv, ecv, semana, totalSem, wifiOk,
+// currentLux, currentPpfd, targetPpfd, luxMode, activeScreen.
+static unsigned long lastFetch = 0;
+static const unsigned long FETCH_INTERVAL = 30000;
+
+// netTask → loop: seta quando ha' dados novos. loop() chama refreshHomeValues()
+// no thread principal (LVGL nao e thread-safe). atomic volatile basta, flag simples.
+static volatile bool uiNeedsRefresh = false;
 
 // ════════════════════════════════════════════════════════════════════════════════
 // Display + touch callbacks (LVGL v9 API)
@@ -277,96 +256,8 @@ static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════════
-// Helper: card estilizado com gradient glassmorphism de 3 stops
-// ════════════════════════════════════════════════════════════════════════════════
-static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
-  lv_obj_t *c = lv_obj_create(parent);
-  lv_obj_set_size(c, w, h);
-  lv_obj_set_pos(c, x, y);
-  // Gradient 3-stop (highlight top + body + shadow base) — efeito glassmorphism
-  lv_obj_set_style_bg_color(c, lv_color_hex(0x243142), 0);       // topo (claro)
-  lv_obj_set_style_bg_grad_color(c, lv_color_hex(0x050811), 0);  // base (bem escuro)
-  lv_obj_set_style_bg_grad_dir(c, LV_GRAD_DIR_VER, 0);
-  lv_obj_set_style_bg_main_stop(c, 0, 0);       // topo comeca 0%
-  lv_obj_set_style_bg_grad_stop(c, 230, 0);     // escurece apos 90% (reforca base escura)
-  lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(c, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(c, 1, 0);
-  lv_obj_set_style_radius(c, 10, 0);
-  lv_obj_set_style_pad_all(c, 6, 0);
-  // Sombra externa (projecao embaixo do card — profundidade)
-  lv_obj_set_style_shadow_color(c, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_shadow_width(c, 12, 0);
-  lv_obj_set_style_shadow_opa(c, LV_OPA_50, 0);
-  lv_obj_set_style_shadow_spread(c, 0, 0);
-  lv_obj_set_style_shadow_ofs_x(c, 0, 0);
-  lv_obj_set_style_shadow_ofs_y(c, 4, 0);
-  lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
-  return c;
-}
-
-// Helper: animação de "respiração" no shadow opa (pulsa o halo)
-// Usado em conjunto com applyBloom pra dar vibe "vivo" estilo dashboard aviação
-static void anim_shadow_opa_cb(void *obj, int32_t v) {
-  lv_obj_set_style_shadow_opa((lv_obj_t*)obj, v, 0);
-}
-
-static void startBreathe(lv_obj_t *obj, uint32_t minOpa, uint32_t maxOpa, uint32_t periodMs) {
-  lv_anim_t a;
-  lv_anim_init(&a);
-  lv_anim_set_var(&a, obj);
-  lv_anim_set_values(&a, minOpa, maxOpa);
-  lv_anim_set_time(&a, periodMs);
-  lv_anim_set_playback_time(&a, periodMs);
-  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-  lv_anim_set_exec_cb(&a, anim_shadow_opa_cb);
-  lv_anim_start(&a);
-}
-
-// Helper: aplica bloom (glow mais intenso + outline animado) — estilo Tesla/HUD
-static void applyBloom(lv_obj_t *obj, uint32_t color) {
-  // Camada 1: shadow grande (o "glow radiante")
-  lv_obj_set_style_shadow_color(obj, lv_color_hex(color), 0);
-  lv_obj_set_style_shadow_width(obj, 28, 0);
-  lv_obj_set_style_shadow_opa(obj, LV_OPA_70, 0);
-  lv_obj_set_style_shadow_spread(obj, 2, 0);
-  lv_obj_set_style_shadow_ofs_x(obj, 0, 0);
-  lv_obj_set_style_shadow_ofs_y(obj, 0, 0);
-  // Respiração sutil — pulsa entre 40% e 80% em 2.2s
-  startBreathe(obj, LV_OPA_40, LV_OPA_80, 2200);
-}
-
-// Helper: outline pulsante nos cards (ring glow animado ao redor da borda)
-static void anim_outline_opa_cb(void *obj, int32_t v) {
-  lv_obj_set_style_outline_opa((lv_obj_t*)obj, v, 0);
-}
-
-static void applyRingPulse(lv_obj_t *card, uint32_t color, uint32_t periodMs = 2800) {
-  lv_obj_set_style_outline_color(card, lv_color_hex(color), 0);
-  lv_obj_set_style_outline_width(card, 2, 0);
-  lv_obj_set_style_outline_pad(card, 0, 0);
-  lv_obj_set_style_outline_opa(card, LV_OPA_0, 0);
-  lv_anim_t a;
-  lv_anim_init(&a);
-  lv_anim_set_var(&a, card);
-  lv_anim_set_values(&a, LV_OPA_0, LV_OPA_60);
-  lv_anim_set_time(&a, periodMs);
-  lv_anim_set_playback_time(&a, periodMs);
-  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-  lv_anim_set_exec_cb(&a, anim_outline_opa_cb);
-  lv_anim_start(&a);
-}
-
-static lv_obj_t* makeLabel(lv_obj_t *parent, const char *text, uint32_t color,
-                            const lv_font_t *font, lv_align_t align, int x, int y) {
-  lv_obj_t *l = lv_label_create(parent);
-  lv_label_set_text(l, text);
-  lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
-  if (font) lv_obj_set_style_text_font(l, font, 0);
-  lv_obj_align(l, align, x, y);
-  return l;
-}
+// UI helpers (makeCard, makeLabel, applyBloom, startBreathe, applyRingPulse,
+// animation callbacks) foram movidos pra cultivo_ui.cpp na fase 2 da refatoracao.
 
 // ════════════════════════════════════════════════════════════════════════════════
 // App splash — logo + barra de progresso (estilo app mobile)
@@ -985,662 +876,12 @@ static void startApPortal() {
 }
 // ════════════════════════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════════════════════════
-// Aba HOME — estilo Ebike demo: arc gigante (TEMP) + coluna de mini-cards
-// Layout responsivo via sw()/sh() — escala proporcional no hardware real
-// ════════════════════════════════════════════════════════════════════════════════
-static void buildHome(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, 0, 0);
-  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
-
-  // ═══ Header compacto ═══
-  lv_obj_t *hdrIcon = lv_img_create(tab);
-  lv_img_set_src(hdrIcon, &ic_sprout);
-  lv_obj_set_style_img_recolor(hdrIcon, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_img_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
-  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
-
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
-
-  char subBuf[48];
-  snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  lblSub = makeLabel(tab, subBuf, COL_PRP, FONT_CAPTION, LV_ALIGN_TOP_LEFT, sw(38), sh(22));
-
-  lv_obj_t *wifiIcon = lv_img_create(tab);
-  lv_img_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
-  lv_obj_set_style_img_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
-  lv_obj_set_style_img_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
-  lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
-  lblWifi = wifiIcon;
-
-  // Gear icon (ao lado do wifi) — abre modal de configuracao
-  // Usa lv_font_montserrat_14 porque LV_SYMBOL_SETTINGS e' glyph FontAwesome
-  // (Manrope nao tem essa faixa Unicode)
-  lv_obj_t *btnCfg = lv_label_create(tab);
-  lv_label_set_text(btnCfg, LV_SYMBOL_SETTINGS);
-  lv_obj_set_style_text_color(btnCfg, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_14, 0);
-  lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(36), sh(6));
-  lv_obj_add_flag(btnCfg, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_ext_click_area(btnCfg, sw(12));
-  lv_obj_add_event_cb(btnCfg, [](lv_event_t *e) { openConfigModal(); }, LV_EVENT_CLICKED, NULL);
-
-  // ═══ Corpo: arc gigante à esquerda + 3 mini-cards à direita ═══
-  int bodyY = sh(42);
-  int bodyH = TAB_H - bodyY - sh(4);
-  int halfW = SCREEN_W / 2;
-
-  // ─── ARC TEMP (estilo velocímetro Ebike) ────────────────────────────
-  int arcSize = (bodyH < halfW - sw(8)) ? bodyH : halfW - sw(8);
-  arcTemp = lv_arc_create(tab);
-  lv_obj_set_size(arcTemp, arcSize, arcSize);
-  lv_obj_set_pos(arcTemp, (halfW - arcSize) / 2, bodyY + (bodyH - arcSize) / 2);
-  lv_arc_set_range(arcTemp, 0, 40);
-  lv_arc_set_value(arcTemp, (int)tempC);
-  lv_arc_set_bg_angles(arcTemp, 135, 45);
-  lv_arc_set_rotation(arcTemp, 0);
-  lv_obj_remove_style(arcTemp, NULL, LV_PART_KNOB);
-  lv_obj_clear_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_style_arc_width(arcTemp, sw(8),  LV_PART_MAIN);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(0x1F2937), LV_PART_MAIN);
-  lv_obj_set_style_arc_opa(arcTemp, LV_OPA_80, LV_PART_MAIN);
-  lv_obj_set_style_arc_width(arcTemp, sw(10), LV_PART_INDICATOR);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-
-  lv_obj_t *lblTempHdr = lv_label_create(arcTemp);
-  lv_label_set_text(lblTempHdr, "TEMP");
-  lv_obj_set_style_text_color(lblTempHdr, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblTempHdr, FONT_CAPTION, 0);
-  lv_obj_align(lblTempHdr, LV_ALIGN_CENTER, 0, -arcSize / 4);
-
-  lblTemp = lv_label_create(arcTemp);
-  lv_label_set_text(lblTemp, "--");
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_text_font(lblTemp, FONT_VALUE, 0);
-  lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
-  applyBloom(lblTemp, COL_GRN);
-  // Arc TEMP tambem ganha bloom no stroke (efeito velocimetro "vivo")
-  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_width(arcTemp, 16, LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_opa(arcTemp, LV_OPA_60, LV_PART_INDICATOR);
-
-  // Ring wave — radar ping emanando do centro do arco (duas ondas offset)
-  int arcCx = (halfW - arcSize) / 2 + arcSize / 2;
-  int arcCy = bodyY + (bodyH - arcSize) / 2 + arcSize / 2;
-  // Ring wave desabilitado temporariamente — o wrapper extrapolava TAB_H
-
-
-  lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
-  lv_label_set_text(lblTempUnit, "°C");
-  lv_obj_set_style_text_color(lblTempUnit, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblTempUnit, FONT_CAPTION, 0);
-  lv_obj_align(lblTempUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
-
-  // ─── 3 mini-cards à direita (UMIDADE, pH, EC) ─────────────────────────
-  int rightX = halfW + sw(2);
-  int cardW = SCREEN_W - rightX - sw(4);
-  int cardGap = sh(4);
-  int cardH = (bodyH - 2 * cardGap) / 3;
-
-  auto makeMiniCard = [&](int yOffset, const char *label, const char *initVal,
-                          uint32_t color, const lv_img_dsc_t *icon,
-                          lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
-    lv_obj_t *c = makeCard(tab, rightX, bodyY + yOffset, cardW, cardH);
-    lv_obj_set_style_pad_all(c, sw(4), 0);
-    applyRingPulse(c, color);  // outline colorido pulsando — vibe monitor cardiaco
-
-    lv_obj_t *ico = lv_img_create(c);
-    lv_img_set_src(ico, icon);
-    lv_obj_set_style_img_recolor(ico, lv_color_hex(color), 0);
-    lv_obj_set_style_img_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
-
-    lv_obj_t *lb = lv_label_create(c);
-    lv_label_set_text(lb, label);
-    lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
-    lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
-    lv_obj_align(lb, LV_ALIGN_TOP_RIGHT, 0, 0);
-
-    int chartW = cardW - sw(44);
-    int chartH = sh(14);
-    lv_obj_t *ch = lv_chart_create(c);
-    lv_obj_set_size(ch, chartW, chartH);
-    lv_obj_align(ch, LV_ALIGN_RIGHT_MID, 0, -sh(1));
-    lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
-    lv_chart_set_point_count(ch, 20);
-    lv_chart_set_div_line_count(ch, 0, 0);
-    // Aura translucida atras da linha (da profundidade ao sparkline)
-    lv_obj_set_style_bg_color(ch, lv_color_hex(color), 0);
-    lv_obj_set_style_bg_opa(ch, LV_OPA_10, 0);
-    lv_obj_set_style_radius(ch, 4, 0);
-    lv_obj_set_style_border_width(ch, 0, 0);
-    lv_obj_set_style_width(ch,  0, LV_PART_INDICATOR);   // v9: size separado em w/h
-    lv_obj_set_style_height(ch, 0, LV_PART_INDICATOR);
-    lv_obj_set_style_line_width(ch, sw(2), LV_PART_ITEMS);
-    lv_obj_set_style_line_color(ch, lv_color_hex(color), LV_PART_ITEMS);
-    lv_obj_set_style_pad_all(ch, 0, 0);
-    *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
-    *sparkOut = ch;
-
-    lv_obj_t *v = lv_label_create(c);
-    lv_label_set_text(v, initVal);
-    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
-    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
-    lv_obj_align(v, LV_ALIGN_BOTTOM_RIGHT, 0, sh(2));
-    applyBloom(v, color);
-    return v;
-  };
-
-  lblRh = makeMiniCard(0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,   &sparkRh, &serRhS);
-  lblPh = makeMiniCard(cardH + cardGap,       "pH",      "--", COL_GRN, &ic_beaker,    &sparkPh, &serPhS);
-  lblEc = makeMiniCard((cardH + cardGap) * 2, "EC",      "--", COL_PRP, &ic_test_tube, &sparkEc, &serEcS);
-
-  // Tap no arco TEMP ou no card UMIDADE -> forca refresh Tuya no servidor
-  // pH/EC ficam de fora (nao vem do Tuya — sao entrada manual).
-  auto refreshTapCb = [](lv_event_t *e) {
-    refreshPending = true;
-    // Flash visual imediato — realca shadow do target em 180ms e volta
-    lv_obj_t *t = (lv_obj_t*)lv_event_get_target(e);
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, t);
-    lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_60);
-    lv_anim_set_time(&a, 180);
-    lv_anim_set_playback_time(&a, 180);
-    lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-      lv_obj_set_style_shadow_opa((lv_obj_t*)obj, v, 0);
-    });
-    lv_anim_start(&a);
-  };
-  lv_obj_add_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(arcTemp, refreshTapCb, LV_EVENT_CLICKED, NULL);
-  lv_obj_t *cardRh = lv_obj_get_parent(lblRh);
-  lv_obj_add_event_cb(cardRh, refreshTapCb, LV_EVENT_CLICKED, NULL);
-
-  // Inicializa sparklines com valores iniciais + ajusta range
-  lv_chart_set_range(sparkRh, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
-  lv_chart_set_range(sparkPh, LV_CHART_AXIS_PRIMARY_Y, 40, 90);
-  lv_chart_set_range(sparkEc, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
-  for (int i = 0; i < 20; i++) {
-    lv_chart_set_next_value(sparkRh, serRhS, (int32_t)rh);
-    lv_chart_set_next_value(sparkPh, serPhS, (int32_t)(phv * 10));
-    lv_chart_set_next_value(sparkEc, serEcS, (int32_t)(ecv * 10));
-  }
-}
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Timer de pulso: anima sparklines + pulsa o arc TEMP (efeito ECG/monitor)
+// UI inline (HOME, LUX, pH/EC, TAREFAS, HISTORICO, navbar, refresh*) movida
+// pra cultivo_ui.cpp na fase 2 da refatoracao. App registra handlers em
+// setup() via cultivoUI_set*Handler() pra os POSTs HTTP.
 // ════════════════════════════════════════════════════════════════════════════════
-static void pulseTimerCb(lv_timer_t *t) {
-  // Variação senoidal pequena em torno do valor atual (ilusão de "vivo")
-  static uint32_t tick = 0;
-  tick++;
-  float wave = sinf(tick * 0.4f);        // -1..1
-  float jitter = ((rand() % 100) - 50) / 100.0f;  // -0.5..0.5
-
-  if (sparkRh && serRhS) {
-    int32_t v = (int32_t)(rh + wave * 1.5f + jitter);
-    lv_chart_set_next_value(sparkRh, serRhS, v);
-  }
-  if (sparkPh && serPhS) {
-    int32_t v = (int32_t)((phv + wave * 0.1f + jitter * 0.1f) * 10);
-    lv_chart_set_next_value(sparkPh, serPhS, v);
-  }
-  if (sparkEc && serEcS) {
-    int32_t v = (int32_t)((ecv + wave * 0.1f + jitter * 0.05f) * 10);
-    lv_chart_set_next_value(sparkEc, serEcS, v);
-  }
-}
-
-static void startPulseTimer() {
-  if (pulseTimer) return;
-  pulseTimer = lv_timer_create(pulseTimerCb, 300, NULL);  // 300ms = ~3Hz de pulso
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Aba LUX / PPFD — toggle de unidade + ajuste via +/- + salvar no backend
-// ════════════════════════════════════════════════════════════════════════════════
-static bool postPpfd(int ppfd);  // fwd
-
-static void refreshLuxDisplay() {
-  if (!lblLuxValue || !lblLuxUnit) return;
-  char buf[16];
-  if (luxMode == 0) {
-    snprintf(buf, sizeof(buf), "%d", targetPpfd);
-    lv_label_set_text(lblLuxValue, buf);
-    lv_label_set_text(lblLuxUnit, "umol/s.m²");
-    lv_obj_set_style_text_color(lblLuxValue, lv_color_hex(COL_GRN), 0);
-  } else {
-    snprintf(buf, sizeof(buf), "%d", targetPpfd * LUX_PER_PPFD);
-    lv_label_set_text(lblLuxValue, buf);
-    lv_label_set_text(lblLuxUnit, "LUX");
-    lv_obj_set_style_text_color(lblLuxValue, lv_color_hex(COL_YEL), 0);
-  }
-  // Toggle visual: destaca o modo ativo
-  if (btnModePpfd && btnModeLux) {
-    lv_obj_set_style_bg_color(btnModePpfd, lv_color_hex(luxMode==0 ? COL_GRN  : COL_CARD), 0);
-    lv_obj_set_style_bg_color(btnModeLux,  lv_color_hex(luxMode==1 ? COL_YEL  : COL_CARD), 0);
-  }
-}
-
-static void luxStepCb(lv_event_t *e) {
-  int delta = (int)(intptr_t)lv_event_get_user_data(e);
-  targetPpfd += delta;
-  if (targetPpfd < 0)    targetPpfd = 0;
-  if (targetPpfd > 2000) targetPpfd = 2000;
-  refreshLuxDisplay();
-}
-
-static void luxModeCb(lv_event_t *e) {
-  luxMode = (int)(intptr_t)lv_event_get_user_data(e);
-  refreshLuxDisplay();
-}
-
-static void luxSaveCb(lv_event_t *e) {
-  if (postPpfd(targetPpfd)) {
-    currentPpfd = targetPpfd;
-    currentLux  = targetPpfd * LUX_PER_PPFD;
-  }
-}
-
-static void buildLux(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, sw(6), 0);
-  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
-
-  // Header: lampada + titulo
-  lv_obj_t *iconBulb = lv_img_create(tab);
-  lv_img_set_src(iconBulb, &ic_lightbulb);
-  lv_obj_set_style_img_recolor(iconBulb, lv_color_hex(COL_YEL), 0);
-  lv_obj_set_style_img_recolor_opa(iconBulb, LV_OPA_COVER, 0);
-  lv_obj_align(iconBulb, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
-  makeLabel(tab, "LUX / PPFD", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
-
-  // Toggle PPFD/LUX (2 botoes no topo direito)
-  int togW = sw(52), togH = sh(20);
-  btnModePpfd = lv_btn_create(tab);
-  lv_obj_set_size(btnModePpfd, togW, togH);
-  lv_obj_align(btnModePpfd, LV_ALIGN_TOP_RIGHT, -togW - sw(4), sh(4));
-  lv_obj_set_style_radius(btnModePpfd, 6, 0);
-  lv_obj_add_event_cb(btnModePpfd, luxModeCb, LV_EVENT_CLICKED, (void*)(intptr_t)0);
-  makeLabel(btnModePpfd, "PPFD", COL_TEXT, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
-
-  btnModeLux = lv_btn_create(tab);
-  lv_obj_set_size(btnModeLux, togW, togH);
-  lv_obj_align(btnModeLux, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
-  lv_obj_set_style_radius(btnModeLux, 6, 0);
-  lv_obj_add_event_cb(btnModeLux, luxModeCb, LV_EVENT_CLICKED, (void*)(intptr_t)1);
-  makeLabel(btnModeLux, "LUX", COL_TEXT, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
-
-  // Valor grande centralizado
-  int valueY = sh(48);
-  lblLuxValue = lv_label_create(tab);
-  lv_label_set_text(lblLuxValue, "0");
-  lv_obj_set_style_text_font(lblLuxValue, FONT_VALUE, 0);
-  lv_obj_set_style_text_color(lblLuxValue, lv_color_hex(COL_GRN), 0);
-  lv_obj_align(lblLuxValue, LV_ALIGN_TOP_MID, 0, valueY);
-  applyBloom(lblLuxValue, COL_GRN);
-
-  lblLuxUnit = lv_label_create(tab);
-  lv_label_set_text(lblLuxUnit, "umol/s.m²");
-  lv_obj_set_style_text_font(lblLuxUnit, FONT_CAPTION, 0);
-  lv_obj_set_style_text_color(lblLuxUnit, lv_color_hex(COL_DIM), 0);
-  lv_obj_align(lblLuxUnit, LV_ALIGN_TOP_MID, 0, valueY + sh(40));
-
-  // Linha com botoes - / +
-  int ctlY = valueY + sh(60);
-  int btnSize = sh(38);
-  lv_obj_t *btnMinus = lv_btn_create(tab);
-  lv_obj_set_size(btnMinus, btnSize, btnSize);
-  lv_obj_align(btnMinus, LV_ALIGN_TOP_MID, -sw(60), ctlY);
-  lv_obj_set_style_radius(btnMinus, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(btnMinus, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(btnMinus, lv_color_hex(COL_RED), 0);
-  lv_obj_set_style_border_width(btnMinus, 2, 0);
-  lv_obj_add_event_cb(btnMinus, luxStepCb, LV_EVENT_CLICKED, (void*)(intptr_t)(-STEP_PPFD));
-  lv_obj_add_event_cb(btnMinus, luxStepCb, LV_EVENT_LONG_PRESSED_REPEAT, (void*)(intptr_t)(-STEP_PPFD));
-  makeLabel(btnMinus, "-", COL_RED, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(4));
-
-  lv_obj_t *btnPlus = lv_btn_create(tab);
-  lv_obj_set_size(btnPlus, btnSize, btnSize);
-  lv_obj_align(btnPlus, LV_ALIGN_TOP_MID, sw(60), ctlY);
-  lv_obj_set_style_radius(btnPlus, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(btnPlus, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(btnPlus, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(btnPlus, 2, 0);
-  lv_obj_add_event_cb(btnPlus, luxStepCb, LV_EVENT_CLICKED, (void*)(intptr_t)(+STEP_PPFD));
-  lv_obj_add_event_cb(btnPlus, luxStepCb, LV_EVENT_LONG_PRESSED_REPEAT, (void*)(intptr_t)(+STEP_PPFD));
-  makeLabel(btnPlus, "+", COL_GRN, FONT_VALUE, LV_ALIGN_CENTER, 0, -sh(4));
-
-  // Botao SALVAR
-  lv_obj_t *btnSave = lv_btn_create(tab);
-  lv_obj_set_size(btnSave, sw(120), sh(24));
-  lv_obj_align(btnSave, LV_ALIGN_TOP_MID, 0, ctlY + btnSize + sh(6));
-  lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_GRN), 0);
-  applyBloom(btnSave, COL_GRN);
-  lv_obj_add_event_cb(btnSave, luxSaveCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnSave, "SALVAR", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-
-  refreshLuxDisplay();
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Aba pH/EC — dois campos + keyboard numerico nativo + salvar
-// ════════════════════════════════════════════════════════════════════════════════
-static void postReading(float newPh, float newEc);  // fwd
-static void refreshHomeValues();                    // fwd
-
-static void updatePhEcHighlights() {
-  lv_obj_set_style_border_color(taPh, lv_color_hex(activePhEcField==0 ? COL_GRN : COL_BORDER), 0);
-  lv_obj_set_style_border_color(taEc, lv_color_hex(activePhEcField==1 ? COL_CYN : COL_BORDER), 0);
-  lv_obj_set_style_border_width(taPh, 2, 0);
-  lv_obj_set_style_border_width(taEc, 2, 0);
-}
-
-static void phEcFocusCb(lv_event_t *e) {
-  lv_obj_t *ta = (lv_obj_t*)lv_event_get_target(e);
-  activePhEcField = (ta == taPh) ? 0 : 1;
-  lv_keyboard_set_textarea(kbNumero, ta);
-  updatePhEcHighlights();
-}
-
-static void phEcSalvarCb(lv_event_t *e) {
-  const char *sPh = lv_textarea_get_text(taPh);
-  const char *sEc = lv_textarea_get_text(taEc);
-  float newPh = atof(sPh);
-  float newEc = atof(sEc);
-  if (strlen(sPh)) phv = newPh;
-  if (strlen(sEc)) ecv = newEc;
-  postReading(newPh, newEc);
-  refreshHomeValues();
-  lv_textarea_set_text(taPh, "");
-  lv_textarea_set_text(taEc, "");
-
-  lv_obj_t *msg = lv_msgbox_create(NULL);
-  lv_msgbox_add_title(msg, "Medicao salva");
-  lv_msgbox_add_text(msg, "pH/EC registrados.");
-  lv_obj_center(msg);
-  lv_timer_t *t = lv_timer_create([](lv_timer_t *t) {
-    lv_obj_t *m = (lv_obj_t*)lv_timer_get_user_data(t);
-    lv_msgbox_close(m);
-    lv_timer_delete(t);
-  }, 1500, msg);
-  (void)t;
-}
-
-static void buildPhEc(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, sw(6), 0);
-  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-
-  makeLabel(tab, "MEDICAO pH / EC", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
-
-  int fieldW = (SCREEN_W - sw(24)) / 2;
-  int fieldH = sh(38);
-
-  taPh = lv_textarea_create(tab);
-  lv_obj_set_size(taPh, fieldW, fieldH);
-  lv_obj_set_pos(taPh, sw(6), sh(18));
-  lv_textarea_set_accepted_chars(taPh, "0123456789.");
-  lv_textarea_set_max_length(taPh, 5);
-  lv_textarea_set_one_line(taPh, true);
-  lv_textarea_set_placeholder_text(taPh, "pH");
-  lv_obj_set_style_bg_color(taPh, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_text_color(taPh, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_text_font(taPh, FONT_TITLE, 0);
-  lv_obj_add_event_cb(taPh, phEcFocusCb, LV_EVENT_CLICKED, NULL);
-
-  taEc = lv_textarea_create(tab);
-  lv_obj_set_size(taEc, fieldW, fieldH);
-  lv_obj_set_pos(taEc, sw(12) + fieldW, sh(18));
-  lv_textarea_set_accepted_chars(taEc, "0123456789.");
-  lv_textarea_set_max_length(taEc, 5);
-  lv_textarea_set_one_line(taEc, true);
-  lv_textarea_set_placeholder_text(taEc, "EC");
-  lv_obj_set_style_bg_color(taEc, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_text_color(taEc, lv_color_hex(COL_CYN), 0);
-  lv_obj_set_style_text_font(taEc, FONT_TITLE, 0);
-  lv_obj_add_event_cb(taEc, phEcFocusCb, LV_EVENT_CLICKED, NULL);
-
-  // Botao SALVAR
-  lv_obj_t *btnSave = lv_btn_create(tab);
-  lv_obj_set_size(btnSave, SCREEN_W - sw(24), sh(30));
-  lv_obj_set_pos(btnSave, sw(12), sh(62));
-  lv_obj_set_style_bg_color(btnSave, lv_color_hex(0x064E3B), 0);
-  lv_obj_set_style_border_color(btnSave, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(btnSave, 1, 0);
-  lv_obj_add_event_cb(btnSave, phEcSalvarCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnSave, "SALVAR", COL_GRN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-
-  // Keyboard numerico (ocupa o resto da tela)
-  kbNumero = lv_keyboard_create(tab);
-  lv_keyboard_set_mode(kbNumero, LV_KEYBOARD_MODE_NUMBER);
-  lv_keyboard_set_textarea(kbNumero, taPh);
-  lv_keyboard_set_popovers(kbNumero, false);
-  lv_obj_set_size(kbNumero, SCREEN_W - sw(12), TAB_H - sh(100));
-  lv_obj_align(kbNumero, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_set_style_bg_color(kbNumero, lv_color_hex(COL_BG), 0);
-
-  activePhEcField = 0;
-  updatePhEcHighlights();
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Aba TAREFAS — checklist com lv_checkbox
-// ════════════════════════════════════════════════════════════════════════════════
-static void fetchTasks();
-static void postTaskComplete(int taskId);
-static void initMockTarefas() {
-  const char* mock[] = {
-    "Regar planta 1", "Medir pH da agua", "Verificar temperatura",
-    "Trocar filtro", "Limpar reservatorio"
-  };
-  numTarefas = 5;
-  for (int i = 0; i < 5; i++) {
-    strncpy(tarefas[i].texto, mock[i], 79);
-    tarefas[i].texto[79] = '\0';
-    tarefas[i].feito = false;
-    tarefas[i].serverId = -1;
-  }
-}
-
-static void tarefaToggleCb(lv_event_t *e) {
-  lv_obj_t *cb = (lv_obj_t*)lv_event_get_target(e);
-  int idx = (int)(intptr_t)lv_event_get_user_data(e);
-  if (idx < 0 || idx >= numTarefas) return;
-  tarefas[idx].feito = lv_obj_has_state(cb, LV_STATE_CHECKED);
-  if (tarefas[idx].serverId > 0) postTaskComplete(tarefas[idx].serverId);
-}
-
-static void rebuildTarefasList() {
-  lv_obj_clean(tarefasList);
-  if (numTarefas == 0) {
-    lv_obj_t *l = lv_label_create(tarefasList);
-    lv_label_set_text(l, "Sem tarefas");
-    lv_obj_set_style_text_color(l, lv_color_hex(COL_DIM), 0);
-    lv_obj_center(l);
-    return;
-  }
-  for (int i = 0; i < numTarefas; i++) {
-    lv_obj_t *item = lv_obj_create(tarefasList);
-    lv_obj_set_width(item, LV_PCT(100));
-    lv_obj_set_height(item, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(item, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_border_color(item, lv_color_hex(COL_BORDER), 0);
-    lv_obj_set_style_border_width(item, 1, 0);
-    lv_obj_set_style_pad_all(item, 6, 0);
-    lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *cb = lv_checkbox_create(item);
-    lv_checkbox_set_text(cb, tarefas[i].texto);
-    lv_obj_set_style_text_color(cb, lv_color_hex(tarefas[i].feito ? COL_DIM : COL_TEXT), 0);
-    if (tarefas[i].feito) lv_obj_add_state(cb, LV_STATE_CHECKED);
-    lv_obj_add_event_cb(cb, tarefaToggleCb, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)i);
-  }
-}
-
-static void buildTarefas(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, sw(6), 0);
-  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-
-  makeLabel(tab, "TAREFAS DO DIA", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
-
-  tarefasList = lv_obj_create(tab);
-  lv_obj_set_size(tarefasList, SCREEN_W - sw(12), TAB_H - sh(34));
-  lv_obj_align(tarefasList, LV_ALIGN_TOP_MID, 0, sh(22));
-  lv_obj_set_style_bg_opa(tarefasList, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(tarefasList, 0, 0);
-  lv_obj_set_flex_flow(tarefasList, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_style_pad_row(tarefasList, sh(4), 0);
-
-  rebuildTarefasList();
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Aba HISTORICO — grafico de linha + btnmatrix metrica/periodo
-// ════════════════════════════════════════════════════════════════════════════════
-static bool fetchHistory(const char* metric, const char* period, float *buf, int &n, int maxN);
-
-static uint32_t metricHistColor(int m) {
-  return m == 0 ? COL_GRN : m == 1 ? COL_CYN : m == 2 ? COL_GRN : COL_CYN;
-}
-
-static void applyHistToChart() {
-  static float buf[60];
-  int n = 0;
-  fetchHistory(METRIC_KEYS[histMetric], PERIOD_KEYS[histPeriod], buf, n, 60);
-  if (n < 2) {
-    lv_chart_set_point_count(chartHist, 2);
-    lv_chart_set_all_values(chartHist, serHist, LV_CHART_POINT_NONE);
-    lv_chart_refresh(chartHist);
-    return;
-  }
-  float vmin = buf[0], vmax = buf[0];
-  for (int i = 1; i < n; i++) {
-    if (buf[i] < vmin) vmin = buf[i];
-    if (buf[i] > vmax) vmax = buf[i];
-  }
-  if (vmax - vmin < 0.5f) { vmin -= 0.5f; vmax += 0.5f; }
-  lv_chart_set_range(chartHist, LV_CHART_AXIS_PRIMARY_Y, (int32_t)(vmin*10), (int32_t)(vmax*10));
-  lv_chart_set_point_count(chartHist, n);
-  lv_chart_set_all_values(chartHist, serHist, LV_CHART_POINT_NONE);
-  for (int i = 0; i < n; i++) lv_chart_set_next_value(chartHist, serHist, (int32_t)(buf[i]*10));
-  lv_obj_set_style_line_color(chartHist, lv_color_hex(metricHistColor(histMetric)), LV_PART_ITEMS);
-  lv_chart_refresh(chartHist);
-}
-
-static void mtxMetricCb(lv_event_t *e) {
-  uint16_t idx = lv_btnmatrix_get_selected_btn((lv_obj_t*)lv_event_get_target(e));
-  if (idx < 4 && (int)idx != histMetric) {
-    histMetric = idx;
-    applyHistToChart();
-  }
-}
-
-static void mtxPeriodCb(lv_event_t *e) {
-  uint16_t idx = lv_btnmatrix_get_selected_btn((lv_obj_t*)lv_event_get_target(e));
-  if (idx < 3 && (int)idx != histPeriod) {
-    histPeriod = idx;
-    applyHistToChart();
-  }
-}
-
-static void buildHistorico(lv_obj_t *tab) {
-  lv_obj_set_style_pad_all(tab, sw(6), 0);
-  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-
-  makeLabel(tab, "HISTORICO", COL_TEXT, FONT_BODY, LV_ALIGN_TOP_MID, 0, 0);
-
-  // Btnmatrix metrica (4 botoes no topo)
-  static const char *metricBtns[] = {"TEMP", "UMID", "pH", "EC", ""};
-  mtxMetric = lv_btnmatrix_create(tab);
-  lv_btnmatrix_set_map(mtxMetric, metricBtns);
-  lv_btnmatrix_set_one_checked(mtxMetric, true);
-  for (int i = 0; i < 4; i++) lv_btnmatrix_set_btn_ctrl(mtxMetric, i, LV_BTNMATRIX_CTRL_CHECKABLE);
-  lv_btnmatrix_set_btn_ctrl(mtxMetric, 0, LV_BTNMATRIX_CTRL_CHECKED);
-  lv_obj_set_size(mtxMetric, SCREEN_W - sw(12), sh(24));
-  lv_obj_align(mtxMetric, LV_ALIGN_TOP_MID, 0, sh(20));
-  lv_obj_set_style_bg_color(mtxMetric, lv_color_hex(COL_BG), 0);
-  lv_obj_set_style_text_font(mtxMetric, FONT_BODY, 0);
-  lv_obj_add_event_cb(mtxMetric, mtxMetricCb, LV_EVENT_VALUE_CHANGED, NULL);
-
-  // Chart no meio
-  chartHist = lv_chart_create(tab);
-  lv_chart_set_type(chartHist, LV_CHART_TYPE_LINE);
-  lv_chart_set_point_count(chartHist, 24);
-  lv_chart_set_div_line_count(chartHist, 4, 6);
-  lv_obj_set_style_width(chartHist,  0, LV_PART_INDICATOR);
-  lv_obj_set_style_height(chartHist, 0, LV_PART_INDICATOR);
-  lv_obj_set_style_line_width(chartHist, sw(2), LV_PART_ITEMS);
-  lv_obj_set_style_bg_color(chartHist, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(chartHist, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_line_color(chartHist, lv_color_hex(COL_BORDER), LV_PART_MAIN);
-  int chartY = sh(50), chartH = TAB_H - chartY - sh(34);
-  lv_obj_set_size(chartHist, SCREEN_W - sw(12), chartH);
-  lv_obj_align(chartHist, LV_ALIGN_TOP_MID, 0, chartY);
-  serHist = lv_chart_add_series(chartHist, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
-
-  // Btnmatrix periodo (3 botoes embaixo)
-  static const char *periodBtns[] = {"24h", "7d", "30d", ""};
-  mtxPeriod = lv_btnmatrix_create(tab);
-  lv_btnmatrix_set_map(mtxPeriod, periodBtns);
-  lv_btnmatrix_set_one_checked(mtxPeriod, true);
-  for (int i = 0; i < 3; i++) lv_btnmatrix_set_btn_ctrl(mtxPeriod, i, LV_BTNMATRIX_CTRL_CHECKABLE);
-  lv_btnmatrix_set_btn_ctrl(mtxPeriod, 0, LV_BTNMATRIX_CTRL_CHECKED);
-  lv_obj_set_size(mtxPeriod, SCREEN_W - sw(12), sh(24));
-  lv_obj_align(mtxPeriod, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
-  lv_obj_set_style_bg_color(mtxPeriod, lv_color_hex(COL_BG), 0);
-  lv_obj_set_style_text_font(mtxPeriod, FONT_BODY, 0);
-  lv_obj_add_event_cb(mtxPeriod, mtxPeriodCb, LV_EVENT_VALUE_CHANGED, NULL);
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Abas placeholder (próximos commits)
-// ════════════════════════════════════════════════════════════════════════════════
-static void buildPlaceholder(lv_obj_t *tab, const char *text) {
-  lv_obj_t *l = lv_label_create(tab);
-  lv_label_set_text(l, text);
-  lv_obj_set_style_text_color(l, lv_color_hex(COL_DIM), 0);
-  lv_obj_center(l);
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// UI redraw (valores)
-// ════════════════════════════════════════════════════════════════════════════════
-static uint32_t cTemp(float t)  { return (t < 18 || t > 32) ? COL_RED : (t > 28) ? COL_YEL : COL_GRN; }
-static uint32_t cRH(float r)    { return (r < 40 || r > 80) ? COL_RED : (r > 70) ? COL_YEL : COL_CYN; }
-
-static void refreshHomeValues() {
-  char buf[16];
-  // TEMP — atualiza label central + cor + posição do arc
-  snprintf(buf, sizeof(buf), "%.1f", tempC);
-  lv_label_set_text(lblTemp, buf);
-  uint32_t tc = cTemp(tempC);
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(tc), 0);
-  if (arcTemp) {
-    lv_arc_set_value(arcTemp, (int)tempC);
-    lv_obj_set_style_arc_color(arcTemp, lv_color_hex(tc), LV_PART_INDICATOR);
-  }
-
-  snprintf(buf, sizeof(buf), "%.0f%%", rh);
-  lv_label_set_text(lblRh, buf);
-  lv_obj_set_style_text_color(lblRh, lv_color_hex(cRH(rh)), 0);
-
-  snprintf(buf, sizeof(buf), "%.1f", phv);  lv_label_set_text(lblPh, buf);
-  snprintf(buf, sizeof(buf), "%.1f", ecv);  lv_label_set_text(lblEc, buf);
-
-  // LUX / PPFD (aba reformulada: toggle + ± + salvar)
-  refreshLuxDisplay();
-
-  char subBuf[48];
-  snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  lv_label_set_text(lblSub, subBuf);
-  lv_label_set_text(lblTitle, TENT_NAME);
-  lv_img_set_src(lblWifi, wifiOk ? &ic_wifi : &ic_wifi_off);
-  lv_obj_set_style_img_recolor(lblWifi, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
-}
 
 // ════════════════════════════════════════════════════════════════════════════════
 // WiFi + HTTP
@@ -1951,186 +1192,29 @@ static void startOTA() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Navegação custom: content area + bottom nav com icones Lucide coloridos
+// UI builder — delega pra cultivo_ui.cpp (compartilhado com sim SDL2)
+// + wrappers pra adaptar assinaturas dos POSTs HTTP locais aos handlers UI
 // ════════════════════════════════════════════════════════════════════════════════
 
-// Destaca tab ativa e esmaece as outras
-static void navSetActive(int idx) {
-  for (int i = 0; i < 5; i++) {
-    bool sel = (i == idx);
-    lv_obj_set_style_img_recolor(navIcons[i],
-      lv_color_hex(sel ? NAV_COLORS[i] : COL_DIM), 0);
-    lv_obj_set_style_img_recolor_opa(navIcons[i], LV_OPA_COVER, 0);
-  }
+// CultivoSaveLuxFn = void(int) — postPpfd retorna bool, descartamos.
+static void luxSaveHandler(int ppfd) { postPpfd(ppfd); }
+// CultivoToggleTaskFn = void(int idx, bool done) — postTaskComplete usa serverId.
+// Mapeia o index do array tarefas[] -> serverId real. Se nao tiver tarefa
+// nesse index ainda, no-op.
+static void taskToggleHandler(int idx, bool done) {
+  if (idx < 0 || idx >= numTarefas) return;
+  if (done && tarefas[idx].serverId > 0) postTaskComplete(tarefas[idx].serverId);
 }
 
-// Fade out do screen atual + fade in do novo
-static void switchScreen(int idx) {
-  if (idx == activeScreen) return;
-  lv_obj_t *screens[5] = { screenHome, screenLux, screenPhEc, screenTarefa, screenGrafic };
-  if (idx < 0 || idx >= 5) return;
-
-  lv_obj_add_flag(screens[activeScreen], LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(screens[idx], LV_OBJ_FLAG_HIDDEN);
-
-  // Fade-in suave do novo screen
-  lv_anim_t a;
-  lv_anim_init(&a);
-  lv_anim_set_var(&a, screens[idx]);
-  lv_anim_set_values(&a, LV_OPA_TRANSP, LV_OPA_COVER);
-  lv_anim_set_time(&a, 180);
-  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-    lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
-  });
-  lv_anim_start(&a);
-
-  activeScreen = idx;
-  navSetActive(idx);
-
-  // Re-fetch dados quando entra em tab dinamica
-  if (idx == 3 && wifiOk) {           // TAREFA
-    fetchTasks();
-    rebuildTarefasList();
-  } else if (idx == 4 && wifiOk) {    // GRAFIC
-    applyHistToChart();
-  } else if (idx == 0) {
-    refreshHomeValues();
-  }
-}
-
-// Callback de clique no icone da navbar
-static void navBtnClickCb(lv_event_t *e) {
-  int idx = (int)(intptr_t)lv_event_get_user_data(e);
-  Serial.printf("[nav] click idx=%d\n", idx);
-  switchScreen(idx);
-}
-
-static void buildNavbar(lv_obj_t *parent) {
-  navbar = lv_obj_create(parent);
-  lv_obj_set_size(navbar, SCREEN_W, TABBAR_H);
-  lv_obj_align(navbar, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_set_style_bg_color(navbar, lv_color_hex(0x0A0F17), 0);
-  lv_obj_set_style_bg_opa(navbar, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(navbar, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(navbar, 1, 0);
-  lv_obj_set_style_border_side(navbar, LV_BORDER_SIDE_TOP, 0);
-  lv_obj_set_style_radius(navbar, 0, 0);
-  lv_obj_set_style_pad_all(navbar, 0, 0);
-  lv_obj_clear_flag(navbar, LV_OBJ_FLAG_SCROLLABLE);
-
-  int btnW = SCREEN_W / 5;
-  for (int i = 0; i < 5; i++) {
-    // Container clicavel (sem visual proprio — so area de toque)
-    lv_obj_t *btn = lv_obj_create(navbar);
-    lv_obj_set_size(btn, btnW, TABBAR_H);
-    lv_obj_set_pos(btn, i * btnW, 0);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(btn, 0, 0);
-    lv_obj_set_style_radius(btn, 0, 0);
-    lv_obj_set_style_pad_all(btn, 0, 0);
-    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_event_cb(btn, navBtnClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
-
-    // Icone Lucide tintado
-    lv_obj_t *ic = lv_img_create(btn);
-    lv_img_set_src(ic, NAV_ICONS_IMG[i]);
-    lv_obj_set_style_img_recolor_opa(ic, LV_OPA_COVER, 0);
-    lv_obj_center(ic);
-    navIcons[i] = ic;
-  }
-
-  navSetActive(0);
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// Tema dark + layout principal
-// ════════════════════════════════════════════════════════════════════════════════
 static void buildUI() {
-  lv_obj_t *scr = lv_scr_act();
-  // Background: gradient diagonal-ish (azul escuro -> preto puro)
-  lv_obj_set_style_bg_color(scr, lv_color_hex(0x0F1729), 0);
-  lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, 0);
-  lv_obj_set_style_bg_main_stop(scr, 0, 0);
-  lv_obj_set_style_bg_grad_stop(scr, 200, 0);
-  lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
-  lv_obj_set_style_pad_all(scr, 0, 0);
-
-  // Overlay 1 — glow ambient verde sutil no canto superior esquerdo
-  // (simula luz "caindo" sobre o dashboard, tipo HUD de nave)
-  lv_obj_t *glow1 = lv_obj_create(scr);
-  lv_obj_set_size(glow1, SCREEN_W * 3 / 5, SCREEN_H * 3 / 5);
-  lv_obj_set_pos(glow1, 0, 0);
-  lv_obj_set_style_bg_color(glow1, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_bg_opa(glow1, LV_OPA_10, 0);
-  lv_obj_set_style_bg_grad_color(glow1, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_grad_dir(glow1, LV_GRAD_DIR_HOR, 0);
-  lv_obj_set_style_border_width(glow1, 0, 0);
-  lv_obj_set_style_radius(glow1, 0, 0);
-  lv_obj_set_style_pad_all(glow1, 0, 0);
-  lv_obj_add_flag(glow1, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  lv_obj_remove_flag(glow1, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_remove_flag(glow1, LV_OBJ_FLAG_SCROLLABLE);
-
-  // Overlay 2 — glow ciano no canto direito inferior (contraponto de cor)
-  lv_obj_t *glow2 = lv_obj_create(scr);
-  lv_obj_set_size(glow2, SCREEN_W * 2 / 5, SCREEN_H * 2 / 5);
-  lv_obj_align(glow2, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-  lv_obj_set_style_bg_color(glow2, lv_color_hex(COL_CYN), 0);
-  lv_obj_set_style_bg_opa(glow2, LV_OPA_10, 0);
-  lv_obj_set_style_bg_grad_color(glow2, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_grad_dir(glow2, LV_GRAD_DIR_VER, 0);
-  lv_obj_set_style_border_width(glow2, 0, 0);
-  lv_obj_set_style_radius(glow2, 0, 0);
-  lv_obj_set_style_pad_all(glow2, 0, 0);
-  lv_obj_add_flag(glow2, LV_OBJ_FLAG_IGNORE_LAYOUT);
-  lv_obj_remove_flag(glow2, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_remove_flag(glow2, LV_OBJ_FLAG_SCROLLABLE);
-
-  // Area de conteudo (ocupa a tela inteira menos a navbar)
-
-  contentArea = lv_obj_create(scr);
-  lv_obj_set_size(contentArea, SCREEN_W, TAB_H);
-  lv_obj_set_pos(contentArea, 0, 0);
-  lv_obj_set_style_bg_opa(contentArea, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(contentArea, 0, 0);
-  lv_obj_set_style_pad_all(contentArea, 0, 0);
-  lv_obj_clear_flag(contentArea, LV_OBJ_FLAG_SCROLLABLE);
-
-  // Helper pra criar cada screen como lv_obj do mesmo tamanho
-  auto makeScreen = [&]() -> lv_obj_t* {
-    lv_obj_t *s = lv_obj_create(contentArea);
-    lv_obj_set_size(s, SCREEN_W, TAB_H);
-    lv_obj_set_pos(s, 0, 0);
-    lv_obj_set_style_bg_opa(s, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(s, 0, 0);
-    lv_obj_set_style_pad_all(s, 0, 0);
-    lv_obj_clear_flag(s, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(s, LV_OBJ_FLAG_HIDDEN);
-    return s;
-  };
-
-  screenHome   = makeScreen();
-  screenLux  = makeScreen();
-  screenPhEc   = makeScreen();
-  screenTarefa = makeScreen();
-  screenGrafic = makeScreen();
-
-  buildHome(screenHome);
-  buildLux(screenLux);
-  buildPhEc(screenPhEc);
-  buildTarefas(screenTarefa);
-  buildHistorico(screenGrafic);
-
-  // HOME visivel por padrao
-  lv_obj_clear_flag(screenHome, LV_OBJ_FLAG_HIDDEN);
-
-  buildNavbar(scr);
-
-  // FASE C — Scan line desabilitado: o overlay no topo do z-order estava
-
-  refreshHomeValues();
-  startPulseTimer();   // anima sparklines dos mini-cards a cada 300ms
+  // Registrar handlers antes do build — UI precisa deles disponiveis quando
+  // user clicar nos saves/toggles. postReading + openConfigModal tem
+  // assinaturas que ja batem com os typedef de cultivo_ui.h.
+  cultivoUI_setLuxSaveHandler(luxSaveHandler);
+  cultivoUI_setPhEcSaveHandler(postReading);
+  cultivoUI_setTaskToggleHandler(taskToggleHandler);
+  cultivoUI_setConfigOpenHandler(openConfigModal);
+  buildCultivoUI();
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -2205,8 +1289,9 @@ void setup() {
     delay(5);
   }
 
-  initMockTarefas();
-  rebuildTarefasList();
+  // initMockTarefas + rebuildTarefasList: removidos na fase 2 — cultivo_ui.cpp
+  // tem suas tarefas mockadas internas. fetchTasks() ainda escreve em
+  // tarefas[] global mas integracao com UI fica p/ depois.
 
   // Sem WiFi salvo: UI sobe em modo offline (ic_wifi_off), usuario toca gear
   // pra abrir config e setar WiFi+token. Botao "Setup via celular" dentro do
@@ -2223,7 +1308,7 @@ void setup() {
     fetchDisplayData();
     fetchHistoryAll();
     fetchTasks();
-    rebuildTarefasList();
+    // rebuildTarefasList(): removido — UI nova ainda nao consome do array tarefas[]
     lastFetch = millis();
     refreshHomeValues();
     // Dai em diante HTTP roda em background, loop() fica livre pra UI
