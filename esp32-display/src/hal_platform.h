@@ -54,9 +54,10 @@ static inline void hal_display_init(int sck, int miso, int mosi, int cs, int dc,
 #ifdef REAL_HARDWARE
   (void)sck; (void)miso; (void)mosi; (void)cs; (void)dc; (void)rst;
 
-  // Backlight: LEDC PWM. ledcAttach e' API nova (Arduino-ESP32 3.x).
-  ledcAttach(LCD_BL, 5000, 8);
-  ledcWrite(LCD_BL, 200);  // ~80% — ajustavel depois pelo auto-dim
+  // Backlight: LEDC PWM (Arduino-ESP32 2.0.x API: setup + attachPin + write)
+  ledcSetup(0 /* channel */, 5000 /* freq Hz */, 8 /* bits */);
+  ledcAttachPin(LCD_BL, 0);
+  ledcWrite(0, 200);  // ~80% — ajustavel depois pelo auto-dim
 
   bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCK, LCD_D0, LCD_D1, LCD_D2, LCD_D3);
   gfx = new Arduino_AXS15231B(bus, LCD_RST, 1 /* rot=1 -> landscape */, true /* IPS */, 320, 480);
