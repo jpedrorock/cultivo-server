@@ -2135,48 +2135,16 @@ void setup() {
   delay(500);
 
   Serial.println("[boot] Wire init"); Serial.flush();
-#ifdef REAL_HARDWARE
-  // Setup I2C minimo: clock 50kHz (mais conservador), sem mexer em GPIO 3
-  // (pode ter funcao de strapping no ESP32-S3).
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
-  Wire.setClock(50000);
-  delay(100);
-
-  // Probe estavel — se chip real, deve responder consistentemente
-  Serial.print("[boot] I2C probe @0x3B (10x): ");
-  int hits = 0;
-  for (int n = 0; n < 10; n++) {
-    Wire.beginTransmission(0x3B);
-    if (Wire.endTransmission() == 0) hits++;
-    delay(20);
-  }
-  Serial.printf("%d/10\n", hits);
-
-  // Tenta read em 2 modos diferentes — ESPHome (write com STOP, depois read
-  // separado) vs CYD (write com repeated-start, depois read).
-  static const uint8_t cmd[11] = {0xB5,0xAB,0xA5,0x5A,0x00,0x00,0x00,0x08,0x00,0x00,0x00};
-
-  Serial.print("[boot] Modo A (STOP + delay + read): ");
-  Wire.beginTransmission(0x3B);
-  Wire.write(cmd, sizeof(cmd));
-  uint8_t errA = Wire.endTransmission(true);  // SEND STOP
-  delay(2);
-  uint8_t gotA = Wire.requestFrom((uint8_t)0x3B, (uint8_t)8);
-  Serial.printf("err=%u got=%u bytes:", errA, gotA);
-  for (uint8_t i = 0; i < 8 && Wire.available(); i++) Serial.printf(" %02X", Wire.read());
-  Serial.println();
-
-  delay(50);
-
-  Serial.print("[boot] Modo B (repeated start): ");
-  Wire.beginTransmission(0x3B);
-  Wire.write(cmd, sizeof(cmd));
-  uint8_t errB = Wire.endTransmission(false);
-  uint8_t gotB = Wire.requestFrom((uint8_t)0x3B, (uint8_t)8);
-  Serial.printf("err=%u got=%u bytes:", errB, gotB);
-  for (uint8_t i = 0; i < 8 && Wire.available(); i++) Serial.printf(" %02X", Wire.read());
-  Serial.println();
-  Serial.flush();
+#ifdef REAL_HARDWARE
+  // Touch nao funciona via Arduino Wire neste board (JC3248W535C_I_y). 650+
+  // pares (SDA, SCL) testados com transacao completa, zero respostas reais.
+  // Provavelmente incompatibilidade da lib Arduino Wire com este chip — o fw
+  // de fabrica usa ESP-IDF esp_lcd_touch_axs15231b. Plano: migrar p/
+  // ESP32_Display_Panel ou bit-bang I2C numa proxima leva. Display funciona OK.
+  Wire.setClock(100000);
+#endif
+  Serial.println("[boot] lv_init"); Serial.flush();
 #else
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
 #endif
