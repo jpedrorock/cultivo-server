@@ -63,8 +63,22 @@ static inline void hal_display_init(int sck, int miso, int mosi, int cs, int dc,
   ledcWrite(0, 200);  // ~80% — ajustavel depois pelo auto-dim
 
   bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCK, LCD_D0, LCD_D1, LCD_D2, LCD_D3);
-  gfx = new Arduino_AXS15231B(bus, LCD_RST, 1 /* rot=1 -> landscape */, true /* IPS */, 320, 480);
+  gfx = new Arduino_AXS15231B(bus, LCD_RST, 0 /* rot setado abaixo */, true /* IPS */, 320, 480);
   gfx->begin();
+  // Forca rotation pra landscape APOS begin() — em algumas versoes do
+  // Arduino_GFX o rotation passado no construtor nao chega no MADCTL via
+  // QSPI, e o display fica em portrait nativo (320x480) cortando o nosso
+  // framebuffer 480x320 da LVGL.
+  gfx->setRotation(1);
+  // Teste de boot: pisca vermelho 1s — se a tela toda fica vermelha, lib +
+  // pinos QSPI funcionam, problema esta na LVGL/flush. Se ficar parcial ou
+  // diferente, problema e' fisico (pinos/init).
+  gfx->fillScreen(0xF800);  // RGB565 vermelho puro
+  delay(800);
+  gfx->fillScreen(0x07E0);  // verde
+  delay(400);
+  gfx->fillScreen(0x001F);  // azul
+  delay(400);
   gfx->fillScreen(0);
 #else
   SPI.begin(sck, miso, mosi, cs);
