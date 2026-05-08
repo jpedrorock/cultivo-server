@@ -129,12 +129,19 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
 #define COL_BLU     0x60A5FA
 
 // ── LVGL v9 draw buffers ────────────────────────────────────────────────────────
-// Usar uint32_t garante 4-byte alignment (LV_DRAW_BUF_ALIGN default).
-// Tamanho: 480*20 pixels de RGB565 = 19200 bytes = 4800 uint32_t.
-// Cobre tanto Wokwi (320x240) quanto hardware real (480x320).
-static const uint32_t BUF_LINES = 20;
-static uint32_t buf1[480 * BUF_LINES / 2];
-static uint32_t buf2[480 * BUF_LINES / 2];
+// Wokwi (320x240) usa partial render com buffer pequeno em SRAM.
+// Hardware real: o painel AXS15231B QSPI so' aceita writes em portrait nativo
+// 320x480 (testes mostraram que rotation no construtor + canvas em landscape
+// gera addr-window corrompido). Solucao: gfx + canvas em portrait native;
+// LVGL configurada em portrait e usa software rotation 90deg p/ a app
+// continuar pensando em landscape 480x320. Buffer fullscreen 320*480*2 =
+// 307200 bytes vai pra PSRAM (allocado em setup), 1 push por frame.
+#ifdef REAL_HARDWARE
+  static uint8_t *fullBuf = nullptr;
+#else
+  static const uint32_t BUF_LINES = 20;
+  static uint32_t buf1[320 * BUF_LINES / 2];
+#endif
 
 // ── Estado dos dados ────────────────────────────────────────────────────────────
 static char TENT_NAME[50] = "ESTUFA 1";
@@ -2111,12 +2118,35 @@ void setup() {
   // (ordem importa: flush_cb antes de set_buffers; color format fica no default
   // que e' RGB565 quando LV_COLOR_DEPTH=16)
   Serial.println("[boot] lv_display_create"); Serial.flush();
+#ifdef REAL_HARDWARE
+  // Display fisico: 320x480 portrait (orientacao native que o AXS15231B aceita).
+  // App pensa em landscape (SCREEN_W=480, SCREEN_H=320) — lv_display_set_rotation
+  // 90deg traduz: LVGL renderiza em landscape no espaco logico, mas o buffer
+  // entregue p/ disp_flush ja vem em layout portrait (320x480 pixels), pronto
+  // pro canvas->draw16bitRGBBitmap em coords nativas do gfx.
+  lv_display_t *disp = lv_display_create(320, 480);
+  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+#else
   lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);
+#endif
   Serial.println("[boot] display_set_flush_cb"); Serial.flush();
   lv_display_set_flush_cb(disp, disp_flush);
   Serial.println("[boot] display_set_buffers"); Serial.flush();
-  // Usa single buffer (buf2=NULL) pra evitar qualquer dor de double-buffering
+#ifdef REAL_HARDWARE
+  // Buffer fullscreen em PSRAM (307200 bytes nao cabe em SRAM). LVGL render
+  // mode FULL = 1 push de 320x480 por frame (canvas pattern do CYD-Klipper).
+  size_t fullBufBytes = 320 * 480 * 2;
+  fullBuf = (uint8_t*)heap_caps_malloc(fullBufBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!fullBuf) {
+    Serial.printf("[boot] PSRAM alloc FAILED (%u bytes)\n", (unsigned)fullBufBytes);
+    Serial.flush();
+    while (1) delay(1000);
+  }
+  Serial.printf("[boot] PSRAM fullBuf=%p size=%u\n", fullBuf, (unsigned)fullBufBytes);
+  lv_display_set_buffers(disp, fullBuf, NULL, fullBufBytes, LV_DISPLAY_RENDER_MODE_FULL);
+#else
   lv_display_set_buffers(disp, buf1, NULL, sizeof(buf1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+#endif
   Serial.println("[boot] display_set_buffers ok"); Serial.flush();
 
   // LVGL v9: criar input device (touch)

@@ -65,36 +65,26 @@ static inline void hal_display_init(int sck, int miso, int mosi, int cs, int dc,
   ledcAttachPin(LCD_BL, 0);
   ledcWrite(0, 200);  // ~80% — ajustavel depois pelo auto-dim
 
-  // ── MODO TESTE PORTRAIT — diagnostico do canvas pattern ────────────────────
-  // Sintoma observado: LVGL 480x320 chunks viram "linha vertical 1px" no painel
-  // (todos os pixels comprimidos numa coluna), mesmo via fillScreen. Isso e'
-  // addr-window errado — o panel nao aceita o range 480x320 que mandamos.
-  // Hipotese: rotation do construtor nao atualiza Arduino_GFX _width/_height
-  // antes do canvas, criando mismatch. Teste: setup PORTRAIT NATIVO (320x480)
-  // identico ao CYD-Klipper, sem rotation envolvida. Se neste modo a tela
-  // inteira ciclar RGB → canvas pattern OK, problema antes era so' rotation.
-  // Se continuar so' a linha → Arduino_GFX QSPI nao funciona neste board e
-  // mudamos pra ESP32_Display_Panel.
+  // Setup do display em PORTRAIT NATIVO 320x480 — orientacao que o AXS15231B
+  // QSPI aceita corretamente (testes em landscape resultaram em addr-window
+  // corrompido = "linha vertical 1px com pixels comprimidos"). A app continua
+  // pensando em landscape 480x320 via lv_display_set_rotation(90) no LVGL.
+  // Pattern do CYD-Klipper (mesmo board JC3248W535C):
+  //   1. construtor com rotation=0 (NAO setRotation depois — quebra MADCTL)
+  //   2. canvas.begin() em vez de gfx->begin() — chama gfx.begin internamente
+  //      e ja aloca o framebuffer da canvas
+  //   3. invertDisplay(true) — AXS15231B requer cores invertidas
+  //   4. toda escrita via canvas->draw...+flush() (1 push fullscreen por frame)
   bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCK, LCD_D0, LCD_D1, LCD_D2, LCD_D3);
-  gfx = new Arduino_AXS15231B(bus, LCD_RST, 0 /* rot=0 portrait native */,
+  gfx = new Arduino_AXS15231B(bus, LCD_RST, 0 /* portrait native */,
                               true /* IPS */, 320, 480, 0, 0, 0, 0);
-  // Canvas portrait 320x480 — match exato com gfx native, evita qualquer
-  // ambiguidade de rotation no path de draw16bitRGBBitmap.
   canvas = new Arduino_Canvas(320, 480, gfx, 0, 0);
   if (!canvas->begin()) {
     Serial.println("[hal] canvas->begin() FAILED");
     Serial.flush();
   }
-  gfx->invertDisplay(true);  // AXS15231B precisa: cores invertidas no chip
-
-  Serial.println("[hal] TESTE portrait — looping RGB no canvas (320x480)");
-  Serial.flush();
-  while (true) {
-    canvas->fillScreen(0xF800); canvas->flush(); delay(1000);  // vermelho
-    canvas->fillScreen(0x07E0); canvas->flush(); delay(1000);  // verde
-    canvas->fillScreen(0x001F); canvas->flush(); delay(1000);  // azul
-    canvas->fillScreen(0xFFFF); canvas->flush(); delay(1000);  // branco
-  }
+  gfx->invertDisplay(true);
+  canvas->fillScreen(0); canvas->flush();
 #else
   SPI.begin(sck, miso, mosi, cs);
   tft.begin();
