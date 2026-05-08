@@ -212,18 +212,9 @@ static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
 }
 
 static bool ftRead(int &rx, int &ry) {
-  Wire.beginTransmission(FT_ADDR);
-  Wire.write(0x02);
-  if (Wire.endTransmission(false) != 0) return false;
-  Wire.requestFrom((int)FT_ADDR, 5);
-  if (Wire.available() < 5) return false;
-  uint8_t n = Wire.read();
-  uint8_t xh = Wire.read(), xl = Wire.read();
-  uint8_t yh = Wire.read(), yl = Wire.read();
-  if (n == 0 || n > 2) return false;
-  rx = ((xh & 0x0F) << 8) | xl;
-  ry = ((yh & 0x0F) << 8) | yl;
-  return true;
+  // Implementacao real (AXS15231B no JC4832W535) ou FT6336 (Wokwi) vive em
+  // hal_platform.h — chip de touch difere por alvo, protocolo idem.
+  return hal_touch_read(&rx, &ry);
 }
 
 static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
