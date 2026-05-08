@@ -17,29 +17,32 @@
 
 #ifdef REAL_HARDWARE
   #include <Arduino_GFX_Library.h>
+  #include <canvas/Arduino_Canvas.h>
   #include <Wire.h>
   extern Arduino_DataBus *bus;
   extern Arduino_GFX     *gfx;
+  extern Arduino_Canvas  *canvas;  // CYD-Klipper pattern: gfx -> canvas -> push
 
-  // ── JC4832W535 pinout (Guition) ─────────────────────────────────────────────
-  // Display: AXS15231B em modo QSPI (4 linhas de dados). Os boards JC*W535
-  // tem 2 pinouts comuns (variante "ESP32-S3-N8" e variante "S3-N16R8"):
-  //   V1: CS=45 SCK=47 D0=21 D1=48 D2=40 D3=39  (era o anterior, deu linha vertical)
-  //   V2: CS=12 SCK=13 D0=11 D1=14 D2=9  D3=8   (essa)
+  // ── JC3248W535C pinout (Guition / Shenzhen Jingcai) ─────────────────────────
+  // Confirmado pela board config oficial do CYD-Klipper p/ este modelo exato.
+  // Display: AXS15231B em QSPI (4 linhas), 320x480 portrait nativo.
   #define LCD_BL     1     // backlight via LEDC PWM
   #define LCD_RST   -1     // sem pino HW de reset (usa software reset cmd)
-  #define LCD_CS    12
-  #define LCD_SCK   13
-  #define LCD_D0    11
-  #define LCD_D1    14
-  #define LCD_D2     9
-  #define LCD_D3     8
+  #define LCD_CS    45
+  #define LCD_SCK   47
+  #define LCD_D0    21
+  #define LCD_D1    48
+  #define LCD_D2    40
+  #define LCD_D3    39
 
   // Touch: AXS15231B integra display QSPI + touch I2C no mesmo chip.
   // Protocolo de touch e' proprietario (nao FT/CST padrao): comando 11 bytes
   // pra enderecar registro, depois leitura de 8 bytes com event/x/y.
+  // SCL=8 confirmado pelo CYD-Klipper (estava 5 antes — provavelmente nunca
+  // leu touch). LCD nao usa pin DC (QSPI codifica command no protocolo),
+  // entao GPIO 8 fica livre p/ touch SCL sem conflito.
   #define TP_SDA       4
-  #define TP_SCL       5
+  #define TP_SCL       8
   #define TP_INT       3   // -1 desabilita IRQ
   #define TP_RST      -1
   #define TP_I2C_ADDR  0x3B
@@ -62,24 +65,36 @@ static inline void hal_display_init(int sck, int miso, int mosi, int cs, int dc,
   ledcAttachPin(LCD_BL, 0);
   ledcWrite(0, 200);  // ~80% — ajustavel depois pelo auto-dim
 
+  // ── MODO TESTE PORTRAIT — diagnostico do canvas pattern ────────────────────
+  // Sintoma observado: LVGL 480x320 chunks viram "linha vertical 1px" no painel
+  // (todos os pixels comprimidos numa coluna), mesmo via fillScreen. Isso e'
+  // addr-window errado — o panel nao aceita o range 480x320 que mandamos.
+  // Hipotese: rotation do construtor nao atualiza Arduino_GFX _width/_height
+  // antes do canvas, criando mismatch. Teste: setup PORTRAIT NATIVO (320x480)
+  // identico ao CYD-Klipper, sem rotation envolvida. Se neste modo a tela
+  // inteira ciclar RGB → canvas pattern OK, problema antes era so' rotation.
+  // Se continuar so' a linha → Arduino_GFX QSPI nao funciona neste board e
+  // mudamos pra ESP32_Display_Panel.
   bus = new Arduino_ESP32QSPI(LCD_CS, LCD_SCK, LCD_D0, LCD_D1, LCD_D2, LCD_D3);
-  gfx = new Arduino_AXS15231B(bus, LCD_RST, 0 /* rot setado abaixo */, true /* IPS */, 320, 480);
-  gfx->begin();
-  // Forca rotation pra landscape APOS begin() — em algumas versoes do
-  // Arduino_GFX o rotation passado no construtor nao chega no MADCTL via
-  // QSPI, e o display fica em portrait nativo (320x480) cortando o nosso
-  // framebuffer 480x320 da LVGL.
-  gfx->setRotation(1);
-  // Teste de boot: pisca vermelho 1s — se a tela toda fica vermelha, lib +
-  // pinos QSPI funcionam, problema esta na LVGL/flush. Se ficar parcial ou
-  // diferente, problema e' fisico (pinos/init).
-  gfx->fillScreen(0xF800);  // RGB565 vermelho puro
-  delay(800);
-  gfx->fillScreen(0x07E0);  // verde
-  delay(400);
-  gfx->fillScreen(0x001F);  // azul
-  delay(400);
-  gfx->fillScreen(0);
+  gfx = new Arduino_AXS15231B(bus, LCD_RST, 0 /* rot=0 portrait native */,
+                              true /* IPS */, 320, 480, 0, 0, 0, 0);
+  // Canvas portrait 320x480 — match exato com gfx native, evita qualquer
+  // ambiguidade de rotation no path de draw16bitRGBBitmap.
+  canvas = new Arduino_Canvas(320, 480, gfx, 0, 0);
+  if (!canvas->begin()) {
+    Serial.println("[hal] canvas->begin() FAILED");
+    Serial.flush();
+  }
+  gfx->invertDisplay(true);  // AXS15231B precisa: cores invertidas no chip
+
+  Serial.println("[hal] TESTE portrait — looping RGB no canvas (320x480)");
+  Serial.flush();
+  while (true) {
+    canvas->fillScreen(0xF800); canvas->flush(); delay(1000);  // vermelho
+    canvas->fillScreen(0x07E0); canvas->flush(); delay(1000);  // verde
+    canvas->fillScreen(0x001F); canvas->flush(); delay(1000);  // azul
+    canvas->fillScreen(0xFFFF); canvas->flush(); delay(1000);  // branco
+  }
 #else
   SPI.begin(sck, miso, mosi, cs);
   tft.begin();

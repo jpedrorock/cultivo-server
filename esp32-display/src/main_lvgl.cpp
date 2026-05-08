@@ -96,8 +96,9 @@ static void clearConfigNVS() {
 
 // Definições dos objetos declarados como extern em hal_platform.h
 #ifdef REAL_HARDWARE
-  Arduino_DataBus *bus = nullptr;
-  Arduino_GFX     *gfx = nullptr;
+  Arduino_DataBus *bus    = nullptr;
+  Arduino_GFX     *gfx    = nullptr;
+  Arduino_Canvas  *canvas = nullptr;
 #else
   Adafruit_ILI9341 tft(TFT_CS, TFT_DC, TFT_RST);
 #endif
