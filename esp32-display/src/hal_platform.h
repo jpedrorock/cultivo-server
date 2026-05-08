@@ -80,9 +80,10 @@ static inline void hal_display_init(int sck, int miso, int mosi, int cs, int dc,
   gfx = new Arduino_AXS15231B(bus, LCD_RST, 0 /* portrait native */,
                               true /* IPS */, 320, 480, 0, 0, 0, 0);
   canvas = new Arduino_Canvas(320, 480, gfx, 0, 0);
-  // QSPI 80MHz (default e' 40MHz) — AXS15231B suporta. Dobra throughput de
-  // push, leva o flush de 34ms p/ ~17ms = ~30fps efetivo com a rotacao atual.
-  if (!canvas->begin(80000000)) {
+  // QSPI 40MHz (default seguro) — testes com 80MHz mostraram pixels perdidos
+  // /imagem com aspecto "low-res" (panel JC3248W535C nao tolera). Trade-off
+  // de perf: push volta de ~19ms p/ ~34ms (-15ms = ~6fps a menos).
+  if (!canvas->begin(40000000)) {
     Serial.println("[hal] canvas->begin() FAILED");
     Serial.flush();
   }
