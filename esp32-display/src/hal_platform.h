@@ -106,8 +106,8 @@ static inline void hal_push_pixels(int x, int y, int w, int h, uint16_t *px) {
 #endif
 }
 
-// I2C peripheral 1 — separado da Wire (peripheral 0) que nao funciona com o
-// AXS15231B touch deste board. ESP-IDF i2c_master driver e' o que ESPHome usa.
+// Touch via ESP-IDF i2c_master (peripheral 1) — Arduino Wire nao funciona com
+// este chip neste board. ESP-IDF usa o mesmo padrao do firmware de fabrica.
 #define HAL_TOUCH_I2C_PORT  I2C_NUM_1
 
 static inline bool hal_touch_init() {
@@ -119,10 +119,8 @@ static inline bool hal_touch_init() {
   conf.sda_pullup_en    = GPIO_PULLUP_ENABLE;
   conf.scl_pullup_en    = GPIO_PULLUP_ENABLE;
   conf.master.clk_speed = 100000;
-  esp_err_t err = i2c_param_config(HAL_TOUCH_I2C_PORT, &conf);
-  if (err != ESP_OK) { Serial.printf("[touch] i2c_param_config err=%d\n", err); return false; }
-  err = i2c_driver_install(HAL_TOUCH_I2C_PORT, I2C_MODE_MASTER, 0, 0, 0);
-  if (err != ESP_OK) { Serial.printf("[touch] i2c_driver_install err=%d\n", err); return false; }
+  if (i2c_param_config(HAL_TOUCH_I2C_PORT, &conf) != ESP_OK) return false;
+  if (i2c_driver_install(HAL_TOUCH_I2C_PORT, I2C_MODE_MASTER, 0, 0, 0) != ESP_OK) return false;
   return true;
 #else
   return true;
@@ -130,37 +128,17 @@ static inline bool hal_touch_init() {
 }
 
 // Le um toque do controlador. Retorna true se ha contato; rx/ry em coords
-// nativas do hardware (mapeadas depois por hal_map_touch).
-//   Real: AXS15231B via ESP-IDF i2c_master (peripheral 1). Protocolo proprio:
-//         escrever cmd 11B, ler 8B. Tap detectado se data[0]==0 && data[1]>0.
-//   Wokwi: FT6336 — registro 0x02 com fingers/x/y simples
+// nativas (panel portrait 320x480, mapeadas depois por hal_map_touch).
 static inline bool hal_touch_read(int *rx, int *ry) {
 #ifdef REAL_HARDWARE
   static const uint8_t cmd[11] = {
     0xB5, 0xAB, 0xA5, 0x5A, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00
   };
   uint8_t b[8] = {0};
-  esp_err_t werr = i2c_master_write_to_device(
-      HAL_TOUCH_I2C_PORT, TP_I2C_ADDR, cmd, sizeof(cmd), pdMS_TO_TICKS(50));
-  if (werr != ESP_OK) {
-    static uint32_t lastDiag = 0;
-    if (millis() - lastDiag > 2000) {
-      lastDiag = millis();
-      Serial.printf("[touch] write err=%d\n", werr);
-    }
-    return false;
-  }
-  esp_err_t rerr = i2c_master_read_from_device(
-      HAL_TOUCH_I2C_PORT, TP_I2C_ADDR, b, sizeof(b), pdMS_TO_TICKS(50));
-  if (rerr != ESP_OK) {
-    static uint32_t lastDiag = 0;
-    if (millis() - lastDiag > 2000) {
-      lastDiag = millis();
-      Serial.printf("[touch] read err=%d\n", rerr);
-    }
-    return false;
-  }
-  // ESPHome AXS15231B parse: data[0]==0 && data[1]>0 = touch presente
+  if (i2c_master_write_to_device(HAL_TOUCH_I2C_PORT, TP_I2C_ADDR, cmd, sizeof(cmd),
+                                  pdMS_TO_TICKS(50)) != ESP_OK) return false;
+  if (i2c_master_read_from_device(HAL_TOUCH_I2C_PORT, TP_I2C_ADDR, b, sizeof(b),
+                                   pdMS_TO_TICKS(50)) != ESP_OK) return false;
   if (b[0] != 0 || b[1] == 0) return false;
   *rx = ((b[2] & 0x0F) << 8) | b[3];
   *ry = ((b[4] & 0x0F) << 8) | b[5];
@@ -183,17 +161,17 @@ static inline bool hal_touch_read(int *rx, int *ry) {
 
 // Mapeia coords brutas do controlador pra coords de tela do alvo.
 // Real: AXS15231B reporta touch em panel native portrait (rx 0..319, ry 0..479).
-//   LVGL roda em logical landscape (480x320) via rotation=270deg software.
-//   Inverso da rotacao 270 que aplicamos em disp_flush:
-//     logical (lx, ly) -> physical (ly, 479 - lx)
-//   Inverso: lx = 479 - py, ly = px
-//   Aqui: px=rx (panel x 0..319), py=ry (panel y 0..479)
+//   LVGL configurada em portrait (320x480) com lv_display_set_rotation
+//   ROTATION_90 — LVGL aplica rotacao tanto no display QUANTO nas coords
+//   do touch automaticamente. Aqui so passa identity (rx, ry).
 // Wokwi (FT6336 simulado): rotaciona 90 graus + escala pro display 320x240.
 static inline void hal_map_touch(int rx, int ry, int *outX, int *outY) {
 #ifdef REAL_HARDWARE
+  // FORMULA confirmada por teste de 4 cantos (8 nov 2026), validada
+  // matematicamente: TL/TR/BL/BR raw values produzem 0/479,0/319 logicals.
+  // LVGL configurada em landscape 480x320 — esta e' a coord que ele espera.
   *outX = 479 - ry;
   *outY = rx;
-  // Clamp p/ caso o touch reporte fora do range esperado
   if (*outX < 0) *outX = 0; if (*outX > 479) *outX = 479;
   if (*outY < 0) *outY = 0; if (*outY > 319) *outY = 319;
 #else

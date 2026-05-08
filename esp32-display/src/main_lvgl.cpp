@@ -129,13 +129,14 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
 #define COL_BLU     0x60A5FA
 
 // ── LVGL v9 draw buffers ────────────────────────────────────────────────────────
-// Wokwi (320x240) usa partial render com buffer pequeno em SRAM.
-// Hardware real: o painel AXS15231B QSPI so' aceita writes em portrait nativo
-// 320x480 (testes mostraram que rotation no construtor + canvas em landscape
-// gera addr-window corrompido). Solucao: gfx + canvas em portrait native;
-// LVGL configurada em portrait e usa software rotation 90deg p/ a app
-// continuar pensando em landscape 480x320. Buffer fullscreen 320*480*2 =
-// 307200 bytes vai pra PSRAM (allocado em setup), 1 push por frame.
+// LVGL software rotation precisa de flag LV_DRAW_SW_ROTATE no build, que nao
+// temos (e habilitar quebra outras coisas). Solucao: LVGL renderiza em
+// landscape 480x320 logico, e rotacionamos manualmente os chunks p/ portrait
+// 320x480 (orientacao native que canvas+gfx aceitam) no disp_flush.
+//
+// Render mode FULL com buffer fullscreen em PSRAM — 1 push por frame.
+// Custo da rotacao manual: ~30ms/frame (loop 153K pixels), mas ainda visivel
+// como lag. Otimizacao futura: row-major copy + memcpy chunks.
 #ifdef REAL_HARDWARE
   static uint8_t *fullBuf = nullptr;
 #else
@@ -213,31 +214,27 @@ static const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
 // Display + touch callbacks (LVGL v9 API)
 // ════════════════════════════════════════════════════════════════════════════════
 static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
+  uint32_t w = area->x2 - area->x1 + 1;
+  uint32_t h = area->y2 - area->y1 + 1;
 #ifdef REAL_HARDWARE
-  // LVGL v9 manda buffer em coords LOGICAS (landscape 480x320) mesmo com
-  // lv_display_set_rotation(270). O painel AXS15231B aceita so' 320x480
-  // portrait — entao rotacionamos pixel-a-pixel daqui pro framebuffer interno
-  // do canvas. ROTATION_270 = 90deg CCW: logical (lx,ly) -> physical (ly, 479-lx).
+  // LVGL v9 com ROTATION_270 + FULL mode nao rotaciona o buffer — entrega
+  // coords logicas landscape (480x320). Rotacionamos manualmente no canvas
+  // portrait (320x480), formula 270deg: logical(lx,ly) -> physical(ly, 479-lx).
   uint16_t *src = (uint16_t*)px_map;
   uint16_t *dst = canvas->getFramebuffer();
-  const int LW = area->x2 - area->x1 + 1;  // 480 esperado
-  const int LH = area->y2 - area->y1 + 1;  // 320 esperado
-  const int PW = 320;
-  const int PH = 480;
+  const int LW = (int)w;   // logical width (480 esperado)
+  const int LH = (int)h;   // logical height (320 esperado)
   for (int ly = 0; ly < LH; ly++) {
-    int py_base = (LW - 1) - 0;  // ajustado por lx no loop interno
     for (int lx = 0; lx < LW; lx++) {
       int px = ly;
       int py = (LW - 1) - lx;
-      if ((unsigned)px < (unsigned)PW && (unsigned)py < (unsigned)PH) {
-        dst[py * PW + px] = src[ly * LW + lx];
+      if ((unsigned)px < 320 && (unsigned)py < 480) {
+        dst[py * 320 + px] = src[ly * LW + lx];
       }
     }
   }
   canvas->flush();
 #else
-  uint32_t w = area->x2 - area->x1 + 1;
-  uint32_t h = area->y2 - area->y1 + 1;
   hal_push_pixels(area->x1, area->y1, w, h, (uint16_t*)px_map);
 #endif
   lv_display_flush_ready(disp);
@@ -2134,12 +2131,9 @@ void setup() {
   // de tempo p/ a parte touch I2C ficar ativa.
   delay(500);
 
-  Serial.println("[boot] touch I2C init (ESP-IDF i2c_master peripheral 1)"); Serial.flush();
+  Serial.println("[boot] touch I2C init (IDF i2c_master peripheral 1)"); Serial.flush();
 #ifdef REAL_HARDWARE
-  if (!hal_touch_init()) {
-    Serial.println("[boot] hal_touch_init FALHOU");
-    Serial.flush();
-  }
+  if (!hal_touch_init()) Serial.println("[boot] hal_touch_init FAILED");
 #else
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
 #endif
@@ -2154,13 +2148,9 @@ void setup() {
   // que e' RGB565 quando LV_COLOR_DEPTH=16)
   Serial.println("[boot] lv_display_create"); Serial.flush();
 #ifdef REAL_HARDWARE
-  // Display fisico: 320x480 portrait (orientacao native que o AXS15231B aceita).
-  // App pensa em landscape (SCREEN_W=480, SCREEN_H=320) — lv_display_set_rotation
-  // 90deg traduz: LVGL renderiza em landscape no espaco logico, mas o buffer
-  // entregue p/ disp_flush ja vem em layout portrait (320x480 pixels), pronto
-  // pro canvas->draw16bitRGBBitmap em coords nativas do gfx.
-  lv_display_t *disp = lv_display_create(320, 480);
-  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
+  // LVGL em landscape 480x320 logico — render mode FULL escreve buffer inteiro
+  // em coords landscape, depois disp_flush rotaciona pro canvas portrait.
+  lv_display_t *disp = lv_display_create(480, 320);
 #else
   lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);
 #endif
@@ -2168,15 +2158,9 @@ void setup() {
   lv_display_set_flush_cb(disp, disp_flush);
   Serial.println("[boot] display_set_buffers"); Serial.flush();
 #ifdef REAL_HARDWARE
-  // Buffer fullscreen em PSRAM (307200 bytes nao cabe em SRAM). LVGL render
-  // mode FULL = 1 push de 320x480 por frame (canvas pattern do CYD-Klipper).
-  size_t fullBufBytes = 320 * 480 * 2;
+  size_t fullBufBytes = 480 * 320 * 2;
   fullBuf = (uint8_t*)heap_caps_malloc(fullBufBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  if (!fullBuf) {
-    Serial.printf("[boot] PSRAM alloc FAILED (%u bytes)\n", (unsigned)fullBufBytes);
-    Serial.flush();
-    while (1) delay(1000);
-  }
+  if (!fullBuf) { Serial.println("[boot] PSRAM fail"); while(1) delay(1000); }
   Serial.printf("[boot] PSRAM fullBuf=%p size=%u\n", fullBuf, (unsigned)fullBufBytes);
   lv_display_set_buffers(disp, fullBuf, NULL, fullBufBytes, LV_DISPLAY_RENDER_MODE_FULL);
 #else
