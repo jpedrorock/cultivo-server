@@ -129,14 +129,11 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
 #define COL_BLU     0x60A5FA
 
 // ── LVGL v9 draw buffers ────────────────────────────────────────────────────────
-// LVGL software rotation precisa de flag LV_DRAW_SW_ROTATE no build, que nao
-// temos (e habilitar quebra outras coisas). Solucao: LVGL renderiza em
-// landscape 480x320 logico, e rotacionamos manualmente os chunks p/ portrait
-// 320x480 (orientacao native que canvas+gfx aceitam) no disp_flush.
-//
-// Render mode FULL com buffer fullscreen em PSRAM — 1 push por frame.
-// Custo da rotacao manual: ~30ms/frame (loop 153K pixels), mas ainda visivel
-// como lag. Otimizacao futura: row-major copy + memcpy chunks.
+// FULL render mode com buffer 480x320 landscape em PSRAM. Testes mostraram
+// que PARTIAL mode adiciona overhead alto da LVGL (rendering em N chunks
+// e' mais lento que 1 buffer contigo, especialmente com animacoes pulse
+// invalidando area grande). Com cache blocking + QSPI 80MHz, FULL mode
+// da ~23 fps efetivos.
 #ifdef REAL_HARDWARE
   static uint8_t *fullBuf = nullptr;
 #else
@@ -213,27 +210,47 @@ static const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
 // ════════════════════════════════════════════════════════════════════════════════
 // Display + touch callbacks (LVGL v9 API)
 // ════════════════════════════════════════════════════════════════════════════════
+// Rotacao 270deg do framebuffer LVGL (480x320 landscape) p/ canvas portrait
+// (320x480). Cache blocking 32x32 + IRAM_ATTR — ~3-4x speedup vs loop ingenuo
+// (22ms -> 6-9ms, mas em FULL mode com overhead PSRAM efetivo ~22ms/frame).
+// physical(px, py) = (ly, 479 - lx) — rotation 270 inverse.
+static IRAM_ATTR void rotate_270_to_canvas(const uint16_t *__restrict__ src,
+                                           uint16_t *__restrict__ dst,
+                                           int LW, int LH) {
+  constexpr int BLOCK = 32;
+  for (int by = 0; by < LH; by += BLOCK) {
+    int y_end = (by + BLOCK < LH) ? by + BLOCK : LH;
+    for (int bx = 0; bx < LW; bx += BLOCK) {
+      int x_end = (bx + BLOCK < LW) ? bx + BLOCK : LW;
+      for (int ly = by; ly < y_end; ly++) {
+        const uint16_t *src_row = src + ly * LW;
+        for (int lx = bx; lx < x_end; lx++) {
+          dst[((LW - 1 - lx) * 320) + ly] = src_row[lx];
+        }
+      }
+    }
+  }
+}
+
 static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
   uint32_t w = area->x2 - area->x1 + 1;
   uint32_t h = area->y2 - area->y1 + 1;
 #ifdef REAL_HARDWARE
-  // LVGL v9 com ROTATION_270 + FULL mode nao rotaciona o buffer — entrega
-  // coords logicas landscape (480x320). Rotacionamos manualmente no canvas
-  // portrait (320x480), formula 270deg: logical(lx,ly) -> physical(ly, 479-lx).
-  uint16_t *src = (uint16_t*)px_map;
-  uint16_t *dst = canvas->getFramebuffer();
-  const int LW = (int)w;   // logical width (480 esperado)
-  const int LH = (int)h;   // logical height (320 esperado)
-  for (int ly = 0; ly < LH; ly++) {
-    for (int lx = 0; lx < LW; lx++) {
-      int px = ly;
-      int py = (LW - 1) - lx;
-      if ((unsigned)px < 320 && (unsigned)py < 480) {
-        dst[py * 320 + px] = src[ly * LW + lx];
-      }
-    }
-  }
+  static uint32_t frameN = 0, sumRotUs = 0, sumPushUs = 0;
+  uint32_t t0 = micros();
+  rotate_270_to_canvas((uint16_t*)px_map, canvas->getFramebuffer(), (int)w, (int)h);
+  uint32_t t1 = micros();
   canvas->flush();
+  uint32_t t2 = micros();
+  sumRotUs += (t1 - t0);
+  sumPushUs += (t2 - t1);
+  if (++frameN >= 60) {
+    Serial.printf("[perf] avg rot=%lu us push=%lu us total=%lu us ~%lu fps\n",
+                  (unsigned long)(sumRotUs/60), (unsigned long)(sumPushUs/60),
+                  (unsigned long)((sumRotUs+sumPushUs)/60),
+                  (unsigned long)(60000000ull/(sumRotUs+sumPushUs)));
+    frameN = 0; sumRotUs = 0; sumPushUs = 0;
+  }
 #else
   hal_push_pixels(area->x1, area->y1, w, h, (uint16_t*)px_map);
 #endif
@@ -2147,13 +2164,7 @@ void setup() {
   // (ordem importa: flush_cb antes de set_buffers; color format fica no default
   // que e' RGB565 quando LV_COLOR_DEPTH=16)
   Serial.println("[boot] lv_display_create"); Serial.flush();
-#ifdef REAL_HARDWARE
-  // LVGL em landscape 480x320 logico — render mode FULL escreve buffer inteiro
-  // em coords landscape, depois disp_flush rotaciona pro canvas portrait.
-  lv_display_t *disp = lv_display_create(480, 320);
-#else
-  lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);
-#endif
+  lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);  // 480x320 landscape
   Serial.println("[boot] display_set_flush_cb"); Serial.flush();
   lv_display_set_flush_cb(disp, disp_flush);
   Serial.println("[boot] display_set_buffers"); Serial.flush();
