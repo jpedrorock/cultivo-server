@@ -18,6 +18,11 @@ extern const lv_image_dsc_t ic_droplet;
 extern const lv_image_dsc_t ic_beaker;
 extern const lv_image_dsc_t ic_test_tube;
 extern const lv_image_dsc_t ic_droplets;
+extern const lv_image_dsc_t ic_settings;
+extern const lv_image_dsc_t ic_plus;
+extern const lv_image_dsc_t ic_minus;
+extern const lv_image_dsc_t ic_zap;
+extern const lv_image_dsc_t ic_play;
 
 #ifdef __cplusplus
 }

@@ -36,6 +36,9 @@ ICONS = {
     # LUX/PPFD — botoes + e - pra ajustar
     "plus":          "ic_plus",
     "minus":         "ic_minus",
+    # CENAS — atalhos Tuya, ic_zap substitui ic_tasks na navbar
+    "zap":           "ic_zap",
+    "play-circle":   "ic_play",
 }
 
 SRC_DIR = Path("esp32-display/assets/icons/64px")

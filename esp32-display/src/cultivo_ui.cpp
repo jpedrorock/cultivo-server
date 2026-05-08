@@ -97,7 +97,7 @@ static lv_obj_t *navIcons[5];
 int activeScreen = 0;
 static const uint32_t NAV_COLORS[5] = { COL_GRN, COL_YEL, COL_PRP, 0xFBBF24, COL_CYN };
 static const lv_image_dsc_t *NAV_ICONS_IMG[5] = {
-  &ic_home, &ic_lightbulb, &ic_flask, &ic_tasks, &ic_activity
+  &ic_home, &ic_lightbulb, &ic_flask, &ic_zap, &ic_activity
 };
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
@@ -864,7 +864,7 @@ struct SceneBtn {
 static const SceneBtn SCENES[] = {
   { "IRRIGAR",  "Aciona valvula/bomba",   COL_CYN, &ic_droplet,   0 },
   { "LUZ OFF",  "Desliga LED da estufa",  COL_YEL, &ic_lightbulb, 1 },
-  { "CUSTOM",   "Cena configuravel",      COL_PRP, &ic_activity,  2 },
+  { "CUSTOM",   "Cena configuravel",      COL_PRP, &ic_zap,       2 },
 };
 static const int NUM_SCENES = sizeof(SCENES) / sizeof(SCENES[0]);
 
@@ -896,7 +896,7 @@ static void buildTarefas(lv_obj_t *tab) {
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
   lv_obj_t *hdrIcon = lv_image_create(tab);
-  lv_image_set_src(hdrIcon, &ic_tasks);
+  lv_image_set_src(hdrIcon, &ic_zap);
   lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_YEL), 0);
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
@@ -955,7 +955,7 @@ static void buildTarefas(lv_obj_t *tab) {
 
     // Indicador "play" do lado direito
     lv_obj_t *playIco = lv_image_create(btn);
-    lv_image_set_src(playIco, &ic_activity);
+    lv_image_set_src(playIco, &ic_play);
     lv_obj_set_style_image_recolor(playIco, lv_color_hex(SCENES[i].color), 0);
     lv_obj_set_style_image_recolor_opa(playIco, LV_OPA_COVER, 0);
     lv_obj_align(playIco, LV_ALIGN_RIGHT_MID, 0, 0);
