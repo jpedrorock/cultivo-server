@@ -527,22 +527,23 @@ static void openConfigModal() {
   makeLabel(configModal, "CONFIGURACAO", COL_GRN, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(2));
   makeLabel(configModal, "fw " FW_VERSION, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(4));
 
-  // Area scrollavel com os 5 campos
+  // Area scrollavel com os 5 campos. Aumentada (sh(180)) p/ caber inputs maiores
+  // (sh(34) cada, ~45px no hardware real) com tap targets confortaveis.
   lv_obj_t *list = lv_obj_create(configModal);
-  lv_obj_set_size(list, SCREEN_W - sw(12), sh(130));
-  lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(24));
+  lv_obj_set_size(list, SCREEN_W - sw(12), sh(180));
+  lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(22));
   lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(list, 0, 0);
-  lv_obj_set_style_pad_all(list, sw(2), 0);
+  lv_obj_set_style_pad_all(list, sw(3), 0);
   lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_style_pad_row(list, sh(3), 0);
+  lv_obj_set_style_pad_row(list, sh(4), 0);
 
   auto addField = [&](const char *label, const char *initVal, lv_obj_t **out,
                        bool pwd = false, bool numeric = false) {
     makeLabel(list, label, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_t *ta = lv_textarea_create(list);
     lv_obj_set_width(ta, lv_pct(100));
-    lv_obj_set_height(ta, sh(22));
+    lv_obj_set_height(ta, sh(34));      // ~45px tap target (era ~29px)
     lv_textarea_set_one_line(ta, true);
     lv_textarea_set_text(ta, initVal ? initVal : "");
     if (pwd)     lv_textarea_set_password_mode(ta, true);
@@ -551,6 +552,7 @@ static void openConfigModal() {
     lv_obj_set_style_bg_color(ta, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_border_color(ta, lv_color_hex(COL_BORDER), 0);
     lv_obj_set_style_border_width(ta, 1, 0);
+    lv_obj_set_style_pad_left(ta, sw(6), 0);
     lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
     *out = ta;
   };
@@ -559,7 +561,7 @@ static void openConfigModal() {
   // via browser do celular em 192.168.4.1. Alternativa ao preenchimento manual.
   lv_obj_t *btnAp = lv_btn_create(list);
   lv_obj_set_width(btnAp, lv_pct(100));
-  lv_obj_set_height(btnAp, sh(24));
+  lv_obj_set_height(btnAp, sh(34));
   lv_obj_set_style_bg_color(btnAp, lv_color_hex(0x1E3A8A), 0);
   lv_obj_set_style_border_color(btnAp, lv_color_hex(COL_CYN), 0);
   lv_obj_set_style_border_width(btnAp, 1, 0);
@@ -568,19 +570,19 @@ static void openConfigModal() {
     if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
     startApPortal();
   }, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnAp, "Setup via celular (AP)", COL_CYN, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(btnAp, "Setup via celular (AP)", COL_CYN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   addField("WiFi SSID",      WIFI_SSID,    &taSsid);
 
   // Botao SCAN — dispara busca assincrona, nao trava LVGL
   lv_obj_t *btnScan = lv_btn_create(list);
   lv_obj_set_width(btnScan, lv_pct(100));
-  lv_obj_set_height(btnScan, sh(22));
+  lv_obj_set_height(btnScan, sh(34));
   lv_obj_set_style_bg_color(btnScan, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(btnScan, lv_color_hex(COL_CYN), 0);
   lv_obj_set_style_border_width(btnScan, 1, 0);
   lv_obj_add_event_cb(btnScan, scanStartCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnScan, "Buscar redes WiFi", COL_CYN, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(btnScan, "Buscar redes WiFi", COL_CYN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   addField("WiFi Senha",     WIFI_PASS,    &taPass,  true);
   addField("Server URL",     SERVER_URL,   &taUrl);
@@ -589,16 +591,15 @@ static void openConfigModal() {
   addField("Tent ID",        tentStr,      &taTent,  false, true);
 
   // Botoes no rodape
-  int btnY = sh(160);
   lv_obj_t *btnCancel = lv_btn_create(configModal);
-  lv_obj_set_size(btnCancel, sw(90), sh(28));
+  lv_obj_set_size(btnCancel, sw(96), sh(36));
   lv_obj_align(btnCancel, LV_ALIGN_BOTTOM_LEFT, sw(6), -sh(6));
   lv_obj_set_style_bg_color(btnCancel, lv_color_hex(COL_CARD), 0);
   lv_obj_add_event_cb(btnCancel, cfgCancelCb, LV_EVENT_CLICKED, NULL);
   makeLabel(btnCancel, "Cancelar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_t *btnReset = lv_btn_create(configModal);
-  lv_obj_set_size(btnReset, sw(70), sh(28));
+  lv_obj_set_size(btnReset, sw(78), sh(36));
   lv_obj_align(btnReset, LV_ALIGN_BOTTOM_MID, 0, -sh(6));
   lv_obj_set_style_bg_color(btnReset, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_RED), 0);
@@ -609,16 +610,15 @@ static void openConfigModal() {
     delay(300);
     ESP.restart();
   }, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnReset, "Reset WiFi", COL_RED, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(btnReset, "Reset", COL_RED, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_t *btnSave = lv_btn_create(configModal);
-  lv_obj_set_size(btnSave, sw(100), sh(28));
+  lv_obj_set_size(btnSave, sw(110), sh(36));
   lv_obj_align(btnSave, LV_ALIGN_BOTTOM_RIGHT, -sw(6), -sh(6));
   lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_GRN), 0);
   applyBloom(btnSave, COL_GRN);
   lv_obj_add_event_cb(btnSave, cfgSaveCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnSave, "Salvar + Reboot", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-  (void)btnY;
+  makeLabel(btnSave, "Salvar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   // Keyboard compartilhado — esconde ao pressionar OK ou Cancelar
   kbCfg = lv_keyboard_create(configModal);
