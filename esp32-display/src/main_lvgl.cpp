@@ -132,7 +132,12 @@ static const int TAB_H    = SCREEN_H - TABBAR_H;
 
 // ── LVGL v9 draw buffers ────────────────────────────────────────────────────────
 // FULL render mode com buffer 480x320 landscape em PSRAM. Cache blocking
-// 32x32 + QSPI 80MHz dao ~23 fps efetivos.
+// 32x32 + QSPI 60MHz dao ~20 fps efetivos.
+//
+// Tentativa de double buffering com push task em core 1 foi piorando perf
+// percebido (transicoes mais lentas) — PSRAM bandwidth disputada entre
+// rotate em core 0 (read fullBuf, write dblBuf) e DMA QSPI em core 1
+// (read dblBuf p/ push). Sequencial single-buffer evita o conflict.
 #ifdef REAL_HARDWARE
   static uint8_t *fullBuf = nullptr;
 #else
@@ -215,21 +220,8 @@ static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
   uint32_t w = area->x2 - area->x1 + 1;
   uint32_t h = area->y2 - area->y1 + 1;
 #ifdef REAL_HARDWARE
-  static uint32_t frameN = 0, sumRotUs = 0, sumPushUs = 0;
-  uint32_t t0 = micros();
   rotate_270_to_canvas((uint16_t*)px_map, canvas->getFramebuffer(), (int)w, (int)h);
-  uint32_t t1 = micros();
   canvas->flush();
-  uint32_t t2 = micros();
-  sumRotUs += (t1 - t0);
-  sumPushUs += (t2 - t1);
-  if (++frameN >= 60) {
-    Serial.printf("[perf] avg rot=%lu us push=%lu us total=%lu us ~%lu fps\n",
-                  (unsigned long)(sumRotUs/60), (unsigned long)(sumPushUs/60),
-                  (unsigned long)((sumRotUs+sumPushUs)/60),
-                  (unsigned long)(60000000ull/(sumRotUs+sumPushUs)));
-    frameN = 0; sumRotUs = 0; sumPushUs = 0;
-  }
 #else
   hal_push_pixels(area->x1, area->y1, w, h, (uint16_t*)px_map);
 #endif
@@ -1205,6 +1197,13 @@ static void taskToggleHandler(int idx, bool done) {
   if (idx < 0 || idx >= numTarefas) return;
   if (done && tarefas[idx].serverId > 0) postTaskComplete(tarefas[idx].serverId);
 }
+// Tap em TEMP/UMID na Home: sinaliza refresh ao netTask, que chama
+// refreshTuyaNow() (server forca poll Tuya) + fetchDisplayData() (re-puxa
+// valores). Loop entao chama refreshHomeValues() pra atualizar a UI.
+static void refreshHandler() {
+  refreshPending = true;
+  Serial.println("[ui] tap-to-refresh requested");
+}
 
 static void buildUI() {
   // Registrar handlers antes do build — UI precisa deles disponiveis quando
@@ -1214,6 +1213,7 @@ static void buildUI() {
   cultivoUI_setPhEcSaveHandler(postReading);
   cultivoUI_setTaskToggleHandler(taskToggleHandler);
   cultivoUI_setConfigOpenHandler(openConfigModal);
+  cultivoUI_setRefreshHandler(refreshHandler);
   buildCultivoUI();
 }
 

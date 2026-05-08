@@ -69,11 +69,21 @@ static CultivoSaveLuxFn      onLuxSave     = nullptr;
 static CultivoSavePhEcFn     onPhEcSave    = nullptr;
 static CultivoToggleTaskFn   onTaskToggle  = nullptr;
 static CultivoOpenConfigFn   onConfigOpen  = nullptr;
+static CultivoRefreshFn      onRefresh     = nullptr;
 
 extern "C" void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb)         { onLuxSave    = cb; }
 extern "C" void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb)       { onPhEcSave   = cb; }
 extern "C" void cultivoUI_setTaskToggleHandler(CultivoToggleTaskFn cb)   { onTaskToggle = cb; }
 extern "C" void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb)   { onConfigOpen = cb; }
+extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRefresh    = cb; }
+
+// Estado de refresh em andamento — UI mostra pulse no anel TEMP enquanto ativo
+static bool isRefreshing = false;
+static lv_timer_t *refreshSpinTimer = nullptr;
+
+extern "C" void cultivoUI_setRefreshing(bool active) {
+  isRefreshing = active;
+}
 
 // ════════════════════════════════════════════════════════════════════════════════
 // Widgets compartilhados entre screens (idem main_lvgl.cpp)
@@ -280,7 +290,18 @@ static void buildHome(lv_obj_t *tab) {
   lv_arc_set_bg_angles(arcTemp, 135, 45);
   lv_arc_set_rotation(arcTemp, 0);
   lv_obj_remove_style(arcTemp, NULL, LV_PART_KNOB);
-  lv_obj_clear_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
+  // Tap no arc TEMP -> chama refresh handler (app puxa Tuya fresh)
+  lv_obj_add_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(arcTemp, sw(4));
+  lv_obj_add_event_cb(arcTemp, [](lv_event_t *e) {
+    (void)e;
+    if (onRefresh && !isRefreshing) {
+      isRefreshing = true;
+      lv_label_set_text(lblTemp, "...");
+      lv_label_set_text(lblRh,   "...");
+      onRefresh();
+    }
+  }, LV_EVENT_CLICKED, NULL);
   // Remove o fundo retangular e borda padrao do lv_arc — queremos so o anel
   lv_obj_set_style_bg_opa(arcTemp, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(arcTemp, 0, 0);
@@ -402,6 +423,19 @@ static void buildHome(lv_obj_t *tab) {
   lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_RED, &ic_droplets,   &sparkVpd,  &serVpdS,  933);
   lblPpfd = makeMiniCard(homeFaceA, (cardH + cardGap) * 2, "PPFD",    "--", COL_YEL, &ic_lightbulb,  &sparkPpfd, &serPpfdS,1866);
 
+  // Tap no card UMIDADE -> mesmo refresh handler que o arc TEMP
+  lv_obj_t *cardRh = lv_obj_get_parent(lblRh);
+  lv_obj_add_flag(cardRh, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(cardRh, [](lv_event_t *e) {
+    (void)e;
+    if (onRefresh && !isRefreshing) {
+      isRefreshing = true;
+      lv_label_set_text(lblTemp, "...");
+      lv_label_set_text(lblRh,   "...");
+      onRefresh();
+    }
+  }, LV_EVENT_CLICKED, NULL);
+
   lv_chart_set_range(sparkRh,   LV_CHART_AXIS_PRIMARY_Y, 0, 100);
   lv_chart_set_range(sparkVpd,  LV_CHART_AXIS_PRIMARY_Y, 0, 30);     // VPD * 10 (0-3.0 kPa)
   lv_chart_set_range(sparkPpfd, LV_CHART_AXIS_PRIMARY_Y, 0, 1500);
@@ -473,6 +507,8 @@ static void buildHome(lv_obj_t *tab) {
 }
 
 extern "C" void refreshHomeValues() {
+  // Refresh trouxe valores frescos: limpa flag de tap-em-progresso
+  isRefreshing = false;
   char buf[24];
   snprintf(buf, sizeof(buf), "%.1f", tempC);
   lv_label_set_text(lblTemp, buf);

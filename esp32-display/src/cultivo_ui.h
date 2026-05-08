@@ -57,11 +57,20 @@ typedef void (*CultivoSaveLuxFn)(int targetPpfd);
 typedef void (*CultivoSavePhEcFn)(float ph, float ec);
 typedef void (*CultivoToggleTaskFn)(int idx, bool done);
 typedef void (*CultivoOpenConfigFn)(void);
+// Tap em TEMP/UMID na Home pede ao app pra fazer poll fresh do server (que
+// por sua vez consulta a Tuya e atualiza os valores). Usado p/ refresh manual.
+typedef void (*CultivoRefreshFn)(void);
 
 void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb);
 void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb);
 void cultivoUI_setTaskToggleHandler(CultivoToggleTaskFn cb);
 void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb);
+void cultivoUI_setRefreshHandler(CultivoRefreshFn cb);
+
+// ── Indicacao de refresh em andamento ─────────────────────────────────────────
+// App chama cultivoUI_setRefreshing(true) ao iniciar refresh, false ao terminar.
+// UI mostra spinner/pulse no card de TEMP+UMID enquanto rodando.
+void cultivoUI_setRefreshing(bool active);
 
 #ifdef __cplusplus
 }
