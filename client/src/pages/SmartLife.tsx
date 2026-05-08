@@ -1267,23 +1267,25 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
 
 function ScenesTab() {
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
+  const [view, setView] = useState<'mine' | 'import'>('mine');
   const [expandedHomes, setExpandedHomes] = useState<Set<string>>(new Set());
   const [showManualForm, setShowManualForm] = useState(false);
 
   const { data: config } = trpc.tuya.getConfig.useQuery();
+  // Só busca cenas da API quando estiver na view de importar
   const { data: scenes = [], isLoading, isError, refetch } = trpc.tuya.listScenes.useQuery(
-    undefined, { enabled: !!config, retry: false }
+    undefined, { enabled: !!config && view === 'import', retry: false }
   );
   const { data: manualScenes = [], refetch: refetchManual } = trpc.tuya.listManualScenes.useQuery();
 
-  // Auto-expand all homes on first load
+  // Auto-expand all homes ao entrar na view de importar
   useEffect(() => {
-    if (scenes.length > 0) {
+    if (view === 'import' && scenes.length > 0) {
       const homes = new Set(scenes.map((s: any) => s.homeName));
       setExpandedHomes(homes);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenes.length]);
+  }, [scenes.length, view]);
 
   const triggerScene = trpc.tuya.triggerScene.useMutation({
     onSuccess: () => { toast.success('Cena disparada!'); setTriggeringId(null); },
@@ -1294,12 +1296,36 @@ function ScenesTab() {
     onSuccess: () => { refetchManual(); toast.success('Cena removida'); },
   });
 
+  const saveManual = trpc.tuya.saveManualScene.useMutation({
+    onSuccess: () => { refetchManual(); toast.success('Cena adicionada!'); },
+    onError: (e) => toast.error(e.message),
+  });
+
   const toggleHome = (homeName: string) => {
     setExpandedHomes(prev => {
       const next = new Set(prev);
       next.has(homeName) ? next.delete(homeName) : next.add(homeName);
       return next;
     });
+  };
+
+  // Set de sceneIds já importados — pra mostrar ✓ ao invés de + na lista da API
+  const importedIds = new Set(manualScenes.map((s: any) => s.sceneId));
+
+  // Importa cena da lista da API
+  const handleImport = (scene: any) => {
+    saveManual.mutate({
+      homeId: scene.homeId ? String(scene.homeId) : undefined,
+      sceneId: scene.sceneId,
+      name: scene.name,
+      type: scene.homeName === 'Automações' ? 'automation' : 'tap',
+    });
+  };
+
+  // Remove cena pelo sceneId (usado quando o usuário clica em ✓ na view de importar)
+  const handleUnimportBySceneId = (sceneId: string) => {
+    const found = manualScenes.find((s: any) => s.sceneId === sceneId);
+    if (found) deleteManual.mutate({ id: found.id });
   };
 
   if (!config) {
@@ -1314,175 +1340,248 @@ function ScenesTab() {
     );
   }
 
-  if (isLoading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VIEW: IMPORTAR DA SMARTLIFE
+  // Mostra a lista completa da API com botão "+ Adicionar" em cada cena.
+  // Cenas já importadas mostram ✓ (clicar remove).
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (view === 'import') {
+    const tapToRunGrouped = (scenes as any[])
+      .filter(s => s.homeName !== 'Automações')
+      .reduce<Record<string, any[]>>((acc, s) => {
+        if (!acc[s.homeName]) acc[s.homeName] = [];
+        acc[s.homeName].push(s);
+        return acc;
+      }, {});
+    const automationList = (scenes as any[]).filter(s => s.homeName === 'Automações');
 
-  // Cenas manuais renderizadas (sempre mostradas mesmo se API falhou)
-  const manualScenesBlock = manualScenes.length > 0 && (
-    <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/30 bg-muted/20">
-        <Zap className="w-3.5 h-3.5 text-muted-foreground/60" />
-        <p className="text-sm font-semibold text-foreground flex-1">Cenas manuais</p>
-      </div>
-      {manualScenes.map((scene: any) => (
-        <ManualSceneRow
-          key={scene.id}
-          scene={scene}
-          isTriggering={triggeringId === scene.sceneId}
-          onTrigger={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
-          onDelete={() => deleteManual.mutate({ id: scene.id })}
-          triggerDisabled={!!triggeringId}
-        />
-      ))}
-    </div>
-  );
-
-  if (isError) {
     return (
-      <div className="space-y-4 pt-2">
-        {/* Aviso de fallback */}
-        <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 p-4 space-y-2">
-          <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Listagem automática indisponível</p>
-          <p className="text-xs text-muted-foreground">
-            A API Tuya não conseguiu descobrir o Home ID automaticamente. Você pode adicionar cenas manualmente usando o <strong>API Explorer</strong> do portal Tuya.
+      <div className="space-y-3 pt-2">
+        {/* Header com botão voltar */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setView('mine')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+            Voltar
+          </button>
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
+        </div>
+
+        {/* Aviso explicando a tela */}
+        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 p-3">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Selecione apenas as cenas que você quer usar no Cultivo. As marcadas com <Check className="inline w-3 h-3 text-emerald-500" /> já estão importadas.
           </p>
-          <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside">
-            <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto</li>
-            <li>Clique em <strong>API Explorer</strong> (menu lateral)</li>
-            <li>Busque por <span className="font-mono">/homes</span> → execute para ver o <strong>home_id</strong></li>
-            <li>Cole abaixo junto com o <strong>scene_id</strong> de cada cena</li>
-          </ol>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2 mt-1 w-full">
-            <RefreshCw className="w-3.5 h-3.5" /> Tentar novamente
-          </Button>
         </div>
 
-        {manualScenesBlock}
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
 
-        <button onClick={() => setShowManualForm(v => !v)}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/60 text-sm text-muted-foreground hover:bg-muted/30 transition-colors">
-          <Plus className="w-4 h-4" />
-          {showManualForm ? 'Fechar formulário' : 'Adicionar cena manualmente'}
-        </button>
+        {/* Erro */}
+        {isError && !isLoading && (
+          <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 p-4 space-y-2">
+            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Listagem automática indisponível</p>
+            <p className="text-xs text-muted-foreground">
+              A API Tuya não conseguiu listar suas cenas. Use o formulário manual abaixo com o <strong>scene_id</strong> obtido no API Explorer do portal Tuya.
+            </p>
+          </div>
+        )}
 
-        {showManualForm && <ManualSceneForm onSaved={() => { refetchManual(); setShowManualForm(false); }} />}
-      </div>
-    );
-  }
+        {/* Tap-to-run agrupados por casa */}
+        {!isLoading && Object.entries(tapToRunGrouped).map(([homeName, homeScenes]) => {
+          const isOpen = expandedHomes.has(homeName);
+          return (
+            <div key={homeName} className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+              <button
+                className="w-full flex items-center gap-2.5 px-4 py-3 border-b border-border/30 bg-muted/20 hover:bg-muted/30 transition-colors text-left"
+                onClick={() => toggleHome(homeName)}
+              >
+                <Home className="w-3.5 h-3.5 text-muted-foreground/60" />
+                <p className="text-sm font-semibold text-foreground flex-1">{homeName}</p>
+                <span className="text-xs text-muted-foreground/50">{homeScenes.length} cena{homeScenes.length !== 1 ? 's' : ''}</span>
+                {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground/40" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40" />}
+              </button>
+              {isOpen && (
+                <div>
+                  {homeScenes.map((scene: any) => {
+                    const imported = importedIds.has(scene.sceneId);
+                    return (
+                      <div key={scene.sceneId} className="flex items-center gap-3 px-4 py-3.5 border-b border-border/20 last:border-0">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                          <Zap className="w-4 h-4 text-amber-500" />
+                        </div>
+                        <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
+                        {imported ? (
+                          <button
+                            onClick={() => handleUnimportBySceneId(scene.sceneId)}
+                            disabled={saveManual.isPending || deleteManual.isPending}
+                            title="Remover do Cultivo"
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-all disabled:opacity-50 shrink-0"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Importada
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleImport(scene)}
+                            disabled={saveManual.isPending}
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Adicionar
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
-  if (scenes.length === 0 && manualScenes.length === 0) {
-    return (
-      <div className="space-y-4 pt-2">
-        <div className="rounded-2xl border border-dashed border-border/60 bg-card/50 py-12 text-center px-6">
-          <Zap className="w-10 h-10 mx-auto text-muted-foreground/25 mb-3" />
-          <p className="font-medium text-foreground">Nenhuma cena encontrada</p>
-          <p className="text-sm text-muted-foreground mt-1">Crie cenas no app SmartLife para vê-las aqui</p>
-        </div>
-        <button onClick={() => setShowManualForm(v => !v)}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/60 text-sm text-muted-foreground hover:bg-muted/30 transition-colors">
-          <Plus className="w-4 h-4" />
-          Adicionar cena manualmente
-        </button>
-        {showManualForm && <ManualSceneForm onSaved={() => { refetchManual(); setShowManualForm(false); }} />}
-      </div>
-    );
-  }
-
-  const tapToRunGrouped = (scenes as any[])
-    .filter(s => s.homeName !== 'Automações')
-    .reduce<Record<string, any[]>>((acc, s) => {
-      if (!acc[s.homeName]) acc[s.homeName] = [];
-      acc[s.homeName].push(s);
-      return acc;
-    }, {});
-
-  const automationList = (scenes as any[]).filter(s => s.homeName === 'Automações');
-
-  return (
-    <div className="space-y-3 pt-2">
-      {/* Botão atualizar */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => { refetch(); refetchManual(); }}
-          disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
-      </div>
-
-      {manualScenesBlock}
-
-      {/* Tap-to-run scenes */}
-      {Object.entries(tapToRunGrouped).map(([homeName, homeScenes]) => {
-        const isOpen = expandedHomes.has(homeName);
-        return (
-          <div key={homeName} className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+        {/* Automações */}
+        {!isLoading && automationList.length > 0 && (
+          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
             <button
               className="w-full flex items-center gap-2.5 px-4 py-3 border-b border-border/30 bg-muted/20 hover:bg-muted/30 transition-colors text-left"
-              onClick={() => toggleHome(homeName)}
+              onClick={() => toggleHome('Automações')}
             >
-              <Home className="w-3.5 h-3.5 text-muted-foreground/60" />
-              <p className="text-sm font-semibold text-foreground flex-1">{homeName}</p>
-              <span className="text-xs text-muted-foreground/50">{homeScenes.length} cena{homeScenes.length !== 1 ? 's' : ''}</span>
-              {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground/40" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40" />}
+              <Clock className="w-3.5 h-3.5 text-blue-400/70" />
+              <p className="text-sm font-semibold text-foreground flex-1">Automações</p>
+              <span className="text-xs text-muted-foreground/50">{automationList.length} regra{automationList.length !== 1 ? 's' : ''}</span>
+              {expandedHomes.has('Automações') ? <ChevronUp className="w-4 h-4 text-muted-foreground/40" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40" />}
             </button>
-            {isOpen && (
+            {expandedHomes.has('Automações') && (
               <div>
-                {homeScenes.map((scene: any) => {
-                  const isTriggering = triggeringId === scene.sceneId;
+                {automationList.map((automation: any) => {
+                  const imported = importedIds.has(automation.sceneId);
                   return (
-                    <div key={scene.sceneId} className="flex items-center gap-3 px-4 py-3.5 border-b border-border/20 last:border-0">
-                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                        <Zap className="w-4 h-4 text-amber-500" />
+                    <div key={automation.sceneId} className="flex items-center gap-3 px-4 py-3.5 border-b border-border/20 last:border-0">
+                      <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                        <Clock className="w-4 h-4 text-blue-500" />
                       </div>
-                      <p className="flex-1 text-sm font-medium text-foreground truncate">{scene.name}</p>
-                      <button
-                        onClick={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
-                        disabled={!!triggeringId}
-                        className="flex items-center gap-1.5 h-8 px-3.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 shrink-0"
-                      >
-                        {isTriggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                        {isTriggering ? 'Disparando...' : 'Disparar'}
-                      </button>
+                      <p className="flex-1 text-sm font-medium text-foreground truncate">{automation.name}</p>
+                      {imported ? (
+                        <button
+                          onClick={() => handleUnimportBySceneId(automation.sceneId)}
+                          disabled={saveManual.isPending || deleteManual.isPending}
+                          title="Remover do Cultivo"
+                          className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-all disabled:opacity-50 shrink-0"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Importada
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleImport(automation)}
+                          disabled={saveManual.isPending}
+                          className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Adicionar
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
           </div>
-        );
-      })}
+        )}
 
-      {/* Automations */}
-      {automationList.length > 0 && (
+        {/* Estado vazio (API conectada mas sem cenas) */}
+        {!isLoading && !isError && scenes.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-border/60 bg-card/50 py-10 text-center px-6">
+            <Zap className="w-9 h-9 mx-auto text-muted-foreground/25 mb-2" />
+            <p className="font-medium text-foreground text-sm">Nenhuma cena na sua conta</p>
+            <p className="text-xs text-muted-foreground mt-1">Crie cenas no app SmartLife para vê-las aqui</p>
+          </div>
+        )}
+
+        {/* Form de entrada manual (sempre disponível como fallback) */}
+        <button
+          onClick={() => setShowManualForm(v => !v)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/50 text-sm text-muted-foreground hover:bg-muted/30 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          {showManualForm ? 'Fechar formulário' : 'Adicionar manualmente (cole o scene_id)'}
+        </button>
+        {showManualForm && <ManualSceneForm onSaved={() => { refetchManual(); setShowManualForm(false); }} />}
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VIEW: MINHAS CENAS (default)
+  // Mostra apenas as cenas que o usuário escolheu importar.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  return (
+    <div className="space-y-3 pt-2">
+      {/* Header com botão importar */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-foreground">Minhas cenas</p>
+        <button
+          onClick={() => refetchManual()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          Atualizar
+        </button>
+      </div>
+
+      {/* Lista das cenas importadas */}
+      {manualScenes.length > 0 ? (
         <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
-          <button
-            className="w-full flex items-center gap-2.5 px-4 py-3 border-b border-border/30 bg-muted/20 hover:bg-muted/30 transition-colors text-left"
-            onClick={() => toggleHome('Automações')}
-          >
-            <Clock className="w-3.5 h-3.5 text-blue-400/70" />
-            <p className="text-sm font-semibold text-foreground flex-1">Automações</p>
-            <span className="text-xs text-muted-foreground/50">{automationList.length} regra{automationList.length !== 1 ? 's' : ''}</span>
-            {expandedHomes.has('Automações') ? <ChevronUp className="w-4 h-4 text-muted-foreground/40" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40" />}
-          </button>
-          {expandedHomes.has('Automações') && (
-            <div>
-              {automationList.map((automation: any) => (
-                <AutomationCard key={automation.sceneId} automation={automation} />
-              ))}
-            </div>
-          )}
+          {manualScenes.map((scene: any) => (
+            <ManualSceneRow
+              key={scene.id}
+              scene={scene}
+              isTriggering={triggeringId === scene.sceneId}
+              onTrigger={() => { setTriggeringId(scene.sceneId); triggerScene.mutate({ sceneId: scene.sceneId, homeId: scene.homeId || undefined }); }}
+              onDelete={() => deleteManual.mutate({ id: scene.id })}
+              triggerDisabled={!!triggeringId}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-border/60 bg-card/50 py-10 text-center px-6">
+          <Zap className="w-9 h-9 mx-auto text-muted-foreground/25 mb-2" />
+          <p className="font-medium text-foreground text-sm">Nenhuma cena adicionada</p>
+          <p className="text-xs text-muted-foreground mt-1">Toque em "Importar da SmartLife" para escolher</p>
         </div>
       )}
 
-      {/* Botão sempre visível para adicionar cena manualmente */}
+      {/* Botão principal: importar da SmartLife */}
       <button
-        onClick={() => setShowManualForm(v => !v)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/50 text-sm text-muted-foreground hover:bg-muted/30 transition-colors"
+        onClick={() => setView('import')}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 active:scale-[0.99] transition-all"
       >
         <Plus className="w-4 h-4" />
-        {showManualForm ? 'Fechar formulário' : 'Adicionar cena manualmente'}
+        Importar da SmartLife
+      </button>
+
+      {/* Form manual ainda disponível */}
+      <button
+        onClick={() => setShowManualForm(v => !v)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/50 text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        {showManualForm ? 'Fechar formulário' : 'Adicionar manualmente (avançado)'}
       </button>
       {showManualForm && <ManualSceneForm onSaved={() => { refetchManual(); setShowManualForm(false); }} />}
     </div>
