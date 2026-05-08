@@ -95,9 +95,12 @@ static lv_obj_t *screenHome, *screenLux, *screenPhEc, *screenTarefa, *screenGraf
 static lv_obj_t *navbar;
 static lv_obj_t *navIcons[5];
 int activeScreen = 0;
-static const uint32_t NAV_COLORS[5] = { COL_GRN, COL_YEL, COL_PRP, 0xFBBF24, COL_CYN };
+// Ordem da navbar: Home / Lux / pH-EC / Hist / Cenas
+// Histórico fica antes de Cenas — leitura natural (dados primeiro, acoes
+// depois). idx 3 = Hist (era Cenas), idx 4 = Cenas (era Hist).
+static const uint32_t NAV_COLORS[5] = { COL_GRN, COL_YEL, COL_PRP, COL_CYN, 0xFBBF24 };
 static const lv_image_dsc_t *NAV_ICONS_IMG[5] = {
-  &ic_home, &ic_lightbulb, &ic_flask, &ic_zap, &ic_activity
+  &ic_home, &ic_lightbulb, &ic_flask, &ic_activity, &ic_zap
 };
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
@@ -1121,8 +1124,9 @@ static void navSetActive(int idx) {
 
 static void switchScreen(int idx) {
   if (idx == activeScreen) return;
+  // Ordem dos screens deve casar com NAV_ICONS_IMG: 3=Hist, 4=Cenas
   lv_obj_t *screens[5] = {
-    screenHome, screenLux, screenPhEc, screenTarefa, screenGrafic
+    screenHome, screenLux, screenPhEc, screenGrafic, screenTarefa
   };
   if (idx < 0 || idx >= 5) return;
 
