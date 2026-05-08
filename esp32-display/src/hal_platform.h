@@ -22,15 +22,18 @@
   extern Arduino_GFX     *gfx;
 
   // ── JC4832W535 pinout (Guition) ─────────────────────────────────────────────
-  // Display: AXS15231B em modo QSPI (4 linhas de dados)
+  // Display: AXS15231B em modo QSPI (4 linhas de dados). Os boards JC*W535
+  // tem 2 pinouts comuns (variante "ESP32-S3-N8" e variante "S3-N16R8"):
+  //   V1: CS=45 SCK=47 D0=21 D1=48 D2=40 D3=39  (era o anterior, deu linha vertical)
+  //   V2: CS=12 SCK=13 D0=11 D1=14 D2=9  D3=8   (essa)
   #define LCD_BL     1     // backlight via LEDC PWM
   #define LCD_RST   -1     // sem pino HW de reset (usa software reset cmd)
-  #define LCD_CS    45
-  #define LCD_SCK   47
-  #define LCD_D0    21
-  #define LCD_D1    48
-  #define LCD_D2    40
-  #define LCD_D3    39
+  #define LCD_CS    12
+  #define LCD_SCK   13
+  #define LCD_D0    11
+  #define LCD_D1    14
+  #define LCD_D2     9
+  #define LCD_D3     8
 
   // Touch: AXS15231B integra display QSPI + touch I2C no mesmo chip.
   // Protocolo de touch e' proprietario (nao FT/CST padrao): comando 11 bytes
