@@ -19,6 +19,7 @@
   #include <Arduino_GFX_Library.h>
   #include <canvas/Arduino_Canvas.h>
   #include <Wire.h>
+  #include <driver/i2c.h>   // ESP-IDF i2c_master — Arduino Wire nao funciona com este chip
   extern Arduino_DataBus *bus;
   extern Arduino_GFX     *gfx;
   extern Arduino_Canvas  *canvas;  // CYD-Klipper pattern: gfx -> canvas -> push
@@ -105,53 +106,64 @@ static inline void hal_push_pixels(int x, int y, int w, int h, uint16_t *px) {
 #endif
 }
 
+// I2C peripheral 1 — separado da Wire (peripheral 0) que nao funciona com o
+// AXS15231B touch deste board. ESP-IDF i2c_master driver e' o que ESPHome usa.
+#define HAL_TOUCH_I2C_PORT  I2C_NUM_1
+
+static inline bool hal_touch_init() {
+#ifdef REAL_HARDWARE
+  i2c_config_t conf = {};
+  conf.mode             = I2C_MODE_MASTER;
+  conf.sda_io_num       = TP_SDA;
+  conf.scl_io_num       = TP_SCL;
+  conf.sda_pullup_en    = GPIO_PULLUP_ENABLE;
+  conf.scl_pullup_en    = GPIO_PULLUP_ENABLE;
+  conf.master.clk_speed = 100000;
+  esp_err_t err = i2c_param_config(HAL_TOUCH_I2C_PORT, &conf);
+  if (err != ESP_OK) { Serial.printf("[touch] i2c_param_config err=%d\n", err); return false; }
+  err = i2c_driver_install(HAL_TOUCH_I2C_PORT, I2C_MODE_MASTER, 0, 0, 0);
+  if (err != ESP_OK) { Serial.printf("[touch] i2c_driver_install err=%d\n", err); return false; }
+  return true;
+#else
+  return true;
+#endif
+}
+
 // Le um toque do controlador. Retorna true se ha contato; rx/ry em coords
 // nativas do hardware (mapeadas depois por hal_map_touch).
-//   Real: AXS15231B touch — protocolo proprio (cmd 11B + read 8B). Pattern
-//         do CYD-Klipper: usa endTransmission(false) (repeated start) e
-//         checa data[1] (num) entre 1-2 fingers em vez de event byte.
+//   Real: AXS15231B via ESP-IDF i2c_master (peripheral 1). Protocolo proprio:
+//         escrever cmd 11B, ler 8B. Tap detectado se data[0]==0 && data[1]>0.
 //   Wokwi: FT6336 — registro 0x02 com fingers/x/y simples
 static inline bool hal_touch_read(int *rx, int *ry) {
 #ifdef REAL_HARDWARE
   static const uint8_t cmd[11] = {
     0xB5, 0xAB, 0xA5, 0x5A, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00
   };
-  // Diagnostic: log a cada 1s se ha erro no I2C (helps debug TP_SCL etc).
-  static uint32_t lastDiag = 0;
-  Wire.beginTransmission(TP_I2C_ADDR);
-  Wire.write(cmd, sizeof(cmd));
-  uint8_t txErr = Wire.endTransmission(false);  // false = repeated start (CYD pattern)
-  if (txErr != 0) {
-    if (millis() - lastDiag > 1000) {
-      lastDiag = millis();
-      Serial.printf("[touch] endTransmission err=%u (no chip @0x%02X?)\n", txErr, TP_I2C_ADDR);
-    }
-    return false;
-  }
-  uint8_t got = Wire.requestFrom((int)TP_I2C_ADDR, 8);
-  if (got != 8) {
-    if (millis() - lastDiag > 1000) {
-      lastDiag = millis();
-      Serial.printf("[touch] requestFrom got=%u (expected 8)\n", got);
-    }
-    return false;
-  }
-  uint8_t b[8];
-  for (int i = 0; i < 8; i++) b[i] = Wire.read();
-  uint8_t num = b[1];  // number of fingers (CYD parse)
-  if (num == 0 || num > 2) {
-    // I2C ok, sem dedo — log raw periodicamente p/ confirmar comunicacao
+  uint8_t b[8] = {0};
+  esp_err_t werr = i2c_master_write_to_device(
+      HAL_TOUCH_I2C_PORT, TP_I2C_ADDR, cmd, sizeof(cmd), pdMS_TO_TICKS(50));
+  if (werr != ESP_OK) {
+    static uint32_t lastDiag = 0;
     if (millis() - lastDiag > 2000) {
       lastDiag = millis();
-      Serial.printf("[touch] idle: %02X %02X %02X %02X %02X %02X %02X %02X\n",
-                    b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7]);
+      Serial.printf("[touch] write err=%d\n", werr);
     }
     return false;
   }
+  esp_err_t rerr = i2c_master_read_from_device(
+      HAL_TOUCH_I2C_PORT, TP_I2C_ADDR, b, sizeof(b), pdMS_TO_TICKS(50));
+  if (rerr != ESP_OK) {
+    static uint32_t lastDiag = 0;
+    if (millis() - lastDiag > 2000) {
+      lastDiag = millis();
+      Serial.printf("[touch] read err=%d\n", rerr);
+    }
+    return false;
+  }
+  // ESPHome AXS15231B parse: data[0]==0 && data[1]>0 = touch presente
+  if (b[0] != 0 || b[1] == 0) return false;
   *rx = ((b[2] & 0x0F) << 8) | b[3];
   *ry = ((b[4] & 0x0F) << 8) | b[5];
-  Serial.printf("[touch] HIT raw=%d,%d bytes=%02X %02X %02X %02X %02X %02X %02X %02X\n",
-                *rx, *ry, b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7]);
   return true;
 #else
   Wire.beginTransmission(0x38);   // FT6336

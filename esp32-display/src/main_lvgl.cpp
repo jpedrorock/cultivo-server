@@ -2134,17 +2134,12 @@ void setup() {
   // de tempo p/ a parte touch I2C ficar ativa.
   delay(500);
 
-  Serial.println("[boot] Wire init"); Serial.flush();
-  Wire.begin(TOUCH_SDA, TOUCH_SCL);
+  Serial.println("[boot] touch I2C init (ESP-IDF i2c_master peripheral 1)"); Serial.flush();
 #ifdef REAL_HARDWARE
-  // Touch nao funciona via Arduino Wire neste board (JC3248W535C_I_y). 650+
-  // pares (SDA, SCL) testados com transacao completa, zero respostas reais.
-  // Provavelmente incompatibilidade da lib Arduino Wire com este chip — o fw
-  // de fabrica usa ESP-IDF esp_lcd_touch_axs15231b. Plano: migrar p/
-  // ESP32_Display_Panel ou bit-bang I2C numa proxima leva. Display funciona OK.
-  Wire.setClock(100000);
-#endif
-  Serial.println("[boot] lv_init"); Serial.flush();
+  if (!hal_touch_init()) {
+    Serial.println("[boot] hal_touch_init FALHOU");
+    Serial.flush();
+  }
 #else
   Wire.begin(TOUCH_SDA, TOUCH_SCL);
 #endif
