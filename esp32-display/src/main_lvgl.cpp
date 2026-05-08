@@ -1204,6 +1204,15 @@ static void refreshHandler() {
   refreshPending = true;
   Serial.println("[ui] tap-to-refresh requested");
 }
+// Tap em botao de cena na tela CENAS — STUB. Quando os endpoints
+// /api/device/scene/:sceneId/trigger forem criados no cultivo-server,
+// substituimos por POST HTTP. Por enquanto so' loga p/ confirmar UI->infra.
+static const char *SCENE_NAMES[] = { "irrigar", "luz-off", "custom" };
+static void sceneTriggerHandler(int sceneId) {
+  const char *name = (sceneId >= 0 && sceneId < 3) ? SCENE_NAMES[sceneId] : "?";
+  Serial.printf("[ui] scene trigger sceneId=%d (%s) — TODO: POST /api/device/scene/%d/trigger\n",
+                sceneId, name, sceneId);
+}
 
 static void buildUI() {
   // Registrar handlers antes do build — UI precisa deles disponiveis quando
@@ -1214,6 +1223,7 @@ static void buildUI() {
   cultivoUI_setTaskToggleHandler(taskToggleHandler);
   cultivoUI_setConfigOpenHandler(openConfigModal);
   cultivoUI_setRefreshHandler(refreshHandler);
+  cultivoUI_setSceneTriggerHandler(sceneTriggerHandler);
   buildCultivoUI();
 }
 

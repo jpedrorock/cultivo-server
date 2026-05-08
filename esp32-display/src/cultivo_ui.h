@@ -60,12 +60,16 @@ typedef void (*CultivoOpenConfigFn)(void);
 // Tap em TEMP/UMID na Home pede ao app pra fazer poll fresh do server (que
 // por sua vez consulta a Tuya e atualiza os valores). Usado p/ refresh manual.
 typedef void (*CultivoRefreshFn)(void);
+// Tap em botao de cena na tela CENAS — sceneId enum-like definido pelo app.
+// Identifiers atuais: 0=irrigar, 1=luz-off, 2=custom (extensivel).
+typedef void (*CultivoSceneTriggerFn)(int sceneId);
 
 void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb);
 void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb);
 void cultivoUI_setTaskToggleHandler(CultivoToggleTaskFn cb);
 void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb);
 void cultivoUI_setRefreshHandler(CultivoRefreshFn cb);
+void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb);
 
 // ── Indicacao de refresh em andamento ─────────────────────────────────────────
 // App chama cultivoUI_setRefreshing(true) ao iniciar refresh, false ao terminar.

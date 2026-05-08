@@ -70,12 +70,14 @@ static CultivoSavePhEcFn     onPhEcSave    = nullptr;
 static CultivoToggleTaskFn   onTaskToggle  = nullptr;
 static CultivoOpenConfigFn   onConfigOpen  = nullptr;
 static CultivoRefreshFn      onRefresh     = nullptr;
+static CultivoSceneTriggerFn onSceneTrigger = nullptr;
 
 extern "C" void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb)         { onLuxSave    = cb; }
 extern "C" void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb)       { onPhEcSave   = cb; }
 extern "C" void cultivoUI_setTaskToggleHandler(CultivoToggleTaskFn cb)   { onTaskToggle = cb; }
 extern "C" void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb)   { onConfigOpen = cb; }
 extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRefresh    = cb; }
+extern "C" void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb) { onSceneTrigger = cb; }
 
 // Estado de refresh em andamento — UI mostra pulse no anel TEMP enquanto ativo
 static bool isRefreshing = false;
@@ -843,44 +845,48 @@ static void buildPhEc(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Tela Tarefas — lista com checkbox + texto, mockada
+// Tela CENAS — atalhos pra triggers Tuya: irrigar, luz off, custom.
+// Substitui Tarefas (registro de rega nao precisa no ESP, so' acionamento
+// remoto). Botoes grandes (~80px), feedback visual ao tocar (pulse).
+// onSceneTrigger(sceneId) callback chamado pelo app — IDs atuais:
+//   0 = IRRIGAR    (acionar bomba/valvula via cena Tuya)
+//   1 = LUZ_OFF    (desligar luz LED da estufa)
+//   2 = CUSTOM     (cena reservada p/ futura config)
 // ════════════════════════════════════════════════════════════════════════════════
-struct SimTarefa { const char *texto; bool feito; };
-static SimTarefa simTarefas[] = {
-  {"Regar plantas da area 1",     true},
-  {"Trocar solucao nutriente",    false},
-  {"Verificar pH da reserva",     true},
-  {"Podar folhas baixas",         false},
-  {"Calibrar sensor de EC",       false},
-  {"Checar temperatura noturna",  true},
+struct SceneBtn {
+  const char *label;
+  const char *desc;
+  uint32_t color;
+  const lv_image_dsc_t *icon;
+  int sceneId;
 };
-static lv_obj_t *lblTarefaCount = nullptr;
 
-static void updateTarefaCount() {
-  if (!lblTarefaCount) return;
-  int feitas = 0;
-  int total = sizeof(simTarefas) / sizeof(simTarefas[0]);
-  for (int i = 0; i < total; i++) if (simTarefas[i].feito) feitas++;
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%d / %d", feitas, total);
-  lv_label_set_text(lblTarefaCount, buf);
-}
+static const SceneBtn SCENES[] = {
+  { "IRRIGAR",  "Aciona valvula/bomba",   COL_CYN, &ic_droplet,   0 },
+  { "LUZ OFF",  "Desliga LED da estufa",  COL_YEL, &ic_lightbulb, 1 },
+  { "CUSTOM",   "Cena configuravel",      COL_PRP, &ic_activity,  2 },
+};
+static const int NUM_SCENES = sizeof(SCENES) / sizeof(SCENES[0]);
 
-static void tarefaToggleCb(lv_event_t *e) {
+// Feedback visual de "trigger enviado" — bg pulsa por ~600ms apos tap
+static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
-  simTarefas[idx].feito = !simTarefas[idx].feito;
-  lv_obj_t *row = (lv_obj_t*)lv_event_get_target(e);
-  lv_obj_t *chk = lv_obj_get_child(row, 0);
-  lv_obj_t *txt = lv_obj_get_child(row, 1);
-  lv_label_set_text(chk, simTarefas[idx].feito ? LV_SYMBOL_OK : LV_SYMBOL_MINUS);
-  lv_obj_set_style_text_color(chk,
-    lv_color_hex(simTarefas[idx].feito ? COL_GRN : COL_DIM), 0);
-  lv_obj_set_style_text_color(txt,
-    lv_color_hex(simTarefas[idx].feito ? COL_DIM : COL_TEXT), 0);
-  // contraste melhor: linha feita tem bg mais escuro (nao so texto dim)
-  lv_obj_set_style_bg_opa(row, simTarefas[idx].feito ? LV_OPA_40 : LV_OPA_COVER, 0);
-  updateTarefaCount();
-  if (onTaskToggle) onTaskToggle(idx, simTarefas[idx].feito);
+  if (idx < 0 || idx >= NUM_SCENES) return;
+  printf("[ui] cena trigger sceneId=%d (%s)\n", SCENES[idx].sceneId, SCENES[idx].label);
+  if (onSceneTrigger) onSceneTrigger(SCENES[idx].sceneId);
+
+  // Pulse no card pra confirmar tap (animar background opa)
+  lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, btn);
+  lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_60);
+  lv_anim_set_time(&a, 200);
+  lv_anim_set_playback_time(&a, 400);
+  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+    lv_obj_set_style_bg_opa((lv_obj_t*)obj, v, 0);
+  });
+  lv_anim_start(&a);
 }
 
 static void buildTarefas(lv_obj_t *tab) {
@@ -894,54 +900,65 @@ static void buildTarefas(lv_obj_t *tab) {
   lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_YEL), 0);
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
-  makeLabel(tab, "TAREFAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
+  makeLabel(tab, "CENAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
+  makeLabel(tab, "Atalhos Tuya", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
 
-  // Contador de tarefas no header direito
-  int feitas = 0;
-  int total = sizeof(simTarefas) / sizeof(simTarefas[0]);
-  for (int i = 0; i < total; i++) if (simTarefas[i].feito) feitas++;
-  char cntBuf[16];
-  snprintf(cntBuf, sizeof(cntBuf), "%d / %d", feitas, total);
-  lblTarefaCount = makeLabel(tab, cntBuf, COL_YEL, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(6));
+  // Layout em coluna — 3 botoes grandes ocupando largura quase total
+  // e altura confortavel (~80px no real). Padding interno generoso.
+  int bodyY = sh(28);
+  int bodyH = TAB_H - bodyY - sh(4);
+  int gap   = sh(6);
+  int btnH  = (bodyH - (NUM_SCENES - 1) * gap) / NUM_SCENES;
+  int btnW  = SCREEN_W - sw(16);
+  int btnX  = (SCREEN_W - btnW) / 2;
 
-  lv_obj_t *list = lv_obj_create(tab);
-  lv_obj_set_size(list, SCREEN_W - sw(12), TAB_H - sh(34));
-  lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(28));
-  lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(list, 0, 0);
-  lv_obj_set_style_pad_all(list, sw(2), 0);
-  lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_style_pad_row(list, sh(6), 0);
+  for (int i = 0; i < NUM_SCENES; i++) {
+    lv_obj_t *btn = lv_obj_create(tab);
+    lv_obj_set_size(btn, btnW, btnH);
+    lv_obj_set_pos(btn, btnX, bodyY + i * (btnH + gap));
+    lv_obj_set_style_bg_color(btn, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(SCENES[i].color), 0);
+    lv_obj_set_style_border_width(btn, 2, 0);
+    lv_obj_set_style_radius(btn, 12, 0);
+    lv_obj_set_style_pad_hor(btn, sw(14), 0);
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+    // Bloom suave na cor da cena (signature look do design system)
+    lv_obj_set_style_shadow_color(btn, lv_color_hex(SCENES[i].color), 0);
+    lv_obj_set_style_shadow_width(btn, 18, 0);
+    lv_obj_set_style_shadow_opa(btn, LV_OPA_30, 0);
+    lv_obj_set_style_shadow_spread(btn, 0, 0);
+    lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED,
+                        (void*)(intptr_t)i);
 
-  for (int i = 0; i < total; i++) {
-    lv_obj_t *row = lv_obj_create(list);
-    lv_obj_set_width(row, lv_pct(100));
-    lv_obj_set_height(row, sh(34));  // >= 44px @ 480x320 p/ touch confortavel
-    lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_bg_opa(row,
-      simTarefas[i].feito ? LV_OPA_40 : LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(row, lv_color_hex(COL_BORDER), 0);
-    lv_obj_set_style_border_width(row, 1, 0);
-    lv_obj_set_style_radius(row, CARD_RADIUS, 0);
-    lv_obj_set_style_pad_hor(row, sw(10), 0);
-    lv_obj_set_style_pad_ver(row, 0, 0);
-    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(row, tarefaToggleCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    // Icone grande a esquerda
+    lv_obj_t *ico = lv_image_create(btn);
+    lv_image_set_src(ico, SCENES[i].icon);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(SCENES[i].color), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
 
-    lv_obj_t *chk = lv_label_create(row);
-    lv_label_set_text(chk, simTarefas[i].feito ? LV_SYMBOL_OK : LV_SYMBOL_MINUS);
-    lv_obj_set_style_text_color(chk,
-      lv_color_hex(simTarefas[i].feito ? COL_GRN : COL_DIM), 0);
-    lv_obj_set_style_text_font(chk, &lv_font_montserrat_14, 0);
-    lv_obj_align(chk, LV_ALIGN_LEFT_MID, 0, 0);
+    // Label principal
+    lv_obj_t *lblName = lv_label_create(btn);
+    lv_label_set_text(lblName, SCENES[i].label);
+    lv_obj_set_style_text_color(lblName, lv_color_hex(SCENES[i].color), 0);
+    lv_obj_set_style_text_font(lblName, FONT_TITLE, 0);
+    lv_obj_align(lblName, LV_ALIGN_LEFT_MID, sw(36), -sh(7));
 
-    lv_obj_t *txt = lv_label_create(row);
-    lv_label_set_text(txt, simTarefas[i].texto);
-    lv_obj_set_style_text_color(txt,
-      lv_color_hex(simTarefas[i].feito ? COL_DIM : COL_TEXT), 0);
-    lv_obj_set_style_text_font(txt, FONT_BODY, 0);
-    lv_obj_align(txt, LV_ALIGN_LEFT_MID, sw(24), 0);
+    // Descricao secundaria
+    lv_obj_t *lblDesc = lv_label_create(btn);
+    lv_label_set_text(lblDesc, SCENES[i].desc);
+    lv_obj_set_style_text_color(lblDesc, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(lblDesc, FONT_CAPTION, 0);
+    lv_obj_align(lblDesc, LV_ALIGN_LEFT_MID, sw(36), sh(8));
+
+    // Indicador "play" do lado direito
+    lv_obj_t *playIco = lv_image_create(btn);
+    lv_image_set_src(playIco, &ic_activity);
+    lv_obj_set_style_image_recolor(playIco, lv_color_hex(SCENES[i].color), 0);
+    lv_obj_set_style_image_recolor_opa(playIco, LV_OPA_COVER, 0);
+    lv_obj_align(playIco, LV_ALIGN_RIGHT_MID, 0, 0);
   }
 }
 
