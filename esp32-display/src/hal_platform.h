@@ -145,11 +145,20 @@ static inline bool hal_touch_read(int *rx, int *ry) {
 }
 
 // Mapeia coords brutas do controlador pra coords de tela do alvo.
-// Real (AXS15231B + rotation=1): touch ja vem em coords landscape, passa direto.
+// Real: AXS15231B reporta touch em panel native portrait (rx 0..319, ry 0..479).
+//   LVGL roda em logical landscape (480x320) via rotation=270deg software.
+//   Inverso da rotacao 270 que aplicamos em disp_flush:
+//     logical (lx, ly) -> physical (ly, 479 - lx)
+//   Inverso: lx = 479 - py, ly = px
+//   Aqui: px=rx (panel x 0..319), py=ry (panel y 0..479)
 // Wokwi (FT6336 simulado): rotaciona 90 graus + escala pro display 320x240.
 static inline void hal_map_touch(int rx, int ry, int *outX, int *outY) {
 #ifdef REAL_HARDWARE
-  *outX = rx; *outY = ry;
+  *outX = 479 - ry;
+  *outY = rx;
+  // Clamp p/ caso o touch reporte fora do range esperado
+  if (*outX < 0) *outX = 0; if (*outX > 479) *outX = 479;
+  if (*outY < 0) *outY = 0; if (*outY > 319) *outY = 319;
 #else
   *outX = map(ry, 0, 320, 0, HAL_SCREEN_W);
   *outY = HAL_SCREEN_H - map(rx, 0, 240, 0, HAL_SCREEN_H);

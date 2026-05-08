@@ -213,9 +213,33 @@ static const char* PERIOD_KEYS[3]   = { "24h", "7d", "30d" };
 // Display + touch callbacks (LVGL v9 API)
 // ════════════════════════════════════════════════════════════════════════════════
 static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
+#ifdef REAL_HARDWARE
+  // LVGL v9 manda buffer em coords LOGICAS (landscape 480x320) mesmo com
+  // lv_display_set_rotation(270). O painel AXS15231B aceita so' 320x480
+  // portrait — entao rotacionamos pixel-a-pixel daqui pro framebuffer interno
+  // do canvas. ROTATION_270 = 90deg CCW: logical (lx,ly) -> physical (ly, 479-lx).
+  uint16_t *src = (uint16_t*)px_map;
+  uint16_t *dst = canvas->getFramebuffer();
+  const int LW = area->x2 - area->x1 + 1;  // 480 esperado
+  const int LH = area->y2 - area->y1 + 1;  // 320 esperado
+  const int PW = 320;
+  const int PH = 480;
+  for (int ly = 0; ly < LH; ly++) {
+    int py_base = (LW - 1) - 0;  // ajustado por lx no loop interno
+    for (int lx = 0; lx < LW; lx++) {
+      int px = ly;
+      int py = (LW - 1) - lx;
+      if ((unsigned)px < (unsigned)PW && (unsigned)py < (unsigned)PH) {
+        dst[py * PW + px] = src[ly * LW + lx];
+      }
+    }
+  }
+  canvas->flush();
+#else
   uint32_t w = area->x2 - area->x1 + 1;
   uint32_t h = area->y2 - area->y1 + 1;
   hal_push_pixels(area->x1, area->y1, w, h, (uint16_t*)px_map);
+#endif
   lv_display_flush_ready(disp);
 }
 
@@ -2125,7 +2149,7 @@ void setup() {
   // entregue p/ disp_flush ja vem em layout portrait (320x480 pixels), pronto
   // pro canvas->draw16bitRGBBitmap em coords nativas do gfx.
   lv_display_t *disp = lv_display_create(320, 480);
-  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_90);
+  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
 #else
   lv_display_t *disp = lv_display_create(SCREEN_W, SCREEN_H);
 #endif
