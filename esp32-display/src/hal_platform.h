@@ -107,26 +107,51 @@ static inline void hal_push_pixels(int x, int y, int w, int h, uint16_t *px) {
 
 // Le um toque do controlador. Retorna true se ha contato; rx/ry em coords
 // nativas do hardware (mapeadas depois por hal_map_touch).
-//   Real: AXS15231B touch — protocolo proprio (cmd 11B + read 8B)
+//   Real: AXS15231B touch — protocolo proprio (cmd 11B + read 8B). Pattern
+//         do CYD-Klipper: usa endTransmission(false) (repeated start) e
+//         checa data[1] (num) entre 1-2 fingers em vez de event byte.
 //   Wokwi: FT6336 — registro 0x02 com fingers/x/y simples
 static inline bool hal_touch_read(int *rx, int *ry) {
 #ifdef REAL_HARDWARE
   static const uint8_t cmd[11] = {
     0xB5, 0xAB, 0xA5, 0x5A, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00
   };
+  // Diagnostic: log a cada 1s se ha erro no I2C (helps debug TP_SCL etc).
+  static uint32_t lastDiag = 0;
   Wire.beginTransmission(TP_I2C_ADDR);
   Wire.write(cmd, sizeof(cmd));
-  if (Wire.endTransmission() != 0) return false;
-  delayMicroseconds(150);
-  Wire.requestFrom((int)TP_I2C_ADDR, 8);
-  if (Wire.available() < 8) return false;
+  uint8_t txErr = Wire.endTransmission(false);  // false = repeated start (CYD pattern)
+  if (txErr != 0) {
+    if (millis() - lastDiag > 1000) {
+      lastDiag = millis();
+      Serial.printf("[touch] endTransmission err=%u (no chip @0x%02X?)\n", txErr, TP_I2C_ADDR);
+    }
+    return false;
+  }
+  uint8_t got = Wire.requestFrom((int)TP_I2C_ADDR, 8);
+  if (got != 8) {
+    if (millis() - lastDiag > 1000) {
+      lastDiag = millis();
+      Serial.printf("[touch] requestFrom got=%u (expected 8)\n", got);
+    }
+    return false;
+  }
   uint8_t b[8];
   for (int i = 0; i < 8; i++) b[i] = Wire.read();
-  uint8_t event  = b[0] >> 4;
-  uint8_t finger = b[1];
-  if (event == 0 || finger == 0) return false;
+  uint8_t num = b[1];  // number of fingers (CYD parse)
+  if (num == 0 || num > 2) {
+    // I2C ok, sem dedo — log raw periodicamente p/ confirmar comunicacao
+    if (millis() - lastDiag > 2000) {
+      lastDiag = millis();
+      Serial.printf("[touch] idle: %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                    b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7]);
+    }
+    return false;
+  }
   *rx = ((b[2] & 0x0F) << 8) | b[3];
   *ry = ((b[4] & 0x0F) << 8) | b[5];
+  Serial.printf("[touch] HIT raw=%d,%d bytes=%02X %02X %02X %02X %02X %02X %02X %02X\n",
+                *rx, *ry, b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7]);
   return true;
 #else
   Wire.beginTransmission(0x38);   // FT6336
