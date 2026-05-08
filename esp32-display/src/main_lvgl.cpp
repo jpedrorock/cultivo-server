@@ -1204,14 +1204,32 @@ static void refreshHandler() {
   refreshPending = true;
   Serial.println("[ui] tap-to-refresh requested");
 }
-// Tap em botao de cena na tela CENAS — STUB. Quando os endpoints
-// /api/device/scene/:sceneId/trigger forem criados no cultivo-server,
-// substituimos por POST HTTP. Por enquanto so' loga p/ confirmar UI->infra.
+// Tap em botao de cena na tela CENAS. Faz POST p/ endpoint do server que
+// dispara cena Tuya. Endpoint server-side: /api/device/scene/:sceneId/trigger
+// (a' integrar no proximo PR do cultivo-server — branch
+// claude/smartlife-scenes-opt-in ja' tem a infra triggerTuyaScene + tabela
+// tuyaManualScenes; falta so' expor o endpoint Express de device-side).
+// Sem WiFi este request descarta logo no inicio (silent fail OK).
 static const char *SCENE_NAMES[] = { "irrigar", "luz-off", "custom" };
 static void sceneTriggerHandler(int sceneId) {
   const char *name = (sceneId >= 0 && sceneId < 3) ? SCENE_NAMES[sceneId] : "?";
-  Serial.printf("[ui] scene trigger sceneId=%d (%s) — TODO: POST /api/device/scene/%d/trigger\n",
-                sceneId, name, sceneId);
+  Serial.printf("[scene] trigger sceneId=%d (%s)\n", sceneId, name);
+  if (!wifiOk) {
+    Serial.println("[scene] WiFi offline — request descartado");
+    return;
+  }
+  HTTPClient http;
+  char url[256];
+  snprintf(url, sizeof(url),
+           "%s/api/device/scene/%d/trigger?token=%s&tentId=%d",
+           SERVER_URL, sceneId, DEVICE_TOKEN, TENT_ID);
+  if (!httpBegin(http, url)) {
+    Serial.println("[scene] httpBegin falhou");
+    return;
+  }
+  int code = http.POST("");
+  Serial.printf("[scene] sceneId=%d HTTP %d\n", sceneId, code);
+  http.end();
 }
 
 static void buildUI() {
