@@ -649,50 +649,87 @@ static char otaPass[20] = "";  // senha de OTA derivada do MAC (idem AP mas com 
 static lv_obj_t *apScreen = nullptr;
 
 static const char PORTAL_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
-<html lang="pt-br"><head><meta charset="UTF-8">
+<html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cultivo Setup</title><style>
+:root{
+  --bg:#0B0F14;--card:#111827;--border:#1F2937;
+  --fg:#F8FAFC;--fg-dim:#94A3B8;--fg-mute:#64748B;
+  --green:#10B981;--green-soft:#34D399;--green-glow:rgba(16,185,129,.35);
+  --r-md:10px;--r-lg:12px;
+}
 *{box-sizing:border-box}
-body{background:#0B0F14;color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-  max-width:460px;margin:0 auto;padding:24px}
-h1{color:#4ADE80;text-align:center;font-weight:300;letter-spacing:3px;margin:20px 0 28px;
-  text-shadow:0 0 12px rgba(74,222,128,.4)}
-label{display:block;margin-top:18px;color:#6B7280;font-size:11px;
-  text-transform:uppercase;letter-spacing:1px}
-input,select{width:100%;padding:12px;background:#111827;border:1px solid #1F2937;
-  color:#fff;border-radius:8px;font-size:16px;margin-top:6px;outline:none;transition:border .2s}
-input:focus,select:focus{border-color:#4ADE80}
-button{width:100%;padding:14px;background:#4ADE80;color:#0B0F14;border:none;
-  border-radius:8px;font-size:14px;font-weight:700;margin-top:28px;cursor:pointer;
-  letter-spacing:1px;text-transform:uppercase;box-shadow:0 0 16px rgba(74,222,128,.3)}
-button:active{transform:translateY(1px)}
-.status{margin-top:14px;color:#6B7280;font-size:12px;text-align:center}
-.logo{text-align:center;color:#4ADE80;font-size:32px;margin-bottom:-6px}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);min-height:100vh;
+  font-family:'Geist','Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  font-feature-settings:"ss01","cv11";letter-spacing:-0.01em;
+  max-width:460px;margin:0 auto;padding:24px 20px 40px}
+header{text-align:center;padding:20px 0 10px}
+.logo{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;
+  border-radius:50%;background:linear-gradient(135deg,#10B98122,#10B98108);
+  box-shadow:0 0 24px var(--green-glow),inset 0 0 0 1px #10B98140;
+  font-size:30px;line-height:56px}
+h1{color:var(--fg);font-weight:700;font-size:22px;letter-spacing:-0.02em;
+  margin:14px 0 4px;line-height:1.2}
+.subtitle{color:var(--fg-dim);font-size:13px;margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:18px 16px;margin-top:12px}
+label{display:block;margin-top:14px;color:var(--fg-dim);font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.06em}
+label:first-child{margin-top:0}
+input,select{width:100%;padding:13px 14px;background:#0B1220;border:1px solid var(--border);
+  color:var(--fg);border-radius:var(--r-md);font-size:15px;margin-top:6px;outline:none;
+  font-family:inherit;letter-spacing:inherit;
+  transition:border-color .15s ease,box-shadow .15s ease}
+input::placeholder{color:#475569}
+input:hover,select:hover{border-color:#334155}
+input:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-glow)}
+button{width:100%;padding:14px;background:var(--green);color:#031712;border:none;
+  border-radius:var(--r-md);font-size:14px;font-weight:700;margin-top:18px;cursor:pointer;
+  letter-spacing:0.04em;text-transform:uppercase;font-family:inherit;
+  box-shadow:0 0 22px var(--green-glow),inset 0 1px 0 rgba(255,255,255,.18);
+  transition:transform .1s ease,box-shadow .15s ease}
+button:hover{box-shadow:0 0 30px var(--green-glow),inset 0 1px 0 rgba(255,255,255,.18)}
+button:active{transform:translateY(1px);box-shadow:0 0 14px var(--green-glow)}
+.status{margin-top:12px;color:var(--fg-mute);font-size:12px;text-align:center;
+  display:flex;align-items:center;justify-content:center;gap:6px}
+.status.ok{color:var(--green-soft)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--fg-mute);
+  animation:pulse 1.4s ease-in-out infinite}
+.status.ok .dot{background:var(--green-soft);animation:none}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+.footer{margin-top:24px;text-align:center;color:#475569;font-size:11px}
+.footer a{color:#64748B;text-decoration:none;border-bottom:1px dashed #334155;padding-bottom:1px}
+.footer a:hover{color:var(--green-soft);border-color:var(--green)}
 </style></head><body>
+<header>
 <div class="logo">&#127793;</div>
-<h1>CULTIVO SETUP</h1>
-<form action="/save" method="POST">
-<label>Rede WiFi</label>
+<h1>Cultivo Setup</h1>
+<p class="subtitle">Conectar dispositivo a sua rede</p>
+</header>
+<form action="/save" method="POST" class="card">
+<label for="ssid">Rede WiFi</label>
 <select name="ssid" id="ssid"><option>Escaneando...</option></select>
-<label>Senha WiFi</label>
-<input type="password" name="pass" autocomplete="off">
-<label>Server URL</label>
-<input type="text" name="url" value="https://cultivo.x.andy.plus">
-<label>Device Token</label>
-<input type="text" name="token" autocomplete="off">
-<label>Tent ID</label>
-<input type="number" name="tent" value="1" min="1">
+<label for="pass">Senha WiFi</label>
+<input id="pass" type="password" name="pass" autocomplete="off" placeholder="* * * * * * * *">
+<label for="url">Server URL</label>
+<input id="url" type="url" name="url" value="https://cultivo.x.andy.plus">
+<label for="token">Device Token</label>
+<input id="token" type="text" name="token" autocomplete="off" placeholder="cole o token gerado no app">
+<label for="tent">Tent ID</label>
+<input id="tent" type="number" name="tent" value="1" min="1">
 <button type="submit">Salvar e Reiniciar</button>
-<div class="status" id="status">Escaneando redes WiFi...</div>
+<div class="status" id="status"><span class="dot"></span><span>Escaneando redes WiFi</span></div>
 </form>
-<p style="color:#475569;font-size:11px;text-align:center;margin-top:20px"><a href="/update" style="color:#475569">recovery: atualizar firmware</a></p>
+<div class="footer"><a href="/update">recovery &middot; atualizar firmware</a></div>
 <script>
 fetch('/scan').then(r=>r.json()).then(d=>{
-  const s=document.getElementById('ssid');s.innerHTML='';
-  (d.networks||[]).forEach(n=>{const o=document.createElement('option');
-    o.textContent=n;s.appendChild(o)});
-  document.getElementById('status').textContent=(d.networks||[]).length+' redes encontradas';
-}).catch(()=>{document.getElementById('status').textContent='Erro ao escanear'});
+  const s=document.getElementById('ssid');const st=document.getElementById('status');
+  s.innerHTML='';const list=d.networks||[];
+  if(!list.length){st.querySelector('span:last-child').textContent='Nenhuma rede encontrada';return}
+  list.forEach(n=>{const o=document.createElement('option');o.textContent=n;s.appendChild(o)});
+  st.classList.add('ok');st.querySelector('span:last-child').textContent=list.length+' redes encontradas';
+}).catch(()=>{document.getElementById('status').querySelector('span:last-child').textContent='Erro ao escanear'});
 </script></body></html>)HTML";
 
 static const char PORTAL_DONE_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
