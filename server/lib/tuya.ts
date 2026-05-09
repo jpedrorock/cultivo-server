@@ -276,3 +276,69 @@ export async function readTuyaDeviceStatus(
     rhPct: rawHum  !== null ? (rawHum  > 100 ? rawHum  / 10 : rawHum)  : null,
   };
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Scene trigger — usado pelo endpoint /api/device/scene/:slotIdx/trigger
+// (chamado pelo ESP32 display via X-Device-Token). Tenta multiplos endpoints
+// porque a Tuya tem inconsistencia entre tipos de cena (IoT Core vs Smart Home
+// Home). triggerTuyaScene retorna {success, msg?} pra simplificar handling.
+// ════════════════════════════════════════════════════════════════════════════════
+async function tuyaPost(
+  pathAndQuery: string,
+  body: object,
+  accessId: string,
+  accessSecret: string,
+  accessToken: string,
+  region: TuyaRegion
+): Promise<any> {
+  const t = Date.now().toString();
+  const nonce = "";
+  const bodyStr = JSON.stringify(body);
+  const signature = buildSign(accessId, accessSecret, t, nonce, pathAndQuery, accessToken, "POST", bodyStr);
+  const res = await fetch(`${BASE_URLS[region]}${pathAndQuery}`, {
+    method: "POST",
+    headers: {
+      client_id: accessId,
+      access_token: accessToken,
+      sign: signature,
+      t,
+      sign_method: "HMAC-SHA256",
+      nonce,
+      "Content-Type": "application/json",
+    },
+    body: bodyStr,
+  });
+  return res.json();
+}
+
+export async function triggerTuyaScene(
+  homeId: number,
+  sceneId: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<{ success: boolean; msg?: string }> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+
+  // Tenta IoT Core primeiro (cenas listadas via /v2.0/cloud/scene/rule).
+  // Se nao for desse tipo, fallback p/ Smart Home Home.
+  const attempts: string[] = [`/v2.0/cloud/scene/rule/${sceneId}/actions/trigger`];
+  if (homeId) {
+    attempts.push(
+      `/v1.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
+      `/v2.0/homes/${homeId}/scenes/${sceneId}/actions/trigger`,
+    );
+  }
+  attempts.push(
+    `/v1.0/scenes/${sceneId}/actions/trigger`,
+    `/v2.0/scenes/${sceneId}/actions/trigger`,
+  );
+
+  for (const path of attempts) {
+    try {
+      const data = await tuyaPost(path, {}, accessId, accessSecret, accessToken, region);
+      if (data.success) return { success: true };
+    } catch {}
+  }
+  return { success: false, msg: "Nenhum endpoint de trigger funcionou" };
+}

@@ -530,6 +530,56 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
+  // POST /api/device/scene/:slotIdx/trigger — dispara cena Tuya pre-mapeada
+  // Slots 0/1/2 mapeiam p/ env vars TUYA_SCENE_{0,1,2} = '<sceneId>' OU
+  // '<homeId>:<sceneId>' (homeId opcional). Usa a config Tuya do grupo do
+  // device. ESP sem precisar conhecer IDs reais — so' sabe qual slot esta
+  // tocando ('irrigar', 'luz-off', 'custom').
+  app.post('/api/device/scene/:slotIdx/trigger', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const slotIdx = parseInt(req.params.slotIdx);
+      if (isNaN(slotIdx) || slotIdx < 0 || slotIdx > 9) {
+        return res.status(400).json({ error: 'slotIdx fora do range (0-9)' });
+      }
+
+      const envKey = `TUYA_SCENE_${slotIdx}`;
+      const cfgRaw = process.env[envKey];
+      if (!cfgRaw) {
+        return res.status(404).json({ error: `${envKey} nao configurado no servidor` });
+      }
+      // Formato: 'sceneId' ou 'homeId:sceneId' (homeId obrigatorio em Smart Home Home)
+      const [maybeHomeId, maybeSceneId] = cfgRaw.includes(':')
+        ? cfgRaw.split(':', 2)
+        : ['0', cfgRaw];
+      const homeId = parseInt(maybeHomeId) || 0;
+      const sceneId = (maybeSceneId || '').trim();
+      if (!sceneId) return res.status(500).json({ error: `${envKey} formato invalido` });
+
+      // Busca config Tuya do grupo do device (qualquer user com tuya enabled)
+      const [cfgRows]: any = await pool.execute(
+        `SELECT tc.accessId, tc.accessSecret, tc.region
+         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
+         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
+        [device.groupId]
+      );
+      if (cfgRows.length === 0) {
+        return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
+      }
+      const cfg = cfgRows[0];
+
+      const { triggerTuyaScene } = await import('../lib/tuya');
+      const result = await triggerTuyaScene(homeId, sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
+      console.log(`[Device] scene slot=${slotIdx} -> ${result.success ? 'OK' : 'FAIL'} (${result.msg ?? ''})`);
+      if (!result.success) return res.status(502).json({ error: result.msg ?? 'Tuya retornou falha' });
+      res.json({ success: true, slotIdx });
+    } catch (err: any) {
+      console.error('[Device] scene trigger error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao disparar cena' });
+    }
+  });
+
   // POST /api/device/refresh-tuya/:tentId — forca leitura imediata do sensor Tuya
   app.post('/api/device/refresh-tuya/:tentId', async (req, res) => {
     try {
