@@ -911,11 +911,102 @@ static void handlePortalUpdateGet() {
   apServer->send_P(200, "text/html", PORTAL_UPDATE_HTML);
 }
 
+// Pagina de resultado do upload — OK reboota em 3s; FAIL oferece tentar
+// de novo. PROGMEM p/ economizar RAM. Mesmos tokens das outras paginas
+// do portal (consistencia visual).
+static const char PORTAL_UPDATE_OK_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="3">
+<title>Cultivo &mdash; Update OK</title><style>
+:root{--bg:#0B0F14;--card:#111827;--border:#1F2937;
+  --fg:#F8FAFC;--fg-dim:#94A3B8;--fg-mute:#64748B;
+  --green:#10B981;--green-soft:#34D399;--green-glow:rgba(16,185,129,.35);}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);min-height:100vh;display:flex;
+  align-items:center;justify-content:center;padding:32px 20px;
+  font-family:'Geist','Inter',-apple-system,system-ui,sans-serif;letter-spacing:-0.01em}
+.wrap{max-width:380px;width:100%;text-align:center;animation:rise .5s ease-out both}
+.icon{display:flex;align-items:center;justify-content:center;width:72px;height:72px;
+  margin:0 auto 18px;border-radius:50%;
+  background:linear-gradient(135deg,#10B98122,#10B98108);
+  box-shadow:0 0 32px var(--green-glow),inset 0 0 0 1px #10B98140;
+  animation:pop .55s cubic-bezier(.2,1.6,.4,1) both .1s}
+.icon svg{stroke:var(--green-soft);stroke-width:2.5;stroke-linecap:round;
+  stroke-linejoin:round;fill:none;width:34px;height:34px;
+  stroke-dasharray:60;stroke-dashoffset:60;animation:draw .45s ease-out forwards .35s}
+h1{color:var(--fg);font-weight:700;font-size:24px;letter-spacing:-0.02em;margin:0 0 8px}
+.lead{color:var(--fg-dim);font-size:14px;line-height:1.5;margin:0 0 22px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;display:flex;align-items:center;justify-content:center;gap:10px;
+  color:var(--fg-dim);font-size:13px}
+.spinner{width:14px;height:14px;border-radius:50%;
+  border:2px solid #1F2937;border-top-color:var(--green-soft);
+  animation:spin .8s linear infinite}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style></head><body>
+<div class="wrap">
+<div class="icon"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></div>
+<h1>Update conclu&iacute;do</h1>
+<p class="lead">Firmware gravado com sucesso. O dispositivo vai reiniciar agora.</p>
+<div class="card"><div class="spinner"></div><span>Reiniciando...</span></div>
+</div>
+</body></html>)HTML";
+
+static const char PORTAL_UPDATE_FAIL_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cultivo &mdash; Update FALHOU</title><style>
+:root{--bg:#0B0F14;--card:#111827;--border:#1F2937;
+  --fg:#F8FAFC;--fg-dim:#94A3B8;--fg-mute:#64748B;
+  --red:#EF4444;--red-soft:#F87171;--red-glow:rgba(239,68,68,.35);
+  --r-md:10px;--r-lg:12px;}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);min-height:100vh;display:flex;
+  align-items:center;justify-content:center;padding:32px 20px;
+  font-family:'Geist','Inter',-apple-system,system-ui,sans-serif;letter-spacing:-0.01em}
+.wrap{max-width:380px;width:100%;text-align:center;animation:rise .5s ease-out both}
+.icon{display:flex;align-items:center;justify-content:center;width:72px;height:72px;
+  margin:0 auto 18px;border-radius:50%;
+  background:linear-gradient(135deg,#EF444422,#EF444408);
+  box-shadow:0 0 32px var(--red-glow),inset 0 0 0 1px #EF444440;
+  animation:shake .5s ease both .1s}
+.icon svg{stroke:var(--red-soft);stroke-width:2.5;stroke-linecap:round;fill:none;
+  width:30px;height:30px}
+h1{color:var(--fg);font-weight:700;font-size:24px;letter-spacing:-0.02em;margin:0 0 8px}
+.lead{color:var(--fg-dim);font-size:14px;line-height:1.5;margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:14px 16px;color:var(--fg-dim);font-size:12.5px;line-height:1.6;text-align:left}
+.card b{color:var(--fg)}
+.btn{display:inline-block;margin-top:18px;padding:12px 22px;border-radius:var(--r-md);
+  background:#1F2937;color:var(--fg);text-decoration:none;font-weight:600;font-size:14px;
+  border:1px solid #334155}
+.btn:hover{background:#1F2937CC}
+.btn.primary{background:var(--red-soft);color:#1A0B0B;border:0;
+  box-shadow:0 0 18px var(--red-glow);margin-left:6px}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}
+  50%{transform:translateX(4px)}75%{transform:translateX(-3px)}}
+</style></head><body>
+<div class="wrap">
+<div class="icon"><svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></div>
+<h1>Update falhou</h1>
+<p class="lead">N&atilde;o foi poss&iacute;vel gravar o firmware. O dispositivo continua com a vers&atilde;o anterior.</p>
+<div class="card"><b>Poss&iacute;veis causas:</b><br>
+&middot; Arquivo n&atilde;o &eacute; <code>firmware.bin</code> v&aacute;lido<br>
+&middot; Conex&atilde;o WiFi instavel durante o upload<br>
+&middot; Espa&ccedil;o insuficiente na flash</div>
+<div><a href="/update" class="btn primary">Tentar de novo</a><a href="/" class="btn">Voltar</a></div>
+</div>
+</body></html>)HTML";
+
 static void handlePortalUpdateDone() {
   bool ok = !Update.hasError();
-  apServer->send(200, "text/html",
-    ok ? "<h1 style='color:#22c55e'>Update OK — rebootando...</h1>"
-       : "<h1 style='color:#ef4444'>Update FALHOU</h1>");
+  apServer->send_P(200, "text/html",
+    ok ? PORTAL_UPDATE_OK_HTML : PORTAL_UPDATE_FAIL_HTML);
   delay(800);
   if (ok) ESP.restart();
 }
