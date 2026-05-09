@@ -1,0 +1,99 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .dockerignore — exclui do build context (diminui upload pro daemon Docker
+# e evita que arquivos sensíveis/grandes vão pra dentro da imagem).
+#
+# Tudo aqui é IGNORADO pelo `COPY . .` no Dockerfile.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Diretórios pesados que NÃO precisam ir pra imagem ───────────────────────
+node_modules/                    # reinstalado dentro do container
+.git/                            # ~84MB, sem utilidade em runtime
+esp32-display/                   # ~670MB de firmware C++/PlatformIO — NUNCA em runtime
+.pio/                            # PlatformIO build cache (caso vaze pra raiz)
+dist/                            # build local — gerado dentro do container
+build/                           # idem
+uploads/                         # imagens dos users (mount via volume em prod)
+local.db                         # SQLite local de dev
+local.db-journal
+*.sqlite
+*.db-journal
+
+# ── Segredos e ambiente local ───────────────────────────────────────────────
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+*.pem
+*.key
+*.crt
+
+# ── Caches e logs ───────────────────────────────────────────────────────────
+.pnpm-store/
+.npm/
+.yarn/
+.cache/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ── Ferramentas / IDEs ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+.cursor/
+.claude/
+.github/
+*.swp
+*.swo
+*~
+
+# ── OS-generated ────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ── Documentação e PDFs (não precisam estar na imagem) ──────────────────────
+*.pdf
+*.md
+!README.md                       # mantém só o README principal
+docs/
+GUIA-DO-USUARIO.pdf
+GUIA-USUARIO.md
+GUIA_INSTALACAO_SIMPLES.pdf
+CHANGES.md
+DEPLOY.md
+todo.md
+
+# ── Scripts de instalação/setup local ───────────────────────────────────────
+install*.sh
+setup*.sh
+package-release.sh
+download-sqlite-bindings.sh
+convert-mysql-to-sqlite.sh
+
+# ── Backups e releases versionados ──────────────────────────────────────────
+releases/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+.manus/
+
+# ── Testes (opcional — descomentar se quiser imagem ainda menor) ────────────
+# server/**/*.test.ts
+# server/**/*.spec.ts
+
+# ── Coverage / relatórios ───────────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ── Drizzle artifacts pesados ───────────────────────────────────────────────
+drizzle/meta/                    # snapshots JSON, só úteis em dev pra diffs
