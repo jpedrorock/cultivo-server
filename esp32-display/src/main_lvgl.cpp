@@ -423,7 +423,9 @@ static void splashFinish() {
 // Salva em NVS e reboota. Usado tambem como tela de setup inicial se NVS vazio.
 // ════════════════════════════════════════════════════════════════════════════════
 static lv_obj_t *configModal = nullptr;
-static lv_obj_t *taSsid, *taPass, *taUrl, *taToken, *taTent;
+// Modal config: token+tentId removidos (vem via pareamento RFC 8628 agora).
+// Apenas WiFi + URL — usuario nao toca em token/tent manualmente mais.
+static lv_obj_t *taSsid, *taPass, *taUrl;
 static lv_obj_t *kbCfg;
 static void startApPortal();  // fwd: botao "Setup celular" do modal chama
 
@@ -522,12 +524,11 @@ static void cfgSaveCb(lv_event_t *e) {
   const char *ssid  = lv_textarea_get_text(taSsid);
   const char *pass  = lv_textarea_get_text(taPass);
   const char *url   = lv_textarea_get_text(taUrl);
-  const char *token = lv_textarea_get_text(taToken);
-  int tent          = atoi(lv_textarea_get_text(taTent));
-  if (tent <= 0) tent = 1;  // nunca salvar tent=0 — quebraria os endpoints da API
   if (strlen(ssid) == 0) { Serial.println("[cfg] ssid vazio, abortando"); return; }
-  if (strlen(token) == 0) { Serial.println("[cfg] token vazio, abortando"); return; }
-  saveConfigToNVS(ssid, pass, url, token, tent);
+  // Token + tent vem do pareamento RFC 8628 — nao sao mais editaveis aqui.
+  // Mantem o que ja' tinha em NVS (DEVICE_TOKEN/TENT_ID em RAM); se vazios
+  // o setup() vai entrar em modo pareamento apos conectar WiFi.
+  saveConfigToNVS(ssid, pass, url, DEVICE_TOKEN, TENT_ID);
   Serial.println("[cfg] salvo, reiniciando...");
   delay(500);
   ESP.restart();
@@ -611,9 +612,8 @@ static void openConfigModal() {
 
   addField("WiFi Senha",     WIFI_PASS,    &taPass,  true);
   addField("Server URL",     SERVER_URL,   &taUrl);
-  addField("Device Token",   DEVICE_TOKEN, &taToken);
-  char tentStr[12]; snprintf(tentStr, sizeof(tentStr), "%d", TENT_ID);
-  addField("Tent ID",        tentStr,      &taTent,  false, true);
+  // Device Token + Tent ID removidos — vem automaticamente via pareamento
+  // RFC 8628 quando ESP boot sem token salvo.
 
   // Botao "Limpar token" — limpa SOMENTE token+tent (preserva WiFi+URL),
   // forca entrada em modo pareamento RFC 8628 no proximo boot. Util pra
