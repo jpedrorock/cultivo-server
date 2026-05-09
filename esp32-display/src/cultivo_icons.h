@@ -23,6 +23,9 @@ extern const lv_image_dsc_t ic_plus;
 extern const lv_image_dsc_t ic_minus;
 extern const lv_image_dsc_t ic_zap;
 extern const lv_image_dsc_t ic_play;
+extern const lv_image_dsc_t ic_refresh;
+extern const lv_image_dsc_t ic_check_circle;
+extern const lv_image_dsc_t ic_alert;
 
 #ifdef __cplusplus
 }

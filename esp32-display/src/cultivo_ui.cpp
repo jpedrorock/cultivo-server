@@ -337,6 +337,17 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_text_font(lblTempUnit, FONT_CAPTION, 0);
   lv_obj_align(lblTempUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
 
+  // Hint de tap-to-refresh: pequeno icone refresh-cw no canto inferior do
+  // arc, dim por padrao. Sinaliza que o arc + card UMID sao tapaveis pra
+  // forcar poll fresh do server (tuya). Esconde nada — soft visual cue.
+  lv_obj_t *hintRefresh = lv_image_create(arcTemp);
+  lv_image_set_src(hintRefresh, &ic_refresh);
+  lv_obj_set_style_image_recolor(hintRefresh, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_image_recolor_opa(hintRefresh, LV_OPA_70, 0);
+  lv_obj_set_style_transform_zoom(hintRefresh, 160, 0);  // ~50% scale (32px -> 16px)
+  lv_obj_align(hintRefresh, LV_ALIGN_BOTTOM_MID, 0, -sh(8));
+  lv_obj_remove_flag(hintRefresh, LV_OBJ_FLAG_CLICKABLE);  // tap passa pro arc
+
   // 3 mini-cards a direita — cada face em seu proprio container
   // transparente; trocar de face e apenas hide/show o container.
   int rightX = halfW + sw(2);

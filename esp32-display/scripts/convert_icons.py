@@ -39,6 +39,10 @@ ICONS = {
     # CENAS — atalhos Tuya, ic_zap substitui ic_tasks na navbar
     "zap":           "ic_zap",
     "play-circle":   "ic_play",
+    # Feedback / status / hints
+    "refresh-cw":    "ic_refresh",      # visual hint em cards tapaveis (TEMP/UMID)
+    "check-circle":  "ic_check_circle", # confirmacao apos trigger de cena
+    "alert-circle":  "ic_alert",        # warning quando valor fora da faixa ideal
 }
 
 SRC_DIR = Path("esp32-display/assets/icons/64px")
