@@ -733,10 +733,53 @@ fetch('/scan').then(r=>r.json()).then(d=>{
 </script></body></html>)HTML";
 
 static const char PORTAL_DONE_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta http-equiv="refresh" content="3">
-<style>body{background:#0B0F14;color:#4ADE80;font-family:sans-serif;
-text-align:center;padding:80px 20px}h1{letter-spacing:3px}</style></head><body>
-<h1>SALVO!</h1><p style="color:#6B7280">Reiniciando...</p></body></html>)HTML";
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="3">
+<title>Cultivo &mdash; Configurado</title><style>
+:root{
+  --bg:#0B0F14;--card:#111827;--border:#1F2937;
+  --fg:#F8FAFC;--fg-dim:#94A3B8;--fg-mute:#64748B;
+  --green:#10B981;--green-soft:#34D399;--green-glow:rgba(16,185,129,.35);
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);min-height:100vh;display:flex;
+  align-items:center;justify-content:center;padding:32px 20px;
+  font-family:'Geist','Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  letter-spacing:-0.01em}
+.wrap{max-width:380px;width:100%;text-align:center;animation:rise .5s ease-out both}
+.icon{display:flex;align-items:center;justify-content:center;width:72px;height:72px;
+  margin:0 auto 18px;border-radius:50%;
+  background:linear-gradient(135deg,#10B98122,#10B98108);
+  box-shadow:0 0 32px var(--green-glow),inset 0 0 0 1px #10B98140;
+  animation:pop .55s cubic-bezier(.2,1.6,.4,1) both .1s}
+.icon svg{stroke:var(--green-soft);stroke-width:2.5;stroke-linecap:round;
+  stroke-linejoin:round;fill:none;width:34px;height:34px;
+  stroke-dasharray:60;stroke-dashoffset:60;animation:draw .45s ease-out forwards .35s}
+h1{color:var(--fg);font-weight:700;font-size:24px;letter-spacing:-0.02em;
+  margin:0 0 8px;line-height:1.2}
+.lead{color:var(--fg-dim);font-size:14px;line-height:1.5;margin:0 0 22px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;display:flex;align-items:center;justify-content:center;gap:10px;
+  color:var(--fg-dim);font-size:13px}
+.spinner{width:14px;height:14px;border-radius:50%;
+  border:2px solid #1F2937;border-top-color:var(--green-soft);
+  animation:spin .8s linear infinite}
+.hint{margin-top:18px;color:var(--fg-mute);font-size:12px;line-height:1.5}
+.hint b{color:var(--fg-dim);font-weight:600}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style></head><body>
+<div class="wrap">
+<div class="icon"><svg viewBox="0 0 24 24"><polyline points="4 12.5 10 18.5 20 6.5"/></svg></div>
+<h1>Tudo certo</h1>
+<p class="lead">Configura&ccedil;&atilde;o salva. O dispositivo vai reiniciar e tentar conectar &agrave; rede.</p>
+<div class="card"><div class="spinner"></div><span>Reiniciando...</span></div>
+<p class="hint">Pode fechar esta p&aacute;gina. Se o display ficar em modo offline ap&oacute;s o boot, abra <b>Setup</b> no menu.</p>
+</div>
+</body></html>)HTML";
 
 static void handlePortalRoot() {
   apServer->send_P(200, "text/html", PORTAL_HTML);
