@@ -103,11 +103,21 @@ static const lv_image_dsc_t *NAV_ICONS_IMG[5] = {
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblVpd, *lblPpfd;
-static lv_obj_t *lblEcHome, *lblPhHome;       // face B: EC + pH
-static lv_obj_t *lblCiclo, *ciclBar;          // face B: card de ciclo
-static lv_obj_t *homeFaceA, *homeFaceB;       // containers das 2 faces
-static int homeFace = 0;                      // 0 = sensores, 1 = nutrientes+ciclo
+// lblTemp = numero grande do arc; lblEcHome/lblPhHome/lblCiclo/ciclBar
+// removidos junto com Face B no redesign single-face.
+static lv_obj_t *lblEcHome = nullptr, *lblPhHome = nullptr;  // legacy
+static lv_obj_t *lblCiclo = nullptr, *ciclBar = nullptr;     // legacy
+static lv_obj_t *homeFaceA;                   // container dos mini-cards
+// Header + unit do arc — agora dinamicos pq tap cicla TEMP/pH/EC/FLOR
+static lv_obj_t *lblArcHdr = nullptr;
+static lv_obj_t *lblArcUnit = nullptr;
 static lv_obj_t *arcTemp;
+// arcMode: 0=TEMP, 1=pH, 2=EC, 3=FLORACAO. Tap no arc cicla.
+static int arcMode = 0;
+// Forward declaration: updateArcMode e' chamado em buildHome (load + tap)
+// e em refreshHomeValues, mas a definicao vem depois — por que' a logica
+// referencia globais que sao setadas em buildHome (lblArcHdr/Unit).
+static void updateArcMode();
 static lv_obj_t *sparkRh, *sparkVpd, *sparkPpfd;
 static lv_chart_series_t *serRhS, *serVpdS, *serPpfdS;
 static lv_timer_t *pulseTimer = nullptr;
@@ -257,29 +267,10 @@ static void buildHome(lv_obj_t *tab) {
     if (onConfigOpen) onConfigOpen();
   }, LV_EVENT_CLICKED, NULL);
 
-  // Botao flip: alterna a Home entre face A (sensores) e face B (nutrientes/ciclo)
-  lv_obj_t *btnFlip = lv_label_create(tab);
-  lv_label_set_text(btnFlip, LV_SYMBOL_REFRESH);
-  lv_obj_set_style_text_color(btnFlip, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(btnFlip, &lv_font_montserrat_24, 0);
-  lv_obj_align(btnFlip, LV_ALIGN_TOP_RIGHT, -sw(76), sh(2));
-  lv_obj_add_flag(btnFlip, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_ext_click_area(btnFlip, sw(8));  // hit area maior pro touch
-  lv_obj_add_event_cb(btnFlip, [](lv_event_t *e) {
-    (void)e;
-    homeFace = 1 - homeFace;
-    if (homeFace == 0) {
-      lv_obj_clear_flag(homeFaceA, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(homeFaceB, LV_OBJ_FLAG_HIDDEN);
-    } else {
-      lv_obj_add_flag(homeFaceA, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(homeFaceB, LV_OBJ_FLAG_HIDDEN);
-    }
-  }, LV_EVENT_CLICKED, NULL);
+  // Single-face redesign: sem botao flip. Tap no arc cicla TEMP/pH/EC/FLORACAO.
+  // Mini-cards UMID/VPD/PPFD ficam sempre visiveis a direita.
 
-  // Corpo: arc grande a esquerda + 2 faces de mini-cards a direita
-  // (alternadas pelo botao flip). Sem strip no rodape agora — a info
-  // de ciclo virou um dos cards da face B.
+  // Corpo: arc grande a esquerda + mini-cards a direita.
   int bodyY = sh(42);
   int bodyH = TAB_H - bodyY - sh(4);
   int halfW = SCREEN_W / 2;
@@ -293,16 +284,17 @@ static void buildHome(lv_obj_t *tab) {
   lv_arc_set_bg_angles(arcTemp, 135, 45);
   lv_arc_set_rotation(arcTemp, 0);
   lv_obj_remove_style(arcTemp, NULL, LV_PART_KNOB);
-  // Tap no arc TEMP -> chama refresh handler (app puxa Tuya fresh)
+  // Tap no arc -> cicla TEMP -> pH -> EC -> FLORACAO -> ... E aciona refresh
+  // do server (1 tap = ver outro modo + puxar dados frescos).
   lv_obj_add_flag(arcTemp, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_ext_click_area(arcTemp, sw(4));
   lv_obj_add_event_cb(arcTemp, [](lv_event_t *e) {
     (void)e;
+    arcMode = (arcMode + 1) % 4;
+    updateArcMode();
     if (onRefresh && !isRefreshing) {
       isRefreshing = true;
-      lv_label_set_text(lblTemp, "...");
-      lv_label_set_text(lblRh,   "...");
-      onRefresh();
+      onRefresh();  // refresh em paralelo — refreshHomeValues aplica quando voltar
     }
   }, LV_EVENT_CLICKED, NULL);
   // Remove o fundo retangular e borda padrao do lv_arc — queremos so o anel
@@ -315,27 +307,27 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_arc_width(arcTemp, sw(10), LV_PART_INDICATOR);
   lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
 
-  lv_obj_t *lblTempHdr = lv_label_create(arcTemp);
-  lv_label_set_text(lblTempHdr, "TEMP");
-  lv_obj_set_style_text_color(lblTempHdr, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblTempHdr, FONT_CAPTION, 0);
-  lv_obj_align(lblTempHdr, LV_ALIGN_CENTER, 0, -arcSize / 4);
+  // Header (TEMP/pH/EC/FASE) + valor + unit — todos dinamicos via updateArcMode
+  lblArcHdr = lv_label_create(arcTemp);
+  lv_label_set_text(lblArcHdr, "TEMP");
+  lv_obj_set_style_text_color(lblArcHdr, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(lblArcHdr, FONT_CAPTION, 0);
+  lv_obj_align(lblArcHdr, LV_ALIGN_CENTER, 0, -arcSize / 4);
 
   lblTemp = lv_label_create(arcTemp);
   lv_label_set_text(lblTemp, "--");
   lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_text_font(lblTemp, FONT_VALUE, 0);
   lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
-  // (sem applyBloom no numero — glow so' nas bordas do arc/cards)
   lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
   lv_obj_set_style_shadow_width(arcTemp, 16, LV_PART_INDICATOR);
   lv_obj_set_style_shadow_opa(arcTemp, LV_OPA_60, LV_PART_INDICATOR);
 
-  lv_obj_t *lblTempUnit = lv_label_create(arcTemp);
-  lv_label_set_text(lblTempUnit, "°C");
-  lv_obj_set_style_text_color(lblTempUnit, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblTempUnit, FONT_CAPTION, 0);
-  lv_obj_align(lblTempUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
+  lblArcUnit = lv_label_create(arcTemp);
+  lv_label_set_text(lblArcUnit, "°C");
+  lv_obj_set_style_text_color(lblArcUnit, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(lblArcUnit, FONT_CAPTION, 0);
+  lv_obj_align(lblArcUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
 
   // Hint de tap-to-refresh: pequeno icone refresh-cw no canto inferior do
   // arc, dim por padrao. Sinaliza que o arc + card UMID sao tapaveis pra
@@ -366,8 +358,6 @@ static void buildHome(lv_obj_t *tab) {
     return ctr;
   };
   homeFaceA = makeFaceContainer();
-  homeFaceB = makeFaceContainer();
-  lv_obj_add_flag(homeFaceB, LV_OBJ_FLAG_HIDDEN);
 
   auto makeMiniCard = [&](lv_obj_t *parent, int yOffset, const char *label, const char *initVal,
                           uint32_t color, const lv_image_dsc_t *icon,
@@ -437,15 +427,15 @@ static void buildHome(lv_obj_t *tab) {
   lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_RED, &ic_droplets,   &sparkVpd,  &serVpdS,  933);
   lblPpfd = makeMiniCard(homeFaceA, (cardH + cardGap) * 2, "PPFD",    "--", COL_YEL, &ic_lightbulb,  &sparkPpfd, &serPpfdS,1866);
 
-  // Tap no card UMIDADE -> mesmo refresh handler que o arc TEMP
+  // Tap no card UMIDADE -> refresh-only (sem ciclar o arc), util pra
+  // forcar pull fresh sem mudar de modo. Sem placeholder "..." porque
+  // refresh costuma vir em ~1-2s e o flicker e' mais distrativo.
   lv_obj_t *cardRh = lv_obj_get_parent(lblRh);
   lv_obj_add_flag(cardRh, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(cardRh, [](lv_event_t *e) {
     (void)e;
     if (onRefresh && !isRefreshing) {
       isRefreshing = true;
-      lv_label_set_text(lblTemp, "...");
-      lv_label_set_text(lblRh,   "...");
       onRefresh();
     }
   }, LV_EVENT_CLICKED, NULL);
@@ -459,106 +449,89 @@ static void buildHome(lv_obj_t *tab) {
     lv_chart_set_next_value(sparkPpfd, serPpfdS, (int32_t)currentPpfd);
   }
 
-  // Face B — nutrientes (EC/pH) + ciclo. As sparklines destes dois cards
-  // ficam "mudas" por enquanto (sem historico mockado) — se quiser depois
-  // e so alimentar num timer igual as da face A.
-  static lv_obj_t *sparkEcHome = nullptr, *sparkPhHome = nullptr;
-  static lv_chart_series_t *serEcHome = nullptr, *serPhHome = nullptr;
-  lblEcHome = makeMiniCard(homeFaceB, 0,               "EC", "--", COL_PRP, &ic_test_tube, &sparkEcHome, &serEcHome, 0);
-  lblPhHome = makeMiniCard(homeFaceB, cardH + cardGap, "pH", "--", COL_GRN, &ic_beaker,    &sparkPhHome, &serPhHome, 933);
-  lv_chart_set_range(sparkEcHome, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
-  lv_chart_set_range(sparkPhHome, LV_CHART_AXIS_PRIMARY_Y, 40, 90);
-  for (int i = 0; i < 20; i++) {
-    lv_chart_set_next_value(sparkEcHome, serEcHome, (int32_t)(ecv * 10));
-    lv_chart_set_next_value(sparkPhHome, serPhHome, (int32_t)(phv * 10));
+  // Face B (EC/pH/ciclo) removida — esses dados agora aparecem no arc cycle.
+  // Aplica primeiro modo (TEMP) com os valores iniciais.
+  updateArcMode();
+}
+
+// Reconfigura arc + labels conforme arcMode (0=TEMP/1=pH/2=EC/3=FLORACAO).
+// Chamado em buildHome (load inicial), no tap handler (cycle), e em
+// refreshHomeValues (atualiza valor do modo atual com dados frescos).
+static void updateArcMode() {
+  if (!lblTemp || !arcTemp) return;
+  char buf[24];
+  uint32_t col = COL_GRN;
+  switch (arcMode) {
+    case 0: { // TEMP
+      lv_label_set_text(lblArcHdr, "TEMP");
+      lv_label_set_text(lblArcUnit, "\xC2\xB0""C");
+      snprintf(buf, sizeof(buf), "%.1f", tempC);
+      lv_label_set_text(lblTemp, buf);
+      col = cTemp(tempC);
+      lv_arc_set_range(arcTemp, 0, 40);
+      lv_arc_set_value(arcTemp, (int)tempC);
+      break;
+    }
+    case 1: { // pH
+      lv_label_set_text(lblArcHdr, "pH");
+      lv_label_set_text(lblArcUnit, "");
+      snprintf(buf, sizeof(buf), "%.1f", phv);
+      lv_label_set_text(lblTemp, buf);
+      // Faixa otima 5.5-6.5; fora vira amarelo p/ alerta visual
+      col = (phv < 5.5f || phv > 6.5f) ? COL_YEL : COL_CYN;
+      lv_arc_set_range(arcTemp, 0, 140);
+      lv_arc_set_value(arcTemp, (int)(phv * 10));
+      break;
+    }
+    case 2: { // EC
+      lv_label_set_text(lblArcHdr, "EC");
+      lv_label_set_text(lblArcUnit, "mS/cm");
+      snprintf(buf, sizeof(buf), "%.1f", ecv);
+      lv_label_set_text(lblTemp, buf);
+      col = COL_PRP;
+      lv_arc_set_range(arcTemp, 0, 40);  // EC * 10 (0-4.0 mS/cm)
+      lv_arc_set_value(arcTemp, (int)(ecv * 10));
+      break;
+    }
+    case 3: { // FLORACAO
+      lv_label_set_text(lblArcHdr, FASE);
+      snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
+      lv_label_set_text(lblArcUnit, buf);
+      char vbuf[8]; snprintf(vbuf, sizeof(vbuf), "%d", semana);
+      lv_label_set_text(lblTemp, vbuf);
+      col = COL_YEL;
+      int total = totalSem > 0 ? totalSem : 16;
+      lv_arc_set_range(arcTemp, 0, total);
+      lv_arc_set_value(arcTemp, semana);
+      break;
+    }
   }
-
-  // Card de ciclo (3o card da face B): layout especial — no lugar da
-  // sparkline vai a barra de progresso do ciclo (semana atual / total).
-  {
-    int yOff = (cardH + cardGap) * 2;
-    lv_obj_t *c = makeCard(homeFaceB, 0, yOff, cardW, cardH);
-    lv_obj_set_style_pad_all(c, sw(4), 0);
-    applyRingPulse(c, COL_GRN, 2800, 1866);
-
-    lv_obj_t *ico = lv_image_create(c);
-    lv_image_set_src(ico, &ic_sprout);
-    lv_obj_set_style_image_recolor(ico, lv_color_hex(COL_GRN), 0);
-    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, sh(2));
-
-    lv_obj_t *lb = lv_label_create(c);
-    lv_label_set_text(lb, FASE);
-    lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
-    lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
-    lv_obj_align(lb, LV_ALIGN_TOP_LEFT, sw(22), sh(4));
-
-    char ciclBuf[16];
-    snprintf(ciclBuf, sizeof(ciclBuf), "%d/%d", semana, totalSem);
-    lblCiclo = lv_label_create(c);
-    lv_label_set_text(lblCiclo, ciclBuf);
-    lv_obj_set_style_text_color(lblCiclo, lv_color_hex(COL_GRN), 0);
-    lv_obj_set_style_text_font(lblCiclo, FONT_TITLE, 0);
-    lv_obj_align(lblCiclo, LV_ALIGN_RIGHT_MID, 0, 0);
-    // sem bloom no numero — borda do card cuida do glow
-
-    // Barra de progresso no lugar da sparkline (mesmo footprint)
-    int barW = cardW - sw(60) - sw(6);
-    ciclBar = lv_bar_create(c);
-    lv_obj_set_size(ciclBar, barW, sh(6));
-    lv_obj_align(ciclBar, LV_ALIGN_BOTTOM_LEFT, 0, -sh(2));
-    lv_bar_set_range(ciclBar, 0, totalSem > 0 ? totalSem : 1);
-    lv_bar_set_value(ciclBar, semana, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_BORDER), 0);
-    lv_obj_set_style_bg_opa(ciclBar, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(ciclBar, sh(3), 0);
-    lv_obj_set_style_bg_color(ciclBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-    lv_obj_set_style_radius(ciclBar, sh(3), LV_PART_INDICATOR);
-    lv_obj_set_style_shadow_color(ciclBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-    lv_obj_set_style_shadow_width(ciclBar, 10, LV_PART_INDICATOR);
-    lv_obj_set_style_shadow_opa(ciclBar, LV_OPA_40, LV_PART_INDICATOR);
-  }
+  lv_obj_set_style_text_color(lblTemp, lv_color_hex(col), 0);
+  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(col), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(col), LV_PART_INDICATOR);
 }
 
 extern "C" void refreshHomeValues() {
   // Refresh trouxe valores frescos: limpa flag de tap-em-progresso
   isRefreshing = false;
   char buf[24];
-  snprintf(buf, sizeof(buf), "%.1f", tempC);
-  lv_label_set_text(lblTemp, buf);
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(cTemp(tempC)), 0);
-  if (arcTemp) lv_arc_set_value(arcTemp, (int)tempC);
 
+  // Arc principal: re-renderiza no modo atual com valores frescos
+  updateArcMode();
+
+  // Mini-cards laterais sempre visiveis
   snprintf(buf, sizeof(buf), "%.0f%%", rh);
   lv_label_set_text(lblRh, buf);
   lv_obj_set_style_text_color(lblRh, lv_color_hex(cRH(rh)), 0);
 
-  // VPD calculado via Tetens (0.6108 * e^(17.27T/(T+237.3)) * (1-RH/100)).
-  // Mantem paridade com a conta do web app; alimenta o mock timer.
   if (lblVpd) {
     snprintf(buf, sizeof(buf), "%.2f", vpd);
     lv_label_set_text(lblVpd, buf);
   }
-
   if (lblPpfd) {
     snprintf(buf, sizeof(buf), "%d", currentPpfd);
     lv_label_set_text(lblPpfd, buf);
   }
-
-  // Face B (escondida no primeiro load mas refresh nao custa nada)
-  if (lblEcHome) {
-    snprintf(buf, sizeof(buf), "%.1f", ecv);
-    lv_label_set_text(lblEcHome, buf);
-  }
-  if (lblPhHome) {
-    snprintf(buf, sizeof(buf), "%.1f", phv);
-    lv_label_set_text(lblPhHome, buf);
-  }
-  if (lblCiclo) {
-    snprintf(buf, sizeof(buf), "%d/%d", semana, totalSem);
-    lv_label_set_text(lblCiclo, buf);
-  }
-  if (ciclBar) lv_bar_set_value(ciclBar, semana, LV_ANIM_OFF);
 }
 
 // Timer de pulso: anima sparklines + arc pra simular monitor ao vivo
