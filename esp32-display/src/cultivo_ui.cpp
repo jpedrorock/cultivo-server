@@ -326,7 +326,7 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
   lv_obj_set_style_text_font(lblTemp, FONT_VALUE, 0);
   lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
-  applyBloom(lblTemp, COL_GRN);
+  // (sem applyBloom no numero — glow so' nas bordas do arc/cards)
   lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
   lv_obj_set_style_shadow_width(arcTemp, 16, LV_PART_INDICATOR);
   lv_obj_set_style_shadow_opa(arcTemp, LV_OPA_60, LV_PART_INDICATOR);
@@ -409,7 +409,7 @@ static void buildHome(lv_obj_t *tab) {
     lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
     lv_obj_set_style_text_font(v, FONT_TITLE, 0);
     lv_obj_align(v, LV_ALIGN_RIGHT_MID, 0, 0);
-    applyBloom(v, color);
+    // sem bloom no numero — card ja' tem ring-pulse + shadow
 
     lv_obj_t *ch = lv_chart_create(c);
     lv_obj_set_size(ch, sparkW, chartH);
@@ -500,7 +500,7 @@ static void buildHome(lv_obj_t *tab) {
     lv_obj_set_style_text_color(lblCiclo, lv_color_hex(COL_GRN), 0);
     lv_obj_set_style_text_font(lblCiclo, FONT_TITLE, 0);
     lv_obj_align(lblCiclo, LV_ALIGN_RIGHT_MID, 0, 0);
-    applyBloom(lblCiclo, COL_GRN);
+    // sem bloom no numero — borda do card cuida do glow
 
     // Barra de progresso no lugar da sparkline (mesmo footprint)
     int barW = cardW - sw(60) - sw(6);
@@ -679,7 +679,7 @@ static void buildLux(lv_obj_t *tab) {
   lv_label_set_text(lblLuxValue, "0");
   lv_obj_set_style_text_font(lblLuxValue, FONT_VALUE, 0);
   lv_obj_set_style_text_color(lblLuxValue, lv_color_hex(COL_GRN), 0);
-  applyBloom(lblLuxValue, COL_GRN);
+  // sem bloom no numero
 
   lblLuxUnit = lv_label_create(leftCol);
   lv_label_set_text(lblLuxUnit, "umol/s.m²");
@@ -811,7 +811,7 @@ static void buildPhEc(lv_obj_t *tab) {
     lv_obj_set_style_text_font(v, FONT_VALUE, 0);
     lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
     lv_obj_align(v, LV_ALIGN_CENTER, 0, -sh(4));
-    applyBloom(v, color);
+    // sem bloom no numero — card border ja' destaca
     *out = v;
 
     int btnSize = sh(30);

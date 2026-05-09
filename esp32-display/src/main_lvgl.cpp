@@ -1263,6 +1263,8 @@ static bool fetchDisplayData() {
   if (!doc["ec"].isNull())       ecv      = doc["ec"].as<float>();
   if (!doc["semana"].isNull())   semana   = doc["semana"].as<int>();
   if (!doc["totalSem"].isNull()) totalSem = doc["totalSem"].as<int>();
+  Serial.printf("[net] dados: T=%.1f RH=%.0f VPD=%.2f pH=%.1f EC=%.2f sem=%d/%d\n",
+                tempC, rh, vpd, phv, ecv, semana, totalSem);
   if (!doc["lux"].isNull())      currentLux  = doc["lux"].as<int>();
   if (!doc["ppfd"].isNull()) {
     currentPpfd = doc["ppfd"].as<int>();
