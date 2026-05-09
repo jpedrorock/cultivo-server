@@ -245,6 +245,115 @@ function TentSensorCard({ tentId }: { tentId: number }) {
   );
 }
 
+// ─── Pareamento ESP32 Display (RFC 8628 Device Authorization Grant) ─────────
+
+function PairDisplayCard({ tentId }: { tentId: number }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const cleaned = code.trim().toUpperCase();
+      // Aceita "MR4-K8X" ou "MR4K8X" (insere hifen no meio se faltar)
+      const normalized = cleaned.includes('-') ? cleaned : (cleaned.length === 6 ? cleaned.slice(0,3) + '-' + cleaned.slice(3) : cleaned);
+      const r = await fetch('/api/device/pair-claim', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: normalized, tentId }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || `Erro ${r.status}`);
+      setSuccess(true);
+      toast.success(`Display "${data.deviceName}" conectado!`);
+      setTimeout(() => { setOpen(false); setCode(''); setSuccess(false); }, 1500);
+    } catch (e: any) {
+      setError(e.message || 'Falha ao parear');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center">
+                <Monitor className="w-4 h-4 text-violet-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Display ESP32</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Conecte o display físico desta estufa
+                </CardDescription>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => { setOpen(true); setError(''); setSuccess(false); setCode(''); }}>
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Conectar
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <Dialog open={open} onOpenChange={(v) => { if (!submitting) setOpen(v); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conectar display ESP32</DialogTitle>
+            <DialogDescription>
+              No display, ligue o aparelho. Ele vai mostrar um código de 6 letras/números
+              (exemplo: <span className="font-mono font-bold">MR4-K8X</span>). Digite aqui:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <input
+              type="text"
+              value={code}
+              onChange={e => { setCode(e.target.value.toUpperCase()); setError(''); }}
+              placeholder="MR4-K8X"
+              maxLength={7}
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              disabled={submitting || success}
+              className="w-full bg-muted rounded-xl px-4 py-4 text-center text-2xl font-mono font-bold tracking-widest text-foreground outline-none placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            />
+
+            {error && (
+              <p className="text-sm text-red-500 text-center">{error}</p>
+            )}
+            {success && (
+              <p className="text-sm text-emerald-500 text-center font-medium">✓ Display conectado!</p>
+            )}
+
+            <p className="text-[11px] text-muted-foreground text-center">
+              O código vale por 10 minutos. Se expirar, é só reiniciar o display que ele gera outro.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>Cancelar</Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || success || code.replace('-', '').length < 6}
+            >
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Conectando...</> : 'Conectar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function TentDetails() {
   const { id } = useParams<{ id: string }>();
   const tentId = parseInt(id || "0");
@@ -1008,6 +1117,9 @@ export default function TentDetails() {
 
         {/* Sensor SmartLife */}
         <TentSensorCard tentId={tentId} />
+
+        {/* Display ESP32 (pareamento) */}
+        <PairDisplayCard tentId={tentId} />
 
         {/* Plantas — sempre visível */}
         <TentPlantsTab tentId={tentId} tentName={tent.name} />

@@ -527,6 +527,28 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // Pareamento estilo OAuth 2.0 Device Authorization Grant (RFC 8628):
+    // ESP32 chama /pair-init → recebe código curto → mostra na tela
+    // User digita esse código no app web → backend vincula ao tentId
+    // ESP32 polla /pair-status → recebe deviceToken longo
+    id: 'create-devicePairingCodes',
+    description: 'Cria tabela devicePairingCodes (RFC 8628 device pairing flow)',
+    run: async (c) => {
+      await c.query(`
+        CREATE TABLE IF NOT EXISTS \`devicePairingCodes\` (
+          \`code\`           VARCHAR(8) PRIMARY KEY,
+          \`deviceName\`     VARCHAR(100) NOT NULL DEFAULT 'ESP32 display',
+          \`createdAt\`      TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          \`expiresAt\`      TIMESTAMP NOT NULL,
+          \`claimedByUserId\` INT NULL,
+          \`tentId\`         INT NULL,
+          \`generatedToken\` VARCHAR(64) NULL,
+          INDEX \`idx_devicePairingCodes_expires\` (\`expiresAt\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
