@@ -43,6 +43,19 @@ extern int   currentLux, currentPpfd, targetPpfd, luxMode;
 // Exposto pra firmware decidir se vale fetchar dados da aba atual.
 extern int activeScreen;
 
+// ── Histórico — buffers preenchidos pelo app via fetchHistoryAll ──────────────
+// 24 amostras de 4 metricas (24h por default). App escreve ASCending por tempo
+// (mais antigo no idx 0, mais novo no idx 23). histCount = quantos pontos
+// validos (ate' 24); restantes sao ignorados pela UI.
+#define HIST_POINTS 24
+extern float histTemp[HIST_POINTS];
+extern float histRh  [HIST_POINTS];
+extern float histPh  [HIST_POINTS];
+extern float histEc  [HIST_POINTS];
+extern int   histCount;  // quantos pontos validos (>=1, max HIST_POINTS)
+// Trigger refresh do chart quando o app preencher os arrays.
+void cultivoUI_applyHistory(void);
+
 // ── Build entry point ─────────────────────────────────────────────────────────
 void buildCultivoUI(void);
 

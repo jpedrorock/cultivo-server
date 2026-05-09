@@ -1475,6 +1475,60 @@ static inline void logIfSlow(const char *label, uint32_t t0, uint32_t thresholdM
   if (dt > thresholdMs) Serial.printf("[net] WARN %s lento: %ums\n", label, dt);
 }
 
+// Histórico — preenche os 4 buffers em cultivo_ui (histTemp/Rh/Ph/Ec, max 24
+// pontos cada) a partir de /api/device/history-all. Server retorna ate' 60
+// pontos ASC por tempo; usamos os ultimos 24 (mais recentes -> direita do chart).
+static volatile bool histNeedsRefresh = false;
+static unsigned long lastHistFetch = 0;
+static const unsigned long HIST_FETCH_INTERVAL = 5UL * 60UL * 1000UL;  // 5 min
+
+static bool fetchHistoryAll(const char *period = "24h") {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/history-all/%d?period=%s",
+           SERVER_URL, TENT_ID, period);
+  httpBegin(http, url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(8000);
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[net] history-all HTTP %d\n", code);
+    http.end();
+    return false;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return false;
+
+  // Helper: copia ate' 24 ULTIMOS pontos do array doc[key] pro buffer destino.
+  // Retorna a quantidade copiada.
+  auto copyTail = [&](const char *key, float *dst) -> int {
+    JsonArray arr = doc[key].as<JsonArray>();
+    int total = arr.size();
+    if (total <= 0) return 0;
+    int take = total > HIST_POINTS ? HIST_POINTS : total;
+    int skip = total - take;
+    int i = 0;
+    int j = 0;
+    for (JsonVariant v : arr) {
+      if (j >= skip) dst[i++] = v.as<float>();
+      j++;
+    }
+    return take;
+  };
+
+  int n = copyTail("temp", histTemp);
+  copyTail("rh", histRh);
+  copyTail("ph", histPh);
+  copyTail("ec", histEc);
+  histCount = n;  // todos os 4 buffers tem mesmo count (server le mesmas rows)
+  Serial.printf("[net] history-all: %d pontos carregados\n", n);
+  histNeedsRefresh = true;
+  return true;
+}
+
 static void netTaskFn(void *param) {
   for (;;) {
     if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
@@ -1492,6 +1546,14 @@ static void netTaskFn(void *param) {
       uint32_t t0 = millis();
       if (fetchDisplayData()) uiNeedsRefresh = true;
       logIfSlow("fetchDisplay", t0, 6000);
+    }
+
+    // Hist refresh menos frequente — dailyLogs muda no maximo cada hora
+    if (millis() - lastHistFetch >= HIST_FETCH_INTERVAL) {
+      lastHistFetch = millis();
+      uint32_t t0 = millis();
+      fetchHistoryAll("24h");
+      logIfSlow("history-all", t0, 6000);
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -1847,7 +1909,10 @@ void setup() {
   if (wifiOk) {
     // Fetch inicial no thread principal — garante dados prontos antes de mostrar UI
     fetchDisplayData();
-    lastFetch = millis();
+    fetchHistoryAll("24h");  // chart de Hist tem dados ja' no primeiro draw
+    cultivoUI_applyHistory();  // aplica imediato (LVGL ja' construido)
+    lastFetch     = millis();
+    lastHistFetch = millis();
     refreshHomeValues();
     // Dai em diante HTTP roda em background, loop() fica livre pra UI
     startNetTask();
@@ -1870,6 +1935,10 @@ void loop() {
   if (uiNeedsRefresh) {
     uiNeedsRefresh = false;
     refreshHomeValues();
+  }
+  if (histNeedsRefresh) {
+    histNeedsRefresh = false;
+    cultivoUI_applyHistory();
   }
 
   // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI

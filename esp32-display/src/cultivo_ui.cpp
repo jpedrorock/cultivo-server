@@ -948,8 +948,18 @@ static void buildTarefas(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Tela Historico — chart + botoes de metrica (temp/rh/ph/ec) e periodo
+// Tela Historico — chart + botoes de metrica (temp/rh/ph/ec)
+// Dados reais do server via fetchHistoryAll (firmware) ou mock (sim).
+// Buffers preenchidos pelo app, UI le e renderiza no applyHistData.
 // ════════════════════════════════════════════════════════════════════════════════
+extern "C" {
+  float histTemp[HIST_POINTS] = {0};
+  float histRh  [HIST_POINTS] = {0};
+  float histPh  [HIST_POINTS] = {0};
+  float histEc  [HIST_POINTS] = {0};
+  int   histCount = 0;  // 0 = sem dados ainda
+}
+
 static lv_obj_t *histChart = nullptr;
 static lv_chart_series_t *histSer = nullptr;
 static int histMetric = 0;  // 0=temp, 1=rh, 2=ph, 3=ec
@@ -958,31 +968,25 @@ static const struct {
   const char *name;
   uint32_t color;
   int ymin, ymax;
-  float base, amp;
+  // Multiplicador p/ converter float -> int do chart (LVGL chart usa int).
+  // pH/EC vao em decimo (6.2 -> 62), tempC/rh inteiro.
+  float scale;
+  // Origem do array (escolhido por idx em applyHistData).
 } HIST_METRICS[4] = {
-  {"TEMP", COL_GRN, 15, 32,  24.0f, 3.0f},
-  {"UMID", COL_CYN, 40, 85,  62.0f, 8.0f},
-  {"pH",   COL_GRN, 40, 90,  62.0f, 5.0f},   // pH * 10
-  {"EC",   COL_PRP,  0, 40,  18.0f, 4.0f},   // EC * 10
+  {"TEMP", COL_GRN, 15, 35,  1.0f},
+  {"UMID", COL_CYN,  0, 100, 1.0f},
+  {"pH",   COL_GRN, 40, 90,  10.0f},   // pH * 10 (5.5-7.5 -> 55-75)
+  {"EC",   COL_PRP,  0, 40,  10.0f},   // EC * 10 (0-4.0 mS/cm)
 };
 
-// Fase global da animacao — incrementa no histAnimTick; aqui e no
-// preenchimento inicial usamos o mesmo valor pra nao dar "pulo" quando
-// o timer comeca a atuar.
-static float histPhase = 0.0f;
-
-// Calcula o valor de cada sample misturando 2 frequencias de sin (um
-// harmonico suave + um mais rapido com amplitude menor). Sozinho o
-// sin(i*k + phase) repete com aparencia "senoidal pura"; somando outra
-// frequencia com fase propria vira uma ondulacao com cara de voz/sinal.
-static inline float histSampleValue(int i, int metric, float phase) {
-  auto &m = HIST_METRICS[metric];
-  float base = m.base;
-  float a    = m.amp * 0.55f;   // harmonico principal
-  float b    = m.amp * 0.28f;   // detalhe
-  return base
-       + sinf(i * 0.35f + phase + metric) * a
-       + sinf(i * 0.11f + phase * 0.6f)    * b;
+static const float *histArrayFor(int metric) {
+  switch (metric) {
+    case 0: return histTemp;
+    case 1: return histRh;
+    case 2: return histPh;
+    case 3: return histEc;
+  }
+  return histTemp;
 }
 
 static void applyHistData() {
@@ -991,25 +995,26 @@ static void applyHistData() {
   lv_chart_set_range(histChart, LV_CHART_AXIS_PRIMARY_Y, m.ymin, m.ymax);
   lv_obj_set_style_line_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_INDICATOR);
-  for (int i = 0; i < 24; i++) {
-    lv_chart_set_value_by_id(histChart, histSer, i,
-      (int32_t)histSampleValue(i, histMetric, histPhase));
+
+  const float *arr = histArrayFor(histMetric);
+  // histCount = pontos validos. Resto dos 24 fica como LV_CHART_POINT_NONE
+  // pra LVGL pular. Empurramos os validos pelos ULTIMOS slots (mais recentes
+  // a direita do chart) — slot 23 = mais novo, slot 0 = mais antigo OU vazio.
+  int valid = histCount > HIST_POINTS ? HIST_POINTS : histCount;
+  int pad   = HIST_POINTS - valid;  // slots vazios a esquerda
+  for (int i = 0; i < HIST_POINTS; i++) {
+    if (i < pad) {
+      lv_chart_set_value_by_id(histChart, histSer, i, LV_CHART_POINT_NONE);
+    } else {
+      lv_chart_set_value_by_id(histChart, histSer, i,
+        (int32_t)(arr[i - pad] * m.scale));
+    }
   }
   lv_chart_refresh(histChart);
 }
 
-// Timer de animacao da onda — avanca a fase e re-escreve os 24 pontos.
-// So trabalha quando a tela Historico esta ativa (activeScreen==4) pra
-// nao comer CPU do ESP32 enquanto o usuario esta em outra tela.
-static void histAnimTick(lv_timer_t *t) {
-  (void)t;
-  if (activeScreen != 4 || !histChart || !histSer) return;
-  histPhase += 0.16f;
-  for (int i = 0; i < 24; i++) {
-    lv_chart_set_value_by_id(histChart, histSer, i,
-      (int32_t)histSampleValue(i, histMetric, histPhase));
-  }
-  lv_chart_refresh(histChart);
+extern "C" void cultivoUI_applyHistory(void) {
+  applyHistData();
 }
 
 static lv_obj_t *histMetricBtns[4] = {nullptr};
@@ -1286,8 +1291,8 @@ extern "C" void buildCultivoUI(void) {
 
   // pulse das sparklines (visual): 300ms; vale tanto pra sim quanto firmware
   pulseTimer = lv_timer_create(pulseTimerCb, 300, NULL);
-  // Onda sonora do Historico: ~12fps, early-return se nao esta na tela.
-  lv_timer_create(histAnimTick, 80, NULL);
+  // Histórico nao tem mais wave-anim mockada — chart redesenha so' quando
+  // chegam dados reais novos do server (cultivoUI_applyHistory).
 
 #ifdef CULTIVO_SIM
   // Mock dos sensores so' no sim. No firmware quem alimenta tempC/rh/etc
