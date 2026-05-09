@@ -816,18 +816,96 @@ static void handlePortalSave() {
 
 // Recovery de firmware via AP portal — util quando OTA comum nao e' viavel
 // (nao ha' internet, mDNS bloqueado, etc). Upload de .bin direto pro flash.
-static const char PORTAL_UPDATE_HTML[] PROGMEM = R"HTML(
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cultivo Update</title>
-<style>body{background:#0b0f14;color:#e2e8f0;font-family:system-ui;padding:20px;max-width:480px;margin:0 auto}
-h1{color:#22c55e}button{background:#22c55e;color:#000;border:0;padding:12px 20px;border-radius:8px;font-weight:700;width:100%;margin-top:12px}
-input[type=file]{color:#e2e8f0;width:100%;padding:8px;border:1px solid #475569;border-radius:6px;background:#1e293b}
-p{color:#94a3b8;font-size:14px}</style></head><body>
-<h1>Firmware Update</h1>
-<p>Selecione o arquivo <code>firmware.bin</code> (tipicamente em <code>.pio/build/real/firmware.bin</code>).</p>
-<form method="POST" enctype="multipart/form-data" action="/update"><input type="file" name="fw" accept=".bin" required><button type="submit">Enviar</button></form>
-<p><a href="/" style="color:#22c55e">← Voltar</a></p></body></html>
-)HTML";
+static const char PORTAL_UPDATE_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cultivo &mdash; Recovery</title><style>
+:root{
+  --bg:#0B0F14;--card:#111827;--border:#1F2937;
+  --fg:#F8FAFC;--fg-dim:#94A3B8;--fg-mute:#64748B;
+  --green:#10B981;--green-soft:#34D399;--green-glow:rgba(16,185,129,.35);
+  --amber:#FBBF24;--amber-soft:#FCD34D;--amber-bg:rgba(251,191,36,.06);
+  --r-md:10px;--r-lg:12px;
+}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);min-height:100vh;
+  font-family:'Geist','Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  letter-spacing:-0.01em;max-width:460px;margin:0 auto;padding:24px 20px 40px}
+header{text-align:center;padding:14px 0 10px}
+.icon{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;
+  border-radius:50%;background:linear-gradient(135deg,#10B98122,#10B98108);
+  box-shadow:0 0 24px var(--green-glow),inset 0 0 0 1px #10B98140}
+.icon svg{stroke:var(--green-soft);stroke-width:2;stroke-linecap:round;
+  stroke-linejoin:round;fill:none;width:26px;height:26px}
+h1{color:var(--fg);font-weight:700;font-size:22px;letter-spacing:-0.02em;
+  margin:14px 0 4px;line-height:1.2}
+.subtitle{color:var(--fg-dim);font-size:13px;margin:0 0 18px;line-height:1.5}
+.warn{background:var(--amber-bg);border:1px solid #92400E55;border-left:3px solid var(--amber);
+  padding:12px 14px;border-radius:var(--r-md);margin:0 0 16px;
+  color:var(--amber-soft);font-size:12.5px;line-height:1.5;text-align:left}
+.warn b{color:var(--amber)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:18px 16px}
+label{display:block;color:var(--fg-dim);font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px}
+.filebox{position:relative;display:block;border:1.5px dashed var(--border);
+  border-radius:var(--r-md);padding:24px 16px;text-align:center;
+  background:#0B1220;cursor:pointer;
+  transition:border-color .15s ease,background .15s ease}
+.filebox:hover{border-color:#334155}
+.filebox.active{border-color:var(--green);border-style:solid;
+  background:#0F2D24;box-shadow:0 0 0 3px var(--green-glow)}
+.filebox input[type=file]{position:absolute;inset:0;width:100%;height:100%;
+  opacity:0;cursor:pointer}
+.fname{color:var(--fg);font-size:14px;font-weight:600;word-break:break-all;
+  margin-bottom:4px}
+.fhint{color:var(--fg-mute);font-size:12px;line-height:1.5}
+.fhint code{background:#1F2937;padding:2px 6px;border-radius:4px;
+  font-family:ui-monospace,SF Mono,Menlo,monospace;font-size:11.5px}
+button{width:100%;padding:14px;background:var(--green);color:#031712;border:none;
+  border-radius:var(--r-md);font-size:14px;font-weight:700;margin-top:16px;cursor:pointer;
+  letter-spacing:0.04em;text-transform:uppercase;font-family:inherit;
+  box-shadow:0 0 22px var(--green-glow),inset 0 1px 0 rgba(255,255,255,.18);
+  transition:transform .1s ease,box-shadow .15s ease,opacity .15s ease}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+.footer{margin-top:20px;text-align:center}
+.footer a{color:var(--fg-mute);font-size:13px;text-decoration:none;
+  border-bottom:1px dashed #334155;padding-bottom:1px}
+.footer a:hover{color:var(--green-soft);border-color:var(--green)}
+</style></head><body>
+<header>
+<div class="icon"><svg viewBox="0 0 24 24"><path d="M12 16V4"/><polyline points="6 10 12 4 18 10"/><path d="M4 20h16"/></svg></div>
+<h1>Recovery</h1>
+<p class="subtitle">Atualizar firmware do dispositivo</p>
+</header>
+<div class="warn"><b>Aten&ccedil;&atilde;o:</b> envie apenas o arquivo <code>firmware.bin</code> gerado pelo PlatformIO. Um arquivo errado pode brickar o dispositivo. Em caso de falha, restaure pelo backup com esptool.</div>
+<form method="POST" enctype="multipart/form-data" action="/update" class="card" id="form">
+<label for="fw">Arquivo de firmware</label>
+<label class="filebox" id="filebox">
+<input type="file" id="fw" name="fw" accept=".bin" required>
+<div class="fname" id="fname">Toque aqui para selecionar</div>
+<div class="fhint">arquivo <code>.bin</code> &middot; tipicamente em <code>.pio/build/real/firmware.bin</code></div>
+</label>
+<button type="submit" id="btn" disabled>Enviar firmware</button>
+</form>
+<div class="footer"><a href="/">&larr; Voltar para o setup</a></div>
+<script>
+const fw=document.getElementById('fw'),fname=document.getElementById('fname'),
+  box=document.getElementById('filebox'),btn=document.getElementById('btn'),
+  form=document.getElementById('form');
+fw.addEventListener('change',()=>{
+  if(fw.files.length){
+    const f=fw.files[0],kb=(f.size/1024).toFixed(0);
+    fname.textContent=f.name+' &middot; '+kb+' KB';
+    box.classList.add('active');btn.disabled=false;
+  }else{
+    fname.textContent='Toque aqui para selecionar';
+    box.classList.remove('active');btn.disabled=true;
+  }
+});
+form.addEventListener('submit',()=>{btn.disabled=true;btn.textContent='Enviando...';});
+</script></body></html>)HTML";
 
 static void handlePortalUpdateGet() {
   apServer->send_P(200, "text/html", PORTAL_UPDATE_HTML);
