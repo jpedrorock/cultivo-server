@@ -191,33 +191,34 @@ static volatile bool uiNeedsRefresh = false;
 // Display + touch callbacks (LVGL v9 API)
 // ════════════════════════════════════════════════════════════════════════════════
 // Rotacao 270deg do framebuffer LVGL (480x320 landscape) p/ canvas portrait
-// (320x480). Cache blocking 32x32 + IRAM_ATTR — ~3-4x speedup vs loop ingenuo
-// (22ms -> 6-9ms, mas em FULL mode com overhead PSRAM efetivo ~22ms/frame).
-// physical(px, py) = (ly, 479 - lx) — rotation 270 inverse.
-static IRAM_ATTR void rotate_270_to_canvas(const uint16_t *__restrict__ src,
-                                           uint16_t *__restrict__ dst,
-                                           int LW, int LH) {
-  constexpr int BLOCK = 32;
-  for (int by = 0; by < LH; by += BLOCK) {
-    int y_end = (by + BLOCK < LH) ? by + BLOCK : LH;
-    for (int bx = 0; bx < LW; bx += BLOCK) {
-      int x_end = (bx + BLOCK < LW) ? bx + BLOCK : LW;
-      for (int ly = by; ly < y_end; ly++) {
-        const uint16_t *src_row = src + ly * LW;
-        for (int lx = bx; lx < x_end; lx++) {
-          dst[((LW - 1 - lx) * 320) + ly] = src_row[lx];
-        }
-      }
-    }
-  }
-}
-
+// (320x480). lv_draw_sw_rotate() da LVGL (otimizada upstream — usado pelos
+// drivers SDL, Linux fbdev, Renesas). Substitui o loop manual com cache
+// blocking. Mesmas mecanicas mas mantida pela equipe LVGL.
 static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
   uint32_t w = area->x2 - area->x1 + 1;
   uint32_t h = area->y2 - area->y1 + 1;
 #ifdef REAL_HARDWARE
-  rotate_270_to_canvas((uint16_t*)px_map, canvas->getFramebuffer(), (int)w, (int)h);
+  static uint32_t frameN = 0, sumRotUs = 0, sumPushUs = 0;
+  uint32_t t0 = micros();
+  // src: LVGL render buf (LW=480 LH=320 landscape, RGB565 = 2 bytes/px)
+  // dst: canvas framebuffer (PW=320 PH=480 portrait)
+  lv_draw_sw_rotate(px_map, canvas->getFramebuffer(),
+                    (int32_t)w, (int32_t)h,
+                    (int32_t)(w * 2),    // src_stride
+                    320 * 2,              // dest_stride (canvas width * bpp)
+                    LV_DISPLAY_ROTATION_270,
+                    LV_COLOR_FORMAT_RGB565);
+  uint32_t t1 = micros();
   canvas->flush();
+  uint32_t t2 = micros();
+  sumRotUs += (t1 - t0); sumPushUs += (t2 - t1);
+  if (++frameN >= 60) {
+    Serial.printf("[perf] rot=%lu push=%lu total=%lu ~%lu fps\n",
+                  (unsigned long)(sumRotUs/60), (unsigned long)(sumPushUs/60),
+                  (unsigned long)((sumRotUs+sumPushUs)/60),
+                  (unsigned long)(60000000ull/(sumRotUs+sumPushUs)));
+    frameN = 0; sumRotUs = 0; sumPushUs = 0;
+  }
 #else
   hal_push_pixels(area->x1, area->y1, w, h, (uint16_t*)px_map);
 #endif
