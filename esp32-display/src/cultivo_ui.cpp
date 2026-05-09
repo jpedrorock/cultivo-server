@@ -88,18 +88,20 @@ extern "C" void cultivoUI_setRefreshing(bool active) {
 // ════════════════════════════════════════════════════════════════════════════════
 // Widgets compartilhados entre screens (idem main_lvgl.cpp)
 // ════════════════════════════════════════════════════════════════════════════════
-static lv_obj_t *contentArea;
-static lv_obj_t *screenHome, *screenLux, *screenPhEc, *screenTarefa, *screenGrafic;
-static lv_obj_t *navbar;
-static lv_obj_t *navIcons[5];
-int activeScreen = 0;
-// Ordem da navbar: Home / Lux / pH-EC / Hist / Cenas
-// Histórico fica antes de Cenas — leitura natural (dados primeiro, acoes
-// depois). idx 3 = Hist (era Cenas), idx 4 = Cenas (era Hist).
-static const uint32_t NAV_COLORS[5] = { COL_GRN, COL_YEL, COL_PRP, COL_CYN, 0xFBBF24 };
-static const lv_image_dsc_t *NAV_ICONS_IMG[5] = {
-  &ic_home, &ic_lightbulb, &ic_flask, &ic_activity, &ic_zap
+// Navbar 3 tabs apos remocao de Lux/PhEc: Home / Hist / Cenas
+// (registro de PPFD/pH/EC vai pelo app mobile, ESP nao precisa desses menus)
+#define NAV_COUNT 3
+static const uint32_t NAV_COLORS[NAV_COUNT] = { COL_GRN, COL_CYN, 0xFBBF24 };
+static const lv_image_dsc_t *NAV_ICONS_IMG[NAV_COUNT] = {
+  &ic_home, &ic_activity, &ic_zap
 };
+
+static lv_obj_t *contentArea;
+static lv_obj_t *screenHome, *screenTarefa, *screenGrafic;
+static lv_obj_t *screenLux = nullptr, *screenPhEc = nullptr;  // legacy refs
+static lv_obj_t *navbar;
+static lv_obj_t *navIcons[NAV_COUNT];
+int activeScreen = 0;
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
 static lv_obj_t *lblTemp, *lblRh, *lblVpd, *lblPpfd;
@@ -514,7 +516,15 @@ static void updateArcMode() {
 extern "C" void refreshHomeValues() {
   // Refresh trouxe valores frescos: limpa flag de tap-em-progresso
   isRefreshing = false;
-  char buf[24];
+  char buf[64];
+
+  // Header: nome da estufa + fase/semana — vinham do server mas nao eram
+  // re-aplicados depois do load inicial (bug). Agora sincroniza a cada refresh.
+  if (lblTitle) lv_label_set_text(lblTitle, TENT_NAME);
+  if (lblSub) {
+    snprintf(buf, sizeof(buf), "Sem %d/%d  %s", semana, totalSem, FASE);
+    lv_label_set_text(lblSub, buf);
+  }
 
   // Arc principal: re-renderiza no modo atual com valores frescos
   updateArcMode();
@@ -998,6 +1008,8 @@ static void applyHistData() {
   lv_chart_set_range(histChart, LV_CHART_AXIS_PRIMARY_Y, m.ymin, m.ymax);
   lv_obj_set_style_line_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_INDICATOR);
+  // Pulse outline segue a metrica ativa
+  lv_obj_set_style_outline_color(histChart, lv_color_hex(m.color), 0);
 
   const float *arr = histArrayFor(histMetric);
   // histCount = pontos validos. Resto dos 24 fica como LV_CHART_POINT_NONE
@@ -1072,6 +1084,10 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(histChart, sw(6), 0);
   histSer = lv_chart_add_series(histChart, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
 
+  // Pulse "live" — outline do chart pulsando opacity, igual aos cards Home.
+  // Cor segue a metrica ativa (re-aplicada em applyHistData).
+  applyRingPulse(histChart, HIST_METRICS[0].color, 3500, 0);
+
   // Botoes de metrica (bottom) — so o ativo acende; inativos ficam "neutros"
   // com border COL_BORDER e texto COL_DIM, senao todos parecem selecionados.
   int btnGap = sw(8);
@@ -1104,7 +1120,7 @@ static void buildHistorico(lv_obj_t *tab) {
 // Navbar + troca de tela (fade) — identico ao main_lvgl.cpp
 // ════════════════════════════════════════════════════════════════════════════════
 static void navSetActive(int idx) {
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < NAV_COUNT; i++) {
     bool sel = (i == idx);
     lv_obj_set_style_image_recolor(navIcons[i],
       lv_color_hex(sel ? NAV_COLORS[i] : COL_DIM), 0);
@@ -1114,11 +1130,11 @@ static void navSetActive(int idx) {
 
 static void switchScreen(int idx) {
   if (idx == activeScreen) return;
-  // Ordem dos screens deve casar com NAV_ICONS_IMG: 3=Hist, 4=Cenas
-  lv_obj_t *screens[5] = {
-    screenHome, screenLux, screenPhEc, screenGrafic, screenTarefa
+  // 3 tabs: Home / Hist / Cenas
+  lv_obj_t *screens[NAV_COUNT] = {
+    screenHome, screenGrafic, screenTarefa
   };
-  if (idx < 0 || idx >= 5) return;
+  if (idx < 0 || idx >= NAV_COUNT) return;
 
   lv_obj_add_flag(screens[activeScreen], LV_OBJ_FLAG_HIDDEN);
   lv_obj_clear_flag(screens[idx], LV_OBJ_FLAG_HIDDEN);
@@ -1157,8 +1173,8 @@ static void buildNavbar(lv_obj_t *parent) {
   lv_obj_set_style_pad_all(navbar, 0, 0);
   lv_obj_clear_flag(navbar, LV_OBJ_FLAG_SCROLLABLE);
 
-  int btnW = SCREEN_W / 5;
-  for (int i = 0; i < 5; i++) {
+  int btnW = SCREEN_W / NAV_COUNT;
+  for (int i = 0; i < NAV_COUNT; i++) {
     lv_obj_t *btn = lv_obj_create(navbar);
     lv_obj_set_size(btn, btnW, TABBAR_H);
     lv_obj_set_pos(btn, i * btnW, 0);
@@ -1276,16 +1292,14 @@ extern "C" void buildCultivoUI(void) {
   };
 
   screenHome   = makeScreen();
-  screenLux    = makeScreen();
-  screenPhEc   = makeScreen();
   screenTarefa = makeScreen();
   screenGrafic = makeScreen();
+  // screenLux/PhEc nao construidas — registro vai pelo app mobile.
 
   buildHome(screenHome);
-  buildLux(screenLux);
-  buildPhEc(screenPhEc);
   buildTarefas(screenTarefa);
   buildHistorico(screenGrafic);
+  // buildLux/PhEc nao chamados (telas removidas — registro vai pelo app)
 
   lv_obj_clear_flag(screenHome, LV_OBJ_FLAG_HIDDEN);
   buildNavbar(scr);
