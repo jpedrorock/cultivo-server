@@ -202,11 +202,15 @@ static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
   uint32_t t0 = micros();
   // src: LVGL render buf (LW=480 LH=320 landscape, RGB565 = 2 bytes/px)
   // dst: canvas framebuffer (PW=320 PH=480 portrait)
+  // LVGL ROTATION_270 e' direcao oposta da nossa rotacao manual antiga;
+  // ROTATION_90 reproduz o mesmo mapping pixel-a-pixel:
+  //   src (lx, ly) -> dst (ly, LW-1-lx)  (matches manual rotate_270_to_canvas)
+  // Touch mapping em hal_map_touch foi calibrado p/ esse layout, manter aqui.
   lv_draw_sw_rotate(px_map, canvas->getFramebuffer(),
                     (int32_t)w, (int32_t)h,
                     (int32_t)(w * 2),    // src_stride
                     320 * 2,              // dest_stride (canvas width * bpp)
-                    LV_DISPLAY_ROTATION_270,
+                    LV_DISPLAY_ROTATION_90,
                     LV_COLOR_FORMAT_RGB565);
   uint32_t t1 = micros();
   canvas->flush();
