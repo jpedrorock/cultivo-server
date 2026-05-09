@@ -56,6 +56,18 @@ extern int   histCount;  // quantos pontos validos (>=1, max HIST_POINTS)
 // Trigger refresh do chart quando o app preencher os arrays.
 void cultivoUI_applyHistory(void);
 
+// ── Cenas dinamicas (preenchidas pelo app via fetchScenes) ───────────────────
+// O app chama cultivoUI_applyScenes(names, count) depois de buscar do server
+// (GET /api/device/scenes). UI rebuilda o grid mostrando ate' 6 cenas reais
+// (2 fileiras x 3 colunas). Se count == 0 (sem config Tuya / server offline),
+// grid mostra placeholder.
+// Names sao copiados internamente — nao precisa manter ponteiros vivos.
+// onSceneTrigger(idx) e' chamado quando user toca botao; idx mapeia 1:1 ao
+// array de names; app le' do seu proprio storage de IDs e dispara via
+// /api/device/scene-by-id/<id>/trigger.
+#define SCENES_MAX 6
+void cultivoUI_applyScenes(const char *names[], int count);
+
 // ── Build entry point ─────────────────────────────────────────────────────────
 void buildCultivoUI(void);
 

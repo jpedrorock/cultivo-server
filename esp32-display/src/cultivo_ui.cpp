@@ -840,45 +840,43 @@ static void buildPhEc(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Tela CENAS — atalhos pra triggers Tuya: irrigar, luz off, custom.
-// Substitui Tarefas (registro de rega nao precisa no ESP, so' acionamento
-// remoto). Botoes grandes (~80px), feedback visual ao tocar (pulse).
-// onSceneTrigger(sceneId) callback chamado pelo app — IDs atuais:
-//   0 = IRRIGAR    (acionar bomba/valvula via cena Tuya)
-//   1 = LUZ_OFF    (desligar luz LED da estufa)
-//   2 = CUSTOM     (cena reservada p/ futura config)
+// Tela CENAS — atalhos pra triggers Tuya. Cenas vem dinamicas do server via
+// GET /api/device/scenes (pega da Tuya Cloud da conta do user). App chama
+// cultivoUI_applyScenes(names, count) e UI rebuilda o grid 2x3 (max 6 cenas).
+// onSceneTrigger(idx) → app dispara via /api/device/scene-by-id/<id>/trigger.
+// Quando count == 0 (offline / sem Tuya), mostra placeholder textual.
 // ════════════════════════════════════════════════════════════════════════════════
-struct SceneBtn {
-  const char *label;
+// Paleta cycling — cenas nao tem icone/cor no payload, entao gerados por idx
+// pra dar variedade visual. 6 entries (igual SCENES_MAX) garante um por slot.
+static const struct {
   uint32_t color;
   const lv_image_dsc_t *icon;
+} SCENE_PALETTE[SCENES_MAX] = {
+  { COL_CYN, &ic_droplet     },  // 0
+  { COL_YEL, &ic_lightbulb   },  // 1
+  { COL_GRN, &ic_sprout      },  // 2
+  { COL_BLU, &ic_activity    },  // 3
+  { COL_PRP, &ic_flask       },  // 4
+  { COL_RED, &ic_thermometer },  // 5
 };
 
-// 12 slots fixos (sceneId == idx do array). Server mapeia cada slot p/ cena
-// Tuya real via env var TUYA_SCENE_<idx>=<sceneId> ou <homeId>:<sceneId>.
-// Labels/icones aqui sao defaults — usuario edita no firmware se quiser
-// renomear. iOS-style 2x6 grid de atalhos rapidos.
-static const SceneBtn SCENES[] = {
-  { "Irrigar",  COL_CYN, &ic_droplet     },  // 0
-  { "Luz On",   COL_YEL, &ic_lightbulb   },  // 1
-  { "Luz Off",  COL_DIM, &ic_lightbulb   },  // 2
-  { "Exaustor", COL_BLU, &ic_activity    },  // 3
-  { "Umid",     COL_CYN, &ic_droplets    },  // 4
-  { "AC",       COL_RED, &ic_thermometer },  // 5
-  { "CO2",      COL_GRN, &ic_sprout      },  // 6
-  { "Bomba",    COL_PRP, &ic_flask       },  // 7
-  { "pH",       COL_GRN, &ic_beaker      },  // 8
-  { "EC",       COL_PRP, &ic_test_tube   },  // 9
-  { "Refresh",  COL_DIM, &ic_refresh     },  // 10
-  { "Custom",   COL_YEL, &ic_zap         },  // 11
-};
-static const int NUM_SCENES = sizeof(SCENES) / sizeof(SCENES[0]);
+// Storage das cenas atuais (preenchido pelo app via cultivoUI_applyScenes)
+static char  sceneNames[SCENES_MAX][24] = {{0}};
+static int   sceneCount = 0;
+
+// Tab pai dos botoes — guardado pra rebuild quando dados chegam do server
+static lv_obj_t *sceneTab = nullptr;
+// Container do grid (filho do tab) — droppado e recriado em cada apply pra
+// limpar botoes antigos sem mexer no header
+static lv_obj_t *sceneGrid = nullptr;
+// Label de placeholder ("Sem cenas...") — visivel quando count == 0
+static lv_obj_t *sceneEmpty = nullptr;
 
 // Feedback visual de "trigger enviado" — bg pulsa por ~600ms apos tap
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
-  if (idx < 0 || idx >= NUM_SCENES) return;
-  printf("[ui] cena trigger slot=%d (%s)\n", idx, SCENES[idx].label);
+  if (idx < 0 || idx >= sceneCount) return;
+  printf("[ui] cena trigger idx=%d (%s)\n", idx, sceneNames[idx]);
   if (onSceneTrigger) onSceneTrigger(idx);
 
   // Pulse no card pra confirmar tap (animar background opa)
@@ -895,6 +893,115 @@ static void sceneClickCb(lv_event_t *e) {
   lv_anim_start(&a);
 }
 
+// Constroi (ou reconstroi) o grid de cenas. Chamado em buildTarefas (1a vez)
+// e em cultivoUI_applyScenes (quando dados chegam do server).
+static void rebuildSceneGrid() {
+  if (!sceneTab) return;
+
+  // Drop grid anterior (se existir) — limpa botoes velhos sem tocar no header.
+  if (sceneGrid) {
+    lv_obj_del(sceneGrid);
+    sceneGrid = nullptr;
+  }
+  if (sceneEmpty) {
+    lv_obj_del(sceneEmpty);
+    sceneEmpty = nullptr;
+  }
+
+  // Sem cenas: mostra placeholder textual no centro do tab
+  if (sceneCount == 0) {
+    sceneEmpty = lv_label_create(sceneTab);
+    lv_label_set_text(sceneEmpty,
+      "Buscando cenas...\n\n"
+      "Configure suas cenas Tuya no app\n"
+      "para acessa-las aqui");
+    lv_obj_set_style_text_color(sceneEmpty, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(sceneEmpty, FONT_CAPTION, 0);
+    lv_obj_set_style_text_align(sceneEmpty, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(sceneEmpty, LV_ALIGN_CENTER, 0, sh(8));
+    return;
+  }
+
+  // Container invisivel ocupando area abaixo do header
+  sceneGrid = lv_obj_create(sceneTab);
+  int gridY = sh(28);
+  int gridH = TAB_H - gridY - sh(4);
+  lv_obj_set_size(sceneGrid, SCREEN_W, gridH);
+  lv_obj_set_pos(sceneGrid, 0, gridY);
+  lv_obj_set_style_bg_opa(sceneGrid, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(sceneGrid, 0, 0);
+  lv_obj_set_style_pad_all(sceneGrid, 0, 0);
+  lv_obj_clear_flag(sceneGrid, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Grid 2 linhas x 3 colunas (max 6 cenas). Botoes sao maiores que o
+  // antigo 2x6, dando feel mais "iOS Home" — alvo de toque ~150x100 px.
+  const int COLS = 3, ROWS = 2;
+  int gridX = sw(6);
+  int gridW = SCREEN_W - 2 * gridX;
+  int gap   = sw(4);
+  int btnW  = (gridW - (COLS - 1) * gap) / COLS;
+  int btnH  = (gridH - (ROWS - 1) * gap) / ROWS;
+
+  for (int i = 0; i < sceneCount && i < SCENES_MAX; i++) {
+    int row = i / COLS;
+    int col = i % COLS;
+    int x = gridX + col * (btnW + gap);
+    int y = row * (btnH + gap);
+    uint32_t color = SCENE_PALETTE[i].color;
+
+    lv_obj_t *btn = lv_obj_create(sceneGrid);
+    lv_obj_set_size(btn, btnW, btnH);
+    lv_obj_set_pos(btn, x, y);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(color), 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_set_style_radius(btn, 14, 0);
+    lv_obj_set_style_pad_all(btn, sw(2), 0);
+    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+    // Bloom sutil na cor da cena
+    lv_obj_set_style_shadow_color(btn, lv_color_hex(color), 0);
+    lv_obj_set_style_shadow_width(btn, 10, 0);
+    lv_obj_set_style_shadow_opa(btn, LV_OPA_20, 0);
+    lv_obj_set_style_shadow_spread(btn, 0, 0);
+    lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+
+    // Icone centralizado top — botoes maiores agora, icone fica maior tbm
+    lv_obj_t *ico = lv_image_create(btn);
+    lv_image_set_src(ico, SCENE_PALETTE[i].icon);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(12));
+
+    // Label embaixo — usa nome real da cena (truncado se >23 chars)
+    lv_obj_t *lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, sceneNames[i]);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(lbl, btnW - sw(8));
+    lv_obj_set_style_text_color(lbl, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
+    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
+  }
+}
+
+extern "C" void cultivoUI_applyScenes(const char *names[], int count) {
+  if (count < 0) count = 0;
+  if (count > SCENES_MAX) count = SCENES_MAX;
+  sceneCount = count;
+  for (int i = 0; i < count; i++) {
+    if (names[i]) {
+      strncpy(sceneNames[i], names[i], sizeof(sceneNames[i]) - 1);
+      sceneNames[i][sizeof(sceneNames[i]) - 1] = '\0';
+    } else {
+      sceneNames[i][0] = '\0';
+    }
+  }
+  printf("[ui] cultivoUI_applyScenes count=%d\n", count);
+  rebuildSceneGrid();
+}
+
 static void buildTarefas(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
@@ -909,55 +1016,9 @@ static void buildTarefas(lv_obj_t *tab) {
   makeLabel(tab, "CENAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
   makeLabel(tab, "Atalhos Tuya", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
 
-  // Grid 2 linhas x 6 colunas — 12 slots fixos. Cada cell tem icone topo
-  // + label embaixo, estilo iOS Home (compact). Tap target ~75x100 px.
-  const int COLS = 6, ROWS = 2;
-  int gridY = sh(28);
-  int gridH = TAB_H - gridY - sh(4);
-  int gridX = sw(6);
-  int gridW = SCREEN_W - 2 * gridX;
-  int gap   = sw(4);
-  int btnW  = (gridW - (COLS - 1) * gap) / COLS;
-  int btnH  = (gridH - (ROWS - 1) * gap) / ROWS;
-
-  for (int i = 0; i < NUM_SCENES; i++) {
-    int row = i / COLS;
-    int col = i % COLS;
-    int x = gridX + col * (btnW + gap);
-    int y = gridY + row * (btnH + gap);
-
-    lv_obj_t *btn = lv_obj_create(tab);
-    lv_obj_set_size(btn, btnW, btnH);
-    lv_obj_set_pos(btn, x, y);
-    lv_obj_set_style_bg_color(btn, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(btn, lv_color_hex(SCENES[i].color), 0);
-    lv_obj_set_style_border_width(btn, 1, 0);
-    lv_obj_set_style_radius(btn, 14, 0);
-    lv_obj_set_style_pad_all(btn, sw(2), 0);
-    lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-    // Bloom sutil na cor da cena
-    lv_obj_set_style_shadow_color(btn, lv_color_hex(SCENES[i].color), 0);
-    lv_obj_set_style_shadow_width(btn, 10, 0);
-    lv_obj_set_style_shadow_opa(btn, LV_OPA_20, 0);
-    lv_obj_set_style_shadow_spread(btn, 0, 0);
-    lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
-
-    // Icone centralizado top
-    lv_obj_t *ico = lv_image_create(btn);
-    lv_image_set_src(ico, SCENES[i].icon);
-    lv_obj_set_style_image_recolor(ico, lv_color_hex(SCENES[i].color), 0);
-    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(8));
-
-    // Label embaixo
-    lv_obj_t *lbl = lv_label_create(btn);
-    lv_label_set_text(lbl, SCENES[i].label);
-    lv_obj_set_style_text_color(lbl, lv_color_hex(COL_TEXT), 0);
-    lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
-    lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
-  }
+  // Guarda parent pra rebuild dinamico quando applyScenes for chamado
+  sceneTab = tab;
+  rebuildSceneGrid();  // 1a build com sceneCount=0 (mostra placeholder)
 }
 
 // ════════════════════════════════════════════════════════════════════════════════

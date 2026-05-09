@@ -342,3 +342,87 @@ export async function triggerTuyaScene(
   }
   return { success: false, msg: "Nenhum endpoint de trigger funcionou" };
 }
+
+// ════════════════════════════════════════════════════════════════════════════════
+// listManualScenes — retorna cenas "tap-to-run" da conta Tuya (manuais, sem
+// trigger automatico). Usado pelo endpoint /api/device/scenes pra popular o
+// grid de Cenas no display ESP32.
+//
+// Tenta multiplos endpoints porque Tuya tem dois sistemas (IoT Core /v2.0
+// /cloud/scene/rule e Smart Home Home /v1.0/homes/.../scenes), e qual funciona
+// depende do tipo de projeto e da Home configurada na conta. Pega o primeiro
+// que retornar uma lista nao-vazia.
+//
+// Retorna max 12 cenas (suficiente pro grid 2x6 do display). homeId opcional —
+// se passado tenta /v1.0/homes/{homeId}/scenes; se nao, fica so' nos endpoints
+// genericos.
+// ════════════════════════════════════════════════════════════════════════════════
+export interface TuyaManualScene {
+  id: string;
+  name: string;
+}
+
+export async function listManualScenes(
+  homeId: number,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<TuyaManualScene[]> {
+  const { accessToken, uid } = await getToken(accessId, accessSecret, region);
+
+  // Helper: extrai {id, name} de varios formatos de payload Tuya.
+  function parseScenes(payload: any): TuyaManualScene[] {
+    const list = Array.isArray(payload)
+      ? payload
+      : (payload?.list ?? payload?.scenes ?? payload?.results ?? []);
+    return (list ?? [])
+      .map((s: any) => ({
+        id: String(s.id ?? s.scene_id ?? s.rule_id ?? ""),
+        name: String(s.name ?? s.scene_name ?? s.rule_name ?? "Cena"),
+      }))
+      .filter((s: TuyaManualScene) => s.id);
+  }
+
+  // Endpoints tentados em ordem — para no primeiro com lista nao-vazia.
+  const attempts: Array<{ label: string; path: string }> = [];
+
+  // IoT Core: /v2.0/cloud/scene/rule (precisa de space_id se for via home)
+  if (homeId) {
+    attempts.push({
+      label: `IoT Core /v2.0/cloud/scene/rule space=${homeId}`,
+      path: `/v2.0/cloud/scene/rule?type=scene&space_id=${homeId}`,
+    });
+  }
+  attempts.push({
+    label: "IoT Core /v2.0/cloud/scene/rule (no space)",
+    path: `/v2.0/cloud/scene/rule?type=scene`,
+  });
+
+  // Smart Home Home: /v1.0/homes/{home_id}/scenes
+  if (homeId) {
+    attempts.push({
+      label: `Smart Home /v1.0/homes/${homeId}/scenes`,
+      path: `/v1.0/homes/${homeId}/scenes`,
+    });
+  }
+
+  // Legacy fallback
+  attempts.push({
+    label: `Legacy /v1.0/users/${uid}/scenes`,
+    path: `/v1.0/users/${uid}/scenes`,
+  });
+
+  for (const a of attempts) {
+    try {
+      const data = await tuyaGet(a.path, accessId, accessSecret, accessToken, region);
+      const scenes = parseScenes(data.result);
+      console.log(`[Tuya] ${a.label}: success=${data.success} count=${scenes.length}`);
+      if (data.success && scenes.length > 0) {
+        return scenes.slice(0, 6);  // grid 2x3 do display ESP32
+      }
+    } catch (e: any) {
+      console.warn(`[Tuya] ${a.label} exception: ${e?.message}`);
+    }
+  }
+  return [];
+}

@@ -1529,6 +1529,70 @@ static bool fetchHistoryAll(const char *period = "24h") {
   return true;
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// Cenas Tuya — fetch dinamico do server (substituiu slots fixos via env vars).
+// Server endpoint /api/device/scenes lista cenas manuais da conta Tuya do user;
+// cada cena tem id Tuya real (string) + nome friendly. Storage local pareia
+// 1:1 com sceneNames[] em cultivo_ui.cpp:
+//   - sceneIdsLocal[i]    = ID Tuya real (usado no POST /scene-by-id/<id>)
+//   - sceneNamesLocal[i]  = label exibido na UI
+//
+// Threading: fetchScenes roda no netTask (core 0), apenas escreve esses
+// buffers e seta scenesNeedsRefresh=true. loop() (core 1) detecta a flag,
+// chama cultivoUI_applyScenes que rebuilda o LVGL grid (LVGL nao e thread-safe).
+// ════════════════════════════════════════════════════════════════════════════════
+#define SCENES_LOCAL_MAX 6
+static char sceneIdsLocal  [SCENES_LOCAL_MAX][48] = {{0}};
+static char sceneNamesLocal[SCENES_LOCAL_MAX][24] = {{0}};
+static int  sceneCountLocal = 0;
+
+static volatile bool scenesNeedsRefresh = false;
+static unsigned long lastScenesFetch = 0;
+// Cenas mudam pouco — fetch a cada 10 min e' suficiente
+static const unsigned long SCENES_FETCH_INTERVAL = 10UL * 60UL * 1000UL;
+
+// fetchScenes: GET /api/device/scenes → JSON {scenes: [{id, name}, ...]}.
+// Popula sceneIdsLocal + sceneNamesLocal e seta scenesNeedsRefresh; loop()
+// faz o apply na UI no proximo tick.
+static bool fetchScenes() {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/scenes", SERVER_URL);
+  httpBegin(http, url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(8000);
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[net] scenes HTTP %d\n", code);
+    http.end();
+    return false;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return false;
+
+  JsonArray arr = doc["scenes"].as<JsonArray>();
+  int n = 0;
+  for (JsonObject s : arr) {
+    if (n >= SCENES_LOCAL_MAX) break;
+    const char *id   = s["id"]   | "";
+    const char *name = s["name"] | "Cena";
+    if (!id || !*id) continue;
+    strncpy(sceneIdsLocal[n], id, sizeof(sceneIdsLocal[n]) - 1);
+    sceneIdsLocal[n][sizeof(sceneIdsLocal[n]) - 1] = '\0';
+    strncpy(sceneNamesLocal[n], name, sizeof(sceneNamesLocal[n]) - 1);
+    sceneNamesLocal[n][sizeof(sceneNamesLocal[n]) - 1] = '\0';
+    n++;
+  }
+  sceneCountLocal = n;
+
+  Serial.printf("[net] scenes: %d cenas carregadas\n", sceneCountLocal);
+  scenesNeedsRefresh = true;
+  return true;
+}
+
 static void netTaskFn(void *param) {
   for (;;) {
     if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
@@ -1554,6 +1618,14 @@ static void netTaskFn(void *param) {
       uint32_t t0 = millis();
       fetchHistoryAll("24h");
       logIfSlow("history-all", t0, 6000);
+    }
+
+    // Cenas Tuya — refresh ocasional (cenas raramente mudam)
+    if (millis() - lastScenesFetch >= SCENES_FETCH_INTERVAL) {
+      lastScenesFetch = millis();
+      uint32_t t0 = millis();
+      fetchScenes();
+      logIfSlow("scenes", t0, 9000);
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -1603,35 +1675,30 @@ static void refreshHandler() {
   refreshPending = true;
   Serial.println("[ui] tap-to-refresh requested");
 }
-// Tap em botao de cena na tela CENAS. Faz POST p/ endpoint do server que
-// dispara cena Tuya. Endpoint server-side: /api/device/scene/:sceneId/trigger
-// (a' integrar no proximo PR do cultivo-server — branch
-// claude/smartlife-scenes-opt-in ja' tem a infra triggerTuyaScene + tabela
-// tuyaManualScenes; falta so' expor o endpoint Express de device-side).
-// Sem WiFi este request descarta logo no inicio (silent fail OK).
-// Nomes friendly p/ logs — index = sceneId/slot (server mapeia via TUYA_SCENE_X)
-static const char *SCENE_NAMES[12] = {
-  "irrigar", "luz-on", "luz-off", "exaustor", "umid", "ac",
-  "co2",     "bomba",  "ph",      "ec",       "refresh", "custom"
-};
-static void sceneTriggerHandler(int sceneId) {
-  const char *name = (sceneId >= 0 && sceneId < 12) ? SCENE_NAMES[sceneId] : "?";
-  Serial.printf("[scene] trigger sceneId=%d (%s)\n", sceneId, name);
+// Tap em botao de cena na tela CENAS. Resolve idx -> sceneId real (do storage
+// preenchido por fetchScenes) e faz POST /api/device/scene-by-id/<id>/trigger.
+static void sceneTriggerHandler(int idx) {
+  if (idx < 0 || idx >= sceneCountLocal) {
+    Serial.printf("[scene] idx=%d fora do range (count=%d)\n", idx, sceneCountLocal);
+    return;
+  }
+  const char *id = sceneIdsLocal[idx];
+  Serial.printf("[scene] trigger idx=%d id=%s name=%s\n", idx, id, sceneNamesLocal[idx]);
   if (!wifiOk) {
     Serial.println("[scene] WiFi offline — request descartado");
     return;
   }
   HTTPClient http;
-  char url[256];
+  char url[224];
   snprintf(url, sizeof(url),
-           "%s/api/device/scene/%d/trigger?token=%s&tentId=%d",
-           SERVER_URL, sceneId, DEVICE_TOKEN, TENT_ID);
+           "%s/api/device/scene-by-id/%s/trigger", SERVER_URL, id);
   if (!httpBegin(http, url)) {
     Serial.println("[scene] httpBegin falhou");
     return;
   }
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
   int code = http.POST("");
-  Serial.printf("[scene] sceneId=%d HTTP %d\n", sceneId, code);
+  Serial.printf("[scene] id=%s HTTP %d\n", id, code);
   http.end();
 }
 
@@ -1915,8 +1982,16 @@ void setup() {
     fetchDisplayData();
     fetchHistoryAll("24h");  // chart de Hist tem dados ja' no primeiro draw
     cultivoUI_applyHistory();  // aplica imediato (LVGL ja' construido)
-    lastFetch     = millis();
-    lastHistFetch = millis();
+    fetchScenes();             // popula sceneIdsLocal+sceneNamesLocal
+    if (scenesNeedsRefresh) {
+      scenesNeedsRefresh = false;
+      const char *namesArr[SCENES_LOCAL_MAX] = {nullptr};
+      for (int i = 0; i < sceneCountLocal; i++) namesArr[i] = sceneNamesLocal[i];
+      cultivoUI_applyScenes(namesArr, sceneCountLocal);
+    }
+    lastFetch       = millis();
+    lastHistFetch   = millis();
+    lastScenesFetch = millis();
     refreshHomeValues();
     // Dai em diante HTTP roda em background, loop() fica livre pra UI
     startNetTask();
@@ -1943,6 +2018,13 @@ void loop() {
   if (histNeedsRefresh) {
     histNeedsRefresh = false;
     cultivoUI_applyHistory();
+  }
+  if (scenesNeedsRefresh) {
+    scenesNeedsRefresh = false;
+    // Monta array de ponteiros pros names — applyScenes faz strncpy interno
+    const char *namesArr[SCENES_LOCAL_MAX] = {nullptr};
+    for (int i = 0; i < sceneCountLocal; i++) namesArr[i] = sceneNamesLocal[i];
+    cultivoUI_applyScenes(namesArr, sceneCountLocal);
   }
 
   // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI
