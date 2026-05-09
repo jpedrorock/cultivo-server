@@ -64,6 +64,10 @@ add_executable(cultivo_sim
     ../src/fonts/manrope_sb_12.c
     ../src/fonts/manrope_sb_14.c
     ../src/fonts/manrope_sb_18.c
+    ../src/fonts/geist_bold_24.c
+    ../src/fonts/geist_bold_40.c
+    ../src/fonts/geist_sb_14.c
+    ../src/fonts/geist_sb_18.c
 )
 
 target_compile_definitions(cultivo_sim PRIVATE CULTIVO_SIM)

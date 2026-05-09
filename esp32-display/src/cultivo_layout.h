@@ -16,10 +16,11 @@
 #if defined(REAL_HARDWARE) || defined(CULTIVO_SIM)
   #define HAL_SCREEN_W 480
   #define HAL_SCREEN_H 320
-  #define FONT_VALUE   (&manrope_bold_40)
-  #define FONT_TITLE   (&manrope_bold_24)
-  #define FONT_BODY    (&manrope_sb_18)
-  #define FONT_CAPTION (&manrope_sb_14)
+  // Geist (Cultivo Design System) no real + sim. Manrope mantido pro Wokwi.
+  #define FONT_VALUE   (&geist_bold_40)
+  #define FONT_TITLE   (&geist_bold_24)
+  #define FONT_BODY    (&geist_sb_18)
+  #define FONT_CAPTION (&geist_sb_14)
 #else  // Wokwi
   #define HAL_SCREEN_W 320
   #define HAL_SCREEN_H 240
