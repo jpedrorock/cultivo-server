@@ -67,14 +67,12 @@ static const int STEP_PPFD    = 25;
 // ════════════════════════════════════════════════════════════════════════════════
 static CultivoSaveLuxFn      onLuxSave     = nullptr;
 static CultivoSavePhEcFn     onPhEcSave    = nullptr;
-static CultivoToggleTaskFn   onTaskToggle  = nullptr;
 static CultivoOpenConfigFn   onConfigOpen  = nullptr;
 static CultivoRefreshFn      onRefresh     = nullptr;
 static CultivoSceneTriggerFn onSceneTrigger = nullptr;
 
 extern "C" void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb)         { onLuxSave    = cb; }
 extern "C" void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb)       { onPhEcSave   = cb; }
-extern "C" void cultivoUI_setTaskToggleHandler(CultivoToggleTaskFn cb)   { onTaskToggle = cb; }
 extern "C" void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb)   { onConfigOpen = cb; }
 extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRefresh    = cb; }
 extern "C" void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb) { onSceneTrigger = cb; }

@@ -2,7 +2,7 @@
 // cultivo_ui.h — UI compartilhada entre simulador (Mac/SDL2) e firmware ESP32-S3
 //
 // Owns:
-//  - As 5 telas principais (Home, LUX/PPFD, pH/EC, Tarefas, Historico) + navbar
+//  - As 5 telas principais (Home, LUX/PPFD, pH/EC, Historico, Cenas) + navbar
 //  - Estado dos sensores como globals (escritos pelo app, lidos pelo refresh)
 //  - Animacoes: ring-pulse, sparklines, onda do Historico
 //
@@ -39,7 +39,7 @@ extern bool  wifiOk;
 // luxMode = 0 PPFD | 1 LUX (toggle de visualizacao no display).
 extern int   currentLux, currentPpfd, targetPpfd, luxMode;
 
-// activeScreen: indice da tela ativa (0=Home, 1=Lux, 2=PhEc, 3=Tarefas, 4=Hist)
+// activeScreen: indice da tela ativa (0=Home, 1=Lux, 2=PhEc, 3=Hist, 4=Cenas)
 // Exposto pra firmware decidir se vale fetchar dados da aba atual.
 extern int activeScreen;
 
@@ -55,7 +55,6 @@ void refreshHomeValues(void);
 // O app registra essas callbacks no boot. Sim usa os defaults (printf).
 typedef void (*CultivoSaveLuxFn)(int targetPpfd);
 typedef void (*CultivoSavePhEcFn)(float ph, float ec);
-typedef void (*CultivoToggleTaskFn)(int idx, bool done);
 typedef void (*CultivoOpenConfigFn)(void);
 // Tap em TEMP/UMID na Home pede ao app pra fazer poll fresh do server (que
 // por sua vez consulta a Tuya e atualiza os valores). Usado p/ refresh manual.
@@ -66,7 +65,6 @@ typedef void (*CultivoSceneTriggerFn)(int sceneId);
 
 void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb);
 void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb);
-void cultivoUI_setTaskToggleHandler(CultivoToggleTaskFn cb);
 void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb);
 void cultivoUI_setRefreshHandler(CultivoRefreshFn cb);
 void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb);

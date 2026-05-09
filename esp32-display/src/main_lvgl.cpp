@@ -173,12 +173,8 @@ static void applyBloom(lv_obj_t *obj, uint32_t color) {
 // p/ casos de "preciso re-fetch agora", se necessario no futuro).
 static volatile bool refreshPending = false;
 
-// Tarefas: HTTP fetchTasks() escreve aqui, mas ainda nao integra com a UI nova
-// do cultivo_ui.cpp (que tem sua propria lista mockada). TODO: expor um setter
-// cultivoUI_setTasks() pra alimentar a UI a partir destes dados do servidor.
-struct Tarefa { char texto[80]; bool feito; int serverId; };
-static Tarefa tarefas[10];
-static int numTarefas = 0;
+// Tarefas: removido na limpeza pos-fase-2. UI nova substituiu Tarefas por
+// Cenas (atalhos Tuya) — registro de rega/tasks fica no app web, nao no ESP.
 
 // ── Estado dos dados (UI + sensores) ────────────────────────────────────────────
 // Globals de estado vivem em cultivo_ui.cpp e sao importados via cultivo_ui.h:
@@ -1249,74 +1245,9 @@ static bool fetchDisplayData() {
   return true;
 }
 
-static bool fetchHistory(const char* metric, const char* period, float *buf, int &n, int maxN) {
-  n = 0;
-  if (!wifiOk) return false;
-  HTTPClient http;
-  char url[160];
-  snprintf(url, sizeof(url), "%s/api/device/history/%d?metric=%s&period=%s",
-           SERVER_URL, TENT_ID, metric, period);
-  httpBegin(http, url);
-  http.addHeader("X-Device-Token", DEVICE_TOKEN);
-  http.setTimeout(5000);
-  int code = http.GET();
-  if (code != 200) { http.end(); return false; }
-
-  JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
-  http.end();
-  if (err != DeserializationError::Ok) return false;
-  JsonArray arr = doc.as<JsonArray>();
-  for (JsonObject pt : arr) {
-    if (n >= maxN) break;
-    buf[n++] = pt["v"] | 0.0f;
-  }
-  return true;
-}
-
-static void fetchTasks() {
-  if (!wifiOk) return;
-  HTTPClient http;
-  char url[128];
-  snprintf(url, sizeof(url), "%s/api/device/tasks/%d", SERVER_URL, TENT_ID);
-  httpBegin(http, url);
-  http.addHeader("X-Device-Token", DEVICE_TOKEN);
-  http.setTimeout(5000);
-  int code = http.GET();
-  if (code != 200) { http.end(); return; }
-
-  JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
-  http.end();
-  if (err != DeserializationError::Ok) return;
-  JsonArray arr = doc.as<JsonArray>();
-  numTarefas = 0;
-  for (JsonObject t : arr) {
-    if (numTarefas >= 10) break;
-    const char *tx = t["texto"] | "...";
-    strncpy(tarefas[numTarefas].texto, tx, 79);
-    tarefas[numTarefas].texto[79] = '\0';
-    tarefas[numTarefas].feito    = t["feito"] | false;
-    tarefas[numTarefas].serverId = t["id"]    | -1;
-    numTarefas++;
-  }
-}
-
-static void postTaskComplete(int taskId) {
-  if (!wifiOk || taskId <= 0) return;
-  HTTPClient http;
-  char url[128];
-  snprintf(url, sizeof(url), "%s/api/device/task-complete", SERVER_URL);
-  httpBegin(http, url);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Device-Token", DEVICE_TOKEN);
-  http.setTimeout(5000);
-  char body[48];
-  snprintf(body, sizeof(body), "{\"taskId\":%d}", taskId);
-  int code = http.POST(body);
-  http.end();
-  Serial.printf("postTaskComplete(%d): %d\n", taskId, code);
-}
+// fetchHistory/fetchTasks/postTaskComplete: removidos na limpeza pos-fase-2.
+// UI nova nao consome historico chart nem tarefas (Cenas substituiu Tarefas;
+// historico tab ainda existe em cultivo_ui mas usa dados internos mockados).
 
 static void postReading(float newPh, float newEc) {
   if (!wifiOk) return;
@@ -1354,12 +1285,6 @@ static bool postPpfd(int ppfd) {
 
 // postWatering removido — rega agora e automatica (bomba do hardware real)
 
-// HOME nao usa mais sparklines (historico esta na aba GRAFIC)
-// fetchHistoryAll vira no-op para manter compatibilidade de chamadas existentes
-static void fetchHistoryAll() {
-  // intencionalmente vazio — historico agora so na aba GRAFIC via applyHistToChart
-}
-
 // ════════════════════════════════════════════════════════════════════════════════
 // Task FreeRTOS de rede — isola HTTP do loop principal
 // Roda no core 0 (Arduino loop fica no core 1). Sem essa task, fetchDisplayData()
@@ -1396,7 +1321,6 @@ static void netTaskFn(void *param) {
       uint32_t t0 = millis();
       if (fetchDisplayData()) uiNeedsRefresh = true;
       logIfSlow("fetchDisplay", t0, 6000);
-      fetchHistoryAll();
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -1439,13 +1363,6 @@ static void startOTA() {
 
 // CultivoSaveLuxFn = void(int) — postPpfd retorna bool, descartamos.
 static void luxSaveHandler(int ppfd) { postPpfd(ppfd); }
-// CultivoToggleTaskFn = void(int idx, bool done) — postTaskComplete usa serverId.
-// Mapeia o index do array tarefas[] -> serverId real. Se nao tiver tarefa
-// nesse index ainda, no-op.
-static void taskToggleHandler(int idx, bool done) {
-  if (idx < 0 || idx >= numTarefas) return;
-  if (done && tarefas[idx].serverId > 0) postTaskComplete(tarefas[idx].serverId);
-}
 // Tap em TEMP/UMID na Home: sinaliza refresh ao netTask, que chama
 // refreshTuyaNow() (server forca poll Tuya) + fetchDisplayData() (re-puxa
 // valores). Loop entao chama refreshHomeValues() pra atualizar a UI.
@@ -1487,7 +1404,6 @@ static void buildUI() {
   // assinaturas que ja batem com os typedef de cultivo_ui.h.
   cultivoUI_setLuxSaveHandler(luxSaveHandler);
   cultivoUI_setPhEcSaveHandler(postReading);
-  cultivoUI_setTaskToggleHandler(taskToggleHandler);
   cultivoUI_setConfigOpenHandler(openConfigModal);
   cultivoUI_setRefreshHandler(refreshHandler);
   cultivoUI_setSceneTriggerHandler(sceneTriggerHandler);
@@ -1566,10 +1482,6 @@ void setup() {
     delay(5);
   }
 
-  // initMockTarefas + rebuildTarefasList: removidos na fase 2 — cultivo_ui.cpp
-  // tem suas tarefas mockadas internas. fetchTasks() ainda escreve em
-  // tarefas[] global mas integracao com UI fica p/ depois.
-
   // Sem WiFi salvo: UI sobe em modo offline (ic_wifi_off), usuario toca gear
   // pra abrir config e setar WiFi+token. Botao "Setup via celular" dentro do
   // modal abre o AP portal pra quem preferir esse fluxo.
@@ -1583,9 +1495,6 @@ void setup() {
   if (wifiOk) {
     // Fetch inicial no thread principal — garante dados prontos antes de mostrar UI
     fetchDisplayData();
-    fetchHistoryAll();
-    fetchTasks();
-    // rebuildTarefasList(): removido — UI nova ainda nao consome do array tarefas[]
     lastFetch = millis();
     refreshHomeValues();
     // Dai em diante HTTP roda em background, loop() fica livre pra UI
