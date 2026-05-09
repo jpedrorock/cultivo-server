@@ -88,10 +88,11 @@ extern "C" void cultivoUI_setRefreshing(bool active) {
 // ════════════════════════════════════════════════════════════════════════════════
 // Widgets compartilhados entre screens (idem main_lvgl.cpp)
 // ════════════════════════════════════════════════════════════════════════════════
-// Navbar 3 tabs apos remocao de Lux/PhEc: Home / Hist / Cenas
-// (registro de PPFD/pH/EC vai pelo app mobile, ESP nao precisa desses menus)
+// Navbar 3 tabs: Home / Hist / Cenas
+// DS: ativo SEMPRE em COL_PRIMARY (verde brand) com indicador linha 2px
+// no topo do tab. Era 3 cores diferentes (GRN/CYN/AMBER) — ficava parecendo
+// botoes desconectados, agora sao "tabs" coerentes igual app/iOS.
 #define NAV_COUNT 3
-static const uint32_t NAV_COLORS[NAV_COUNT] = { COL_GRN, COL_CYN, 0xFBBF24 };
 static const lv_image_dsc_t *NAV_ICONS_IMG[NAV_COUNT] = {
   &ic_home, &ic_activity, &ic_zap
 };
@@ -233,25 +234,36 @@ static uint32_t cRH(float h) {
 static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  // Header: icone + titulo + sub + wifi + gear
+  // ── Header (DS): [icone primary] TITULO + [• badge fase]      [refresh][gear][wifi]
+  // - lblSub e' renderizado em duas partes: "Sem X/Y" cinza + bullet+FASE
+  //   na cor do phase token (igual badges do app)
+  // - btnRefresh top-right e' o "lugar pra pedir atualizacao na hora" pedido
+  //   pelo user; anima rotacao 360 enquanto isRefreshing=true.
   lv_obj_t *hdrIcon = lv_image_create(tab);
   lv_image_set_src(hdrIcon, &ic_sprout);
-  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
 
   lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
 
+  // Sub: "Sem X/Y  •FASE" — bullet+fase na cor do phase token (badge style)
   char subBuf[48];
-  snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  %s", semana, totalSem, FASE);
-  lblSub = makeLabel(tab, subBuf, COL_PRP, FONT_CAPTION, LV_ALIGN_TOP_LEFT, sw(38), sh(22));
+  snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  #%06X %s#",
+           semana, totalSem, (unsigned)(phaseColor(FASE) & 0xFFFFFF), FASE);
+  lblSub = lv_label_create(tab);
+  lv_label_set_recolor(lblSub, true);
+  lv_label_set_text(lblSub, subBuf);
+  lv_obj_set_style_text_color(lblSub, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(lblSub, FONT_CAPTION, 0);
+  lv_obj_align(lblSub, LV_ALIGN_TOP_LEFT, sw(38), sh(22));
 
   lv_obj_t *wifiIcon = lv_image_create(tab);
   lv_image_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
-  lv_obj_set_style_image_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_GRN : COL_DIM), 0);
+  lv_obj_set_style_image_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_PRIMARY : COL_DIM), 0);
   lv_obj_set_style_image_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
   lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
   lblWifi = wifiIcon;
@@ -267,6 +279,34 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_add_event_cb(btnCfg, [](lv_event_t *e) {
     (void)e;
     if (onConfigOpen) onConfigOpen();
+  }, LV_EVENT_CLICKED, NULL);
+
+  // Refresh manual — botao top-right entre gear e wifi. Tap dispara onRefresh
+  // (server poll Tuya); icone roda 360 enquanto isRefreshing=true.
+  lv_obj_t *btnRefresh = lv_image_create(tab);
+  lv_image_set_src(btnRefresh, &ic_refresh);
+  lv_obj_set_style_image_recolor(btnRefresh, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_image_recolor_opa(btnRefresh, LV_OPA_COVER, 0);
+  lv_obj_align(btnRefresh, LV_ALIGN_TOP_RIGHT, -sw(80), sh(4));
+  lv_obj_add_flag(btnRefresh, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(btnRefresh, sw(10));
+  lv_obj_add_event_cb(btnRefresh, [](lv_event_t *e) {
+    lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
+    if (onRefresh && !isRefreshing) {
+      isRefreshing = true;
+      onRefresh();
+      // Animacao rotacao 360 — visual feedback do tap. LVGL transform_angle
+      // usa decimo de grau (0-3600). Loop curto enquanto refreshing.
+      lv_anim_t a;
+      lv_anim_init(&a);
+      lv_anim_set_var(&a, btn);
+      lv_anim_set_values(&a, 0, 3600);
+      lv_anim_set_time(&a, MOTION_SLOW);
+      lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+        lv_obj_set_style_transform_rotation((lv_obj_t*)obj, v, 0);
+      });
+      lv_anim_start(&a);
+    }
   }, LV_EVENT_CLICKED, NULL);
 
   // Single-face redesign: sem botao flip. Tap no arc cicla TEMP/pH/EC/FLORACAO.
@@ -299,15 +339,20 @@ static void buildHome(lv_obj_t *tab) {
       onRefresh();  // refresh em paralelo — refreshHomeValues aplica quando voltar
     }
   }, LV_EVENT_CLICKED, NULL);
-  // Remove o fundo retangular e borda padrao do lv_arc — queremos so o anel
+  // Anel DS: track neutro COL_BORDER + indicator COL_PRIMARY (verde brand).
+  // Sem variar cor por modo — phase ja' aparece no badge do header. Shadow
+  // suave (era 60 opa, agora 30) pra ficar menos "neon" e mais "premium".
   lv_obj_set_style_bg_opa(arcTemp, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(arcTemp, 0, 0);
   lv_obj_set_style_pad_all(arcTemp, 0, 0);
   lv_obj_set_style_arc_width(arcTemp, sw(8),  LV_PART_MAIN);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(0x1F2937), LV_PART_MAIN);
-  lv_obj_set_style_arc_opa(arcTemp, LV_OPA_80, LV_PART_MAIN);
+  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_BORDER), LV_PART_MAIN);
+  lv_obj_set_style_arc_opa(arcTemp, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_arc_width(arcTemp, sw(10), LV_PART_INDICATOR);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
+  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_width(arcTemp, 12, LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_opa(arcTemp, LV_OPA_30, LV_PART_INDICATOR);
 
   // Header (TEMP/pH/EC/FASE) + valor + unit — todos dinamicos via updateArcMode
   lblArcHdr = lv_label_create(arcTemp);
@@ -316,31 +361,18 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_text_font(lblArcHdr, FONT_CAPTION, 0);
   lv_obj_align(lblArcHdr, LV_ALIGN_CENTER, 0, -arcSize / 4);
 
+  // Valor: branco fixo (DS hierarchy — cor nunca dispute com o anel)
   lblTemp = lv_label_create(arcTemp);
   lv_label_set_text(lblTemp, "--");
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_TEXT), 0);
   lv_obj_set_style_text_font(lblTemp, FONT_VALUE, 0);
   lv_obj_align(lblTemp, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_width(arcTemp, 16, LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_opa(arcTemp, LV_OPA_60, LV_PART_INDICATOR);
 
   lblArcUnit = lv_label_create(arcTemp);
   lv_label_set_text(lblArcUnit, "°C");
   lv_obj_set_style_text_color(lblArcUnit, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_text_font(lblArcUnit, FONT_CAPTION, 0);
   lv_obj_align(lblArcUnit, LV_ALIGN_CENTER, 0, arcSize / 4);
-
-  // Hint de tap-to-refresh: pequeno icone refresh-cw no canto inferior do
-  // arc, dim por padrao. Sinaliza que o arc + card UMID sao tapaveis pra
-  // forcar poll fresh do server (tuya). Esconde nada — soft visual cue.
-  lv_obj_t *hintRefresh = lv_image_create(arcTemp);
-  lv_image_set_src(hintRefresh, &ic_refresh);
-  lv_obj_set_style_image_recolor(hintRefresh, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_image_recolor_opa(hintRefresh, LV_OPA_70, 0);
-  lv_obj_set_style_transform_zoom(hintRefresh, 160, 0);  // ~50% scale (32px -> 16px)
-  lv_obj_align(hintRefresh, LV_ALIGN_BOTTOM_MID, 0, -sh(8));
-  lv_obj_remove_flag(hintRefresh, LV_OBJ_FLAG_CLICKABLE);  // tap passa pro arc
 
   // 3 mini-cards a direita — cada face em seu proprio container
   // transparente; trocar de face e apenas hide/show o container.
@@ -361,25 +393,21 @@ static void buildHome(lv_obj_t *tab) {
   };
   homeFaceA = makeFaceContainer();
 
+  // Mini-card DS — layout coerente com cards do app mobile:
+  //   topo-esq:    [icone-cor] LABEL                                   [◉ wifi]
+  //   centro-dir:                                            VALOR (branco)
+  //   rodape-esq:  [─── sparkline ───]
+  //
+  // Sem ring-pulse colorido (era distrativo), sem bg do chart, valor sempre
+  // em COL_TEXT branco (cor da metrica fica so' no icone + linha do chart).
   auto makeMiniCard = [&](lv_obj_t *parent, int yOffset, const char *label, const char *initVal,
                           uint32_t color, const lv_image_dsc_t *icon,
-                          lv_obj_t **sparkOut, lv_chart_series_t **serOut,
-                          uint32_t pulseDelayMs) -> lv_obj_t* {
+                          lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
     lv_obj_t *c = makeCard(parent, 0, yOffset, cardW, cardH);
     lv_obj_set_style_pad_all(c, sw(4), 0);
-    // Ring-pulse defasado: 3 cards a 2800ms com offsets distribuidos no
-    // periodo ficam visivelmente fora de fase e a tela "respira" em vez
-    // de piscar junto.
-    applyRingPulse(c, color, 2800, pulseDelayMs);
 
-    // Layout em 2 linhas:
-    //   topo:    [icone][LABEL]              [VALOR grande]
-    //   rodape:  [------ sparkline ------]
-    // Icone + nome viram uma linha so (nao sobra espaco vertical pra
-    // empilhar os 3); valor fica na direita centralizado pra dominar
-    // visualmente; sparkline ocupa todo o rodape a esquerda, longe do
-    // valor, sem cruzar com nada.
     int iconW      = sw(22);    // x-offset do label depois do icone
+    int wifiW      = sw(14);    // espaco reservado pro mini wifi top-right
     int valueRoomW = sw(60);    // largura reservada pro VALOR na direita
     int chartH     = sh(10);
     int sparkW     = cardW - valueRoomW - sw(6);
@@ -396,26 +424,38 @@ static void buildHome(lv_obj_t *tab) {
     lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
     lv_obj_align(lb, LV_ALIGN_TOP_LEFT, iconW, sh(4));
 
+    // Mini wifi top-right — verde quando dado fresh, dim quando offline.
+    // Reduzido a ~50% (transform_zoom 128) pra nao competir com o icone
+    // principal da metrica. Igual indicadores do app mobile.
+    lv_obj_t *wifi = lv_image_create(c);
+    lv_image_set_src(wifi, &ic_wifi);
+    lv_obj_set_style_image_recolor(wifi, lv_color_hex(wifiOk ? COL_PRIMARY : COL_DIM), 0);
+    lv_obj_set_style_image_recolor_opa(wifi, LV_OPA_COVER, 0);
+    lv_obj_set_style_transform_zoom(wifi, 128, 0);   // ~50% (16->8px)
+    lv_obj_align(wifi, LV_ALIGN_TOP_RIGHT, 0, sh(2));
+    (void)wifiW;  // reservado pra alignment futuro
+
+    // Valor: branco fixo (DS hierarchy). Cor da metrica fica so' no icone
+    // e no sparkline — assim a leitura "olho bate primeiro no numero".
     lv_obj_t *v = lv_label_create(c);
     lv_label_set_text(v, initVal);
-    lv_obj_set_style_text_color(v, lv_color_hex(color), 0);
+    lv_obj_set_style_text_color(v, lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_text_font(v, FONT_TITLE, 0);
     lv_obj_align(v, LV_ALIGN_RIGHT_MID, 0, 0);
-    // sem bloom no numero — card ja' tem ring-pulse + shadow
 
+    // Sparkline minimalista — sem fundo colorido, sem radius, linha 3px
+    // pra dar presenca visual na cor da metrica. Match com sparklines do app.
     lv_obj_t *ch = lv_chart_create(c);
     lv_obj_set_size(ch, sparkW, chartH);
     lv_obj_align(ch, LV_ALIGN_BOTTOM_LEFT, 0, -sh(2));
     lv_chart_set_type(ch, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ch, 20);
     lv_chart_set_div_line_count(ch, 0, 0);
-    lv_obj_set_style_bg_color(ch, lv_color_hex(color), 0);
-    lv_obj_set_style_bg_opa(ch, LV_OPA_10, 0);
-    lv_obj_set_style_radius(ch, 4, 0);
+    lv_obj_set_style_bg_opa(ch, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ch, 0, 0);
     lv_obj_set_style_width(ch,  0, LV_PART_INDICATOR);
     lv_obj_set_style_height(ch, 0, LV_PART_INDICATOR);
-    lv_obj_set_style_line_width(ch, sw(2), LV_PART_ITEMS);
+    lv_obj_set_style_line_width(ch, sw(3), LV_PART_ITEMS);
     lv_obj_set_style_line_color(ch, lv_color_hex(color), LV_PART_ITEMS);
     lv_obj_set_style_pad_all(ch, 0, 0);
     *serOut = lv_chart_add_series(ch, lv_color_hex(color), LV_CHART_AXIS_PRIMARY_Y);
@@ -424,10 +464,13 @@ static void buildHome(lv_obj_t *tab) {
     return v;
   };
 
-  // Face A — sensores de ambiente
-  lblRh   = makeMiniCard(homeFaceA, 0,                     "UMIDADE", "--", COL_CYN, &ic_droplet,    &sparkRh,   &serRhS,     0);
-  lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_RED, &ic_droplets,   &sparkVpd,  &serVpdS,  933);
-  lblPpfd = makeMiniCard(homeFaceA, (cardH + cardGap) * 2, "PPFD",    "--", COL_YEL, &ic_lightbulb,  &sparkPpfd, &serPpfdS,1866);
+  // Face A — sensores de ambiente. Cores DS:
+  //   UMIDADE  ciano  + ic_droplet
+  //   VPD      verde  + ic_activity (wave/wind, era ic_droplets que parecia UMID)
+  //   PPFD     amber  + ic_lightbulb
+  lblRh   = makeMiniCard(homeFaceA, 0,                     "UMIDADE", "--", COL_CYN,     &ic_droplet,   &sparkRh,   &serRhS);
+  lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_PRIMARY, &ic_activity,  &sparkVpd,  &serVpdS);
+  lblPpfd = makeMiniCard(homeFaceA, (cardH + cardGap) * 2, "PPFD",    "--", COL_YEL,     &ic_lightbulb, &sparkPpfd, &serPpfdS);
 
   // Tap no card UMIDADE -> refresh-only (sem ciclar o arc), util pra
   // forcar pull fresh sem mudar de modo. Sem placeholder "..." porque
@@ -456,20 +499,21 @@ static void buildHome(lv_obj_t *tab) {
   updateArcMode();
 }
 
-// Reconfigura arc + labels conforme arcMode (0=TEMP/1=pH/2=EC/3=FLORACAO).
-// Chamado em buildHome (load inicial), no tap handler (cycle), e em
-// refreshHomeValues (atualiza valor do modo atual com dados frescos).
+// Reconfigura arc + labels conforme arcMode (0=TEMP/1=pH/2=EC/3=FASE).
+// DS rule: anel SEMPRE em COL_PRIMARY, valor SEMPRE em COL_TEXT branco.
+// Cor da fase fica no badge do header (lblSub) — anel preserva cor da marca
+// independente do modo, evitando que tap-pra-ciclar mude a "personalidade
+// visual" da Home. Chamado em buildHome, no tap handler, e em
+// refreshHomeValues.
 static void updateArcMode() {
   if (!lblTemp || !arcTemp) return;
   char buf[24];
-  uint32_t col = COL_GRN;
   switch (arcMode) {
     case 0: { // TEMP
       lv_label_set_text(lblArcHdr, "TEMP");
       lv_label_set_text(lblArcUnit, "\xC2\xB0""C");
       snprintf(buf, sizeof(buf), "%.1f", tempC);
       lv_label_set_text(lblTemp, buf);
-      col = cTemp(tempC);
       lv_arc_set_range(arcTemp, 0, 40);
       lv_arc_set_value(arcTemp, (int)tempC);
       break;
@@ -479,8 +523,6 @@ static void updateArcMode() {
       lv_label_set_text(lblArcUnit, "");
       snprintf(buf, sizeof(buf), "%.1f", phv);
       lv_label_set_text(lblTemp, buf);
-      // Faixa otima 5.5-6.5; fora vira amarelo p/ alerta visual
-      col = (phv < 5.5f || phv > 6.5f) ? COL_YEL : COL_CYN;
       lv_arc_set_range(arcTemp, 0, 140);
       lv_arc_set_value(arcTemp, (int)(phv * 10));
       break;
@@ -490,27 +532,26 @@ static void updateArcMode() {
       lv_label_set_text(lblArcUnit, "mS/cm");
       snprintf(buf, sizeof(buf), "%.1f", ecv);
       lv_label_set_text(lblTemp, buf);
-      col = COL_PRP;
       lv_arc_set_range(arcTemp, 0, 40);  // EC * 10 (0-4.0 mS/cm)
       lv_arc_set_value(arcTemp, (int)(ecv * 10));
       break;
     }
-    case 3: { // FLORACAO
+    case 3: { // FASE
       lv_label_set_text(lblArcHdr, FASE);
       snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
       lv_label_set_text(lblArcUnit, buf);
       char vbuf[8]; snprintf(vbuf, sizeof(vbuf), "%d", semana);
       lv_label_set_text(lblTemp, vbuf);
-      col = COL_YEL;
       int total = totalSem > 0 ? totalSem : 16;
       lv_arc_set_range(arcTemp, 0, total);
       lv_arc_set_value(arcTemp, semana);
       break;
     }
   }
-  lv_obj_set_style_text_color(lblTemp, lv_color_hex(col), 0);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(col), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(col), LV_PART_INDICATOR);
+  // Cores fixas DS — anel/valor nao mudam conforme modo
+  lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
 }
 
 extern "C" void refreshHomeValues() {
@@ -519,20 +560,23 @@ extern "C" void refreshHomeValues() {
   char buf[64];
 
   // Header: nome da estufa + fase/semana — vinham do server mas nao eram
-  // re-aplicados depois do load inicial (bug). Agora sincroniza a cada refresh.
+  // re-aplicados depois do load inicial (bug). Agora sincroniza a cada
+  // refresh, e a cor do badge fase atualiza junto (phaseColor pode mudar
+  // se o ciclo passou de VEGA pra FLORA por exemplo).
   if (lblTitle) lv_label_set_text(lblTitle, TENT_NAME);
   if (lblSub) {
-    snprintf(buf, sizeof(buf), "Sem %d/%d  %s", semana, totalSem, FASE);
+    snprintf(buf, sizeof(buf), "Sem %d/%d  #%06X %s#",
+             semana, totalSem, (unsigned)(phaseColor(FASE) & 0xFFFFFF), FASE);
     lv_label_set_text(lblSub, buf);
   }
 
   // Arc principal: re-renderiza no modo atual com valores frescos
   updateArcMode();
 
-  // Mini-cards laterais sempre visiveis
+  // Mini-cards laterais sempre visiveis. Valor fica branco fixo (DS) — sem
+  // pintar conforme a metrica.
   snprintf(buf, sizeof(buf), "%.0f%%", rh);
   lv_label_set_text(lblRh, buf);
-  lv_obj_set_style_text_color(lblRh, lv_color_hex(cRH(rh)), 0);
 
   if (lblVpd) {
     snprintf(buf, sizeof(buf), "%.2f", vpd);
@@ -872,23 +916,28 @@ static lv_obj_t *sceneGrid = nullptr;
 // Label de placeholder ("Sem cenas...") — visivel quando count == 0
 static lv_obj_t *sceneEmpty = nullptr;
 
-// Feedback visual de "trigger enviado" — bg pulsa por ~600ms apos tap
+// Feedback visual de "trigger enviado" — flash sutil no border (vira primary
+// por ~MOTION_FAST + MOTION_MED) pra confirmar tap sem ser ofensivo. Era um
+// pulse opa do bg que ficava muito chamativo no DS clean.
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   if (idx < 0 || idx >= sceneCount) return;
   printf("[ui] cena trigger idx=%d (%s)\n", idx, sceneNames[idx]);
   if (onSceneTrigger) onSceneTrigger(idx);
 
-  // Pulse no card pra confirmar tap (animar background opa)
+  // Flash de border primary -> volta ao border neutro. MOTION_FAST entrada,
+  // MOTION_MED retorno. Ease standard pro feel "tap material".
   lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
+  lv_obj_set_style_border_color(btn, lv_color_hex(COL_PRIMARY), 0);
   lv_anim_t a;
   lv_anim_init(&a);
   lv_anim_set_var(&a, btn);
-  lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_60);
-  lv_anim_set_time(&a, 200);
-  lv_anim_set_playback_time(&a, 400);
+  lv_anim_set_values(&a, 0xFF, 0x00);  // marker — usado pelo callback p/ trigger reset
+  lv_anim_set_time(&a, MOTION_FAST + MOTION_MED);
   lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-    lv_obj_set_style_bg_opa((lv_obj_t*)obj, v, 0);
+    if (v < 0x40) {
+      lv_obj_set_style_border_color((lv_obj_t*)obj, lv_color_hex(COL_BORDER), 0);
+    }
   });
   lv_anim_start(&a);
 }
@@ -908,17 +957,33 @@ static void rebuildSceneGrid() {
     sceneEmpty = nullptr;
   }
 
-  // Sem cenas: mostra placeholder textual no centro do tab
+  // Sem cenas: empty state DS — icone dim grande + texto secundario.
+  // Padrao consistente com empty states do app web (ex: lista vazia).
   if (sceneCount == 0) {
-    sceneEmpty = lv_label_create(sceneTab);
+    lv_obj_t *emptyWrap = lv_obj_create(sceneTab);
+    lv_obj_set_size(emptyWrap, sw(220), sh(80));
+    lv_obj_align(emptyWrap, LV_ALIGN_CENTER, 0, sh(8));
+    lv_obj_set_style_bg_opa(emptyWrap, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(emptyWrap, 0, 0);
+    lv_obj_set_style_pad_all(emptyWrap, 0, 0);
+    lv_obj_clear_flag(emptyWrap, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *ico = lv_image_create(emptyWrap);
+    lv_image_set_src(ico, &ic_zap);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, 0);
+
+    sceneEmpty = lv_label_create(emptyWrap);
     lv_label_set_text(sceneEmpty,
-      "Buscando cenas...\n\n"
-      "Configure suas cenas Tuya no app\n"
-      "para acessa-las aqui");
+      "Buscando cenas...\n"
+      "Configure suas cenas Tuya no app pra acessa-las aqui.");
+    lv_label_set_long_mode(sceneEmpty, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(sceneEmpty, sw(220));
     lv_obj_set_style_text_color(sceneEmpty, lv_color_hex(COL_DIM), 0);
     lv_obj_set_style_text_font(sceneEmpty, FONT_CAPTION, 0);
     lv_obj_set_style_text_align(sceneEmpty, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(sceneEmpty, LV_ALIGN_CENTER, 0, sh(8));
+    lv_obj_align(sceneEmpty, LV_ALIGN_TOP_MID, 0, sh(20));
     return;
   }
 
@@ -947,34 +1012,32 @@ static void rebuildSceneGrid() {
     int col = i % COLS;
     int x = gridX + col * (btnW + gap);
     int y = row * (btnH + gap);
-    uint32_t color = SCENE_PALETTE[i].color;
+    uint32_t iconColor = SCENE_PALETTE[i].color;
 
+    // Card DS: bg COL_CARD, border neutra (era cor da cena — gritante).
+    // Cor da cena fica so' no icone como acento.
     lv_obj_t *btn = lv_obj_create(sceneGrid);
     lv_obj_set_size(btn, btnW, btnH);
     lv_obj_set_pos(btn, x, y);
     lv_obj_set_style_bg_color(btn, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(btn, lv_color_hex(color), 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(COL_BORDER), 0);
     lv_obj_set_style_border_width(btn, 1, 0);
-    lv_obj_set_style_radius(btn, 14, 0);
+    lv_obj_set_style_radius(btn, RADIUS_LG, 0);
     lv_obj_set_style_pad_all(btn, sw(2), 0);
+    lv_obj_set_style_shadow_width(btn, 0, 0);  // sem bloom — DS clean
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-    // Bloom sutil na cor da cena
-    lv_obj_set_style_shadow_color(btn, lv_color_hex(color), 0);
-    lv_obj_set_style_shadow_width(btn, 10, 0);
-    lv_obj_set_style_shadow_opa(btn, LV_OPA_20, 0);
-    lv_obj_set_style_shadow_spread(btn, 0, 0);
     lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
-    // Icone centralizado top — botoes maiores agora, icone fica maior tbm
+    // Icone centralizado top — cor da paleta (decorativa, nao branding)
     lv_obj_t *ico = lv_image_create(btn);
     lv_image_set_src(ico, SCENE_PALETTE[i].icon);
-    lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(iconColor), 0);
     lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
     lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(12));
 
-    // Label embaixo — usa nome real da cena (truncado se >23 chars)
+    // Label embaixo — branco fixo (DS), truncado se nome longo
     lv_obj_t *lbl = lv_label_create(btn);
     lv_label_set_text(lbl, sceneNames[i]);
     lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
@@ -1005,12 +1068,13 @@ extern "C" void cultivoUI_applyScenes(const char *names[], int count) {
 static void buildTarefas(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
+  // Header DS — icone primary (era YEL/amber), titulo + sub
   lv_obj_t *hdrIcon = lv_image_create(tab);
   lv_image_set_src(hdrIcon, &ic_zap);
-  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_YEL), 0);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
   makeLabel(tab, "CENAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
@@ -1047,10 +1111,13 @@ static const struct {
   float scale;
   // Origem do array (escolhido por idx em applyHistData).
 } HIST_METRICS[4] = {
-  {"TEMP", COL_GRN, 15, 35,  1.0f},
-  {"UMID", COL_CYN,  0, 100, 1.0f},
-  {"pH",   COL_GRN, 40, 90,  10.0f},   // pH * 10 (5.5-7.5 -> 55-75)
-  {"EC",   COL_PRP,  0, 40,  10.0f},   // EC * 10 (0-4.0 mS/cm)
+  // Cores DS: cada metrica tem cor distinta na sparkline pra leitura rapida
+  // ("essa onda laranja e' temperatura"). Valor branco fica no header — cor
+  // aqui e' decorativa, nao compete com primary/branding.
+  {"TEMP", COL_PHASE_HARVEST, 15, 35,  1.0f},   // laranja (igual app mobile)
+  {"UMID", COL_CYN,            0, 100, 1.0f},   // ciano
+  {"pH",   COL_PRP,           40, 90,  10.0f},  // roxo claro (5.5-7.5 -> 55-75)
+  {"EC",   COL_AMBER,          0, 40,  10.0f},  // amber (0-4.0 mS/cm)
 };
 
 static const float *histArrayFor(int metric) {
@@ -1067,10 +1134,10 @@ static void applyHistData() {
   if (!histChart || !histSer) return;
   auto &m = HIST_METRICS[histMetric];
   lv_chart_set_range(histChart, LV_CHART_AXIS_PRIMARY_Y, m.ymin, m.ymax);
+  // Linha do chart pega cor da metrica (decorativo); outline pulse nao muda
+  // (fica COL_PRIMARY fixo via applyRingPulse no buildHistorico).
   lv_obj_set_style_line_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_INDICATOR);
-  // Pulse outline segue a metrica ativa
-  lv_obj_set_style_outline_color(histChart, lv_color_hex(m.color), 0);
 
   const float *arr = histArrayFor(histMetric);
   // histCount = pontos validos. Resto dos 24 fica como LV_CHART_POINT_NONE
@@ -1095,37 +1162,46 @@ extern "C" void cultivoUI_applyHistory(void) {
 
 static lv_obj_t *histMetricBtns[4] = {nullptr};
 
-static void histMetricCb(lv_event_t *e) {
-  int idx = (int)(intptr_t)lv_event_get_user_data(e);
-  histMetric = idx;
+// Aplica visual de pill DS aos botoes — ativo: bg primary + texto branco;
+// inativo: bg transparent + border neutra + texto dim. Estilo iOS segmented.
+static void histStylePills(int activeIdx) {
   for (int i = 0; i < 4; i++) {
-    bool sel = (i == idx);
+    bool sel = (i == activeIdx);
     lv_obj_set_style_bg_color(histMetricBtns[i],
-      lv_color_hex(sel ? HIST_METRICS[i].color : COL_CARD), 0);
+      lv_color_hex(sel ? COL_PRIMARY : COL_CARD), 0);
+    lv_obj_set_style_bg_opa(histMetricBtns[i],
+      sel ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_color(histMetricBtns[i],
-      lv_color_hex(sel ? HIST_METRICS[i].color : COL_BORDER), 0);
+      lv_color_hex(sel ? COL_PRIMARY : COL_BORDER), 0);
     lv_obj_t *lbl = lv_obj_get_child(histMetricBtns[i], 0);
     if (lbl) lv_obj_set_style_text_color(lbl,
       lv_color_hex(sel ? COL_TEXT : COL_DIM), 0);
   }
+}
+
+static void histMetricCb(lv_event_t *e) {
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  histMetric = idx;
+  histStylePills(idx);
   applyHistData();
 }
 
 static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_color(tab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
+  // Header — icone primary (era ciano), titulo + sub
   lv_obj_t *hdrIcon = lv_image_create(tab);
   lv_image_set_src(hdrIcon, &ic_activity);
-  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
   makeLabel(tab, "HISTORICO", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
   makeLabel(tab, "ultimas 24h", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
 
-  // Chart
+  // Chart DS — bg = COL_CARD elevado, border neutra finissima, line_width 3
   int btnH     = sh(32);
   int btnAreaH = btnH + sh(10);  // botao + gap
   histChart = lv_chart_create(tab);
@@ -1137,55 +1213,71 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_bg_color(histChart, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_border_color(histChart, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(histChart, 1, 0);
-  lv_obj_set_style_radius(histChart, 8, 0);
+  lv_obj_set_style_radius(histChart, RADIUS_LG, 0);
   lv_obj_set_style_line_color(histChart, lv_color_hex(COL_BORDER), LV_PART_MAIN);
-  lv_obj_set_style_line_width(histChart, sw(2), LV_PART_ITEMS);
+  lv_obj_set_style_line_width(histChart, sw(3), LV_PART_ITEMS);
   lv_obj_set_style_width(histChart,  0, LV_PART_INDICATOR);
   lv_obj_set_style_height(histChart, 0, LV_PART_INDICATOR);
   lv_obj_set_style_pad_all(histChart, sw(6), 0);
-  histSer = lv_chart_add_series(histChart, lv_color_hex(COL_GRN), LV_CHART_AXIS_PRIMARY_Y);
+  histSer = lv_chart_add_series(histChart, lv_color_hex(COL_PRIMARY), LV_CHART_AXIS_PRIMARY_Y);
 
-  // Pulse "live" — outline do chart pulsando opacity, igual aos cards Home.
-  // Cor segue a metrica ativa (re-aplicada em applyHistData).
-  applyRingPulse(histChart, HIST_METRICS[0].color, 3500, 0);
+  // Pulse "live" no outline do chart — feel de monitor ativo. Usa motion
+  // breath token (2500ms) pra alinhar com --motion-breath do CSS, e cor
+  // PRIMARY (nao muda por metrica) — assim a "respiracao" e' brand-coerente.
+  applyRingPulse(histChart, COL_PRIMARY, MOTION_BREATH, 0);
 
-  // Botoes de metrica (bottom) — so o ativo acende; inativos ficam "neutros"
-  // com border COL_BORDER e texto COL_DIM, senao todos parecem selecionados.
+  // Botoes pill (segmented control) — DS style. Inicializa como botoes
+  // neutros; histStylePills aplica o estado visual logo abaixo.
   int btnGap = sw(8);
   int btnW = (SCREEN_W - sw(16) - btnGap * 3) / 4;
   for (int i = 0; i < 4; i++) {
-    bool sel = (i == 0);
     lv_obj_t *btn = lv_btn_create(tab);
     lv_obj_set_size(btn, btnW, btnH);
     lv_obj_align(btn, LV_ALIGN_BOTTOM_LEFT,
                  sw(8) + i * (btnW + btnGap), -sh(6));
-    lv_obj_set_style_bg_color(btn,
-      lv_color_hex(sel ? HIST_METRICS[i].color : COL_CARD), 0);
-    lv_obj_set_style_border_color(btn,
-      lv_color_hex(sel ? HIST_METRICS[i].color : COL_BORDER), 0);
     lv_obj_set_style_border_width(btn, 1, 0);
-    lv_obj_set_style_radius(btn, sh(8), 0);
+    lv_obj_set_style_radius(btn, RADIUS_XL, 0);  // pill radius
     lv_obj_set_style_shadow_width(btn, 0, 0);
     lv_obj_add_event_cb(btn, histMetricCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
     lv_obj_t *lbl = makeLabel(btn, HIST_METRICS[i].name,
-                              sel ? COL_TEXT : COL_DIM,
-                              FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+                              COL_DIM, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
     (void)lbl;
     histMetricBtns[i] = btn;
   }
+  histStylePills(0);  // TEMP ativo no boot
 
   applyHistData();
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Navbar + troca de tela (fade) — identico ao main_lvgl.cpp
+// Navbar DS — 3 tabs com indicador linha topo no tab ativo (estilo iOS/Material).
+// Atualiza cor do icone (primary se ativo, dim caso contrario) E posiciona
+// o indicator com animacao fast (150ms) — "swipe" entre tabs.
 // ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t *navIndicator = nullptr;
+
 static void navSetActive(int idx) {
   for (int i = 0; i < NAV_COUNT; i++) {
     bool sel = (i == idx);
     lv_obj_set_style_image_recolor(navIcons[i],
-      lv_color_hex(sel ? NAV_COLORS[i] : COL_DIM), 0);
+      lv_color_hex(sel ? COL_PRIMARY : COL_DIM), 0);
     lv_obj_set_style_image_recolor_opa(navIcons[i], LV_OPA_COVER, 0);
+  }
+
+  // Indicator linha primary no topo do tab ativo. Anima x_pos com motion fast.
+  if (navIndicator) {
+    int btnW = SCREEN_W / NAV_COUNT;
+    int targetX = idx * btnW;
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, navIndicator);
+    int32_t curX = lv_obj_get_x(navIndicator);
+    lv_anim_set_values(&a, curX, targetX);
+    lv_anim_set_time(&a, MOTION_FAST);
+    lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+      lv_obj_set_x((lv_obj_t*)obj, v);
+    });
+    lv_anim_start(&a);
   }
 }
 
@@ -1225,7 +1317,9 @@ static void buildNavbar(lv_obj_t *parent) {
   navbar = lv_obj_create(parent);
   lv_obj_set_size(navbar, SCREEN_W, TABBAR_H);
   lv_obj_align(navbar, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_set_style_bg_color(navbar, lv_color_hex(0x0A0F17), 0);
+  // BG = COL_BG (mesmo do tab) pra dar feel "single surface" — separa so'
+  // pela border-top finissima COL_BORDER. Era 0x0A0F17 arbitrario.
+  lv_obj_set_style_bg_color(navbar, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(navbar, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(navbar, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(navbar, 1, 0);
@@ -1235,6 +1329,21 @@ static void buildNavbar(lv_obj_t *parent) {
   lv_obj_clear_flag(navbar, LV_OBJ_FLAG_SCROLLABLE);
 
   int btnW = SCREEN_W / NAV_COUNT;
+
+  // Indicator: linha 2px PRIMARY no topo, posicionado sobre o tab ativo.
+  // Criado ANTES dos botoes pra ficar atras (z-order natural — botoes
+  // desenham por cima mas mantem clickable).
+  navIndicator = lv_obj_create(navbar);
+  lv_obj_set_size(navIndicator, btnW, sh(2));
+  lv_obj_set_pos(navIndicator, 0, 0);
+  lv_obj_set_style_bg_color(navIndicator, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(navIndicator, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(navIndicator, 0, 0);
+  lv_obj_set_style_radius(navIndicator, 0, 0);
+  lv_obj_set_style_pad_all(navIndicator, 0, 0);
+  lv_obj_clear_flag(navIndicator, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(navIndicator, LV_OBJ_FLAG_SCROLLABLE);
+
   for (int i = 0; i < NAV_COUNT; i++) {
     lv_obj_t *btn = lv_obj_create(navbar);
     lv_obj_set_size(btn, btnW, TABBAR_H);
