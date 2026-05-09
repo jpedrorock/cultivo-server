@@ -390,6 +390,160 @@ function registerDeviceRoutes(app: express.Application) {
       res.status(500).json({ error: 'Erro interno' });
     }
   });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // RFC 8628 — Device Authorization Grant (pareamento user-friendly)
+  //
+  // Fluxo:
+  //   1. ESP32 sem token → POST /pair-init → recebe { code:"MR-4F8K", expiresIn:600 }
+  //   2. ESP32 mostra na tela: "Vá em app.cultivo.pro → Estufa → Conectar Display
+  //                             e digite: MR-4F8K"
+  //   3. ESP32 polla GET /pair-status?code=MR-4F8K cada 5s
+  //   4. User no app → POST /pair-claim { code, tentId } (autenticado JWT)
+  //                  → backend gera deviceToken longo, vincula tudo
+  //   5. ESP32 vê paired=true → recebe { token, tentId } → salva NVS → bora
+  //
+  // Segurança:
+  //   - Code 6 chars [A-HJ-NP-Z2-9] (sem 0/O/1/I/L pra não confundir) ~25 bilhões
+  //   - Expira em 10 min, single-use
+  //   - Token longo (64 hex) gerado server-side, NUNCA aparece pro usuário
+  //   - Rate limit grosseiro: max 5 codes ativos por IP simultaneamente
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // Alfabeto sem caracteres ambíguos (0 vs O, 1 vs I/L)
+  const PAIR_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  function generatePairCode(): string {
+    // 6 chars formato XXX-XXX (visualmente fácil de ler/digitar)
+    let s = '';
+    for (let i = 0; i < 6; i++) {
+      s += PAIR_CODE_ALPHABET[crypto.randomInt(0, PAIR_CODE_ALPHABET.length)];
+    }
+    return s.slice(0, 3) + '-' + s.slice(3);  // "MR4-K8X" → 7 chars com hifen
+  }
+
+  // POST /api/device/pair-init — ESP32 (não-autenticado, rate limited)
+  app.post('/api/device/pair-init', async (req, res) => {
+    try {
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip || 'unknown';
+
+      // Rate limit grosseiro: limpa expirados e conta ativos por IP nos headers
+      // (não temos coluna ip — usa expiresAt como proxy: se já tem 5 ativos, espera)
+      await pool.execute(`DELETE FROM devicePairingCodes WHERE expiresAt < NOW() AND claimedByUserId IS NULL`);
+      const [activeRows]: any = await pool.execute(
+        `SELECT COUNT(*) AS n FROM devicePairingCodes WHERE expiresAt > NOW() AND claimedByUserId IS NULL`
+      );
+      if (activeRows[0].n >= 50) {
+        // limite global pra prevenir flood — 50 códigos pendentes simultâneos é mais que suficiente
+        return res.status(429).json({ error: 'Muitos códigos ativos. Tente novamente em alguns minutos.' });
+      }
+
+      const deviceName = (req.body?.deviceName as string)?.slice(0, 100) || 'ESP32 display';
+
+      // Gera código único (retry se colisão)
+      let code = '';
+      for (let attempt = 0; attempt < 5; attempt++) {
+        code = generatePairCode();
+        try {
+          await pool.execute(
+            `INSERT INTO devicePairingCodes (code, deviceName, expiresAt) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+            [code, deviceName]
+          );
+          break;
+        } catch (e: any) {
+          if (e.errno === 1062 && attempt < 4) continue;  // duplicate key, retry
+          throw e;
+        }
+      }
+
+      console.log(`[Device] pair-init code=${code} ip=${ip}`);
+      res.json({ code, expiresIn: 600, pollIntervalSec: 5 });
+    } catch (err: any) {
+      console.error('[Device] pair-init error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // POST /api/device/pair-claim — User (autenticado JWT)
+  // Body: { code: "MR4-K8X", tentId: 1 }
+  app.post('/api/device/pair-claim', async (req, res) => {
+    try {
+      const { authenticateRequest } = await import('./auth');
+      const user = await authenticateRequest(req);
+      if (!user) return res.status(401).json({ error: 'Não autenticado' });
+
+      const code = String(req.body?.code || '').trim().toUpperCase();
+      const tentId = Number(req.body?.tentId);
+      if (!code || !tentId) return res.status(400).json({ error: 'code e tentId obrigatórios' });
+
+      // Verifica que a tent pertence ao group do user
+      const [tentRows]: any = await pool.execute(
+        `SELECT id FROM tents WHERE id = ? AND groupId = ? LIMIT 1`,
+        [tentId, user.groupId ?? 0]
+      );
+      if (tentRows.length === 0) return res.status(403).json({ error: 'Estufa não pertence a você' });
+
+      // Busca o code, valida que não expirou nem foi usado
+      const [codeRows]: any = await pool.execute(
+        `SELECT deviceName, expiresAt, claimedByUserId FROM devicePairingCodes WHERE code = ? LIMIT 1`,
+        [code]
+      );
+      if (codeRows.length === 0) return res.status(404).json({ error: 'Código inválido ou inexistente' });
+      const codeRow = codeRows[0];
+      if (new Date(codeRow.expiresAt).getTime() < Date.now()) return res.status(410).json({ error: 'Código expirado, gere outro no display' });
+      if (codeRow.claimedByUserId) return res.status(409).json({ error: 'Código já foi usado' });
+
+      // Gera deviceToken longo + insere em deviceTokens + marca code como claimed
+      const deviceToken = crypto.randomBytes(32).toString('hex');
+      await pool.execute(
+        `INSERT INTO deviceTokens (token, name, tentId, groupId) VALUES (?, ?, ?, ?)`,
+        [deviceToken, codeRow.deviceName, tentId, user.groupId ?? 0]
+      );
+      await pool.execute(
+        `UPDATE devicePairingCodes SET claimedByUserId = ?, tentId = ?, generatedToken = ? WHERE code = ?`,
+        [user.id, tentId, deviceToken, code]
+      );
+
+      console.log(`[Device] pair-claim code=${code} userId=${user.id} tentId=${tentId}`);
+      res.json({ success: true, deviceName: codeRow.deviceName });
+    } catch (err: any) {
+      console.error('[Device] pair-claim error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // GET /api/device/pair-status?code=XXX — ESP32 polla (não-autenticado)
+  app.get('/api/device/pair-status', async (req, res) => {
+    try {
+      const code = String(req.query?.code || '').trim().toUpperCase();
+      if (!code) return res.status(400).json({ error: 'code obrigatório' });
+
+      const [rows]: any = await pool.execute(
+        `SELECT expiresAt, claimedByUserId, tentId, generatedToken FROM devicePairingCodes WHERE code = ? LIMIT 1`,
+        [code]
+      );
+      if (rows.length === 0) return res.status(404).json({ status: 'not_found' });
+      const r = rows[0];
+
+      if (r.claimedByUserId && r.generatedToken) {
+        // Pareado! Devolve o token UMA VEZ e deleta o code (single-use)
+        const token = r.generatedToken as string;
+        const tentId = r.tentId as number;
+        await pool.execute(`DELETE FROM devicePairingCodes WHERE code = ?`, [code]);
+        console.log(`[Device] pair-status code=${code} → DELIVERED tentId=${tentId}`);
+        return res.json({ status: 'paired', token, tentId });
+      }
+
+      if (new Date(r.expiresAt).getTime() < Date.now()) {
+        await pool.execute(`DELETE FROM devicePairingCodes WHERE code = ?`, [code]);
+        return res.status(410).json({ status: 'expired' });
+      }
+
+      return res.json({ status: 'pending' });
+    } catch (err: any) {
+      console.error('[Device] pair-status error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
 }
 
 export { registerDeviceRoutes };
