@@ -93,6 +93,18 @@ static void saveDeviceTokenToNVS(const char *token, int tent) {
   DEVICE_TOKEN[sizeof(DEVICE_TOKEN) - 1] = '\0';
   TENT_ID = tent;
 }
+
+// Limpa SOMENTE o token (preserva WiFi + URL). Usado pra forçar entrada em
+// modo pareamento sem perder credenciais — chamado pelo botão "Limpar token"
+// no config modal e em casos de fluxo de teste.
+static void clearTokenOnlyNVS() {
+  prefs.begin("cultivo", false);
+  prefs.remove("token");
+  prefs.remove("tent");
+  prefs.end();
+  DEVICE_TOKEN[0] = '\0';
+  TENT_ID = 1;
+}
 // ════════════════════════════════════════════════════════════════════════════════
 
 // ── Driver de display ───────────────────────────────────────────────────────────
@@ -602,6 +614,24 @@ static void openConfigModal() {
   addField("Device Token",   DEVICE_TOKEN, &taToken);
   char tentStr[12]; snprintf(tentStr, sizeof(tentStr), "%d", TENT_ID);
   addField("Tent ID",        tentStr,      &taTent,  false, true);
+
+  // Botao "Limpar token" — limpa SOMENTE token+tent (preserva WiFi+URL),
+  // forca entrada em modo pareamento RFC 8628 no proximo boot. Util pra
+  // testar fluxo ou re-parear sem perder credenciais WiFi.
+  lv_obj_t *btnReparear = lv_btn_create(list);
+  lv_obj_set_width(btnReparear, lv_pct(100));
+  lv_obj_set_height(btnReparear, sh(34));
+  lv_obj_set_style_bg_color(btnReparear, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(btnReparear, lv_color_hex(COL_PRP), 0);
+  lv_obj_set_style_border_width(btnReparear, 1, 0);
+  lv_obj_add_event_cb(btnReparear, [](lv_event_t *e) {
+    Serial.println("[cfg] limpar token -> reboot p/ pareamento");
+    clearTokenOnlyNVS();
+    delay(300);
+    ESP.restart();
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnReparear, "Limpar token (re-parear)", COL_PRP, FONT_BODY,
+            LV_ALIGN_CENTER, 0, 0);
 
   // Botoes no rodape
   lv_obj_t *btnCancel = lv_btn_create(configModal);
