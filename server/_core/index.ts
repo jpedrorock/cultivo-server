@@ -6,6 +6,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerDeviceRoutes } from "./deviceRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -208,6 +209,9 @@ async function startServer() {
 
   // Rotas de autenticação JWT (registro, login, logout, me)
   registerAuthRoutes(app);
+
+  // Rotas REST p/ ESP32 display (X-Device-Token auth, sem JWT)
+  registerDeviceRoutes(app);
 
   // Landing page de redirecionamento para QR codes de plantas
   app.get("/scan/plant/:id", (req, res) => {

@@ -509,6 +509,24 @@ const MIGRATIONS: Migration[] = [
       await addColumnIfNotExists(c, 'plantStructures', 'potSizeL', 'FLOAT NOT NULL DEFAULT 5');
     },
   },
+  {
+    id: 'create-deviceTokens',
+    description: 'Cria tabela deviceTokens (X-Device-Token p/ ESP32 display)',
+    run: async (c) => {
+      await c.query(`
+        CREATE TABLE IF NOT EXISTS \`deviceTokens\` (
+          \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+          \`token\`     VARCHAR(64) NOT NULL UNIQUE,
+          \`name\`      VARCHAR(100) NOT NULL,
+          \`tentId\`    INT NOT NULL,
+          \`groupId\`   INT NOT NULL,
+          \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          INDEX \`idx_deviceTokens_tent\` (\`tentId\`),
+          INDEX \`idx_deviceTokens_group\` (\`groupId\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
