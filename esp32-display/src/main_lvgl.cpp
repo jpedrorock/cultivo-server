@@ -81,6 +81,18 @@ static void clearConfigNVS() {
   prefs.clear();
   prefs.end();
 }
+
+// Salva apenas token+tentId apos pareamento RFC 8628 — preserva ssid/pass/url.
+static void saveDeviceTokenToNVS(const char *token, int tent) {
+  prefs.begin("cultivo", false);
+  prefs.putString("token", token);
+  prefs.putInt   ("tent",  tent);
+  prefs.end();
+  // Tambem atualiza globais em RAM
+  strncpy(DEVICE_TOKEN, token, sizeof(DEVICE_TOKEN) - 1);
+  DEVICE_TOKEN[sizeof(DEVICE_TOKEN) - 1] = '\0';
+  TENT_ID = tent;
+}
 // ════════════════════════════════════════════════════════════════════════════════
 
 // ── Driver de display ───────────────────────────────────────────────────────────
@@ -1211,6 +1223,104 @@ static bool httpBegin(HTTPClient &http, const char *url) {
   return http.begin(httpPlainClient, url);
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// Device pairing flow (RFC 8628 Device Authorization Grant)
+// User boot sem token? Chama pair-init -> mostra code -> polla pair-status
+// cada 5s ate' user digitar o code no app web. Quando o app pareia, retorna
+// { token, tentId } — salvamos em NVS e seguimos pro fluxo normal.
+// ════════════════════════════════════════════════════════════════════════════════
+struct PairInitResult {
+  bool   ok;
+  char   code[16];
+  int    expiresIn;
+  int    pollIntervalSec;
+  int    httpCode;
+};
+
+struct PairStatusResult {
+  // status: 0=pending, 1=paired, 2=expired, 3=not_found, -1=erro/timeout
+  int    status;
+  char   token[65];
+  int    tentId;
+};
+
+static bool postPairInit(PairInitResult *out) {
+  if (!wifiOk || !out) return false;
+  HTTPClient http;
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/pair-init", SERVER_URL);
+  httpBegin(http, url);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(8000);
+  // Body opcional — manda nome amigavel pro user identificar no app
+  int code = http.POST("{\"deviceName\":\"ESP32-display\"}");
+  out->httpCode = code;
+  if (code != 200) {
+    Serial.printf("[pair] pair-init HTTP %d\n", code);
+    if (code > 0) Serial.printf("[pair] body: %s\n", http.getString().substring(0, 200).c_str());
+    http.end();
+    out->ok = false;
+    return false;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) {
+    Serial.printf("[pair] pair-init JSON parse err: %s\n", err.c_str());
+    out->ok = false;
+    return false;
+  }
+  const char *codeStr = doc["code"];
+  if (!codeStr) { out->ok = false; return false; }
+  strncpy(out->code, codeStr, sizeof(out->code) - 1);
+  out->code[sizeof(out->code) - 1] = '\0';
+  out->expiresIn       = doc["expiresIn"]       | 600;
+  out->pollIntervalSec = doc["pollIntervalSec"] | 5;
+  out->ok = true;
+  Serial.printf("[pair] code=%s expira em %ds (poll %ds)\n",
+                out->code, out->expiresIn, out->pollIntervalSec);
+  return true;
+}
+
+static void getPairStatus(const char *code, PairStatusResult *out) {
+  out->status = -1; out->token[0] = '\0'; out->tentId = 0;
+  if (!wifiOk || !code) return;
+  HTTPClient http;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/pair-status?code=%s", SERVER_URL, code);
+  httpBegin(http, url);
+  http.setTimeout(5000);
+  int httpCode = http.GET();
+  if (httpCode == 410) { out->status = 2; http.end(); return; }  // expired
+  if (httpCode == 404) { out->status = 3; http.end(); return; }  // not_found
+  if (httpCode != 200) {
+    Serial.printf("[pair] pair-status HTTP %d\n", httpCode);
+    http.end();
+    return;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return;
+  const char *st = doc["status"];
+  if (!st) return;
+  if (strcmp(st, "paired") == 0) {
+    out->status = 1;
+    const char *tk = doc["token"];
+    if (tk) {
+      strncpy(out->token, tk, sizeof(out->token) - 1);
+      out->token[sizeof(out->token) - 1] = '\0';
+    }
+    out->tentId = doc["tentId"] | 1;
+  } else if (strcmp(st, "expired") == 0) {
+    out->status = 2;
+  } else if (strcmp(st, "not_found") == 0) {
+    out->status = 3;
+  } else {
+    out->status = 0;  // pending (or unknown — trata como pending)
+  }
+}
+
 // POST /api/device/refresh-tuya/:tentId — forca poll imediato no servidor
 // Retorna tempC/rh/vpd frescos (pH/EC nao vem do Tuya).
 // Flag refreshPending declarada no topo do arquivo; setada via tap handlers.
@@ -1444,6 +1554,178 @@ static void buildUI() {
 // ════════════════════════════════════════════════════════════════════════════════
 // Arduino entry points
 // ════════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════════
+// Tela de pareamento (RFC 8628) — fullscreen overlay igual splash/AP screen.
+// Mostrado quando o device tem WiFi mas nao tem token. Faz pair-init pra
+// obter o code, polla pair-status ate' o user digitar o code no app web.
+// ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t *pairScreen   = nullptr;
+static lv_obj_t *lblPairCode  = nullptr;
+static lv_obj_t *lblPairTimer = nullptr;
+static lv_obj_t *lblPairHint  = nullptr;
+
+static void buildPairScreen() {
+  pairScreen = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(pairScreen, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(pairScreen, 0, 0);
+  lv_obj_set_style_bg_color(pairScreen, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(pairScreen, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(pairScreen, 0, 0);
+  lv_obj_set_style_radius(pairScreen, 0, 0);
+  lv_obj_set_style_pad_all(pairScreen, 0, 0);
+  lv_obj_clear_flag(pairScreen, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Glow verde sutil canto superior — match estetica das outras telas
+  lv_obj_t *glow = lv_obj_create(pairScreen);
+  lv_obj_set_size(glow, SCREEN_W * 3 / 5, SCREEN_H * 2 / 3);
+  lv_obj_set_pos(glow, 0, 0);
+  lv_obj_set_style_bg_color(glow, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_bg_opa(glow, LV_OPA_10, 0);
+  lv_obj_set_style_bg_grad_color(glow, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_grad_dir(glow, LV_GRAD_DIR_HOR, 0);
+  lv_obj_set_style_border_width(glow, 0, 0);
+  lv_obj_set_style_radius(glow, 0, 0);
+  lv_obj_remove_flag(glow, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(glow, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Header — "CONECTAR DISPLAY"
+  makeLabel(pairScreen, "CONECTAR DISPLAY", COL_GRN, FONT_TITLE,
+            LV_ALIGN_TOP_MID, 0, sh(12));
+  makeLabel(pairScreen, "Vincule este display \xC3\xA0 sua estufa",
+            COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_MID, 0, sh(40));
+
+  // Code central — fonte VALUE (geist_bold_40), com ext_click_area p/ user
+  // saber que da' pra interagir. Letterspacing alto p/ legibilidade a distancia.
+  lblPairCode = lv_label_create(pairScreen);
+  lv_label_set_text(lblPairCode, "------");
+  lv_obj_set_style_text_color(lblPairCode, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(lblPairCode, FONT_VALUE, 0);
+  lv_obj_set_style_text_letter_space(lblPairCode, sw(6), 0);
+  lv_obj_align(lblPairCode, LV_ALIGN_CENTER, 0, -sh(8));
+
+  // Hint — onde digitar
+  lblPairHint = lv_label_create(pairScreen);
+  lv_label_set_text(lblPairHint, "app.cultivo.pro \xE2\x86\x92 Conectar Display");
+  lv_obj_set_style_text_color(lblPairHint, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_text_font(lblPairHint, FONT_BODY, 0);
+  lv_obj_align(lblPairHint, LV_ALIGN_CENTER, 0, sh(48));
+
+  // Timer countdown abaixo
+  lblPairTimer = lv_label_create(pairScreen);
+  lv_label_set_text(lblPairTimer, "expira em --:--");
+  lv_obj_set_style_text_color(lblPairTimer, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(lblPairTimer, FONT_CAPTION, 0);
+  lv_obj_align(lblPairTimer, LV_ALIGN_BOTTOM_MID, 0, -sh(36));
+
+  // Botao "Trocar WiFi" — limpa NVS e reboota -> AP portal
+  lv_obj_t *btnReset = lv_btn_create(pairScreen);
+  lv_obj_set_size(btnReset, sw(100), sh(28));
+  lv_obj_align(btnReset, LV_ALIGN_BOTTOM_MID, 0, -sh(6));
+  lv_obj_set_style_bg_color(btnReset, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_border_width(btnReset, 1, 0);
+  lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
+    Serial.println("[pair] user cancelou — clearConfigNVS + reboot p/ AP portal");
+    clearConfigNVS();
+    delay(300);
+    ESP.restart();
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnReset, "Trocar WiFi", COL_DIM, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+}
+
+static void updatePairCode(const char *code) {
+  if (lblPairCode) lv_label_set_text(lblPairCode, code);
+}
+
+static void updatePairTimer(int secondsLeft) {
+  if (!lblPairTimer) return;
+  if (secondsLeft < 0) secondsLeft = 0;
+  char buf[32];
+  snprintf(buf, sizeof(buf), "expira em %d:%02d", secondsLeft / 60, secondsLeft % 60);
+  lv_label_set_text(lblPairTimer, buf);
+}
+
+static void dismissPairScreen() {
+  if (pairScreen) {
+    lv_obj_del(pairScreen);
+    pairScreen = nullptr;
+    lblPairCode = lblPairTimer = lblPairHint = nullptr;
+  }
+}
+
+// Bloqueia o setup() rodando lv_timer_handler + polling pair-status ate'
+// o user parear via app web. Salva token em NVS e retorna quando paired.
+// Retry de pair-init em caso de falha de rede com backoff de 30s.
+static bool runPairingFlow() {
+  buildPairScreen();
+  lv_timer_handler();
+  delay(20);
+
+  PairInitResult pi = {};
+  unsigned long lastPoll  = 0;
+  unsigned long expireAt  = 0;
+  unsigned long pollMs    = 5000;
+  bool haveCode = false;
+
+  // Get first code
+  while (!haveCode) {
+    if (postPairInit(&pi) && pi.ok) {
+      updatePairCode(pi.code);
+      haveCode = true;
+      pollMs   = pi.pollIntervalSec * 1000;
+      expireAt = millis() + (unsigned long)pi.expiresIn * 1000;
+    } else {
+      Serial.println("[pair] pair-init falhou, retry em 30s");
+      updatePairCode("ERRO");
+      // Aguarda 30s renderizando UI
+      unsigned long w = millis();
+      while (millis() - w < 30000) { lv_timer_handler(); delay(20); }
+    }
+  }
+
+  // Loop polling
+  for (;;) {
+    lv_timer_handler();
+    delay(20);
+
+    long secLeft = ((long)expireAt - (long)millis()) / 1000;
+    updatePairTimer((int)secLeft);
+
+    // Code expirou? Pede outro automaticamente.
+    if (secLeft <= 0) {
+      Serial.println("[pair] code expirou, gerando novo");
+      if (postPairInit(&pi) && pi.ok) {
+        updatePairCode(pi.code);
+        pollMs   = pi.pollIntervalSec * 1000;
+        expireAt = millis() + (unsigned long)pi.expiresIn * 1000;
+        lastPoll = 0;
+      } else {
+        // Backoff 30s renderizando
+        unsigned long w = millis();
+        while (millis() - w < 30000) { lv_timer_handler(); delay(20); }
+      }
+      continue;
+    }
+
+    // Polling pair-status
+    if (millis() - lastPoll >= pollMs) {
+      lastPoll = millis();
+      PairStatusResult ps;
+      getPairStatus(pi.code, &ps);
+      if (ps.status == 1) {  // paired!
+        Serial.printf("[pair] paired! tentId=%d\n", ps.tentId);
+        saveDeviceTokenToNVS(ps.token, ps.tentId);
+        dismissPairScreen();
+        return true;
+      } else if (ps.status == 2 || ps.status == 3) {
+        // expired ou not_found — gera novo code na proxima iteracao
+        expireAt = millis();  // forca renovacao
+      }
+      // ps.status 0 (pending) ou -1 (erro tx) — continua pollando
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.printf("\n[boot] Cultivo ESP32 Display fw=%s\n", FW_VERSION);
@@ -1521,6 +1803,15 @@ void setup() {
   } else {
     Serial.println("[boot] sem WiFi salvo — UI offline, toque no gear pra configurar");
     wifiOk = false;
+  }
+
+  // Pareamento RFC 8628: WiFi OK mas sem device token? Mostra code e polla
+  // o server ate' o user vincular o display via app web. Bloqueia setup ate'
+  // parear (ou user cancelar -> reset NVS -> reboot pra AP portal).
+  if (wifiOk && strlen(DEVICE_TOKEN) == 0) {
+    Serial.println("[boot] sem device token — entrando em modo pareamento");
+    runPairingFlow();  // bloqueia ate' paired (ou reboot via cancel)
+    Serial.println("[boot] paired OK, retomando fluxo normal");
   }
 
   if (wifiOk) {
