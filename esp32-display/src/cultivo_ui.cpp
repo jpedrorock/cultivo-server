@@ -840,16 +840,27 @@ static void buildPhEc(lv_obj_t *tab) {
 // ════════════════════════════════════════════════════════════════════════════════
 struct SceneBtn {
   const char *label;
-  const char *desc;
   uint32_t color;
   const lv_image_dsc_t *icon;
-  int sceneId;
 };
 
+// 12 slots fixos (sceneId == idx do array). Server mapeia cada slot p/ cena
+// Tuya real via env var TUYA_SCENE_<idx>=<sceneId> ou <homeId>:<sceneId>.
+// Labels/icones aqui sao defaults — usuario edita no firmware se quiser
+// renomear. iOS-style 2x6 grid de atalhos rapidos.
 static const SceneBtn SCENES[] = {
-  { "IRRIGAR",  "Aciona valvula/bomba",   COL_CYN, &ic_droplet,   0 },
-  { "LUZ OFF",  "Desliga LED da estufa",  COL_YEL, &ic_lightbulb, 1 },
-  { "CUSTOM",   "Cena configuravel",      COL_PRP, &ic_zap,       2 },
+  { "Irrigar",  COL_CYN, &ic_droplet     },  // 0
+  { "Luz On",   COL_YEL, &ic_lightbulb   },  // 1
+  { "Luz Off",  COL_DIM, &ic_lightbulb   },  // 2
+  { "Exaustor", COL_BLU, &ic_activity    },  // 3
+  { "Umid",     COL_CYN, &ic_droplets    },  // 4
+  { "AC",       COL_RED, &ic_thermometer },  // 5
+  { "CO2",      COL_GRN, &ic_sprout      },  // 6
+  { "Bomba",    COL_PRP, &ic_flask       },  // 7
+  { "pH",       COL_GRN, &ic_beaker      },  // 8
+  { "EC",       COL_PRP, &ic_test_tube   },  // 9
+  { "Refresh",  COL_DIM, &ic_refresh     },  // 10
+  { "Custom",   COL_YEL, &ic_zap         },  // 11
 };
 static const int NUM_SCENES = sizeof(SCENES) / sizeof(SCENES[0]);
 
@@ -857,8 +868,8 @@ static const int NUM_SCENES = sizeof(SCENES) / sizeof(SCENES[0]);
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   if (idx < 0 || idx >= NUM_SCENES) return;
-  printf("[ui] cena trigger sceneId=%d (%s)\n", SCENES[idx].sceneId, SCENES[idx].label);
-  if (onSceneTrigger) onSceneTrigger(SCENES[idx].sceneId);
+  printf("[ui] cena trigger slot=%d (%s)\n", idx, SCENES[idx].label);
+  if (onSceneTrigger) onSceneTrigger(idx);
 
   // Pulse no card pra confirmar tap (animar background opa)
   lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
@@ -888,62 +899,54 @@ static void buildTarefas(lv_obj_t *tab) {
   makeLabel(tab, "CENAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
   makeLabel(tab, "Atalhos Tuya", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
 
-  // Layout em coluna — 3 botoes grandes ocupando largura quase total
-  // e altura confortavel (~80px no real). Padding interno generoso.
-  int bodyY = sh(28);
-  int bodyH = TAB_H - bodyY - sh(4);
-  int gap   = sh(6);
-  int btnH  = (bodyH - (NUM_SCENES - 1) * gap) / NUM_SCENES;
-  int btnW  = SCREEN_W - sw(16);
-  int btnX  = (SCREEN_W - btnW) / 2;
+  // Grid 2 linhas x 6 colunas — 12 slots fixos. Cada cell tem icone topo
+  // + label embaixo, estilo iOS Home (compact). Tap target ~75x100 px.
+  const int COLS = 6, ROWS = 2;
+  int gridY = sh(28);
+  int gridH = TAB_H - gridY - sh(4);
+  int gridX = sw(6);
+  int gridW = SCREEN_W - 2 * gridX;
+  int gap   = sw(4);
+  int btnW  = (gridW - (COLS - 1) * gap) / COLS;
+  int btnH  = (gridH - (ROWS - 1) * gap) / ROWS;
 
   for (int i = 0; i < NUM_SCENES; i++) {
+    int row = i / COLS;
+    int col = i % COLS;
+    int x = gridX + col * (btnW + gap);
+    int y = gridY + row * (btnH + gap);
+
     lv_obj_t *btn = lv_obj_create(tab);
     lv_obj_set_size(btn, btnW, btnH);
-    lv_obj_set_pos(btn, btnX, bodyY + i * (btnH + gap));
+    lv_obj_set_pos(btn, x, y);
     lv_obj_set_style_bg_color(btn, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(btn, lv_color_hex(SCENES[i].color), 0);
-    lv_obj_set_style_border_width(btn, 2, 0);
-    lv_obj_set_style_radius(btn, 12, 0);
-    lv_obj_set_style_pad_hor(btn, sw(14), 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_set_style_radius(btn, 14, 0);
+    lv_obj_set_style_pad_all(btn, sw(2), 0);
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
-    // Bloom suave na cor da cena (signature look do design system)
+    // Bloom sutil na cor da cena
     lv_obj_set_style_shadow_color(btn, lv_color_hex(SCENES[i].color), 0);
-    lv_obj_set_style_shadow_width(btn, 18, 0);
-    lv_obj_set_style_shadow_opa(btn, LV_OPA_30, 0);
+    lv_obj_set_style_shadow_width(btn, 10, 0);
+    lv_obj_set_style_shadow_opa(btn, LV_OPA_20, 0);
     lv_obj_set_style_shadow_spread(btn, 0, 0);
-    lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED,
-                        (void*)(intptr_t)i);
+    lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
-    // Icone grande a esquerda
+    // Icone centralizado top
     lv_obj_t *ico = lv_image_create(btn);
     lv_image_set_src(ico, SCENES[i].icon);
     lv_obj_set_style_image_recolor(ico, lv_color_hex(SCENES[i].color), 0);
     lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(8));
 
-    // Label principal
-    lv_obj_t *lblName = lv_label_create(btn);
-    lv_label_set_text(lblName, SCENES[i].label);
-    lv_obj_set_style_text_color(lblName, lv_color_hex(SCENES[i].color), 0);
-    lv_obj_set_style_text_font(lblName, FONT_TITLE, 0);
-    lv_obj_align(lblName, LV_ALIGN_LEFT_MID, sw(36), -sh(7));
-
-    // Descricao secundaria
-    lv_obj_t *lblDesc = lv_label_create(btn);
-    lv_label_set_text(lblDesc, SCENES[i].desc);
-    lv_obj_set_style_text_color(lblDesc, lv_color_hex(COL_DIM), 0);
-    lv_obj_set_style_text_font(lblDesc, FONT_CAPTION, 0);
-    lv_obj_align(lblDesc, LV_ALIGN_LEFT_MID, sw(36), sh(8));
-
-    // Indicador "play" do lado direito
-    lv_obj_t *playIco = lv_image_create(btn);
-    lv_image_set_src(playIco, &ic_play);
-    lv_obj_set_style_image_recolor(playIco, lv_color_hex(SCENES[i].color), 0);
-    lv_obj_set_style_image_recolor_opa(playIco, LV_OPA_COVER, 0);
-    lv_obj_align(playIco, LV_ALIGN_RIGHT_MID, 0, 0);
+    // Label embaixo
+    lv_obj_t *lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, SCENES[i].label);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
+    lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
   }
 }
 

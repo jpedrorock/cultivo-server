@@ -1609,9 +1609,13 @@ static void refreshHandler() {
 // claude/smartlife-scenes-opt-in ja' tem a infra triggerTuyaScene + tabela
 // tuyaManualScenes; falta so' expor o endpoint Express de device-side).
 // Sem WiFi este request descarta logo no inicio (silent fail OK).
-static const char *SCENE_NAMES[] = { "irrigar", "luz-off", "custom" };
+// Nomes friendly p/ logs — index = sceneId/slot (server mapeia via TUYA_SCENE_X)
+static const char *SCENE_NAMES[12] = {
+  "irrigar", "luz-on", "luz-off", "exaustor", "umid", "ac",
+  "co2",     "bomba",  "ph",      "ec",       "refresh", "custom"
+};
 static void sceneTriggerHandler(int sceneId) {
-  const char *name = (sceneId >= 0 && sceneId < 3) ? SCENE_NAMES[sceneId] : "?";
+  const char *name = (sceneId >= 0 && sceneId < 12) ? SCENE_NAMES[sceneId] : "?";
   Serial.printf("[scene] trigger sceneId=%d (%s)\n", sceneId, name);
   if (!wifiOk) {
     Serial.println("[scene] WiFi offline — request descartado");
