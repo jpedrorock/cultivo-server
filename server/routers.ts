@@ -418,6 +418,25 @@ async function callAiProviderWithFallback(opts: Parameters<typeof callAiProvider
   throw new Error(lastError || `Nenhum modelo disponível para ${provider}`);
 }
 
+// ─── Backup import validation primitives ─────────────────────────────────────
+//
+// Usado em backup.import (linha ~6850) — valida cada row do backup uploadado.
+// Schema pragmático: aceita primitivos + null, bloqueia arrays/objetos aninhados,
+// limita tamanhos pra prevenir DoS. Substituiu z.array(z.any()) que aceitava
+// qualquer payload (vetor de XSS-stored e DoS via JSON gigante).
+const MAX_BACKUP_ROWS = 100_000;       // por tabela — generoso pra backup grande
+const MAX_BACKUP_FIELD_BYTES = 50_000; // 50KB por valor de campo (ex: nodesJson)
+const MAX_BACKUP_KEY_LEN = 64;         // nome de coluna razoável
+
+const safeBackupValue = z.union([
+  z.string().max(MAX_BACKUP_FIELD_BYTES),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+]);
+
+const safeBackupRow = z.record(z.string().max(MAX_BACKUP_KEY_LEN), safeBackupValue);
+
 // ─── Tuya / SmartLife integration router ─────────────────────────────────────
 
 const POLL_INTERVAL_OPTIONS = [30, 60, 180, 480, 720] as const;
@@ -6846,25 +6865,38 @@ export const appRouter = router({
     }),
 
     // Importar backup
+    //
+    // SEGURANÇA — antes era z.array(z.any()) em cada tabela, aceitando QUALQUER
+    // payload. Riscos: DoS via array gigante / strings de GBs / nesting infinito,
+    // e XSS-stored se algum render usasse dangerouslySetInnerHTML. Agora valida:
+    //   - cada row é dict de chaves primitivas (sem arrays/objetos aninhados)
+    //   - chaves max 64 chars
+    //   - valores max 50KB de string
+    //   - max 100k rows por tabela
+    //
+    // PRAGMÁTICO: não enumera campos exatos de cada tabela (overkill — 13 tabelas
+    // × ~20 colunas cada = 260 campos pra mapear). Drizzle valida tipo no insert
+    // contra schema real; se o cliente passar `name: 999` em vez de string,
+    // MySQL rejeita. Esta validação é "front line" pra DoS + estrutura.
     import: protectedProcedure
       .input(
         z.object({
-          version: z.string(),
-          exportDate: z.string(),
+          version: z.string().max(32),
+          exportDate: z.string().max(64),
           data: z.object({
-            tents: z.array(z.any()).optional(),
-            strains: z.array(z.any()).optional(),
-            cycles: z.array(z.any()).optional(),
-            plants: z.array(z.any()).optional(),
-            dailyLogs: z.array(z.any()).optional(),
-            taskTemplates: z.array(z.any()).optional(),
-            alertSettings: z.array(z.any()).optional(),
-            alerts: z.array(z.any()).optional(),
-            plantPhotos: z.array(z.any()).optional(),
-            plantHealthLogs: z.array(z.any()).optional(),
-            recipeTemplates: z.array(z.any()).optional(),
-            nutrientApplications: z.array(z.any()).optional(),
-            wateringApplications: z.array(z.any()).optional(),
+            tents:                z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            strains:              z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            cycles:               z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            plants:               z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            dailyLogs:            z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            taskTemplates:        z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            alertSettings:        z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            alerts:               z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            plantPhotos:          z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            plantHealthLogs:      z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            recipeTemplates:      z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            nutrientApplications: z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
+            wateringApplications: z.array(safeBackupRow).max(MAX_BACKUP_ROWS).optional(),
           }),
         })
       )
