@@ -322,19 +322,31 @@ function registerDeviceRoutes(app: express.Application) {
         cfg = cfgRows[0] ?? null;
       }
 
-      // Lê estado de TODOS os devices em paralelo (sem state se cfg ausente)
+      // Lê estado de TODOS os devices em paralelo (sem state se cfg ausente).
+      // debug=true → cada call inclui debugDps (lista de DPs que o device expôs)
+      // pra ajudar a diagnosticar quando switchOn=null.
       const { getTuyaDeviceSwitchState } = await import('../lib/tuya');
       const deviceStates = await Promise.allSettled(
         tentDeviceRows.map((r: any) =>
           cfg
-            ? getTuyaDeviceSwitchState(r.deviceId, cfg.accessId, cfg.accessSecret, cfg.region)
-            : Promise.resolve({ online: false, switchOn: null, switchCode: null })
+            ? getTuyaDeviceSwitchState(r.deviceId, cfg.accessId, cfg.accessSecret, cfg.region, { debug: true })
+            : Promise.resolve({ online: false, switchOn: null, switchCode: null, debugDps: [] as string[] })
         )
       );
 
       tentDeviceRows.forEach((r: any, idx: number) => {
         const stateRes = deviceStates[idx];
-        const state = stateRes.status === 'fulfilled' ? stateRes.value : { online: false, switchOn: null };
+        const ok = stateRes.status === 'fulfilled';
+        const state = ok ? stateRes.value : { online: false, switchOn: null, switchCode: null, debugDps: [] };
+        const errMsg = ok ? null : (stateRes.reason instanceof Error ? stateRes.reason.message : String(stateRes.reason));
+        // Log detalhado por device pra diagnosticar state=null em prod
+        console.log(
+          `[Device] /scenes device=${r.deviceId} name="${r.name}" ` +
+          `online=${state.online} switchOn=${state.switchOn} ` +
+          `switchCode=${state.switchCode ?? '(none)'} ` +
+          `dps=[${(state as any).debugDps?.join(',') ?? ''}] ` +
+          `${errMsg ? `error="${errMsg}"` : ''}`
+        );
         items.push({
           type: 'device',
           id: r.deviceId as string,
@@ -405,7 +417,26 @@ function registerDeviceRoutes(app: express.Application) {
       const r = await controlTuyaDevice(deviceId, cur.switchCode, desired, cfg.accessId, cfg.accessSecret, cfg.region);
       console.log(`[Device] device-toggle device=${deviceId} -> ${desired} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''})`);
       if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
-      res.json({ success: true, deviceId, state: desired });
+
+      // Re-consulta após o toggle pra confirmar estado real (Tuya às vezes leva
+      // ~500ms-2s pra propagar). Se a re-consulta falhar (timeout/erro), devolve
+      // o desired como best-effort — comando foi aceito, só não confirmamos.
+      let confirmedState: boolean = desired;
+      try {
+        // Pequeno delay pra dar tempo do estado propagar no cloud Tuya
+        await new Promise(r => setTimeout(r, 500));
+        const after = await getTuyaDeviceSwitchState(deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+        if (after.switchOn !== null) {
+          confirmedState = after.switchOn;
+          if (after.switchOn !== desired) {
+            console.warn(`[Device] device-toggle device=${deviceId} desired=${desired} but Tuya reports ${after.switchOn} (propagation lag?)`);
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[Device] device-toggle re-confirm failed device=${deviceId}: ${e?.message}`);
+      }
+
+      res.json({ success: true, deviceId, state: confirmedState });
     } catch (err: any) {
       console.error('[Device] device-toggle error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao alternar device' });

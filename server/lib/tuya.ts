@@ -329,17 +329,37 @@ export interface TuyaSwitchState {
   switchCode: string | null;  // "switch", "switch_1", etc.
 }
 
-const SWITCH_CODES = ["switch_1", "switch", "switch_led", "power", "led_switch"];
+// Lista expandida de DP codes que representam um switch on/off em devices Tuya.
+// Cobre: tomadas (switch_1, switch_2..switch_6), lâmpadas (switch_led, light, led),
+// genéricos (power, led_switch, on, sw1), e variantes de regional/firmware.
+// Match em ordem — primeiro DP encontrado vira o "switch principal" do device.
+const SWITCH_CODES = [
+  // Mais comuns primeiro (tomadas inteligentes 1-gang)
+  "switch_1", "switch",
+  // Lâmpadas inteligentes
+  "switch_led", "led", "light", "led_switch",
+  // Genéricos
+  "power", "on",
+  // Tomadas multi-gang (1-6 gangs comuns)
+  "switch_2", "switch_3", "switch_4", "switch_5", "switch_6",
+  // Variantes alternativas
+  "sw1", "sw_1", "switch_main", "main_switch",
+];
 
 /**
  * Retorna o estado online + switch atual de um dispositivo controlável.
+ *
+ * Verbose: se opts.debug=true, inclui no retorno todos os DP codes que o
+ * device expôs (útil pra debugar quando switchOn=null — significa que
+ * nenhum DP do device bateu com SWITCH_CODES).
  */
 export async function getTuyaDeviceSwitchState(
   deviceId: string,
   accessId: string,
   accessSecret: string,
-  region: TuyaRegion
-): Promise<TuyaSwitchState> {
+  region: TuyaRegion,
+  opts: { debug?: boolean } = {}
+): Promise<TuyaSwitchState & { debugDps?: string[] }> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
 
   // Busca info + status em paralelo
@@ -352,14 +372,18 @@ export async function getTuyaDeviceSwitchState(
 
   let switchOn: boolean | null = null;
   let switchCode: string | null = null;
+  const dpCodes: string[] = [];
   for (const s of (statusData.result ?? []) as { code: string; value: any }[]) {
+    dpCodes.push(s.code);
     if (SWITCH_CODES.includes(s.code) && switchCode === null) {
       switchCode = s.code;
       switchOn = Boolean(s.value);
     }
   }
 
-  return { online, switchOn, switchCode };
+  return opts.debug
+    ? { online, switchOn, switchCode, debugDps: dpCodes }
+    : { online, switchOn, switchCode };
 }
 
 /**
