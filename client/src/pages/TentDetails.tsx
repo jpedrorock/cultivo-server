@@ -245,6 +245,276 @@ function TentSensorCard({ tentId }: { tentId: number }) {
   );
 }
 
+// ─── Cenas + Devices vinculados a estufa (mostra no display ESP32) ──────────
+
+const ICON_HINT_LABELS: Record<string, string> = {
+  light: 'Luz',
+  fan: 'Ventilador / Exaustor',
+  pump: 'Bomba / Rega',
+  heater: 'Aquecedor',
+  ac: 'Ar-condicionado',
+  humidifier: 'Umidificador',
+  dehumidifier: 'Desumidificador',
+  co2: 'CO₂',
+  other: 'Outro',
+};
+
+function TentDisplayItemsCard({ tentId }: { tentId: number }) {
+  const utils = trpc.useUtils();
+  const [showSceneAdd, setShowSceneAdd] = useState(false);
+  const [showDeviceAdd, setShowDeviceAdd] = useState(false);
+  const [selectedSceneId, setSelectedSceneId] = useState<string>('');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [selectedIconHint, setSelectedIconHint] = useState<string>('other');
+
+  // Cenas + Devices vinculados à estufa
+  const { data: tentScenes = [] } = trpc.tentScenes.list.useQuery({ tentId });
+  const { data: tentDevices = [] } = trpc.tentDevices.list.useQuery({ tentId });
+
+  // Listas globais Tuya (só busca quando user abre os dropdowns)
+  const { data: allScenes = [], isLoading: scenesLoading } = trpc.tuya.listScenes.useQuery(
+    undefined,
+    { enabled: showSceneAdd, retry: false }
+  );
+  const { data: allDevices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
+    undefined,
+    { enabled: showDeviceAdd, retry: false }
+  );
+
+  const linkedSceneIds = new Set(tentScenes.map((s: any) => s.sceneId));
+  const linkedDeviceIds = new Set(tentDevices.map((d: any) => d.deviceId));
+
+  const totalCount = tentScenes.length + tentDevices.length;
+  const atLimit = totalCount >= 6;
+
+  const addScene = trpc.tentScenes.add.useMutation({
+    onSuccess: () => {
+      toast.success('Cena adicionada');
+      utils.tentScenes.list.invalidate({ tentId });
+      setSelectedSceneId('');
+      setShowSceneAdd(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeScene = trpc.tentScenes.remove.useMutation({
+    onSuccess: () => { utils.tentScenes.list.invalidate({ tentId }); toast.success('Removida'); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const addDevice = trpc.tentDevices.add.useMutation({
+    onSuccess: () => {
+      toast.success('Dispositivo adicionado');
+      utils.tentDevices.list.invalidate({ tentId });
+      setSelectedDeviceId('');
+      setSelectedIconHint('other');
+      setShowDeviceAdd(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const removeDevice = trpc.tentDevices.remove.useMutation({
+    onSuccess: () => { utils.tentDevices.list.invalidate({ tentId }); toast.success('Removido'); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleAddScene = () => {
+    if (!selectedSceneId) return;
+    const scene = (allScenes as any[]).find((s: any) => s.sceneId === selectedSceneId);
+    if (!scene) return;
+    addScene.mutate({ tentId, sceneId: scene.sceneId, name: scene.name });
+  };
+
+  const handleAddDevice = () => {
+    if (!selectedDeviceId) return;
+    const dev = (allDevices as any[]).find((d: any) => d.id === selectedDeviceId);
+    if (!dev) return;
+    addDevice.mutate({
+      tentId,
+      deviceId: dev.id,
+      name: dev.name,
+      iconHint: selectedIconHint as any,
+    });
+  };
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-amber-500" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Cenas e controles do display</CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                {totalCount === 0
+                  ? 'Vincule cenas e dispositivos pra aparecerem no display ESP32'
+                  : `${totalCount}/6 itens — aparecem na aba "Cenas" do display`}
+              </CardDescription>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-3 pb-4">
+        {/* Lista de cenas vinculadas */}
+        {tentScenes.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Cenas</p>
+            {(tentScenes as any[]).map((s: any) => (
+              <div key={s.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-muted/40">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                </div>
+                <p className="flex-1 text-sm text-foreground truncate">{s.name}</p>
+                <button
+                  onClick={() => removeScene.mutate({ id: s.id })}
+                  disabled={removeScene.isPending}
+                  className="shrink-0 w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Lista de dispositivos vinculados */}
+        {tentDevices.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Dispositivos</p>
+            {(tentDevices as any[]).map((d: any) => (
+              <div key={d.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-muted/40">
+                <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0">
+                  <Zap className="w-3.5 h-3.5 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground truncate">{d.name}</p>
+                  {d.iconHint && (
+                    <p className="text-[10px] text-muted-foreground">{ICON_HINT_LABELS[d.iconHint] ?? d.iconHint}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => removeDevice.mutate({ id: d.id })}
+                  disabled={removeDevice.isPending}
+                  className="shrink-0 w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {totalCount === 0 && !showSceneAdd && !showDeviceAdd && (
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 py-6 px-4 text-center">
+            <p className="text-xs text-muted-foreground">Nenhum item vinculado ainda. O display vai mostrar a lista padrão da conta.</p>
+          </div>
+        )}
+
+        {/* Form: adicionar cena */}
+        {showSceneAdd && (
+          <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+            <p className="text-xs font-semibold">Adicionar cena</p>
+            {scenesLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando cenas Tuya...
+              </div>
+            ) : (
+              <>
+                <select
+                  value={selectedSceneId}
+                  onChange={e => setSelectedSceneId(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">— Escolha uma cena —</option>
+                  {(allScenes as any[])
+                    .filter((s: any) => !linkedSceneIds.has(s.sceneId))
+                    .map((s: any) => (
+                      <option key={s.sceneId} value={s.sceneId}>
+                        {s.name} {s.homeName ? `(${s.homeName})` : ''}
+                      </option>
+                    ))}
+                </select>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowSceneAdd(false); setSelectedSceneId(''); }}>Cancelar</Button>
+                  <Button size="sm" className="flex-1" disabled={!selectedSceneId || addScene.isPending} onClick={handleAddScene}>
+                    {addScene.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Adicionar'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Form: adicionar device */}
+        {showDeviceAdd && (
+          <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+            <p className="text-xs font-semibold">Adicionar dispositivo</p>
+            {devicesLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando dispositivos Tuya...
+              </div>
+            ) : (
+              <>
+                <select
+                  value={selectedDeviceId}
+                  onChange={e => setSelectedDeviceId(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">— Escolha um dispositivo —</option>
+                  {(allDevices as any[])
+                    .filter((d: any) => !linkedDeviceIds.has(d.id))
+                    .map((d: any) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} {d.online ? '🟢' : '⚫'}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  value={selectedIconHint}
+                  onChange={e => setSelectedIconHint(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  {Object.entries(ICON_HINT_LABELS).map(([k, label]) => (
+                    <option key={k} value={k}>{label}</option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowDeviceAdd(false); setSelectedDeviceId(''); }}>Cancelar</Button>
+                  <Button size="sm" className="flex-1" disabled={!selectedDeviceId || addDevice.isPending} onClick={handleAddDevice}>
+                    {addDevice.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Adicionar'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Botões "+ Adicionar" — só se não estiver no limite */}
+        {!atLimit && !showSceneAdd && !showDeviceAdd && (
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowSceneAdd(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Cena
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowDeviceAdd(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Dispositivo
+            </Button>
+          </div>
+        )}
+
+        {atLimit && (
+          <p className="text-[11px] text-amber-500 text-center pt-1">
+            Limite atingido (6 itens). Remova algum pra adicionar outro.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Pareamento ESP32 Display (RFC 8628 Device Authorization Grant) ─────────
 
 function PairDisplayCard({ tentId }: { tentId: number }) {
@@ -1120,6 +1390,9 @@ export default function TentDetails() {
 
         {/* Display ESP32 (pareamento) */}
         <PairDisplayCard tentId={tentId} />
+
+        {/* Cenas e devices vinculados ao display dessa estufa */}
+        <TentDisplayItemsCard tentId={tentId} />
 
         {/* Plantas — sempre visível */}
         <TentPlantsTab tentId={tentId} tentName={tent.name} />
