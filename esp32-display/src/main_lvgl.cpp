@@ -1526,6 +1526,11 @@ static bool postPpfd(int ppfd) {
 // principal (LVGL nao e thread-safe).
 // ════════════════════════════════════════════════════════════════════════════════
 static TaskHandle_t netTaskHandle = NULL;
+// Task dedicada pra taps (scenes/devices) — sem ela, tap esperava ate'
+// 8s+ se netTask tava no meio de fetchDisplay/fetchScenes (fetches sao
+// bloqueantes). Agora tap roda em paralelo, latencia ~50ms + tempo
+// do POST HTTPS (~500ms-2s).
+static TaskHandle_t tapTaskHandle = NULL;
 
 // Logger de tempo decorrido — acima do threshold, loga WARN.
 // Substitui WDT customizado: WDT so ajuda se setuparmos timeout > Tuya timeout
@@ -1707,16 +1712,26 @@ static bool fetchScenes() {
 // Forward declaration — definido logo abaixo (depois do netTaskFn)
 static void processSceneTap();
 
-static void netTaskFn(void *param) {
+// Task dedicada de tap — wake quando sceneTapPending=true. Stack 8KB cobre
+// TLS handshake + JsonDocument com folga. Roda em paralelo com netTask
+// (que pode estar bloqueada em fetchScenes/fetchDisplay) — latencia tipica
+// ~50ms (vTaskDelay) + tempo do POST HTTPS (500ms-2s).
+static void tapTaskFn(void *param) {
   for (;;) {
-    if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
-
-    // Tap pendente em scene/device — prioritario (UX: user clicou agora)
-    if (sceneTapPending) {
+    if (sceneTapPending && wifiOk) {
       uint32_t t0 = millis();
       processSceneTap();
       logIfSlow("sceneTap", t0, 9000);
     }
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
+
+static void netTaskFn(void *param) {
+  for (;;) {
+    if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
+
+    // (taps sao processados pela tapTask em paralelo — nao bloqueia aqui)
 
     if (refreshPending) {
       refreshPending = false;
@@ -1757,7 +1772,10 @@ static void startNetTask() {
   if (netTaskHandle) return;
   // Stack 8KB: cobre TLS handshake (~4KB) + JSON parsing (~2KB) com folga
   xTaskCreatePinnedToCore(netTaskFn, "netTask", 8192, NULL, 1, &netTaskHandle, 0);
-  Serial.println("[net] task iniciada no core 0");
+  // tapTask: dedicada pra processar taps em paralelo. Mesma stack 8KB +
+  // mesma prioridade do netTask (1). Core 0 (Arduino loop fica no core 1).
+  xTaskCreatePinnedToCore(tapTaskFn, "tapTask", 8192, NULL, 1, &tapTaskHandle, 0);
+  Serial.println("[net] netTask + tapTask iniciadas no core 0");
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
