@@ -91,6 +91,20 @@
 #define RADIUS_LG 12
 #define RADIUS_XL 16
 
+// Helper: resolve temperatura -> cor por range. Da' feedback visual sobre
+// o estado da estufa em escala fria->quente:
+//   < 25 °C: azul     (frio)
+//   25-27:   verde    (ideal — primary)
+//   28-30:   laranja  (morno, atencao)
+//   > 30:    vermelho (quente, perigo)
+// Cores sao tokens DS (COL_*), nao arbitrarias.
+static inline uint32_t tempColor(float t) {
+  if (t < 25.0f) return COL_BLU;
+  if (t < 28.0f) return COL_PRIMARY;
+  if (t <= 30.0f) return COL_PHASE_HARVEST;
+  return COL_RED;
+}
+
 // Helper: resolve nome de fase ("VEGA"/"FLORA"/"DRYING"/etc) -> cor token.
 // Default = primary (caso fase desconhecida ou string vazia).
 static inline uint32_t phaseColor(const char *fase) {

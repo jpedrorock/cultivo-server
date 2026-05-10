@@ -551,7 +551,10 @@ static void updateArcMode() {
       lv_label_set_text(lblTemp, buf);
       lv_arc_set_range(arcTemp, 0, 40);
       lv_arc_set_value(arcTemp, (int)tempC);
-      col = COL_PHASE_HARVEST;  // laranja (DS, igual chart Hist TEMP)
+      // Cor reflete range termico — feedback visual: azul=frio, verde=ideal,
+      // laranja=morno, vermelho=quente. Mais util que cor fixa pois user
+      // identifica problemas de longe (ex: anel vermelho = estufa esquentou).
+      col = tempColor(tempC);
       break;
     }
     case 1: { // pH
