@@ -1834,30 +1834,32 @@ static bool postDeviceToggle(const char *deviceId, bool desiredState, bool *outR
   char body[128];
   snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"state\":%s}",
            deviceId, desiredState ? "true" : "false");
-  http.setTimeout(8000);  // Tuya cloud pode demorar
+  http.setTimeout(15000);  // server tem re-consulta Tuya 500ms + margem
+  Serial.printf("[device] POST %s body=%s\n", url, body);
   int code = http.POST(body);
   if (code != 200) {
-    Serial.printf("[device] toggle %s -> %s HTTP %d (FAIL)\n",
-                  deviceId, desiredState ? "ON" : "OFF", code);
+    String errBody = http.getString();
+    Serial.printf("[device] toggle HTTP %d body=%s\n",
+                  code, errBody.substring(0, 200).c_str());
     http.end();
     return false;
   }
-  // Parsear response p/ pegar STATE real (server pode retornar diferente
-  // se Tuya executou mas com outro estado — race condition, dispositivo
-  // offline, etc).
-  JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  // DEBUG: log body inteiro pra confirmar response do server
+  String respBody = http.getString();
   http.end();
+  Serial.printf("[device] toggle 200 body=%s\n", respBody.c_str());
+
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, respBody);
   if (err != DeserializationError::Ok) {
     Serial.printf("[device] toggle JSON err: %s\n", err.c_str());
-    if (outRealState) *outRealState = desiredState;  // assume desired
-    return true;  // HTTP foi OK, so' falhou parse
+    if (outRealState) *outRealState = desiredState;
+    return true;
   }
   bool realState = doc["state"] | desiredState;
   if (outRealState) *outRealState = realState;
-  Serial.printf("[device] toggle %s -> desired=%s realState=%s OK\n",
-                deviceId, desiredState ? "ON" : "OFF",
-                realState ? "ON" : "OFF");
+  Serial.printf("[device] toggle desired=%s realState=%s OK\n",
+                desiredState ? "ON" : "OFF", realState ? "ON" : "OFF");
   return true;
 }
 
