@@ -474,27 +474,19 @@ static void buildHome(lv_obj_t *tab) {
   lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_PRIMARY, &ic_activity,  &sparkVpd,  &serVpdS);
 
   // Slot 3 — CARD CICLO compacto (1 linha so'). Layout horizontal:
-  //   [🌱]  Sem 4/16                                  [FLORACAO]
-  // Tudo centralizado verticalmente. Card menor que UMID/VPD pq fase muda
-  // pouco — nao precisa do espaco que metricas dinamicas pediam.
+  //   Sem 4/16                                       [FLORACAO]
+  // Sem icone planta — badge ja' comunica fase via cor, icone era ruido.
   {
     int yOffset = (cardH + cardGap) * 2;
     lv_obj_t *c = makeCard(homeFaceA, 0, yOffset, cardW, cycleH);
     lv_obj_set_style_pad_all(c, sw(6), 0);
 
-    // Icone fase esquerda (cor do phase token, atualiza em refreshHomeValues)
-    lv_obj_t *ico = lv_image_create(c);
-    lv_image_set_src(ico, &ic_sprout);
-    lv_obj_set_style_image_recolor(ico, lv_color_hex(phaseColor(FASE)), 0);
-    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
-
-    // "Sem X/Y" colado no icone, branco bold (FONT_BODY p/ caber bem)
+    // "Sem X/Y" esquerda, branco bold (FONT_BODY p/ caber bem)
     lblCycleVal = lv_label_create(c);
     lv_label_set_text(lblCycleVal, "Sem -/-");
     lv_obj_set_style_text_color(lblCycleVal, lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_text_font(lblCycleVal, FONT_BODY, 0);
-    lv_obj_align(lblCycleVal, LV_ALIGN_LEFT_MID, sw(24), 0);
+    lv_obj_align(lblCycleVal, LV_ALIGN_LEFT_MID, 0, 0);
 
     // Badge fase pill na direita — bg colorido translucido + texto colorido
     lblCycleBadge = lv_label_create(c);
