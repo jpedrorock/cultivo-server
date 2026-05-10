@@ -604,6 +604,22 @@ const MIGRATIONS: Migration[] = [
       await addColumnIfNotExists(c, 'tentDevices', 'switchCode', 'VARCHAR(50) NULL AFTER `iconHint`');
     },
   },
+  {
+    // ADENDO 2 do HANDOFF — bug "device-toggle não muda nada no ESP, mas
+    // funciona no app web". Causa raiz: web usa getTuyaConfig(ctx.user.id),
+    // ESP REST usa "WHERE u.groupId=? LIMIT 1" pegando QUALQUER user do
+    // grupo. Se grupo tem múltiplos users com configs Tuya diferentes,
+    // ESP pode pegar a errada.
+    //
+    // Fix: salvar ownerUserId em deviceTokens (no generate-token e no
+    // pair-claim), e no /device-toggle usar getTuyaConfig(ownerUserId)
+    // — alinha 100% com o caminho do web.
+    id: 'add-deviceTokens-ownerUserId',
+    description: 'Adiciona deviceTokens.ownerUserId (fix toggle — usar cfg do user que criou o token)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'deviceTokens', 'ownerUserId', 'INT NULL AFTER `groupId`');
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

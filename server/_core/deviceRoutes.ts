@@ -24,20 +24,61 @@
 import express from "express";
 import crypto from "crypto";
 import { getMysqlPool } from "../mysql-pool";
+import type { TuyaRegion } from "../lib/tuya";
 
-async function validateDeviceToken(req: express.Request): Promise<{ tentId: number; groupId: number } | null> {
+/**
+ * Valida o X-Device-Token e devolve dados pra contextualizar a request.
+ *
+ * `ownerUserId` é o user que criou o token (ADENDO 2 do HANDOFF). Usado
+ * pelo /device-toggle pra pegar a config Tuya CERTA — antes pegava
+ * "WHERE u.groupId=? LIMIT 1" e podia escolher um user com config errada.
+ * NULL pra rows antigas (criadas antes da migration add-deviceTokens-ownerUserId).
+ */
+async function validateDeviceToken(req: express.Request): Promise<{ tentId: number; groupId: number; ownerUserId: number | null } | null> {
   const token = req.headers['x-device-token'] as string | undefined;
   if (!token) return null;
   try {
     const pool = getMysqlPool();
     const [rows]: any = await pool.execute(
-      `SELECT tentId, groupId FROM deviceTokens WHERE token = ? LIMIT 1`,
+      `SELECT tentId, groupId, ownerUserId FROM deviceTokens WHERE token = ? LIMIT 1`,
       [token]
     );
-    return rows.length > 0 ? { tentId: rows[0].tentId, groupId: rows[0].groupId } : null;
+    if (rows.length === 0) return null;
+    return {
+      tentId: rows[0].tentId,
+      groupId: rows[0].groupId,
+      ownerUserId: rows[0].ownerUserId ?? null,
+    };
   } catch {
     return null;
   }
+}
+
+/**
+ * Busca a config Tuya pra um device-token. Estratégia:
+ *   1. Se ownerUserId conhecido → config DESSE user (alinha com o caminho
+ *      do app web `getTuyaConfig(ctx.user.id)` — fix do ADENDO 2).
+ *   2. Senão (rows antigas pré-migration) → fallback pro LIMIT 1 antigo.
+ *
+ * Retorna null se nenhuma config for encontrada.
+ */
+async function getTuyaCfgForDevice(device: { groupId: number; ownerUserId: number | null }): Promise<{ accessId: string; accessSecret: string; region: TuyaRegion } | null> {
+  const pool = getMysqlPool();
+  if (device.ownerUserId) {
+    const [rows]: any = await pool.execute(
+      `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
+      [device.ownerUserId]
+    );
+    if (rows.length > 0) return rows[0] as { accessId: string; accessSecret: string; region: TuyaRegion };
+    // Fallback: se owner não tem config (raro), tenta grupo
+  }
+  const [rows]: any = await pool.execute(
+    `SELECT tc.accessId, tc.accessSecret, tc.region
+     FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
+     WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
+    [device.groupId]
+  );
+  return rows.length > 0 ? (rows[0] as { accessId: string; accessSecret: string; region: TuyaRegion }) : null;
 }
 
 function registerDeviceRoutes(app: express.Application) {
@@ -227,17 +268,11 @@ function registerDeviceRoutes(app: express.Application) {
       const sceneId = (maybeSceneId || '').trim();
       if (!sceneId) return res.status(500).json({ error: `${envKey} formato invalido` });
 
-      // Busca config Tuya do grupo do device (qualquer user com tuya enabled)
-      const [cfgRows]: any = await pool.execute(
-        `SELECT tc.accessId, tc.accessSecret, tc.region
-         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-        [device.groupId]
-      );
-      if (cfgRows.length === 0) {
+      // Busca config Tuya — prefere config do owner do token (helper)
+      const cfg = await getTuyaCfgForDevice(device);
+      if (!cfg) {
         return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
       }
-      const cfg = cfgRows[0];
 
       const { triggerTuyaScene } = await import('../lib/tuya');
       const result = await triggerTuyaScene(homeId, sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
@@ -276,14 +311,8 @@ function registerDeviceRoutes(app: express.Application) {
 
       // 2) Sem vínculos? Cai no comportamento legado (cenas do grupo inteiro)
       if (tentSceneRows.length === 0 && tentDeviceRows.length === 0) {
-        const [cfgRows]: any = await pool.execute(
-          `SELECT tc.accessId, tc.accessSecret, tc.region
-           FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-           WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-          [device.groupId]
-        );
-        if (cfgRows.length === 0) return res.json({ scenes: [] });
-        const cfg = cfgRows[0];
+        const cfg = await getTuyaCfgForDevice(device);
+        if (!cfg) return res.json({ scenes: [] });
 
         const { listTuyaScenesIoTCore } = await import('../lib/tuya');
         try {
@@ -313,13 +342,7 @@ function registerDeviceRoutes(app: express.Application) {
 
       let cfg: any = null;
       if (tentDeviceRows.length > 0) {
-        const [cfgRows]: any = await pool.execute(
-          `SELECT tc.accessId, tc.accessSecret, tc.region
-           FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-           WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-          [device.groupId]
-        );
-        cfg = cfgRows[0] ?? null;
+        cfg = await getTuyaCfgForDevice(device);
       }
 
       // Lê estado de TODOS os devices em paralelo (sem state se cfg ausente).
@@ -401,17 +424,18 @@ function registerDeviceRoutes(app: express.Application) {
       }
       const bindRow = bindRows[0];
 
-      // Busca config Tuya
-      const [cfgRows]: any = await pool.execute(
-        `SELECT tc.accessId, tc.accessSecret, tc.region
-         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-        [device.groupId]
-      );
-      if (cfgRows.length === 0) {
-        return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
+      // Busca config Tuya — ADENDO 2 do HANDOFF: usa helper que prefere a
+      // config DO USER que criou o token (alinha com getTuyaConfig(ctx.user.id)
+      // do app web). Fallback pra LIMIT 1 do grupo se ownerUserId NULL.
+      const cfg = await getTuyaCfgForDevice(device);
+      if (!cfg) {
+        return res.status(404).json({
+          error: device.ownerUserId
+            ? 'Config Tuya do dono do display não encontrada (configure SmartLife na conta dele)'
+            : 'Nenhuma config Tuya ativa pro grupo',
+        });
       }
-      const cfg = cfgRows[0];
+      console.log(`[Device] device-toggle using cfg from ${device.ownerUserId ? `ownerUserId=${device.ownerUserId}` : `groupId=${device.groupId} (LIMIT 1, pré-fix)`}`);
 
       // Resolve switchCode: 1) usa o salvo se houver, 2) descobre + persiste se NULL
       // (rows criadas antes desse fix, ou casos onde a discovery falhou no add)
@@ -469,16 +493,11 @@ function registerDeviceRoutes(app: express.Application) {
       const sceneId = String(req.params.sceneId ?? '').trim();
       if (!sceneId) return res.status(400).json({ error: 'sceneId vazio' });
 
-      const [cfgRows]: any = await pool.execute(
-        `SELECT tc.accessId, tc.accessSecret, tc.region
-         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-        [device.groupId]
-      );
-      if (cfgRows.length === 0) {
+      // Prefere config do owner do token (helper)
+      const cfg = await getTuyaCfgForDevice(device);
+      if (!cfg) {
         return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
       }
-      const cfg = cfgRows[0];
       const homeId = parseInt(process.env.TUYA_HOME_ID ?? '0') || 0;
 
       const { triggerTuyaScene } = await import('../lib/tuya');
@@ -627,9 +646,11 @@ function registerDeviceRoutes(app: express.Application) {
       const { tentId, name } = req.body;
       if (!tentId || !name) return res.status(400).json({ error: 'tentId e name obrigatórios' });
       const token = crypto.randomBytes(32).toString('hex');
+      // ownerUserId = quem gerou o token. Usado pelo /device-toggle pra
+      // pegar a config Tuya CERTA (alinha com o caminho do app web).
       await pool.execute(
-        `INSERT INTO deviceTokens (token, name, tentId, groupId) VALUES (?, ?, ?, ?)`,
-        [token, name, tentId, user.groupId ?? 0]
+        `INSERT INTO deviceTokens (token, name, tentId, groupId, ownerUserId) VALUES (?, ?, ?, ?, ?)`,
+        [token, name, tentId, user.groupId ?? 0, user.id]
       );
       res.json({ token });
     } catch (err: any) {
@@ -739,11 +760,13 @@ function registerDeviceRoutes(app: express.Application) {
       if (new Date(codeRow.expiresAt).getTime() < Date.now()) return res.status(410).json({ error: 'Código expirado, gere outro no display' });
       if (codeRow.claimedByUserId) return res.status(409).json({ error: 'Código já foi usado' });
 
-      // Gera deviceToken longo + insere em deviceTokens + marca code como claimed
+      // Gera deviceToken longo + insere em deviceTokens + marca code como claimed.
+      // ownerUserId = user que pareou (usado pelo /device-toggle pra pegar
+      // a config Tuya CERTA, alinha com o web).
       const deviceToken = crypto.randomBytes(32).toString('hex');
       await pool.execute(
-        `INSERT INTO deviceTokens (token, name, tentId, groupId) VALUES (?, ?, ?, ?)`,
-        [deviceToken, codeRow.deviceName, tentId, user.groupId ?? 0]
+        `INSERT INTO deviceTokens (token, name, tentId, groupId, ownerUserId) VALUES (?, ?, ?, ?, ?)`,
+        [deviceToken, codeRow.deviceName, tentId, user.groupId ?? 0, user.id]
       );
       await pool.execute(
         `UPDATE devicePairingCodes SET claimedByUserId = ?, tentId = ?, generatedToken = ? WHERE code = ?`,
