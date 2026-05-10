@@ -259,3 +259,96 @@ tabela `tentDevices.state`). Não consulta a Tuya em tempo real.
 
 Sem fechar essa parte, o feature de device toggle fica meio inutil — UI
 mente sobre o estado real.
+
+---
+
+## ⚠️ ADENDO 2 — toggle nao executa de fato na Tuya (descoberto em prod)
+
+### Sintoma observado pelo user
+
+Toca no LED 65W no display ESP. Visual:
+- Card mostra "carregando" (border primary + opa 70) por ~1s
+- VOLTA pro estado anterior (continua mostrando OFF)
+- A luz fisica **nao muda** no SmartLife
+
+Lado app web (`/SmartLife` page) usando o MESMO `controlTuyaDevice` (via
+tRPC `tuya.sendDeviceCommand`) — **funciona**. Liga/desliga normal.
+
+### Causa provavel
+
+Endpoint `/api/device/device-toggle` faz re-consulta apos 500ms pra
+confirmar state real. Se Tuya nao executou o comando (mesmo retornando
+success: true do POST), a re-consulta retorna o state ANTIGO. Server
+responde `{state: <antigo>}`. ESP pinta antigo → "voltou ao estado".
+
+### Diferenca relevante entre os 2 caminhos
+
+| Aspecto | App web (tRPC) | ESP (REST) |
+|---|---|---|
+| Auth | JWT user | X-Device-Token |
+| Config Tuya | `getTuyaConfig(ctx.user.id)` — user logado | `WHERE u.groupId = ? LIMIT 1` — primeiro user do grupo |
+| switchCode | `status.switchCode ?? mapping.switchCode` (vem do mapping salvo) | Descoberto on-the-fly via `getTuyaDeviceSwitchState` |
+| Re-consulta | Nao tem (UI faz refetch separado depois) | Sim (500ms apos toggle) |
+
+### Hipoteses pra investigar (server logs precisam)
+
+1. **switchCode errado**: `getTuyaDeviceSwitchState` itera `SWITCH_CODES`
+   e pega o PRIMEIRO match. Pra device LED Tuya as vezes tem `switch_1`
+   E `switch_led` simultaneos — o codigo certo pra o LED ser `switch_led`
+   mas a funcao pega `switch_1` (que tuya aceita silenciosamente sem fazer
+   nada). App web salva `mapping.switchCode` no `tuyaSensorMappings` e
+   passa direto — sem essa logica de descoberta.
+
+2. **Config Tuya errada**: se o grupo tem multiplos users, cada um com sua
+   propria config Tuya, o LIMIT 1 pode pegar a config "errada" (de outro
+   projeto Tuya). API call vai com accessId diferente, comando "vazio
+   no vacuo".
+
+3. **Race condition na re-consulta**: 500ms pode nao bastar. Tuya as vezes
+   demora 2-3s pra propagar pro device fisico. Re-consulta retorna state
+   antigo → state retornado pra ESP fica wrong.
+
+### Como debugar (server-side)
+
+Olhar logs prod quando user toca no LED no ESP:
+
+```
+[Device] device-toggle device=eb35a... -> true (?: ?)
+[Device] device-toggle device=eb35a... desired=true but Tuya reports false (propagation lag?)
+```
+
+- Se aparece "OK" no primeiro log mas "Tuya reports false" no segundo →
+  hipotese 1 ou 3
+- Se aparece "FAIL" no primeiro → controlTuyaDevice retornou erro mas
+  endpoint retornou 502 → ESP veria HTTP 502 (nao e' o caso, ESP recebe
+  200)
+
+Tambem util: log do JSON de status na re-consulta (`debugDps`) — qual
+DPs o device expoe + qual switchCode foi escolhido. Se for `switch_1`
+mas device e' uma lampada, switchCode esta errado.
+
+### Possivel fix
+
+**Opcao A** (recomendada): adicionar coluna `switchCode VARCHAR(50)` em
+`tentDevices`. Quando user vincula device pela UI web, salva o switchCode
+descoberto via debug (igual `tuyaSensorMappings`). Endpoint usa
+`tentDevices.switchCode` em vez de descobrir on-the-fly. Alinha com o
+pattern do app web e elimina a fonte de switchCode errado.
+
+**Opcao B**: tirar a re-consulta. ESP pollar /scenes a cada 30s ja' captura
+a mudanca eventual. Sem re-consulta, server retorna `state: desired`,
+ESP pinta optimisticamente, e proximos polls confirmam estado real (ou
+revertem se Tuya nao executou).
+
+**Opcao C**: aumentar delay da re-consulta pra 2s + ler `debugDps` pra
+confirmar que estamos lendo o switchCode certo.
+
+### O que ESP firmware ja' faz
+
+Fix recente (commit 3a209f2): tirou optimistic toggle. UI agora SO' pinta
+quando recebe state real do server. Por isso o "volta ao antigo" e' obvio
+agora — antes ficava confuso com optimistic.
+
+Tap → "carregando" → recebe state do server → pinta. Se server retornar
+state errado, ESP pinta errado. ESP esta correto, server precisa retornar
+state certo.
