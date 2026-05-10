@@ -187,6 +187,20 @@ static void applyBloom(lv_obj_t *obj, uint32_t color) {
 // p/ casos de "preciso re-fetch agora", se necessario no futuro).
 static volatile bool refreshPending = false;
 
+// Tap em scene/device — handler LVGL nao pode chamar HTTPClient direto:
+// thread UI tem ~8KB stack, nao cobre TLS handshake + JsonDocument; estourava
+// e o ESP RESETAVA no toggle. Em vez disso o handler so' enfileira (idx +
+// flag) e netTaskFn no core 0 (8KB stack dedicada) faz o request.
+//
+// Result flow p/ device toggle: sceneTapPending=true → netTask faz POST →
+// escreve deviceToggleRes* + deviceTogglePendingUI=true → loop() consome e
+// chama cultivoUI_setDeviceState (LVGL safe).
+static volatile bool sceneTapPending      = false;
+static int           sceneTapIdx          = -1;
+static volatile bool deviceTogglePendingUI = false;
+static int           deviceToggleResIdx    = -1;
+static bool          deviceToggleResState  = false;
+
 // Tarefas: removido na limpeza pos-fase-2. UI nova substituiu Tarefas por
 // Cenas (atalhos Tuya) — registro de rega/tasks fica no app web, nao no ESP.
 
