@@ -43,8 +43,22 @@ self.addEventListener('install', (event) => {
       }
     })
   );
-  // Ativar imediatamente sem esperar
-  self.skipWaiting();
+  // NÃO auto-skip-waiting. O client (main.tsx) detecta nova versão e
+  // mostra prompt pro usuário; quando ele clicar "Atualizar", o client
+  // posta {type:'SKIP_WAITING'} e aí esse SW assume.
+  //
+  // Antes, skipWaiting() rodava aqui sem aviso → SW novo virava ativo no
+  // próximo refresh, surpreendendo o usuário (formulário recarregando no
+  // meio, comportamento mudando, etc.).
+});
+
+// Permite que o client peça pra esse SW assumir o controle (quando user
+// clica "Atualizar" no prompt de nova versão).
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    console.log('[SW] SKIP_WAITING recebido — ativando nova versão');
+    self.skipWaiting();
+  }
 });
 
 // Ativação do Service Worker
