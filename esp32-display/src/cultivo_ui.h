@@ -56,17 +56,34 @@ extern int   histCount;  // quantos pontos validos (>=1, max HIST_POINTS)
 // Trigger refresh do chart quando o app preencher os arrays.
 void cultivoUI_applyHistory(void);
 
-// ── Cenas dinamicas (preenchidas pelo app via fetchScenes) ───────────────────
-// O app chama cultivoUI_applyScenes(names, count) depois de buscar do server
-// (GET /api/device/scenes). UI rebuilda o grid mostrando ate' 6 cenas reais
-// (2 fileiras x 3 colunas). Se count == 0 (sem config Tuya / server offline),
-// grid mostra placeholder.
-// Names sao copiados internamente — nao precisa manter ponteiros vivos.
-// onSceneTrigger(idx) e' chamado quando user toca botao; idx mapeia 1:1 ao
-// array de names; app le' do seu proprio storage de IDs e dispara via
-// /api/device/scene-by-id/<id>/trigger.
+// ── Itens dinamicos do display: cenas + dispositivos ─────────────────────────
+// Backend agora retorna {items:[{type, id, name, state?, iconHint?}, ...]}
+// (sprint 1 do vinculo cena-estufa). type=0 (scene) tap dispara cena Tuya;
+// type=1 (device) tap toggla on/off. state e' relevante so' p/ device — UI
+// mostra ON/OFF visualmente. iconHint resolve qual icone mostrar.
+//
+// onSceneTrigger(idx) ainda e' chamado pra TUDO (scene OU device). App
+// resolve idx -> tipo via storage proprio e chama:
+//   - scene  -> POST /api/device/scene-by-id/<id>/trigger
+//   - device -> POST /api/device/device-toggle (com state oposto)
 #define SCENES_MAX 6
+
+typedef struct {
+  const char *id;        // sceneId ou deviceId Tuya
+  const char *name;      // label exibido
+  uint8_t     type;      // 0=scene, 1=device
+  bool        state;     // device on/off (ignorado p/ scene)
+  const char *iconHint;  // "light"|"fan"|"pump"|"heater"|"ac"|"" (default)
+} CultivoItem;
+
+void cultivoUI_applyItems(const CultivoItem *items, int count);
+
+// API legacy mantida — chama applyItems internamente (todos type=scene).
 void cultivoUI_applyScenes(const char *names[], int count);
+
+// App chama quando confirmar (ou rejeitar) o toggle de um device — UI
+// atualiza visual on/off. Util quando POST /device-toggle responde.
+void cultivoUI_setDeviceState(int idx, bool state);
 
 // ── Build entry point ─────────────────────────────────────────────────────────
 void buildCultivoUI(void);

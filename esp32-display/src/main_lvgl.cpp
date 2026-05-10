@@ -140,19 +140,9 @@ static inline int sh(int v) { return (v * SCREEN_H) / 240; }
 static const int TABBAR_H = (SCREEN_H >= 320) ? 64 : 48;   // nav maior no hardware real
 static const int TAB_H    = SCREEN_H - TABBAR_H;
 
-// ── Cores do tema (usadas por splash/config modal/AP portal — UI builders
-//   movidos pra cultivo_ui.cpp tem suas proprias copias destes valores) ───────
-#define COL_BG      0x0B0F14
-#define COL_CARD    0x111827
-#define COL_BORDER  0x1F2937
-#define COL_TEXT    0xFFFFFF
-#define COL_DIM     0x6B7280
-#define COL_GRN     0x4ADE80
-#define COL_YEL     0xFBBF24
-#define COL_RED     0xF87171
-#define COL_CYN     0x2DD4BF
-#define COL_PRP     0xA78BFA
-#define COL_BLU     0x60A5FA
+// Cores do tema vem de cultivo_layout.h (incluido via hal_platform.h).
+// Removidas as duplicatas que viviam aqui — geravam warnings de
+// "macro redefined" em cada build. Tokens DS sao a fonte unica.
 
 // ── LVGL v9 draw buffers ────────────────────────────────────────────────────────
 // FULL render mode com buffer 480x320 landscape em PSRAM. Cache blocking
@@ -1587,30 +1577,68 @@ static bool fetchHistoryAll(const char *period = "24h") {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Cenas Tuya — fetch dinamico do server (substituiu slots fixos via env vars).
-// Server endpoint /api/device/scenes lista cenas manuais da conta Tuya do user;
-// cada cena tem id Tuya real (string) + nome friendly. Storage local pareia
-// 1:1 com sceneNames[] em cultivo_ui.cpp:
-//   - sceneIdsLocal[i]    = ID Tuya real (usado no POST /scene-by-id/<id>)
-//   - sceneNamesLocal[i]  = label exibido na UI
+// Items Tuya (cenas + dispositivos) — fetch dinamico do server
+// (sprint 1 do vinculo cena-estufa). Endpoint /api/device/scenes retorna:
+//   - Formato novo {items:[{type, id, name, state?, iconHint?}, ...]} quando
+//     a estufa tem vinculos via tabela tentScenes/tentDevices
+//   - Formato legacy {scenes:[{id, name}, ...]} quando nao tem vinculos
+//     (firmware antigo continua funcionando — fallback transparente)
 //
-// Threading: fetchScenes roda no netTask (core 0), apenas escreve esses
-// buffers e seta scenesNeedsRefresh=true. loop() (core 1) detecta a flag,
-// chama cultivoUI_applyScenes que rebuilda o LVGL grid (LVGL nao e thread-safe).
+// Storage local pareia 1:1 com items[] em cultivo_ui.cpp. App resolve idx
+// -> tipo via itemTypeLocal[] e dispara endpoint correto:
+//   - scene  -> POST /api/device/scene-by-id/<id>/trigger
+//   - device -> POST /api/device/device-toggle
+//
+// Threading: fetchScenes roda no netTask (core 0), apenas escreve buffers
+// e seta scenesNeedsRefresh=true. loop() (core 1) detecta a flag, chama
+// cultivoUI_applyItems que rebuilda o grid LVGL (LVGL nao e thread-safe).
 // ════════════════════════════════════════════════════════════════════════════════
 #define SCENES_LOCAL_MAX 6
-static char sceneIdsLocal  [SCENES_LOCAL_MAX][48] = {{0}};
-static char sceneNamesLocal[SCENES_LOCAL_MAX][24] = {{0}};
-static int  sceneCountLocal = 0;
+static char    sceneIdsLocal     [SCENES_LOCAL_MAX][48] = {{0}};
+static char    sceneNamesLocal   [SCENES_LOCAL_MAX][24] = {{0}};
+static char    sceneIconHintLocal[SCENES_LOCAL_MAX][12] = {{0}};
+static uint8_t sceneTypeLocal    [SCENES_LOCAL_MAX]     = {0};   // 0=scene, 1=device
+static bool    sceneStateLocal   [SCENES_LOCAL_MAX]     = {false};
+static int     sceneCountLocal = 0;
 
 static volatile bool scenesNeedsRefresh = false;
 static unsigned long lastScenesFetch = 0;
 // Cenas mudam pouco — fetch a cada 10 min e' suficiente.
 static const unsigned long SCENES_FETCH_INTERVAL = 10UL * 60UL * 1000UL;
 
-// fetchScenes: GET /api/device/scenes → JSON {scenes: [{id, name}, ...]}.
-// Popula sceneIdsLocal + sceneNamesLocal e seta scenesNeedsRefresh; loop()
-// faz o apply na UI no proximo tick.
+static inline void copyToBuf(char *dst, size_t cap, const char *src) {
+  if (!src) { dst[0] = '\0'; return; }
+  strncpy(dst, src, cap - 1);
+  dst[cap - 1] = '\0';
+}
+
+// Parsea entrada do JSON (item OR scene legacy) pro slot n. Retorna true se
+// preencheu (id valido), false se descartou.
+static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
+  const char *id   = obj["id"]   | "";
+  const char *name = obj["name"] | "Item";
+  if (!id || !*id) return false;
+  copyToBuf(sceneIdsLocal[n],   sizeof(sceneIdsLocal[n]),   id);
+  copyToBuf(sceneNamesLocal[n], sizeof(sceneNamesLocal[n]), name);
+  if (isLegacyFormat) {
+    // Legacy {scenes:[...]} sempre type=scene, sem iconHint, sem state
+    sceneTypeLocal[n]  = 0;
+    sceneStateLocal[n] = false;
+    sceneIconHintLocal[n][0] = '\0';
+  } else {
+    // Novo {items:[...]}: type pode ser "scene"|"device" string ou numero
+    const char *typeStr = obj["type"] | "scene";
+    sceneTypeLocal[n]  = (!strcmp(typeStr, "device")) ? 1 : 0;
+    sceneStateLocal[n] = obj["state"] | false;
+    copyToBuf(sceneIconHintLocal[n], sizeof(sceneIconHintLocal[n]),
+              obj["iconHint"] | "");
+  }
+  return true;
+}
+
+// fetchScenes: GET /api/device/scenes. Aceita {items:[...]} (formato novo
+// sprint 1) OU {scenes:[...]} (legacy) — server decide qual mandar baseado
+// em ter vinculos na tentScenes/tentDevices.
 static bool fetchScenes() {
   if (!wifiOk) return false;
   HTTPClient http;
@@ -1628,24 +1656,28 @@ static bool fetchScenes() {
   JsonDocument doc;
   DeserializationError err = deserializeJson(doc, http.getStream());
   http.end();
-  if (err != DeserializationError::Ok) return false;
+  if (err != DeserializationError::Ok) {
+    Serial.printf("[net] scenes JSON err: %s\n", err.c_str());
+    return false;
+  }
 
-  JsonArray arr = doc["scenes"].as<JsonArray>();
+  // Detecta formato — items tem prioridade (novo)
+  JsonArray itemsArr = doc["items"].as<JsonArray>();
+  bool isLegacy = itemsArr.isNull();
+  JsonArray arr  = isLegacy ? doc["scenes"].as<JsonArray>() : itemsArr;
+
   int n = 0;
-  for (JsonObject s : arr) {
+  for (JsonObject obj : arr) {
     if (n >= SCENES_LOCAL_MAX) break;
-    const char *id   = s["id"]   | "";
-    const char *name = s["name"] | "Cena";
-    if (!id || !*id) continue;
-    strncpy(sceneIdsLocal[n], id, sizeof(sceneIdsLocal[n]) - 1);
-    sceneIdsLocal[n][sizeof(sceneIdsLocal[n]) - 1] = '\0';
-    strncpy(sceneNamesLocal[n], name, sizeof(sceneNamesLocal[n]) - 1);
-    sceneNamesLocal[n][sizeof(sceneNamesLocal[n]) - 1] = '\0';
-    n++;
+    if (parseItemSlot(obj, n, isLegacy)) n++;
   }
   sceneCountLocal = n;
 
-  Serial.printf("[net] scenes: %d cenas carregadas\n", sceneCountLocal);
+  // Conta scenes vs devices p/ log
+  int nScenes = 0, nDevices = 0;
+  for (int i = 0; i < n; i++) (sceneTypeLocal[i] == 0 ? nScenes : nDevices)++;
+  Serial.printf("[net] items: %d total (%d cenas, %d devices) [%s]\n",
+                n, nScenes, nDevices, isLegacy ? "legacy" : "novo");
   scenesNeedsRefresh = true;
   return true;
 }
@@ -1732,15 +1764,71 @@ static void refreshHandler() {
   refreshPending = true;
   Serial.println("[ui] tap-to-refresh requested");
 }
-// Tap em botao de cena na tela CENAS. Resolve idx -> sceneId real (do storage
-// preenchido por fetchScenes) e faz POST /api/device/scene-by-id/<id>/trigger.
+// POST /api/device/device-toggle — manda novo state pro server, retorna true
+// se HTTP 200. Body: {"deviceId":"...", "state":true|false}.
+static bool postDeviceToggle(const char *deviceId, bool newState) {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/device-toggle", SERVER_URL);
+  if (!httpBegin(http, url)) {
+    Serial.println("[device] httpBegin falhou");
+    return false;
+  }
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.addHeader("Content-Type", "application/json");
+  char body[128];
+  snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"state\":%s}",
+           deviceId, newState ? "true" : "false");
+  int code = http.POST(body);
+  Serial.printf("[device] toggle %s -> %s HTTP %d\n",
+                deviceId, newState ? "ON" : "OFF", code);
+  http.end();
+  return code == 200;
+}
+
+// Tap em botao do grid CENAS — diferencia scene vs device:
+//   - scene  : POST /api/device/scene-by-id/<id>/trigger (one-shot)
+//   - device : optimistic toggle (UI ja' inverteu sceneStateLocal via
+//              applyItems anterior); manda novo state pro server, reverte se
+//              falhou via cultivoUI_setDeviceState.
+//
+// IMPORTANTE: o callback da UI (sceneClickCb em cultivo_ui.cpp) JA' inverte
+// items[idx].state localmente antes de chamar este handler — entao aqui o
+// server recebe o state DESEJADO (= storage atual da UI).
 static void sceneTriggerHandler(int idx) {
   if (idx < 0 || idx >= sceneCountLocal) {
     Serial.printf("[scene] idx=%d fora do range (count=%d)\n", idx, sceneCountLocal);
     return;
   }
-  const char *id = sceneIdsLocal[idx];
-  Serial.printf("[scene] trigger idx=%d id=%s name=%s\n", idx, id, sceneNamesLocal[idx]);
+  const char *id   = sceneIdsLocal[idx];
+  const char *name = sceneNamesLocal[idx];
+
+  if (sceneTypeLocal[idx] == 1) {
+    // Device — manda novo state. UI ja' inverteu visualmente; se POST falhar,
+    // reverte tanto o state interno quanto o visual via setDeviceState.
+    bool desired = !sceneStateLocal[idx];  // UI inverteu, o "novo" pro server e' o oposto do storage
+    // Espera: storage no main_lvgl ainda tem state ANTIGO (so' UI inverteu).
+    // Vamos sincronizar: assumimos toggle, escrevemos desired no storage.
+    sceneStateLocal[idx] = desired;
+    Serial.printf("[device] toggle idx=%d id=%s name=%s -> %s\n",
+                  idx, id, name, desired ? "ON" : "OFF");
+    if (!wifiOk) {
+      Serial.println("[device] WiFi offline — reverte UI");
+      sceneStateLocal[idx] = !desired;
+      cultivoUI_setDeviceState(idx, !desired);
+      return;
+    }
+    if (!postDeviceToggle(id, desired)) {
+      Serial.println("[device] POST falhou — reverte UI");
+      sceneStateLocal[idx] = !desired;
+      cultivoUI_setDeviceState(idx, !desired);
+    }
+    return;
+  }
+
+  // Scene — trigger one-shot
+  Serial.printf("[scene] trigger idx=%d id=%s name=%s\n", idx, id, name);
   if (!wifiOk) {
     Serial.println("[scene] WiFi offline — request descartado");
     return;
@@ -2044,12 +2132,19 @@ void setup() {
     fetchDisplayData();
     fetchHistoryAll("24h");  // chart de Hist tem dados ja' no primeiro draw
     cultivoUI_applyHistory();  // aplica imediato (LVGL ja' construido)
-    fetchScenes();             // popula sceneIdsLocal+sceneNamesLocal
+    fetchScenes();             // popula scene*Local + scenesNeedsRefresh
     if (scenesNeedsRefresh) {
       scenesNeedsRefresh = false;
-      const char *namesArr[SCENES_LOCAL_MAX] = {nullptr};
-      for (int i = 0; i < sceneCountLocal; i++) namesArr[i] = sceneNamesLocal[i];
-      cultivoUI_applyScenes(namesArr, sceneCountLocal);
+      // Monta CultivoItem[] a partir do storage e aplica na UI
+      CultivoItem buf[SCENES_LOCAL_MAX] = {};
+      for (int i = 0; i < sceneCountLocal; i++) {
+        buf[i].id       = sceneIdsLocal[i];
+        buf[i].name     = sceneNamesLocal[i];
+        buf[i].type     = sceneTypeLocal[i];
+        buf[i].state    = sceneStateLocal[i];
+        buf[i].iconHint = sceneIconHintLocal[i];
+      }
+      cultivoUI_applyItems(buf, sceneCountLocal);
     }
     lastFetch       = millis();
     lastHistFetch   = millis();
@@ -2089,10 +2184,16 @@ void loop() {
   }
   if (scenesNeedsRefresh) {
     scenesNeedsRefresh = false;
-    // Monta array de ponteiros pros names — applyScenes faz strncpy interno
-    const char *namesArr[SCENES_LOCAL_MAX] = {nullptr};
-    for (int i = 0; i < sceneCountLocal; i++) namesArr[i] = sceneNamesLocal[i];
-    cultivoUI_applyScenes(namesArr, sceneCountLocal);
+    // Monta CultivoItem[] a partir do storage (scene + device + iconHint + state)
+    CultivoItem buf[SCENES_LOCAL_MAX] = {};
+    for (int i = 0; i < sceneCountLocal; i++) {
+      buf[i].id       = sceneIdsLocal[i];
+      buf[i].name     = sceneNamesLocal[i];
+      buf[i].type     = sceneTypeLocal[i];
+      buf[i].state    = sceneStateLocal[i];
+      buf[i].iconHint = sceneIconHintLocal[i];
+    }
+    cultivoUI_applyItems(buf, sceneCountLocal);
   }
 
   // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI

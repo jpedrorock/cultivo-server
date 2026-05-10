@@ -1065,29 +1065,55 @@ static void buildPhEc(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
-// Tela CENAS — atalhos pra triggers Tuya. Cenas vem dinamicas do server via
-// GET /api/device/scenes (pega da Tuya Cloud da conta do user). App chama
-// cultivoUI_applyScenes(names, count) e UI rebuilda o grid 2x3 (max 6 cenas).
-// onSceneTrigger(idx) → app dispara via /api/device/scene-by-id/<id>/trigger.
-// Quando count == 0 (offline / sem Tuya), mostra placeholder textual.
+// Tela CENAS — atalhos cenas + dispositivos vinculados a estufa. Items vem
+// dinamicos do server via GET /api/device/scenes (formato novo {items:[...]}).
+// Cada item tem type=scene (tap dispara cena Tuya) ou type=device (tap toggla
+// on/off). App chama cultivoUI_applyItems() e UI rebuilda o grid 2x3.
+// onSceneTrigger(idx) → app resolve type via storage proprio e POSTa endpoint
+// correto. Quando count == 0 (sem vinculos), mostra placeholder textual.
 // ════════════════════════════════════════════════════════════════════════════════
-// Paleta cycling — cenas nao tem icone/cor no payload, entao gerados por idx
-// pra dar variedade visual. 6 entries (igual SCENES_MAX) garante um por slot.
-static const struct {
-  uint32_t color;
-  const lv_image_dsc_t *icon;
-} SCENE_PALETTE[SCENES_MAX] = {
-  { COL_CYN, &ic_droplet     },  // 0
-  { COL_YEL, &ic_lightbulb   },  // 1
-  { COL_GRN, &ic_sprout      },  // 2
-  { COL_BLU, &ic_activity    },  // 3
-  { COL_PRP, &ic_flask       },  // 4
-  { COL_RED, &ic_thermometer },  // 5
+
+// Paleta de cores p/ cenas (cycling por slot — cenas nao tem cor no payload)
+static const uint32_t SCENE_COLOR_PALETTE[SCENES_MAX] = {
+  COL_CYN, COL_YEL, COL_PRIMARY, COL_BLU, COL_PRP, COL_AMBER,
 };
 
-// Storage das cenas atuais (preenchido pelo app via cultivoUI_applyScenes)
-static char  sceneNames[SCENES_MAX][24] = {{0}};
-static int   sceneCount = 0;
+// Resolve iconHint string -> ic_* image. Default = ic_zap (raio).
+// Tambem usado no fallback de cena sem iconHint definido.
+static const lv_image_dsc_t* resolveIcon(const char *hint, bool isScene, int slotIdx) {
+  if (!hint || !*hint) {
+    // Cena sem hint: cycling por slot (variedade visual). Device sem hint: zap.
+    if (isScene) {
+      static const lv_image_dsc_t *cyc[SCENES_MAX] = {
+        &ic_droplet, &ic_lightbulb, &ic_sprout,
+        &ic_activity, &ic_flask, &ic_thermometer
+      };
+      return cyc[slotIdx % SCENES_MAX];
+    }
+    return &ic_zap;
+  }
+  // iconHint conhecidos do server (sprint 1)
+  if (!strcmp(hint, "light"))  return &ic_lightbulb;
+  if (!strcmp(hint, "fan"))    return &ic_activity;     // wave/wind
+  if (!strcmp(hint, "pump"))   return &ic_droplet;
+  if (!strcmp(hint, "heater")) return &ic_thermometer;
+  if (!strcmp(hint, "ac"))     return &ic_thermometer;
+  return &ic_zap;
+}
+
+// Storage atual (preenchido pelo app via cultivoUI_applyItems)
+typedef struct {
+  char     id[48];          // sceneId/deviceId Tuya
+  char     name[24];        // label
+  uint8_t  type;            // 0=scene, 1=device
+  bool     state;           // device on/off
+  char     iconHint[12];    // "light"/"fan"/etc
+} ItemStorage;
+static ItemStorage items[SCENES_MAX];
+static int sceneCount = 0;  // mantem nome legado p/ minimizar diff
+// Refs aos botoes pra updates pontuais (toggle visual sem rebuild full)
+static lv_obj_t *itemBtns[SCENES_MAX]  = {nullptr};
+static lv_obj_t *itemIcons[SCENES_MAX] = {nullptr};
 
 // Tab pai dos botoes — guardado pra rebuild quando dados chegam do server
 static lv_obj_t *sceneTab = nullptr;
@@ -1097,23 +1123,65 @@ static lv_obj_t *sceneGrid = nullptr;
 // Label de placeholder ("Sem cenas...") — visivel quando count == 0
 static lv_obj_t *sceneEmpty = nullptr;
 
-// Feedback visual de "trigger enviado" — flash sutil no border (vira primary
-// por ~MOTION_FAST + MOTION_MED) pra confirmar tap sem ser ofensivo. Era um
-// pulse opa do bg que ficava muito chamativo no DS clean.
+// Pinta visual on/off de um device card.
+// ON  : card "preenchido" — bg primary opa 25, border primary cheio, icone
+//       BRANCO brilhante (= "lampada acesa"), shadow primary suave
+// OFF : card "vazado"   — bg card neutro, border BORDER neutra, icone DIM
+//       (= "lampada apagada")
+// Diferenca obvia a metros de distancia, sem precisar rasterizar icones
+// "filled" novos. Idempotente — pode ser chamado a qualquer hora.
+static void paintDeviceState(int idx) {
+  if (idx < 0 || idx >= SCENES_MAX) return;
+  if (!itemBtns[idx] || !itemIcons[idx]) return;
+  if (items[idx].type != 1) return;  // so' devices
+
+  bool on = items[idx].state;
+  if (on) {
+    // ON: card "aceso"
+    lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_30, 0);
+    lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_image_recolor(itemIcons[idx], lv_color_hex(COL_TEXT), 0);
+    // Shadow primary suave pra dar feel de "irradiando luz"
+    lv_obj_set_style_shadow_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_shadow_width(itemBtns[idx], 12, 0);
+    lv_obj_set_style_shadow_opa(itemBtns[idx],   LV_OPA_30, 0);
+    lv_obj_set_style_shadow_spread(itemBtns[idx], 0, 0);
+  } else {
+    // OFF: card "apagado"
+    lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_image_recolor(itemIcons[idx], lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_shadow_width(itemBtns[idx], 0, 0);  // sem glow
+  }
+}
+
+// Feedback de tap: scene = flash border primary (era trigger). device =
+// optimistic toggle visual (assume sucesso, app confirma/reverte via
+// cultivoUI_setDeviceState). Anim ease padrao.
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   if (idx < 0 || idx >= sceneCount) return;
-  printf("[ui] cena trigger idx=%d (%s)\n", idx, sceneNames[idx]);
+  printf("[ui] item tap idx=%d type=%d (%s)\n",
+         idx, items[idx].type, items[idx].name);
   if (onSceneTrigger) onSceneTrigger(idx);
 
-  // Flash de border primary -> volta ao border neutro. MOTION_FAST entrada,
-  // MOTION_MED retorno. Ease standard pro feel "tap material".
+  if (items[idx].type == 1) {
+    // Device — optimistic toggle. App vai chamar setDeviceState quando
+    // server confirmar (ou reverter se falhou).
+    items[idx].state = !items[idx].state;
+    paintDeviceState(idx);
+    return;
+  }
+
+  // Scene — flash border primary -> volta ao neutro
   lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
   lv_obj_set_style_border_color(btn, lv_color_hex(COL_PRIMARY), 0);
   lv_anim_t a;
   lv_anim_init(&a);
   lv_anim_set_var(&a, btn);
-  lv_anim_set_values(&a, 0xFF, 0x00);  // marker — usado pelo callback p/ trigger reset
+  lv_anim_set_values(&a, 0xFF, 0x00);  // marker — usado p/ trigger reset
   lv_anim_set_time(&a, MOTION_FAST + MOTION_MED);
   lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
     if (v < 0x40) {
@@ -1188,15 +1256,21 @@ static void rebuildSceneGrid() {
   int btnW  = (gridW - (COLS - 1) * gap) / COLS;
   int btnH  = (gridH - (ROWS - 1) * gap) / ROWS;
 
+  // Reset refs antigos (botoes vao ser recriados)
+  for (int i = 0; i < SCENES_MAX; i++) { itemBtns[i] = nullptr; itemIcons[i] = nullptr; }
+
   for (int i = 0; i < sceneCount && i < SCENES_MAX; i++) {
     int row = i / COLS;
     int col = i % COLS;
     int x = gridX + col * (btnW + gap);
     int y = row * (btnH + gap);
-    uint32_t iconColor = SCENE_PALETTE[i].color;
 
-    // Card DS: bg COL_CARD, border neutra (era cor da cena — gritante).
-    // Cor da cena fica so' no icone como acento.
+    bool isScene = (items[i].type == 0);
+    const lv_image_dsc_t *iconImg = resolveIcon(items[i].iconHint, isScene, i);
+    // Cor scene = paleta cycling (decorativo). Device = pintada por paintDeviceState
+    uint32_t iconColor = isScene ? SCENE_COLOR_PALETTE[i] : COL_DIM;
+
+    // Card DS — bg/border iniciais; paintDeviceState aplica estado on/off depois
     lv_obj_t *btn = lv_obj_create(sceneGrid);
     lv_obj_set_size(btn, btnW, btnH);
     lv_obj_set_pos(btn, x, y);
@@ -1206,44 +1280,83 @@ static void rebuildSceneGrid() {
     lv_obj_set_style_border_width(btn, 1, 0);
     lv_obj_set_style_radius(btn, RADIUS_LG, 0);
     lv_obj_set_style_pad_all(btn, sw(2), 0);
-    lv_obj_set_style_shadow_width(btn, 0, 0);  // sem bloom — DS clean
+    lv_obj_set_style_shadow_width(btn, 0, 0);
     lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
-    // Icone centralizado top — cor da paleta (decorativa, nao branding)
+    // Icone top
     lv_obj_t *ico = lv_image_create(btn);
-    lv_image_set_src(ico, SCENE_PALETTE[i].icon);
+    lv_image_set_src(ico, iconImg);
     lv_obj_set_style_image_recolor(ico, lv_color_hex(iconColor), 0);
     lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
     lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(12));
 
-    // Label embaixo — branco fixo (DS), truncado se nome longo
+    // Label embaixo
     lv_obj_t *lbl = lv_label_create(btn);
-    lv_label_set_text(lbl, sceneNames[i]);
+    lv_label_set_text(lbl, items[i].name);
     lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_width(lbl, btnW - sw(8));
     lv_obj_set_style_text_color(lbl, lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
+
+    // Salva refs + aplica estado on/off (so' efetivo em devices)
+    itemBtns[i]  = btn;
+    itemIcons[i] = ico;
+    if (!isScene) paintDeviceState(i);
   }
 }
 
-extern "C" void cultivoUI_applyScenes(const char *names[], int count) {
+// Helper interno: copia 1 string com cap (evita repetir strncpy + null term).
+static void copyStr(char *dst, size_t dstLen, const char *src) {
+  if (!dst || dstLen == 0) return;
+  if (!src) { dst[0] = '\0'; return; }
+  strncpy(dst, src, dstLen - 1);
+  dst[dstLen - 1] = '\0';
+}
+
+extern "C" void cultivoUI_applyItems(const CultivoItem *src, int count) {
   if (count < 0) count = 0;
   if (count > SCENES_MAX) count = SCENES_MAX;
   sceneCount = count;
   for (int i = 0; i < count; i++) {
-    if (names[i]) {
-      strncpy(sceneNames[i], names[i], sizeof(sceneNames[i]) - 1);
-      sceneNames[i][sizeof(sceneNames[i]) - 1] = '\0';
-    } else {
-      sceneNames[i][0] = '\0';
-    }
+    copyStr(items[i].id,       sizeof(items[i].id),       src[i].id);
+    copyStr(items[i].name,     sizeof(items[i].name),     src[i].name);
+    copyStr(items[i].iconHint, sizeof(items[i].iconHint), src[i].iconHint);
+    items[i].type  = src[i].type;
+    items[i].state = src[i].state;
   }
-  printf("[ui] cultivoUI_applyScenes count=%d\n", count);
+  // Limpa slots nao usados (evita render de lixo se shrink)
+  for (int i = count; i < SCENES_MAX; i++) {
+    items[i].id[0] = items[i].name[0] = items[i].iconHint[0] = '\0';
+    items[i].type = 0; items[i].state = false;
+  }
+  printf("[ui] cultivoUI_applyItems count=%d\n", count);
   rebuildSceneGrid();
+}
+
+// Legacy: mantida pra compat. Constroi CultivoItem[] com type=scene + iconHint
+// vazio (paleta cycling resolve icone).
+extern "C" void cultivoUI_applyScenes(const char *names[], int count) {
+  CultivoItem buf[SCENES_MAX] = {};
+  if (count > SCENES_MAX) count = SCENES_MAX;
+  for (int i = 0; i < count; i++) {
+    buf[i].id       = "";       // legacy nao tem id (app usa storage proprio)
+    buf[i].name     = names[i] ? names[i] : "";
+    buf[i].type     = 0;        // scene
+    buf[i].state    = false;
+    buf[i].iconHint = "";
+  }
+  cultivoUI_applyItems(buf, count);
+}
+
+extern "C" void cultivoUI_setDeviceState(int idx, bool state) {
+  if (idx < 0 || idx >= sceneCount) return;
+  if (items[idx].type != 1) return;  // so' devices
+  items[idx].state = state;
+  paintDeviceState(idx);
 }
 
 static void buildTarefas(lv_obj_t *tab) {
