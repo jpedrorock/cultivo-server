@@ -263,12 +263,14 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
   lblWifi = wifiIcon;
 
-  // Gear — abre modal de config (firmware) ou no-op (sim).
-  lv_obj_t *btnCfg = lv_label_create(tab);
-  lv_label_set_text(btnCfg, LV_SYMBOL_SETTINGS);
-  lv_obj_set_style_text_color(btnCfg, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(btnCfg, &lv_font_montserrat_24, 0);
-  lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(44), sh(2));
+  // Gear — abre modal de config. Era LV_SYMBOL_SETTINGS em font 24
+  // (~15px efetivo, ficava menor que os icones rasterizados de 32px).
+  // Trocado por ic_settings (imagem 32px) pra match visual com refresh+wifi.
+  lv_obj_t *btnCfg = lv_image_create(tab);
+  lv_image_set_src(btnCfg, &ic_settings);
+  lv_obj_set_style_image_recolor(btnCfg, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_image_recolor_opa(btnCfg, LV_OPA_COVER, 0);
+  lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(44), sh(4));
   lv_obj_add_flag(btnCfg, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_ext_click_area(btnCfg, sw(8));
   lv_obj_add_event_cb(btnCfg, [](lv_event_t *e) {
@@ -606,6 +608,15 @@ extern "C" void refreshHomeValues() {
   // Header agora SO' tem nome da estufa (semana/fase migrou pro card CICLO).
   if (lblTitle) lv_label_set_text(lblTitle, TENT_NAME);
 
+  // Atualiza icone wifi conforme estado atual — sem isso, o icone pegava
+  // wifiOk so' no buildHome (boot) e nunca mais mudava. Quando wifi conecta
+  // depois (boot offline -> conecta) ficava mostrando 'off' eternamente.
+  if (lblWifi) {
+    lv_image_set_src(lblWifi, wifiOk ? &ic_wifi : &ic_wifi_off);
+    lv_obj_set_style_image_recolor(lblWifi,
+      lv_color_hex(wifiOk ? COL_PRIMARY : COL_DIM), 0);
+  }
+
   // Arc principal: re-renderiza no modo atual com valores frescos
   updateArcMode();
 
@@ -678,6 +689,16 @@ static void pulseTimerCb(lv_timer_t *t) {
     autoscaleSpark(sparkVpd, serVpdS);
   }
   // sparkPpfd removido — card PPFD substituido pelo card CICLO (estatico).
+
+  // Sync wifi icon a cada tick — captura desconexao mesmo sem fetch ativo.
+  // Custo: 1 if + max 2 set_style por 300ms — desprezivel.
+  static bool lastWifi = !wifiOk;  // forca primeira sync
+  if (lblWifi && wifiOk != lastWifi) {
+    lastWifi = wifiOk;
+    lv_image_set_src(lblWifi, wifiOk ? &ic_wifi : &ic_wifi_off);
+    lv_obj_set_style_image_recolor(lblWifi,
+      lv_color_hex(wifiOk ? COL_PRIMARY : COL_DIM), 0);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
