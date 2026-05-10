@@ -247,18 +247,13 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  // ── Header (DS): [icone primary] TITULO              [refresh][gear][wifi]
-  // Header agora SO' tem nome da estufa — semana/fase migrou pro card CICLO
-  // no slot que era do PPFD. Visual mais limpo, info de fase fica no corpo.
+  // ── Header (DS): TITULO                              [refresh][gear][wifi]
+  // Header agora SO' tem nome da estufa — sem icone sprout (ja' aparece no
+  // card CICLO embaixo, evita duplicar). Semana/fase migrou pro card CICLO
+  // no slot que era do PPFD. Visual maximamente limpo no topo.
   // - btnRefresh top-right e' o "lugar pra pedir atualizacao na hora";
   //   anima rotacao 360 enquanto isRefreshing=true.
-  lv_obj_t *hdrIcon = lv_image_create(tab);
-  lv_image_set_src(hdrIcon, &ic_sprout);
-  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
-  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(8));
-
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(10));
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(8), sh(10));
   lblSub = nullptr;  // legacy — semana/fase agora no card CICLO
 
   lv_obj_t *wifiIcon = lv_image_create(tab);
