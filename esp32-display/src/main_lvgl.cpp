@@ -320,19 +320,20 @@ static void buildSplash() {
   lv_obj_set_style_pad_all(splashScreen, 0, 0);
   lv_obj_clear_flag(splashScreen, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Anel circular com glow verde — funciona como ícone de app
+  // Logo container DS — circular com glow primary suave (era 28px width
+  // shadow + opa 40, ficava intenso. Reduzido pra 16+30 — mais "premium").
   lv_obj_t *logoCont = lv_obj_create(splashScreen);
   lv_obj_set_size(logoCont, sw(64), sw(64));
   lv_obj_align(logoCont, LV_ALIGN_CENTER, 0, -sh(48));
   lv_obj_set_style_radius(logoCont, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(logoCont, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_bg_color(logoCont, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_bg_opa(logoCont, LV_OPA_20, 0);
-  lv_obj_set_style_border_color(logoCont, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(logoCont, 2, 0);
+  lv_obj_set_style_border_color(logoCont, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_border_width(logoCont, 1, 0);  // era 2 — mais clean
   lv_obj_set_style_border_opa(logoCont, LV_OPA_60, 0);
-  lv_obj_set_style_shadow_color(logoCont, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_shadow_width(logoCont, 28, 0);
-  lv_obj_set_style_shadow_opa(logoCont, LV_OPA_40, 0);
+  lv_obj_set_style_shadow_color(logoCont, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_shadow_width(logoCont, 16, 0);  // era 28
+  lv_obj_set_style_shadow_opa(logoCont, LV_OPA_30, 0);  // era 40
   lv_obj_set_style_pad_all(logoCont, 0, 0);
   lv_obj_clear_flag(logoCont, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -340,29 +341,29 @@ static void buildSplash() {
   lv_img_set_src(logo, &ic_sprout);
   lv_obj_center(logo);
 
-  // Nome do app
+  // Nome do app — Geist bold 40 (FONT_VALUE)
   lv_obj_t *lblName = lv_label_create(splashScreen);
   lv_label_set_text(lblName, "cultivo");
   lv_obj_set_style_text_font(lblName, FONT_VALUE, 0);
   lv_obj_set_style_text_color(lblName, lv_color_hex(COL_TEXT), 0);
   lv_obj_align(lblName, LV_ALIGN_CENTER, 0, sh(12));
 
-  // Subtítulo
+  // Subtítulo — Geist semibold 18 dim
   lv_obj_t *lblSub = lv_label_create(splashScreen);
   lv_label_set_text(lblSub, "Monitor de Estufa");
   lv_obj_set_style_text_font(lblSub, FONT_BODY, 0);
   lv_obj_set_style_text_color(lblSub, lv_color_hex(COL_DIM), 0);
   lv_obj_align(lblSub, LV_ALIGN_CENTER, 0, sh(40));
 
-  // Barra de progresso — fina, verde, preenche da esquerda pra direita
+  // Barra de progresso DS — radius pill (RADIUS_SM/2 = 4 ja' quase pill p/ 4px)
   splashBar = lv_bar_create(splashScreen);
   lv_obj_set_size(splashBar, SCREEN_W - sw(48), sh(4));
   lv_obj_align(splashBar, LV_ALIGN_BOTTOM_MID, 0, -sh(28));
   lv_obj_set_style_bg_color(splashBar, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_bg_opa(splashBar, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(splashBar, 2, 0);
-  lv_obj_set_style_bg_color(splashBar, lv_color_hex(COL_GRN), LV_PART_INDICATOR);
-  lv_obj_set_style_radius(splashBar, 2, LV_PART_INDICATOR);
+  lv_obj_set_style_radius(splashBar, RADIUS_SM, 0);
+  lv_obj_set_style_bg_color(splashBar, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(splashBar, RADIUS_SM, LV_PART_INDICATOR);
   lv_bar_set_range(splashBar, 0, 100);
   lv_bar_set_value(splashBar, 0, LV_ANIM_OFF);
 
@@ -373,20 +374,20 @@ static void buildSplash() {
   lv_obj_set_style_text_color(splashMsg, lv_color_hex(COL_DIM), 0);
   lv_obj_align(splashMsg, LV_ALIGN_BOTTOM_MID, 0, -sh(10));
 
-  // Versão no canto inferior direito
+  // Versão no canto inferior direito — quase invisivel (border color)
   lv_obj_t *lblVer = lv_label_create(splashScreen);
   lv_label_set_text(lblVer, "v" FW_VERSION);
   lv_obj_set_style_text_font(lblVer, FONT_CAPTION, 0);
   lv_obj_set_style_text_color(lblVer, lv_color_hex(COL_BORDER), 0);
   lv_obj_align(lblVer, LV_ALIGN_BOTTOM_RIGHT, -sw(8), -sh(6));
 
-  // Fade in
+  // Fade in com motion token
   lv_obj_set_style_opa(splashScreen, LV_OPA_0, 0);
   lv_anim_t fadeIn;
   lv_anim_init(&fadeIn);
   lv_anim_set_var(&fadeIn, splashScreen);
   lv_anim_set_values(&fadeIn, LV_OPA_0, LV_OPA_COVER);
-  lv_anim_set_time(&fadeIn, 300);
+  lv_anim_set_time(&fadeIn, MOTION_MED);
   lv_anim_set_exec_cb(&fadeIn, [](void *obj, int32_t v) {
     lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
   });
@@ -403,7 +404,7 @@ static void splashFinish() {
   lv_anim_init(&a);
   lv_anim_set_var(&a, splashScreen);
   lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_0);
-  lv_anim_set_time(&a, 450);
+  lv_anim_set_time(&a, MOTION_SLOW);
   lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
     lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
   });
@@ -543,14 +544,15 @@ static void openConfigModal() {
   configModal = lv_obj_create(lv_scr_act());
   lv_obj_set_size(configModal, SCREEN_W, SCREEN_H);
   lv_obj_set_pos(configModal, 0, 0);
-  lv_obj_set_style_bg_color(configModal, lv_color_hex(0x060A10), 0);
+  // BG = COL_BG token DS (era 0x060A10 arbitrario)
+  lv_obj_set_style_bg_color(configModal, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(configModal, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(configModal, 0, 0);
   lv_obj_set_style_radius(configModal, 0, 0);
   lv_obj_set_style_pad_all(configModal, sw(6), 0);
   lv_obj_clear_flag(configModal, LV_OBJ_FLAG_SCROLLABLE);
 
-  makeLabel(configModal, "CONFIGURACAO", COL_GRN, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(2));
+  makeLabel(configModal, "CONFIGURACAO", COL_PRIMARY, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(2));
   makeLabel(configModal, "fw " FW_VERSION, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(4));
 
   // Area scrollavel com os 5 campos. Aumentada (sh(180)) p/ caber inputs maiores
@@ -578,75 +580,76 @@ static void openConfigModal() {
     lv_obj_set_style_bg_color(ta, lv_color_hex(COL_CARD), 0);
     lv_obj_set_style_border_color(ta, lv_color_hex(COL_BORDER), 0);
     lv_obj_set_style_border_width(ta, 1, 0);
+    lv_obj_set_style_radius(ta, RADIUS_MD, 0);
     lv_obj_set_style_pad_left(ta, sw(6), 0);
     lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
     *out = ta;
   };
 
-  // Botao "Setup via celular" — sobe AP portal para o usuario configurar
-  // via browser do celular em 192.168.4.1. Alternativa ao preenchimento manual.
-  lv_obj_t *btnAp = lv_btn_create(list);
-  lv_obj_set_width(btnAp, lv_pct(100));
-  lv_obj_set_height(btnAp, sh(34));
-  lv_obj_set_style_bg_color(btnAp, lv_color_hex(0x1E3A8A), 0);
-  lv_obj_set_style_border_color(btnAp, lv_color_hex(COL_CYN), 0);
-  lv_obj_set_style_border_width(btnAp, 1, 0);
-  lv_obj_add_event_cb(btnAp, [](lv_event_t *e) {
+  // Helper local — botao secundario (border+texto, sem bg) DS style.
+  auto secondaryBtn = [&](lv_obj_t *parent, const char *label,
+                          lv_event_cb_t cb) -> lv_obj_t* {
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_set_width(btn, lv_pct(100));
+    lv_obj_set_height(btn, sh(34));
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+    lv_obj_set_style_radius(btn, RADIUS_LG, 0);
+    lv_obj_set_style_shadow_width(btn, 0, 0);
+    lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
+    return btn;
+  };
+
+  // Botao "Setup via celular" — secundario DS, sem cor especial (era azul/ciano)
+  lv_obj_t *btnAp = secondaryBtn(list, nullptr, [](lv_event_t *e) {
     Serial.println("[cfg] abrindo AP portal a pedido do usuario");
     if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
     startApPortal();
-  }, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnAp, "Setup via celular (AP)", COL_CYN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  });
+  makeLabel(btnAp, "Setup via celular (AP)", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   addField("WiFi SSID",      WIFI_SSID,    &taSsid);
 
-  // Botao SCAN — dispara busca assincrona, nao trava LVGL
-  lv_obj_t *btnScan = lv_btn_create(list);
-  lv_obj_set_width(btnScan, lv_pct(100));
-  lv_obj_set_height(btnScan, sh(34));
-  lv_obj_set_style_bg_color(btnScan, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(btnScan, lv_color_hex(COL_CYN), 0);
-  lv_obj_set_style_border_width(btnScan, 1, 0);
-  lv_obj_add_event_cb(btnScan, scanStartCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnScan, "Buscar redes WiFi", COL_CYN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  // Botao SCAN — secundario DS
+  lv_obj_t *btnScan = secondaryBtn(list, nullptr, scanStartCb);
+  makeLabel(btnScan, "Buscar redes WiFi", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   addField("WiFi Senha",     WIFI_PASS,    &taPass,  true);
   addField("Server URL",     SERVER_URL,   &taUrl);
   // Device Token + Tent ID removidos — vem automaticamente via pareamento
   // RFC 8628 quando ESP boot sem token salvo.
 
-  // Botao "Limpar token" — limpa SOMENTE token+tent (preserva WiFi+URL),
-  // forca entrada em modo pareamento RFC 8628 no proximo boot. Util pra
-  // testar fluxo ou re-parear sem perder credenciais WiFi.
-  lv_obj_t *btnReparear = lv_btn_create(list);
-  lv_obj_set_width(btnReparear, lv_pct(100));
-  lv_obj_set_height(btnReparear, sh(34));
-  lv_obj_set_style_bg_color(btnReparear, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(btnReparear, lv_color_hex(COL_PRP), 0);
-  lv_obj_set_style_border_width(btnReparear, 1, 0);
-  lv_obj_add_event_cb(btnReparear, [](lv_event_t *e) {
+  // "Limpar token (re-parear)" — secundario DS, sem cor de destaque (era PRP)
+  lv_obj_t *btnReparear = secondaryBtn(list, nullptr, [](lv_event_t *e) {
     Serial.println("[cfg] limpar token -> reboot p/ pareamento");
     clearTokenOnlyNVS();
     delay(300);
     ESP.restart();
-  }, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnReparear, "Limpar token (re-parear)", COL_PRP, FONT_BODY,
+  });
+  makeLabel(btnReparear, "Limpar token (re-parear)", COL_TEXT, FONT_BODY,
             LV_ALIGN_CENTER, 0, 0);
 
-  // Botoes no rodape
+  // Footer buttons DS — Cancel (ghost), Reset (destrutivo), Salvar (primary)
   lv_obj_t *btnCancel = lv_btn_create(configModal);
   lv_obj_set_size(btnCancel, sw(96), sh(36));
   lv_obj_align(btnCancel, LV_ALIGN_BOTTOM_LEFT, sw(6), -sh(6));
-  lv_obj_set_style_bg_color(btnCancel, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_bg_opa(btnCancel, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_color(btnCancel, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(btnCancel, 1, 0);
+  lv_obj_set_style_radius(btnCancel, RADIUS_LG, 0);
+  lv_obj_set_style_shadow_width(btnCancel, 0, 0);
   lv_obj_add_event_cb(btnCancel, cfgCancelCb, LV_EVENT_CLICKED, NULL);
   makeLabel(btnCancel, "Cancelar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_t *btnReset = lv_btn_create(configModal);
   lv_obj_set_size(btnReset, sw(78), sh(36));
   lv_obj_align(btnReset, LV_ALIGN_BOTTOM_MID, 0, -sh(6));
-  lv_obj_set_style_bg_color(btnReset, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_bg_opa(btnReset, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_RED), 0);
   lv_obj_set_style_border_width(btnReset, 1, 0);
+  lv_obj_set_style_radius(btnReset, RADIUS_LG, 0);
+  lv_obj_set_style_shadow_width(btnReset, 0, 0);
   lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
     Serial.println("[cfg] reset WiFi -> AP portal");
     clearConfigNVS();
@@ -655,11 +658,15 @@ static void openConfigModal() {
   }, LV_EVENT_CLICKED, NULL);
   makeLabel(btnReset, "Reset", COL_RED, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
+  // CTA principal Salvar — primary cheio (sem bloom — DS clean)
   lv_obj_t *btnSave = lv_btn_create(configModal);
   lv_obj_set_size(btnSave, sw(110), sh(36));
   lv_obj_align(btnSave, LV_ALIGN_BOTTOM_RIGHT, -sw(6), -sh(6));
-  lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_GRN), 0);
-  applyBloom(btnSave, COL_GRN);
+  lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(btnSave, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(btnSave, 0, 0);
+  lv_obj_set_style_radius(btnSave, RADIUS_LG, 0);
+  lv_obj_set_style_shadow_width(btnSave, 0, 0);
   lv_obj_add_event_cb(btnSave, cfgSaveCb, LV_EVENT_CLICKED, NULL);
   makeLabel(btnSave, "Salvar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
@@ -1072,7 +1079,8 @@ static void buildApScreen(const char *ssid, const char *pass, const char *ip) {
   apScreen = lv_obj_create(lv_scr_act());
   lv_obj_set_size(apScreen, SCREEN_W, SCREEN_H);
   lv_obj_set_pos(apScreen, 0, 0);
-  lv_obj_set_style_bg_color(apScreen, lv_color_hex(0x060A10), 0);
+  // BG = COL_BG (era 0x060A10 arbitrario, agora token DS)
+  lv_obj_set_style_bg_color(apScreen, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(apScreen, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(apScreen, 0, 0);
   lv_obj_set_style_radius(apScreen, 0, 0);
@@ -1081,52 +1089,57 @@ static void buildApScreen(const char *ssid, const char *pass, const char *ip) {
   // nao interceptar cliques no proprio overlay — so os filhos (botao) clicaveis
   lv_obj_clear_flag(apScreen, LV_OBJ_FLAG_CLICKABLE);
 
-  makeLabel(apScreen, "MODO SETUP", COL_YEL, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(14));
+  // Header — "MODO SETUP" agora em primary (era amber/warning, mas e' estado
+  // de espera nao alerta — primary alinha melhor com brand)
+  makeLabel(apScreen, "MODO SETUP", COL_PRIMARY, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(14));
   makeLabel(apScreen, "Conecte seu celular na rede:", COL_DIM, FONT_CAPTION,
             LV_ALIGN_TOP_MID, 0, sh(40));
 
+  // SSID — branco bold (info principal); sem bloom (DS clean)
   lv_obj_t *lblSsid = lv_label_create(apScreen);
   lv_label_set_text(lblSsid, ssid);
   lv_obj_set_style_text_font(lblSsid, FONT_BODY, 0);
-  lv_obj_set_style_text_color(lblSsid, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_text_color(lblSsid, lv_color_hex(COL_TEXT), 0);
   lv_obj_align(lblSsid, LV_ALIGN_TOP_MID, 0, sh(54));
-  applyBloom(lblSsid, COL_GRN);
 
   makeLabel(apScreen, "Senha:", COL_DIM, FONT_CAPTION,
             LV_ALIGN_TOP_MID, 0, sh(76));
+  // Senha: branco bold (mesma hierarquia do SSID)
   lv_obj_t *lblPass = lv_label_create(apScreen);
   lv_label_set_text(lblPass, pass);
   lv_obj_set_style_text_font(lblPass, FONT_BODY, 0);
-  lv_obj_set_style_text_color(lblPass, lv_color_hex(COL_YEL), 0);
+  lv_obj_set_style_text_color(lblPass, lv_color_hex(COL_TEXT), 0);
   lv_obj_align(lblPass, LV_ALIGN_TOP_MID, 0, sh(90));
 
   makeLabel(apScreen, "Abra no navegador:", COL_DIM, FONT_CAPTION,
             LV_ALIGN_TOP_MID, 0, sh(110));
 
+  // URL — primary (link feel, era CYN)
   lv_obj_t *lblIp = lv_label_create(apScreen);
   char buf[32];
   snprintf(buf, sizeof(buf), "http://%s", ip);
   lv_label_set_text(lblIp, buf);
   lv_obj_set_style_text_font(lblIp, FONT_BODY, 0);
-  lv_obj_set_style_text_color(lblIp, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_text_color(lblIp, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_align(lblIp, LV_ALIGN_TOP_MID, 0, sh(120));
 
-  // Botao fallback — abre o modal de config direto no display (teclado LVGL).
-  // Util quando nao da' pra usar o portal via WiFi (ex: Wokwi sem simulacao de AP).
+  // Botao fallback DS — bg primary cheio + texto branco (CTA principal),
+  // border sem (radius LG arredondado). Sem bloom.
   lv_obj_t *btnManual = lv_btn_create(apScreen);
   lv_obj_set_size(btnManual, sw(200), sh(36));
   lv_obj_align(btnManual, LV_ALIGN_BOTTOM_MID, 0, -sh(38));
-  lv_obj_set_style_bg_color(btnManual, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(btnManual, lv_color_hex(COL_GRN), 0);
-  lv_obj_set_style_border_width(btnManual, 2, 0);
+  lv_obj_set_style_bg_color(btnManual, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(btnManual, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(btnManual, 0, 0);
+  lv_obj_set_style_radius(btnManual, RADIUS_LG, 0);
+  lv_obj_set_style_shadow_width(btnManual, 0, 0);
   lv_obj_set_ext_click_area(btnManual, sw(12));
-  applyBloom(btnManual, COL_GRN);
   lv_obj_add_event_cb(btnManual, [](lv_event_t *e) {
     Serial.println("[ap] abrindo modal manual de config");
     openConfigModal();
     if (configModal) lv_obj_move_foreground(configModal);
   }, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnManual, "Configurar no display", COL_GRN, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(btnManual, "Configurar no display", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
 
   makeLabel(apScreen, "Aguardando configuracao...", COL_DIM, FONT_CAPTION,
             LV_ALIGN_BOTTOM_MID, 0, -sh(22));
@@ -1738,27 +1751,29 @@ static void buildPairScreen() {
   lv_obj_set_style_pad_all(pairScreen, 0, 0);
   lv_obj_clear_flag(pairScreen, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Glow verde sutil canto superior — match estetica das outras telas
+  // Glow primary sutil canto superior — gradient horizontal, opacidade
+  // baixa pra dar "ambient light" sem competir com o codigo central. Match
+  // com as outras telas (mantem o feel "espaco respirando").
   lv_obj_t *glow = lv_obj_create(pairScreen);
   lv_obj_set_size(glow, SCREEN_W * 3 / 5, SCREEN_H * 2 / 3);
   lv_obj_set_pos(glow, 0, 0);
-  lv_obj_set_style_bg_color(glow, lv_color_hex(COL_GRN), 0);
+  lv_obj_set_style_bg_color(glow, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_bg_opa(glow, LV_OPA_10, 0);
-  lv_obj_set_style_bg_grad_color(glow, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_grad_color(glow, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_grad_dir(glow, LV_GRAD_DIR_HOR, 0);
   lv_obj_set_style_border_width(glow, 0, 0);
   lv_obj_set_style_radius(glow, 0, 0);
   lv_obj_remove_flag(glow, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_remove_flag(glow, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Header — "CONECTAR DISPLAY"
-  makeLabel(pairScreen, "CONECTAR DISPLAY", COL_GRN, FONT_TITLE,
+  // Header — "CONECTAR DISPLAY" em primary (Geist bold 24)
+  makeLabel(pairScreen, "CONECTAR DISPLAY", COL_PRIMARY, FONT_TITLE,
             LV_ALIGN_TOP_MID, 0, sh(12));
   makeLabel(pairScreen, "Vincule este display \xC3\xA0 sua estufa",
             COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_MID, 0, sh(40));
 
-  // Code central — fonte VALUE (geist_bold_40), com ext_click_area p/ user
-  // saber que da' pra interagir. Letterspacing alto p/ legibilidade a distancia.
+  // Code central — fonte VALUE (Geist bold 40), letterspacing alto p/ leitura
+  // a distancia. Branco fixo (info principal — DS hierarchy)
   lblPairCode = lv_label_create(pairScreen);
   lv_label_set_text(lblPairCode, "------");
   lv_obj_set_style_text_color(lblPairCode, lv_color_hex(COL_TEXT), 0);
@@ -1766,10 +1781,10 @@ static void buildPairScreen() {
   lv_obj_set_style_text_letter_space(lblPairCode, sw(6), 0);
   lv_obj_align(lblPairCode, LV_ALIGN_CENTER, 0, -sh(8));
 
-  // Hint — onde digitar
+  // Hint — onde digitar (cor primary, link-feel; era ciano)
   lblPairHint = lv_label_create(pairScreen);
   lv_label_set_text(lblPairHint, "app.cultivo.pro \xE2\x86\x92 Conectar Display");
-  lv_obj_set_style_text_color(lblPairHint, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_text_color(lblPairHint, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_text_font(lblPairHint, FONT_BODY, 0);
   lv_obj_align(lblPairHint, LV_ALIGN_CENTER, 0, sh(48));
 
@@ -1780,13 +1795,16 @@ static void buildPairScreen() {
   lv_obj_set_style_text_font(lblPairTimer, FONT_CAPTION, 0);
   lv_obj_align(lblPairTimer, LV_ALIGN_BOTTOM_MID, 0, -sh(36));
 
-  // Botao "Trocar WiFi" — limpa NVS e reboota -> AP portal
+  // Botao "Trocar WiFi" DS — secundario (border + texto, sem bg)
   lv_obj_t *btnReset = lv_btn_create(pairScreen);
   lv_obj_set_size(btnReset, sw(100), sh(28));
   lv_obj_align(btnReset, LV_ALIGN_BOTTOM_MID, 0, -sh(6));
   lv_obj_set_style_bg_color(btnReset, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_bg_opa(btnReset, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(btnReset, 1, 0);
+  lv_obj_set_style_radius(btnReset, RADIUS_XL, 0);  // pill style
+  lv_obj_set_style_shadow_width(btnReset, 0, 0);
   lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
     Serial.println("[pair] user cancelou — clearConfigNVS + reboot p/ AP portal");
     clearConfigNVS();
