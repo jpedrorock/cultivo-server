@@ -500,14 +500,20 @@ static void buildHome(lv_obj_t *tab) {
 }
 
 // Reconfigura arc + labels conforme arcMode (0=TEMP/1=pH/2=EC/3=FASE).
-// DS rule: anel SEMPRE em COL_PRIMARY, valor SEMPRE em COL_TEXT branco.
-// Cor da fase fica no badge do header (lblSub) — anel preserva cor da marca
-// independente do modo, evitando que tap-pra-ciclar mude a "personalidade
-// visual" da Home. Chamado em buildHome, no tap handler, e em
-// refreshHomeValues.
+// DS hierarchy: cada modo tem sua cor (token DS, nao arbitraria) — assim o
+// tap-pra-ciclar da' feedback visual claro. Valor central permanece branco
+// (info principal sempre com max contraste). Cor pinta:
+//   - anel indicator + shadow
+//   - header label ("TEMP"/"pH"/"EC"/<FASE>)
+//
+//   TEMP: phase_harvest laranja (igual sparkline TEMP no Hist + app mobile)
+//   pH:   COL_PRP roxo claro
+//   EC:   COL_AMBER amber
+//   FASE: phaseColor(FASE) — cor real da fase atual (FLORA=magenta etc)
 static void updateArcMode() {
   if (!lblTemp || !arcTemp) return;
   char buf[24];
+  uint32_t col = COL_PRIMARY;
   switch (arcMode) {
     case 0: { // TEMP
       lv_label_set_text(lblArcHdr, "TEMP");
@@ -516,6 +522,7 @@ static void updateArcMode() {
       lv_label_set_text(lblTemp, buf);
       lv_arc_set_range(arcTemp, 0, 40);
       lv_arc_set_value(arcTemp, (int)tempC);
+      col = COL_PHASE_HARVEST;  // laranja (DS, igual chart Hist TEMP)
       break;
     }
     case 1: { // pH
@@ -525,6 +532,7 @@ static void updateArcMode() {
       lv_label_set_text(lblTemp, buf);
       lv_arc_set_range(arcTemp, 0, 140);
       lv_arc_set_value(arcTemp, (int)(phv * 10));
+      col = COL_PRP;  // roxo claro (DS, igual pill pH no Hist)
       break;
     }
     case 2: { // EC
@@ -534,6 +542,7 @@ static void updateArcMode() {
       lv_label_set_text(lblTemp, buf);
       lv_arc_set_range(arcTemp, 0, 40);  // EC * 10 (0-4.0 mS/cm)
       lv_arc_set_value(arcTemp, (int)(ecv * 10));
+      col = COL_AMBER;  // amber (DS, igual chart Hist EC)
       break;
     }
     case 3: { // FASE
@@ -545,13 +554,16 @@ static void updateArcMode() {
       int total = totalSem > 0 ? totalSem : 16;
       lv_arc_set_range(arcTemp, 0, total);
       lv_arc_set_value(arcTemp, semana);
+      col = phaseColor(FASE);  // cor do phase token (FLORA=magenta etc)
       break;
     }
   }
-  // Cores fixas DS — anel/valor nao mudam conforme modo
+  // Valor central permanece branco (DS — info principal sempre max contraste).
   lv_obj_set_style_text_color(lblTemp, lv_color_hex(COL_TEXT), 0);
-  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
-  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  // Header ("TEMP"/"pH"/...) e anel pegam cor do modo — feedback visual do tap.
+  lv_obj_set_style_text_color(lblArcHdr, lv_color_hex(col), 0);
+  lv_obj_set_style_arc_color(arcTemp, lv_color_hex(col), LV_PART_INDICATOR);
+  lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(col), LV_PART_INDICATOR);
 }
 
 extern "C" void refreshHomeValues() {
@@ -588,6 +600,35 @@ extern "C" void refreshHomeValues() {
   }
 }
 
+// Auto-scale do sparkline: olha os ultimos 20 pontos e ajusta range pra
+// que a variacao real ocupe ~60% da altura. Sem isso, RH variando 50-60%
+// num range 0-100 ficava a barriga visual de ~14% (quase invisivel em 14px
+// de altura). Com auto-scale, mesma variacao ocupa ~60% — onda fica obvia.
+//
+// Algoritmo: min/max dos pontos validos + padding 25% do range. Se ainda
+// nao tem variacao (min == max), expande artificialmente (+/-1) pra evitar
+// linha reta colada no eixo.
+static void autoscaleSpark(lv_obj_t *chart, lv_chart_series_t *ser) {
+  if (!chart || !ser) return;
+  int32_t *arr = lv_chart_get_y_array(chart, ser);
+  if (!arr) return;
+  int32_t mn = INT32_MAX, mx = INT32_MIN;
+  bool any = false;
+  for (int i = 0; i < 20; i++) {
+    int32_t v = arr[i];
+    if (v == LV_CHART_POINT_NONE) continue;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+    any = true;
+  }
+  if (!any) return;
+  if (mn == mx) { mn--; mx++; }              // range zero -> expande artificial
+  int32_t pad = (mx - mn) / 4;               // 25% padding em cima e embaixo
+  if (pad < 1) pad = 1;
+  lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, mn - pad, mx + pad);
+  lv_chart_refresh(chart);
+}
+
 // Timer de pulso: anima sparklines + arc pra simular monitor ao vivo
 static void pulseTimerCb(lv_timer_t *t) {
   (void)t;
@@ -598,12 +639,15 @@ static void pulseTimerCb(lv_timer_t *t) {
 
   if (sparkRh && serRhS) {
     lv_chart_set_next_value(sparkRh, serRhS, (int32_t)(rh + wave * 1.5f + jitter));
+    autoscaleSpark(sparkRh, serRhS);
   }
   if (sparkVpd && serVpdS) {
     lv_chart_set_next_value(sparkVpd, serVpdS, (int32_t)((vpd + wave * 0.03f) * 10));
+    autoscaleSpark(sparkVpd, serVpdS);
   }
   if (sparkPpfd && serPpfdS) {
     lv_chart_set_next_value(sparkPpfd, serPpfdS, (int32_t)(currentPpfd + wave * 12));
+    autoscaleSpark(sparkPpfd, serPpfdS);
   }
 }
 
