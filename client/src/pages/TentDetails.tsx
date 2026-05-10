@@ -1440,30 +1440,46 @@ export default function TentDetails() {
           </>
         )}
 
-        {/* Sensor SmartLife */}
-        <TentSensorCard tentId={tentId} />
-
-        {/* Display ESP32 (pareamento) */}
-        <PairDisplayCard tentId={tentId} />
-
-        {/* Cenas e devices vinculados ao display dessa estufa */}
-        <TentDisplayItemsCard tentId={tentId} />
-
-        {/* Plantas — sempre visível */}
-        <TentPlantsTab tentId={tentId} tentName={tent.name} />
-
-        {/* Charts and History */}
-        <Tabs defaultValue="charts" className="space-y-6" id="charts-container">
-          <TabsList className="bg-card/90 backdrop-blur-sm w-full flex p-1 h-auto gap-1">
-            <TabsTrigger value="charts" className="flex-1">
-              Gráficos
+        {/* Tabs principais — agrupa as 4 áreas da estufa numa nav só.
+            Antes eram 4 cards empilhados (sensor / pair / cenas / plantas) +
+            tabs internas de gráficos. Agora tudo em 4 tabs no mesmo nível,
+            menos scroll vertical, foco visual numa área por vez.
+            id="charts-container" mantido pra compat com PDF export que faz
+            scrollIntoView nele antes de capturar. */}
+        <Tabs defaultValue="plantas" className="space-y-6" id="charts-container">
+          <TabsList className="bg-card/90 backdrop-blur-sm w-full grid grid-cols-4 p-1 h-auto gap-1">
+            <TabsTrigger value="plantas" className="gap-1.5 text-xs sm:text-sm">
+              <Sprout className="w-3.5 h-3.5" />
+              <span>Plantas</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex-1">
-              Histórico
+            <TabsTrigger value="smartlife" className="gap-1.5 text-xs sm:text-sm">
+              <Wifi className="w-3.5 h-3.5" />
+              <span>SmartLife</span>
+            </TabsTrigger>
+            <TabsTrigger value="metricas" className="gap-1.5 text-xs sm:text-sm">
+              <ThermometerSun className="w-3.5 h-3.5" />
+              <span>Métricas</span>
+            </TabsTrigger>
+            <TabsTrigger value="historico" className="gap-1.5 text-xs sm:text-sm">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Histórico</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="charts" className="space-y-6">
+          {/* Tab Plantas (default) — lista de plantas + ações */}
+          <TabsContent value="plantas" className="space-y-4">
+            <TentPlantsTab tentId={tentId} tentName={tent.name} />
+          </TabsContent>
+
+          {/* Tab SmartLife — sensor + pareamento ESP32 + cenas/devices em um só lugar */}
+          <TabsContent value="smartlife" className="space-y-4">
+            <TentSensorCard tentId={tentId} />
+            <PairDisplayCard tentId={tentId} />
+            <TentDisplayItemsCard tentId={tentId} />
+          </TabsContent>
+
+          {/* Tab Métricas (gráficos — antes era a tab "charts") */}
+          <TabsContent value="metricas" className="space-y-6">
             {/* Date Range Selector */}
             <div className="flex items-center gap-3">
               <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -1794,7 +1810,8 @@ export default function TentDetails() {
             )}
           </TabsContent>
 
-          <TabsContent value="history">
+          {/* Tab Histórico (tabela de logs — antes era "history") */}
+          <TabsContent value="historico">
             {logsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
