@@ -105,9 +105,17 @@ static lv_obj_t *navIcons[NAV_COUNT];
 int activeScreen = 0;
 
 static lv_obj_t *lblTitle, *lblSub, *lblWifi;
-static lv_obj_t *lblTemp, *lblRh, *lblVpd, *lblPpfd;
-// lblTemp = numero grande do arc; lblEcHome/lblPhHome/lblCiclo/ciclBar
-// removidos junto com Face B no redesign single-face.
+static lv_obj_t *lblTemp, *lblRh, *lblVpd;
+// lblPpfd / sparkPpfd / serPpfdS removidos — card PPFD substituido pelo card
+// CICLO (mostra Sem X/Y + badge fase). PPFD continua acessivel via tap-pra-
+// ciclar no anel principal (modo arcMode=3 com FASE).
+static lv_obj_t *lblPpfd = nullptr;  // legacy ref — pode sair se nada referencia
+// Card CICLO — substitui PPFD no slot 3. lblCycleVal mostra "Sem X/Y",
+// lblCycleBadge e' a pill colorida com nome da fase (FLORA/VEGA/...) na
+// cor do phase token. Atualizados em refreshHomeValues.
+static lv_obj_t *lblCycleVal   = nullptr;
+static lv_obj_t *lblCycleBadge = nullptr;
+// lblTemp = numero grande do arc; lblEcHome/lblPhHome legacy.
 static lv_obj_t *lblEcHome = nullptr, *lblPhHome = nullptr;  // legacy
 static lv_obj_t *lblCiclo = nullptr, *ciclBar = nullptr;     // legacy
 static lv_obj_t *homeFaceA;                   // container dos mini-cards
@@ -121,8 +129,10 @@ static int arcMode = 0;
 // e em refreshHomeValues, mas a definicao vem depois — por que' a logica
 // referencia globais que sao setadas em buildHome (lblArcHdr/Unit).
 static void updateArcMode();
-static lv_obj_t *sparkRh, *sparkVpd, *sparkPpfd;
-static lv_chart_series_t *serRhS, *serVpdS, *serPpfdS;
+static lv_obj_t *sparkRh, *sparkVpd;
+static lv_obj_t *sparkPpfd = nullptr;  // legacy — card PPFD removido
+static lv_chart_series_t *serRhS, *serVpdS;
+static lv_chart_series_t *serPpfdS = nullptr;  // legacy
 static lv_timer_t *pulseTimer = nullptr;
 #ifdef CULTIVO_SIM
 static lv_timer_t *mockTimer  = nullptr;
@@ -237,29 +247,19 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  // ── Header (DS): [icone primary] TITULO + [• badge fase]      [refresh][gear][wifi]
-  // - lblSub e' renderizado em duas partes: "Sem X/Y" cinza + bullet+FASE
-  //   na cor do phase token (igual badges do app)
-  // - btnRefresh top-right e' o "lugar pra pedir atualizacao na hora" pedido
-  //   pelo user; anima rotacao 360 enquanto isRefreshing=true.
+  // ── Header (DS): [icone primary] TITULO              [refresh][gear][wifi]
+  // Header agora SO' tem nome da estufa — semana/fase migrou pro card CICLO
+  // no slot que era do PPFD. Visual mais limpo, info de fase fica no corpo.
+  // - btnRefresh top-right e' o "lugar pra pedir atualizacao na hora";
+  //   anima rotacao 360 enquanto isRefreshing=true.
   lv_obj_t *hdrIcon = lv_image_create(tab);
   lv_image_set_src(hdrIcon, &ic_sprout);
   lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
-  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(8));
 
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
-
-  // Sub: "Sem X/Y  •FASE" — bullet+fase na cor do phase token (badge style)
-  char subBuf[48];
-  snprintf(subBuf, sizeof(subBuf), "Sem %d/%d  #%06X %s#",
-           semana, totalSem, (unsigned)(phaseColor(FASE) & 0xFFFFFF), FASE);
-  lblSub = lv_label_create(tab);
-  lv_label_set_recolor(lblSub, true);
-  lv_label_set_text(lblSub, subBuf);
-  lv_obj_set_style_text_color(lblSub, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblSub, FONT_CAPTION, 0);
-  lv_obj_align(lblSub, LV_ALIGN_TOP_LEFT, sw(38), sh(22));
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(10));
+  lblSub = nullptr;  // legacy — semana/fase agora no card CICLO
 
   lv_obj_t *wifiIcon = lv_image_create(tab);
   lv_image_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
@@ -464,13 +464,57 @@ static void buildHome(lv_obj_t *tab) {
     return v;
   };
 
-  // Face A — sensores de ambiente. Cores DS:
+  // Face A — slot 0+1: sensores de ambiente. Cores DS:
   //   UMIDADE  ciano  + ic_droplet
-  //   VPD      verde  + ic_activity (wave/wind, era ic_droplets que parecia UMID)
-  //   PPFD     amber  + ic_lightbulb
+  //   VPD      verde  + ic_activity (wave/wind)
   lblRh   = makeMiniCard(homeFaceA, 0,                     "UMIDADE", "--", COL_CYN,     &ic_droplet,   &sparkRh,   &serRhS);
   lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_PRIMARY, &ic_activity,  &sparkVpd,  &serVpdS);
-  lblPpfd = makeMiniCard(homeFaceA, (cardH + cardGap) * 2, "PPFD",    "--", COL_YEL,     &ic_lightbulb, &sparkPpfd, &serPpfdS);
+
+  // Slot 2 — CARD CICLO (substituiu PPFD). Mostra "Sem X/Y" + badge fase.
+  // Layout custom (nao usa makeMiniCard pq nao tem sparkline nem valor numerico
+  // padrao): icone fase top-left, label "CICLO" top-right, valor "Sem 4/16"
+  // grande no centro-direita, badge da fase pill no rodape esquerda.
+  {
+    int yOffset = (cardH + cardGap) * 2;
+    lv_obj_t *c = makeCard(homeFaceA, 0, yOffset, cardW, cardH);
+    lv_obj_set_style_pad_all(c, sw(4), 0);
+
+    // Icone fase top-left (cor do phase token, atualiza em refreshHomeValues)
+    lv_obj_t *ico = lv_image_create(c);
+    lv_image_set_src(ico, &ic_sprout);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(phaseColor(FASE)), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, sh(2));
+
+    // Label "CICLO" top
+    lv_obj_t *lb = lv_label_create(c);
+    lv_label_set_text(lb, "CICLO");
+    lv_obj_set_style_text_color(lb, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
+    lv_obj_align(lb, LV_ALIGN_TOP_LEFT, sw(22), sh(4));
+
+    // Valor "Sem X/Y" — branco, centro-direita (mesma posicao dos outros valores)
+    lblCycleVal = lv_label_create(c);
+    lv_label_set_text(lblCycleVal, "Sem -/-");
+    lv_obj_set_style_text_color(lblCycleVal, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_font(lblCycleVal, FONT_TITLE, 0);
+    lv_obj_align(lblCycleVal, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    // Badge fase pill — rodape esquerda. Cor de fundo translucida + cor do
+    // phase token em texto pra destacar fase atual sem competir com valor.
+    lblCycleBadge = lv_label_create(c);
+    lv_label_set_text(lblCycleBadge, FASE);
+    lv_obj_set_style_text_color(lblCycleBadge, lv_color_hex(phaseColor(FASE)), 0);
+    lv_obj_set_style_text_font(lblCycleBadge, FONT_CAPTION, 0);
+    lv_obj_set_style_bg_color(lblCycleBadge, lv_color_hex(phaseColor(FASE)), 0);
+    lv_obj_set_style_bg_opa(lblCycleBadge, LV_OPA_20, 0);
+    lv_obj_set_style_pad_left(lblCycleBadge, sw(6), 0);
+    lv_obj_set_style_pad_right(lblCycleBadge, sw(6), 0);
+    lv_obj_set_style_pad_top(lblCycleBadge, sh(1), 0);
+    lv_obj_set_style_pad_bottom(lblCycleBadge, sh(1), 0);
+    lv_obj_set_style_radius(lblCycleBadge, RADIUS_SM, 0);
+    lv_obj_align(lblCycleBadge, LV_ALIGN_BOTTOM_LEFT, 0, -sh(2));
+  }
 
   // Tap no card UMIDADE -> refresh-only (sem ciclar o arc), util pra
   // forcar pull fresh sem mudar de modo. Sem placeholder "..." porque
@@ -485,13 +529,11 @@ static void buildHome(lv_obj_t *tab) {
     }
   }, LV_EVENT_CLICKED, NULL);
 
-  lv_chart_set_range(sparkRh,   LV_CHART_AXIS_PRIMARY_Y, 0, 100);
-  lv_chart_set_range(sparkVpd,  LV_CHART_AXIS_PRIMARY_Y, 0, 30);     // VPD * 10 (0-3.0 kPa)
-  lv_chart_set_range(sparkPpfd, LV_CHART_AXIS_PRIMARY_Y, 0, 1500);
+  lv_chart_set_range(sparkRh,  LV_CHART_AXIS_PRIMARY_Y, 0, 100);
+  lv_chart_set_range(sparkVpd, LV_CHART_AXIS_PRIMARY_Y, 0, 30);     // VPD * 10 (0-3.0 kPa)
   for (int i = 0; i < 20; i++) {
-    lv_chart_set_next_value(sparkRh,   serRhS,   (int32_t)rh);
-    lv_chart_set_next_value(sparkVpd,  serVpdS,  (int32_t)(vpd * 10));
-    lv_chart_set_next_value(sparkPpfd, serPpfdS, (int32_t)currentPpfd);
+    lv_chart_set_next_value(sparkRh,  serRhS,  (int32_t)rh);
+    lv_chart_set_next_value(sparkVpd, serVpdS, (int32_t)(vpd * 10));
   }
 
   // Face B (EC/pH/ciclo) removida — esses dados agora aparecem no arc cycle.
@@ -571,22 +613,13 @@ extern "C" void refreshHomeValues() {
   isRefreshing = false;
   char buf[64];
 
-  // Header: nome da estufa + fase/semana — vinham do server mas nao eram
-  // re-aplicados depois do load inicial (bug). Agora sincroniza a cada
-  // refresh, e a cor do badge fase atualiza junto (phaseColor pode mudar
-  // se o ciclo passou de VEGA pra FLORA por exemplo).
+  // Header agora SO' tem nome da estufa (semana/fase migrou pro card CICLO).
   if (lblTitle) lv_label_set_text(lblTitle, TENT_NAME);
-  if (lblSub) {
-    snprintf(buf, sizeof(buf), "Sem %d/%d  #%06X %s#",
-             semana, totalSem, (unsigned)(phaseColor(FASE) & 0xFFFFFF), FASE);
-    lv_label_set_text(lblSub, buf);
-  }
 
   // Arc principal: re-renderiza no modo atual com valores frescos
   updateArcMode();
 
-  // Mini-cards laterais sempre visiveis. Valor fica branco fixo (DS) — sem
-  // pintar conforme a metrica.
+  // Mini-cards laterais. Valor fica branco fixo (DS).
   snprintf(buf, sizeof(buf), "%.0f%%", rh);
   lv_label_set_text(lblRh, buf);
 
@@ -594,9 +627,18 @@ extern "C" void refreshHomeValues() {
     snprintf(buf, sizeof(buf), "%.2f", vpd);
     lv_label_set_text(lblVpd, buf);
   }
-  if (lblPpfd) {
-    snprintf(buf, sizeof(buf), "%d", currentPpfd);
-    lv_label_set_text(lblPpfd, buf);
+
+  // Card CICLO — atualiza valor "Sem X/Y" + badge fase (texto + cor). Cor
+  // do phase token muda automatico se ciclo passou (ex: VEGA -> FLORA).
+  if (lblCycleVal) {
+    snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
+    lv_label_set_text(lblCycleVal, buf);
+  }
+  if (lblCycleBadge) {
+    uint32_t pc = phaseColor(FASE);
+    lv_label_set_text(lblCycleBadge, FASE);
+    lv_obj_set_style_text_color(lblCycleBadge, lv_color_hex(pc), 0);
+    lv_obj_set_style_bg_color(lblCycleBadge, lv_color_hex(pc), 0);
   }
 }
 
@@ -645,10 +687,7 @@ static void pulseTimerCb(lv_timer_t *t) {
     lv_chart_set_next_value(sparkVpd, serVpdS, (int32_t)((vpd + wave * 0.03f) * 10));
     autoscaleSpark(sparkVpd, serVpdS);
   }
-  if (sparkPpfd && serPpfdS) {
-    lv_chart_set_next_value(sparkPpfd, serPpfdS, (int32_t)(currentPpfd + wave * 12));
-    autoscaleSpark(sparkPpfd, serPpfdS);
-  }
+  // sparkPpfd removido — card PPFD substituido pelo card CICLO (estatico).
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
