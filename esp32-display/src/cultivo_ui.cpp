@@ -279,11 +279,15 @@ static void buildHome(lv_obj_t *tab) {
   }, LV_EVENT_CLICKED, NULL);
 
   // Refresh manual — botao top-right entre gear e wifi. Tap dispara onRefresh
-  // (server poll Tuya); icone roda 360 enquanto isRefreshing=true.
+  // (server poll Tuya); icone roda 360 no proprio eixo enquanto refreshing.
+  // Pivot centralizado (16,16 p/ icone 32x32) — sem isso girava em torno do
+  // top-left e o icone "viajava" pelo header.
   lv_obj_t *btnRefresh = lv_image_create(tab);
   lv_image_set_src(btnRefresh, &ic_refresh);
   lv_obj_set_style_image_recolor(btnRefresh, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_image_recolor_opa(btnRefresh, LV_OPA_COVER, 0);
+  lv_obj_set_style_transform_pivot_x(btnRefresh, 16, 0);
+  lv_obj_set_style_transform_pivot_y(btnRefresh, 16, 0);
   lv_obj_align(btnRefresh, LV_ALIGN_TOP_RIGHT, -sw(80), sh(4));
   lv_obj_add_flag(btnRefresh, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_ext_click_area(btnRefresh, sw(10));
@@ -292,8 +296,7 @@ static void buildHome(lv_obj_t *tab) {
     if (onRefresh && !isRefreshing) {
       isRefreshing = true;
       onRefresh();
-      // Animacao rotacao 360 — visual feedback do tap. LVGL transform_angle
-      // usa decimo de grau (0-3600). Loop curto enquanto refreshing.
+      // Animacao rotacao 360 no centro (pivot setado no buildHome).
       lv_anim_t a;
       lv_anim_init(&a);
       lv_anim_set_var(&a, btn);
@@ -600,9 +603,92 @@ static void updateArcMode() {
   lv_obj_set_style_shadow_color(arcTemp, lv_color_hex(col), LV_PART_INDICATOR);
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// Toast — feedback transitorio (ex: "Atualizado" apos refresh manual). Cria
+// label flutuante no topo da tela ativa, anima fade in -> hold 1.2s -> fade
+// out -> auto-destroi. Reentrante (cada chamada cria um novo toast).
+//
+// Estilo DS: card escuro (COL_CARD bg, COL_BORDER border), radius LG,
+// icone ic_check_circle primary + texto branco. Sombra leve pra "flutuar"
+// sobre o conteudo.
+// ════════════════════════════════════════════════════════════════════════════════
+static void toastDeleteCb(lv_anim_t *a) {
+  lv_obj_t *o = (lv_obj_t*)lv_anim_get_user_data(a);
+  if (o) lv_obj_del(o);
+}
+
+static void toastFadeOutCb(lv_timer_t *t) {
+  lv_obj_t *toast = (lv_obj_t*)lv_timer_get_user_data(t);
+  lv_timer_del(t);
+  if (!toast) return;
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, toast);
+  lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_TRANSP);
+  lv_anim_set_time(&a, MOTION_MED);
+  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+    lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
+  });
+  lv_anim_set_user_data(&a, toast);
+  lv_anim_set_completed_cb(&a, toastDeleteCb);
+  lv_anim_start(&a);
+}
+
+static void showToast(const char *msg) {
+  lv_obj_t *toast = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(toast);
+  lv_obj_set_style_bg_color(toast, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_bg_opa(toast, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(toast, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(toast, 1, 0);
+  lv_obj_set_style_radius(toast, RADIUS_LG, 0);
+  lv_obj_set_style_pad_hor(toast, sw(12), 0);
+  lv_obj_set_style_pad_ver(toast, sh(6),  0);
+  lv_obj_set_style_shadow_width(toast, 12, 0);
+  lv_obj_set_style_shadow_opa(toast, LV_OPA_50, 0);
+  lv_obj_set_style_shadow_color(toast, lv_color_hex(0x000000), 0);
+  lv_obj_set_size(toast, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_align(toast, LV_ALIGN_TOP_MID, 0, sh(40));
+  lv_obj_clear_flag(toast, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(toast, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t *icon = lv_image_create(toast);
+  lv_image_set_src(icon, &ic_check_circle);
+  lv_obj_set_style_image_recolor(icon, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_image_recolor_opa(icon, LV_OPA_COVER, 0);
+  lv_obj_align(icon, LV_ALIGN_LEFT_MID, 0, 0);
+
+  lv_obj_t *lbl = lv_label_create(toast);
+  lv_label_set_text(lbl, msg);
+  lv_obj_set_style_text_color(lbl, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(lbl, FONT_BODY, 0);
+  lv_obj_align(lbl, LV_ALIGN_LEFT_MID, sw(24), 0);
+
+  // Fade in
+  lv_obj_set_style_opa(toast, LV_OPA_TRANSP, 0);
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, toast);
+  lv_anim_set_values(&a, LV_OPA_TRANSP, LV_OPA_COVER);
+  lv_anim_set_time(&a, MOTION_FAST);
+  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+    lv_obj_set_style_opa((lv_obj_t*)obj, v, 0);
+  });
+  lv_anim_start(&a);
+
+  // Hold 1200ms -> fade out -> delete (chain via timer one-shot)
+  lv_timer_t *t = lv_timer_create(toastFadeOutCb, 1200, toast);
+  lv_timer_set_repeat_count(t, 1);
+}
+
 extern "C" void refreshHomeValues() {
-  // Refresh trouxe valores frescos: limpa flag de tap-em-progresso
+  // Refresh trouxe valores frescos. Se estava refreshing (user tocou no
+  // botao manual), mostra toast "Atualizado" pra confirmar conclusao.
+  // Refresh automatico (fetch periodico) tem isRefreshing=false, sem toast
+  // — evita spam visual a cada 30s.
+  bool wasManualRefresh = isRefreshing;
   isRefreshing = false;
+  if (wasManualRefresh) showToast("Atualizado");
   char buf[64];
 
   // Header agora SO' tem nome da estufa (semana/fase migrou pro card CICLO).
