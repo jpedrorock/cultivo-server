@@ -19,32 +19,13 @@ import { PageTransition } from "@/components/PageTransition";
 import { savePendingLog, isOnline } from "@/lib/offlineStorage";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
-import { getCircleStyle } from "@/lib/quickLogColors";
+import { getCircleStyle, getPHColor, getValidationColor } from "@/lib/quickLogColors";
 import { QuickLogModeSelector } from "@/components/QuickLogModeSelector";
 import { PlantHealthForm } from "@/components/PlantHealthForm";
 import { TrichomeForm } from "@/components/TrichomeForm";
 
 // LST Techniques and Trichome types removed - available in individual plant pages
-
-function getPHColor(ph: number): string {
-  if (ph < 4) return "#dc2626";
-  if (ph < 5.5) return "#f97316";
-  if (ph < 6) return "#eab308";
-  if (ph <= 7) return "#22c55e";
-  if (ph <= 8) return "#3b82f6";
-  if (ph <= 10) return "#8b5cf6";
-  return "#ec4899";
-}
-
-function getValidationColor(value: string, min?: number | null, max?: number | null): string {
-  if (!value || !min || !max) return "";
-  const v = parseFloat(value);
-  if (isNaN(v)) return "";
-  if (v >= min && v <= max) return "text-green-500 dark:text-green-400";
-  const tolerance = (max - min) * 0.15;
-  if (v >= min - tolerance && v <= max + tolerance) return "text-amber-500 dark:text-amber-400";
-  return "text-red-500 dark:text-red-400";
-}
+// getPHColor + getValidationColor agora vivem em @/lib/quickLogColors (import acima)
 
 export default function QuickLog() {
   const { collapsed } = useSidebar();

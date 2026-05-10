@@ -151,3 +151,36 @@ export function getCircleStyle(args: {
   }
   return { background: base };
 }
+
+// ─── Color helpers usados no QuickLog (extraídos do topo do arquivo) ─────────
+
+/**
+ * Cor do indicador de pH em escala visual (vermelho → verde → azul → roxo).
+ * Faixa ideal de cultivo (5.5 – 7) cai no verde.
+ */
+export function getPHColor(ph: number): string {
+  if (ph < 4)   return "#dc2626";  // vermelho — muito ácido
+  if (ph < 5.5) return "#f97316";  // laranja
+  if (ph < 6)   return "#eab308";  // amarelo
+  if (ph <= 7)  return "#22c55e";  // verde — ideal
+  if (ph <= 8)  return "#3b82f6";  // azul
+  if (ph <= 10) return "#8b5cf6";  // roxo
+  return "#ec4899";                // pink — muito alcalino
+}
+
+/**
+ * Classe Tailwind de cor pra valor numérico de input vs faixa min/max.
+ * - Verde: dentro da faixa
+ * - Amber: até 15% fora (tolerância)
+ * - Vermelho: muito fora
+ * - "" se faltar dado
+ */
+export function getValidationColor(value: string, min?: number | null, max?: number | null): string {
+  if (!value || !min || !max) return "";
+  const v = parseFloat(value);
+  if (isNaN(v)) return "";
+  if (v >= min && v <= max) return "text-green-500 dark:text-green-400";
+  const tolerance = (max - min) * 0.15;
+  if (v >= min - tolerance && v <= max + tolerance) return "text-amber-500 dark:text-amber-400";
+  return "text-red-500 dark:text-red-400";
+}
