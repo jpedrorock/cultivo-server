@@ -259,9 +259,53 @@ static bool ftRead(int &rx, int &ry) {
   return hal_touch_read(&rx, &ry);
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// Screen sleep — apaga backlight apos N segundos sem touch. Wake on touch:
+// primeiro toque acorda + e' descartado (nao dispara botao por acidente).
+// Economia de energia + privacidade (display escuro quando ninguem ta usando).
+//
+// Implementacao via PWM no LCD_BL (LEDC channel 0). Sleep = duty 0, wake =
+// duty 200 (~80%, mesmo valor do hal_display_init). Backlight off NAO desliga
+// LVGL/touch — chip continua respondendo, so' o painel nao emite luz.
+// ════════════════════════════════════════════════════════════════════════════════
+#define SCREEN_SLEEP_MS 30000   // 30s de inatividade -> apaga
+static bool screenAsleep = false;
+static lv_timer_t *sleepTimer = nullptr;
+
+static void screenWake() {
+  if (!screenAsleep) return;
+  ledcWrite(0, 200);
+  screenAsleep = false;
+  Serial.println("[backlight] wake");
+}
+
+static void screenSleep() {
+  if (screenAsleep) return;
+  ledcWrite(0, 0);
+  screenAsleep = true;
+  Serial.println("[backlight] sleep");
+}
+
+static void sleepTimerCb(lv_timer_t *) {
+  uint32_t inactive = lv_display_get_inactive_time(NULL);
+  if (!screenAsleep && inactive >= SCREEN_SLEEP_MS) {
+    screenSleep();
+  }
+}
+
 static void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
   int rx, ry, mx, my;
   if (!ftRead(rx, ry)) { data->state = LV_INDEV_STATE_RELEASED; return; }
+
+  // Wake on touch: tela apagada + dedo no display -> acende e descarta o
+  // touch. User precisa tocar DE NOVO pra interagir. Evita ativar algo
+  // por acidente so' por ter olhado pro display.
+  if (screenAsleep) {
+    screenWake();
+    data->state = LV_INDEV_STATE_RELEASED;
+    return;
+  }
+
   hal_map_touch(rx, ry, &mx, &my);
   data->point.x = mx;
   data->point.y = my;
@@ -2016,6 +2060,12 @@ void setup() {
     // OTA disponivel enquanto o device ta online
     startOTA();
   }
+
+  // Timer de sleep — checa lv_display_get_inactive_time a cada 1s.
+  // Apaga backlight apos SCREEN_SLEEP_MS sem touch. Wake on touch handled
+  // em touchpad_read.
+  sleepTimer = lv_timer_create(sleepTimerCb, 1000, NULL);
+
   Serial.println("[LVGL] UI pronta");
 }
 

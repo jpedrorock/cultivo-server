@@ -283,12 +283,10 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
 
-  // ── Header (DS): TITULO                              [refresh][gear][wifi]
-  // Header agora SO' tem nome da estufa — sem icone sprout (ja' aparece no
-  // card CICLO embaixo, evita duplicar). Semana/fase migrou pro card CICLO
-  // no slot que era do PPFD. Visual maximamente limpo no topo.
-  // - btnRefresh top-right e' o "lugar pra pedir atualizacao na hora";
-  //   anima rotacao 360 enquanto isRefreshing=true.
+  // ── Header (DS): TITULO                                       [gear][wifi]
+  // Sem icone refresh — server ja' faz polling a cada 30s, refresh manual
+  // ficou redundante. Tap no card UMID continua disponivel como atalho
+  // discreto pra quem quiser forcar pull on-demand (mostra toast).
   lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(8), sh(10));
   lblSub = nullptr;  // legacy — semana/fase agora no card CICLO
 
@@ -314,34 +312,8 @@ static void buildHome(lv_obj_t *tab) {
     if (onConfigOpen) onConfigOpen();
   }, LV_EVENT_CLICKED, NULL);
 
-  // Refresh manual — botao top-right entre gear e wifi. Tap dispara onRefresh
-  // (server poll Tuya); icone gira continuamente enquanto refreshing.
-  // Pivot centralizado (16,16 p/ icone 32x32) — sem isso girava em torno do
-  // top-left e o icone "viajava" pelo header.
-  refreshIcon = lv_image_create(tab);
-  lv_image_set_src(refreshIcon, &ic_refresh);
-  lv_obj_set_style_image_recolor(refreshIcon, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_image_recolor_opa(refreshIcon, LV_OPA_COVER, 0);
-  lv_obj_set_style_transform_pivot_x(refreshIcon, 16, 0);
-  lv_obj_set_style_transform_pivot_y(refreshIcon, 16, 0);
-  lv_obj_align(refreshIcon, LV_ALIGN_TOP_RIGHT, -sw(80), sh(4));
-  lv_obj_add_flag(refreshIcon, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_ext_click_area(refreshIcon, sw(10));
-  lv_obj_add_event_cb(refreshIcon, [](lv_event_t *e) {
-    (void)e;
-    if (onRefresh && !isRefreshing) {
-      isRefreshing = true;
-      refreshStartedAt = lv_tick_get();
-      onRefresh();
-      showToast("Atualizando...");
-      // Spin continuo via timer — para sozinho quando isRefreshing=false
-      // (refreshHomeValues seta apos dados frescos) ou quando timeout (10s).
-      // Era anim one-shot 600ms — usuario perdia se nao olhasse direto.
-      if (!refreshSpinTimer) {
-        refreshSpinTimer = lv_timer_create(refreshSpinTick, 50, NULL);
-      }
-    }
-  }, LV_EVENT_CLICKED, NULL);
+  // (icone refresh removido — server polling a cada 30s torna refresh manual
+  // redundante. Atalho via tap no card UMID continua disponivel.)
 
   // Single-face redesign: sem botao flip. Tap no arc cicla TEMP/pH/EC/FLORACAO.
   // Mini-cards UMID/VPD/PPFD ficam sempre visiveis a direita.
