@@ -1772,9 +1772,10 @@ static void startNetTask() {
   if (netTaskHandle) return;
   // Stack 8KB: cobre TLS handshake (~4KB) + JSON parsing (~2KB) com folga
   xTaskCreatePinnedToCore(netTaskFn, "netTask", 8192, NULL, 1, &netTaskHandle, 0);
-  // tapTask: dedicada pra processar taps em paralelo. Mesma stack 8KB +
-  // mesma prioridade do netTask (1). Core 0 (Arduino loop fica no core 1).
-  xTaskCreatePinnedToCore(tapTaskFn, "tapTask", 8192, NULL, 1, &tapTaskHandle, 0);
+  // tapTask: dedicada pra processar taps em paralelo. Stack 12KB (8KB
+  // estava apertado — TLS handshake + WiFiClientSecure + JsonDocument
+  // estourava em algumas situacoes -> ESP reset).
+  xTaskCreatePinnedToCore(tapTaskFn, "tapTask", 12288, NULL, 1, &tapTaskHandle, 0);
   Serial.println("[net] netTask + tapTask iniciadas no core 0");
 }
 

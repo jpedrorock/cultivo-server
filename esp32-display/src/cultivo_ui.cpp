@@ -1157,9 +1157,14 @@ static void paintDeviceState(int idx) {
   }
 }
 
-// Feedback de tap: scene = flash border primary (era trigger). device =
-// optimistic toggle visual (assume sucesso, app confirma/reverte via
-// cultivoUI_setDeviceState). Anim ease padrao.
+// Feedback de tap:
+//   scene  : flash border primary (one-shot) — sem state, so' confirma trigger
+//   device : NAO inverte state localmente (era "optimistic toggle" e gerava
+//            "pisca acende-apaga" quando server respondia diferente). Em vez
+//            disso, mostra estado "carregando" (border primary fixo + opa
+//            reduzido) e aguarda cultivoUI_setDeviceState do app pra pintar
+//            estado real. App garante chamar setDeviceState mesmo em falha
+//            (com state antigo).
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   if (idx < 0 || idx >= sceneCount) return;
@@ -1168,10 +1173,12 @@ static void sceneClickCb(lv_event_t *e) {
   if (onSceneTrigger) onSceneTrigger(idx);
 
   if (items[idx].type == 1) {
-    // Device — optimistic toggle. App vai chamar setDeviceState quando
-    // server confirmar (ou reverter se falhou).
-    items[idx].state = !items[idx].state;
-    paintDeviceState(idx);
+    // Device — feedback "carregando" sem mudar state local.
+    // Border primary + opacidade reduzida. setDeviceState restaura full opa.
+    if (itemBtns[idx]) {
+      lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
+      lv_obj_set_style_opa(itemBtns[idx], LV_OPA_70, 0);
+    }
     return;
   }
 
@@ -1356,6 +1363,8 @@ extern "C" void cultivoUI_setDeviceState(int idx, bool state) {
   if (idx < 0 || idx >= sceneCount) return;
   if (items[idx].type != 1) return;  // so' devices
   items[idx].state = state;
+  // Restaura opacidade cheia (sceneClickCb baixou pra 70 enquanto carregava)
+  if (itemBtns[idx]) lv_obj_set_style_opa(itemBtns[idx], LV_OPA_COVER, 0);
   paintDeviceState(idx);
 }
 
