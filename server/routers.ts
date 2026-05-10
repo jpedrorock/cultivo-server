@@ -913,10 +913,226 @@ const tuyaRouter = router({
     }),
 });
 
+// ─── tentScenes router (cenas Tuya vinculadas a estufa) ────────────────────────
+//
+// Permite ao user vincular cenas Tuya específicas a uma estufa, controlando
+// quais aparecem no display ESP32 dela. Mesma cena pode ser vinculada a
+// múltiplas estufas (compartilhada).
+const tentScenesRouter = router({
+  /** Lista cenas vinculadas a uma estufa (ordenadas por position) */
+  list: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT id, sceneId, name, position FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        [input.tentId]
+      );
+      return (rows as any[]).map(r => ({
+        id: r.id as number,
+        sceneId: r.sceneId as string,
+        name: r.name as string,
+        position: r.position as number,
+      }));
+    }),
+
+  /** Adiciona uma cena à estufa (position auto = max+1). Bloqueia duplicatas. */
+  add: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      sceneId: z.string().min(1).max(64),
+      name: z.string().min(1).max(100),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+
+      // Verifica duplicata
+      const [dup]: any = await pool.execute(
+        `SELECT id FROM tentScenes WHERE tentId = ? AND sceneId = ? LIMIT 1`,
+        [input.tentId, input.sceneId]
+      );
+      if (dup.length > 0) throw new TRPCError({ code: 'CONFLICT', message: 'Cena já vinculada a esta estufa' });
+
+      // Limita a 6 itens totais (cenas + devices)
+      const [counts]: any = await pool.execute(
+        `SELECT
+           (SELECT COUNT(*) FROM tentScenes WHERE tentId = ?) +
+           (SELECT COUNT(*) FROM tentDevices WHERE tentId = ?) AS total`,
+        [input.tentId, input.tentId]
+      );
+      if (counts[0].total >= 6) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Limite de 6 itens (cenas + devices) por estufa atingido' });
+      }
+
+      // position = max+1 (apêndice no final)
+      const [maxRow]: any = await pool.execute(
+        `SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM tentScenes WHERE tentId = ?`,
+        [input.tentId]
+      );
+      const nextPos = maxRow[0].next_pos;
+
+      const [ins]: any = await pool.execute(
+        `INSERT INTO tentScenes (tentId, sceneId, name, position) VALUES (?, ?, ?, ?)`,
+        [input.tentId, input.sceneId, input.name, nextPos]
+      );
+      return { id: ins.insertId as number, position: nextPos };
+    }),
+
+  /** Remove uma cena vinculada (compacta positions depois). */
+  remove: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      // Carrega tentId e valida ownership
+      const [rows]: any = await pool.execute(
+        `SELECT tentId FROM tentScenes WHERE id = ? LIMIT 1`,
+        [input.id]
+      );
+      if (rows.length === 0) throw new TRPCError({ code: 'NOT_FOUND' });
+      await validateTentOwnership(rows[0].tentId, ctx.user.groupId);
+
+      await pool.execute(`DELETE FROM tentScenes WHERE id = ?`, [input.id]);
+      return { ok: true };
+    }),
+
+  /** Reordena: aceita lista [{id, position}] em batch. */
+  reorder: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      order: z.array(z.object({ id: z.number(), position: z.number().int().min(0).max(99) })).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      // Valida que todos os IDs pertencem à tentId (anti-tamper)
+      if (input.order.length > 0) {
+        const ids = input.order.map(o => o.id);
+        const placeholders = ids.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentScenes WHERE tentId = ? AND id IN (${placeholders})`,
+          [input.tentId, ...ids]
+        );
+        if (rows.length !== ids.length) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs inválidos' });
+        }
+      }
+      for (const o of input.order) {
+        await pool.execute(`UPDATE tentScenes SET position = ? WHERE id = ?`, [o.position, o.id]);
+      }
+      return { ok: true };
+    }),
+});
+
+// ─── tentDevices router (dispositivos Tuya vinculados a estufa) ────────────────
+const ICON_HINTS = ['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'other'] as const;
+
+const tentDevicesRouter = router({
+  list: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT id, deviceId, name, position, iconHint FROM tentDevices WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        [input.tentId]
+      );
+      return (rows as any[]).map(r => ({
+        id: r.id as number,
+        deviceId: r.deviceId as string,
+        name: r.name as string,
+        position: r.position as number,
+        iconHint: r.iconHint as string | null,
+      }));
+    }),
+
+  add: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      deviceId: z.string().min(1).max(64),
+      name: z.string().min(1).max(100),
+      iconHint: z.enum(ICON_HINTS).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+
+      const [dup]: any = await pool.execute(
+        `SELECT id FROM tentDevices WHERE tentId = ? AND deviceId = ? LIMIT 1`,
+        [input.tentId, input.deviceId]
+      );
+      if (dup.length > 0) throw new TRPCError({ code: 'CONFLICT', message: 'Device já vinculado a esta estufa' });
+
+      const [counts]: any = await pool.execute(
+        `SELECT
+           (SELECT COUNT(*) FROM tentScenes WHERE tentId = ?) +
+           (SELECT COUNT(*) FROM tentDevices WHERE tentId = ?) AS total`,
+        [input.tentId, input.tentId]
+      );
+      if (counts[0].total >= 6) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Limite de 6 itens (cenas + devices) por estufa atingido' });
+      }
+
+      const [maxRow]: any = await pool.execute(
+        `SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM tentDevices WHERE tentId = ?`,
+        [input.tentId]
+      );
+      const nextPos = maxRow[0].next_pos;
+
+      const [ins]: any = await pool.execute(
+        `INSERT INTO tentDevices (tentId, deviceId, name, position, iconHint) VALUES (?, ?, ?, ?, ?)`,
+        [input.tentId, input.deviceId, input.name, nextPos, input.iconHint ?? null]
+      );
+      return { id: ins.insertId as number, position: nextPos };
+    }),
+
+  remove: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT tentId FROM tentDevices WHERE id = ? LIMIT 1`,
+        [input.id]
+      );
+      if (rows.length === 0) throw new TRPCError({ code: 'NOT_FOUND' });
+      await validateTentOwnership(rows[0].tentId, ctx.user.groupId);
+      await pool.execute(`DELETE FROM tentDevices WHERE id = ?`, [input.id]);
+      return { ok: true };
+    }),
+
+  reorder: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      order: z.array(z.object({ id: z.number(), position: z.number().int().min(0).max(99) })).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      if (input.order.length > 0) {
+        const ids = input.order.map(o => o.id);
+        const placeholders = ids.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentDevices WHERE tentId = ? AND id IN (${placeholders})`,
+          [input.tentId, ...ids]
+        );
+        if (rows.length !== ids.length) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs inválidos' });
+        }
+      }
+      for (const o of input.order) {
+        await pool.execute(`UPDATE tentDevices SET position = ? WHERE id = ?`, [o.position, o.id]);
+      }
+      return { ok: true };
+    }),
+});
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   tuya: tuyaRouter,
+  tentScenes: tentScenesRouter,
+  tentDevices: tentDevicesRouter,
   // Auth real está em /api/auth/* (REST) — registerAuthRoutes em _core/authRoutes.ts.
   // O sub-router tRPC `auth` foi removido: retornava { id:1, name:"Local User" }
   // hardcoded mesmo dentro de protectedProcedure (bug latente — qualquer caller

@@ -549,6 +549,47 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // Vincula cenas Tuya específicas a uma estufa.
+    // Mesmo sceneId pode aparecer em N estufas (compartilhada).
+    // Display ESP32 lê tentScenes WHERE tentId = device.tentId, ordenado por position.
+    id: 'create-tentScenes',
+    description: 'Cria tabela tentScenes (cenas Tuya vinculadas a estufa)',
+    run: async (c) => {
+      await c.query(`
+        CREATE TABLE IF NOT EXISTS \`tentScenes\` (
+          \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+          \`tentId\`    INT NOT NULL,
+          \`sceneId\`   VARCHAR(64) NOT NULL,
+          \`name\`      VARCHAR(100) NOT NULL DEFAULT 'Cena',
+          \`position\`  INT NOT NULL DEFAULT 0,
+          \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          INDEX \`idx_tentScenes_tent_pos\` (\`tentId\`, \`position\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
+  {
+    // Vincula dispositivos Tuya (lâmpada, exaustor, etc) a uma estufa.
+    // ESP32 mostra junto das cenas no mesmo grid 2x3.
+    // iconHint: "light"|"fan"|"pump"|"heater"|"ac" — ESP escolhe ícone.
+    id: 'create-tentDevices',
+    description: 'Cria tabela tentDevices (dispositivos Tuya vinculados a estufa)',
+    run: async (c) => {
+      await c.query(`
+        CREATE TABLE IF NOT EXISTS \`tentDevices\` (
+          \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+          \`tentId\`    INT NOT NULL,
+          \`deviceId\`  VARCHAR(64) NOT NULL,
+          \`name\`      VARCHAR(100) NOT NULL DEFAULT 'Dispositivo',
+          \`position\`  INT NOT NULL DEFAULT 0,
+          \`iconHint\`  VARCHAR(20) NULL,
+          \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          INDEX \`idx_tentDevices_tent_pos\` (\`tentId\`, \`position\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

@@ -11,8 +11,11 @@
 //   GET  /api/device/tasks/:tentId          → tarefas pendentes
 //   POST /api/device/task-complete          → toggle done
 //   POST /api/device/scene/:slotIdx/trigger → trigger cena Tuya (slot 0-9 -> env TUYA_SCENE_X)
-//   GET  /api/device/scenes                 → lista cenas Tuya manuais do user (max 6)
-//   POST /api/device/scene-by-id/:sceneId/trigger → trigger por sceneId real (do GET /scenes)
+//   GET  /api/device/scenes                 → itens vinculados à estufa (cenas+devices)
+//                                             novo formato: {items:[{type,id,name,position,iconHint?,state?}]}
+//                                             legacy fallback: {scenes:[{id,name}]} se sem vínculos
+//   POST /api/device/scene-by-id/:sceneId/trigger → trigger por sceneId real
+//   POST /api/device/device-toggle          → liga/desliga device Tuya vinculado
 //   POST /api/device/refresh-tuya/:tentId   → forca poll Tuya (cria dailyLog)
 //   GET  /api/device/history/:tentId        → 24h/7d/30d history p/ chart
 //   GET  /api/device/history-all/:tentId    → 4 metricas em uma chamada (sparklines)
@@ -247,17 +250,140 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
-  // GET /api/device/scenes — lista cenas Tuya manuais (tap-to-run) do grupo
-  // do device. ESP usa pra popular o grid Cenas dinamicamente em vez de
-  // SCENES[] hardcoded. Max 6 cenas (grid 2x3 do display ESP32).
-  // Resposta: { scenes: [{id, name}, ...] } — id = sceneId Tuya real,
-  // usado depois em POST /api/device/scene-by-id/:sceneId/trigger.
-  // Usa listTuyaScenesIoTCore (mesmo helper do app web).
+  // GET /api/device/scenes — itens (cenas + dispositivos) vinculados à estufa
+  // deste display. Filtra por tentScenes/tentDevices WHERE tentId = device.tentId.
+  // Max 6 itens (grid 2x3). Devices têm `state` com switch on/off atual (lido
+  // em paralelo da Tuya). Itens ordenados por position.
+  //
+  // BACKWARD COMPAT: se NÃO houver itens vinculados na nova tabela mas o user
+  // tiver cenas Tuya manuais, retorna formato antigo `{scenes:[...]}` pra não
+  // quebrar firmwares antigos. Quando user vincular ao menos 1 item via app
+  // web, passa pro formato novo `{items:[...]}`.
   app.get('/api/device/scenes', async (req, res) => {
     try {
       const device = await validateDeviceToken(req);
       if (!device) return res.status(401).json({ error: 'Token inválido' });
 
+      // 1) Carrega vínculos da estufa
+      const [tentSceneRows]: any = await pool.execute(
+        `SELECT sceneId, name, position FROM tentScenes WHERE tentId = ? ORDER BY position ASC LIMIT 6`,
+        [device.tentId]
+      );
+      const [tentDeviceRows]: any = await pool.execute(
+        `SELECT deviceId, name, position, iconHint FROM tentDevices WHERE tentId = ? ORDER BY position ASC LIMIT 6`,
+        [device.tentId]
+      );
+
+      // 2) Sem vínculos? Cai no comportamento legado (cenas do grupo inteiro)
+      if (tentSceneRows.length === 0 && tentDeviceRows.length === 0) {
+        const [cfgRows]: any = await pool.execute(
+          `SELECT tc.accessId, tc.accessSecret, tc.region
+           FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
+           WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
+          [device.groupId]
+        );
+        if (cfgRows.length === 0) return res.json({ scenes: [] });
+        const cfg = cfgRows[0];
+
+        const { listTuyaScenesIoTCore } = await import('../lib/tuya');
+        try {
+          const allScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
+          const scenes = allScenes
+            .filter(s => s.type === 'scene')
+            .slice(0, 6)
+            .map(s => ({ id: s.sceneId, name: s.name }));
+          console.log(`[Device] /scenes (legacy) group=${device.groupId} -> ${scenes.length} cenas`);
+          return res.json({ scenes });
+        } catch (e: any) {
+          console.warn('[Device] /scenes legacy:', e?.message);
+          return res.json({ scenes: [] });
+        }
+      }
+
+      // 3) Tem vínculos: monta itens, busca state dos devices em paralelo
+      const items: Array<any> = [];
+      for (const r of tentSceneRows) {
+        items.push({
+          type: 'scene',
+          id: r.sceneId as string,
+          name: r.name as string,
+          position: r.position as number,
+        });
+      }
+
+      let cfg: any = null;
+      if (tentDeviceRows.length > 0) {
+        const [cfgRows]: any = await pool.execute(
+          `SELECT tc.accessId, tc.accessSecret, tc.region
+           FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
+           WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
+          [device.groupId]
+        );
+        cfg = cfgRows[0] ?? null;
+      }
+
+      // Lê estado de TODOS os devices em paralelo (sem state se cfg ausente)
+      const { getTuyaDeviceSwitchState } = await import('../lib/tuya');
+      const deviceStates = await Promise.allSettled(
+        tentDeviceRows.map((r: any) =>
+          cfg
+            ? getTuyaDeviceSwitchState(r.deviceId, cfg.accessId, cfg.accessSecret, cfg.region)
+            : Promise.resolve({ online: false, switchOn: null, switchCode: null })
+        )
+      );
+
+      tentDeviceRows.forEach((r: any, idx: number) => {
+        const stateRes = deviceStates[idx];
+        const state = stateRes.status === 'fulfilled' ? stateRes.value : { online: false, switchOn: null };
+        items.push({
+          type: 'device',
+          id: r.deviceId as string,
+          name: r.name as string,
+          position: r.position as number,
+          iconHint: r.iconHint as string | null,
+          state: state.switchOn,    // boolean | null
+          online: state.online,
+        });
+      });
+
+      // Ordena por position (cenas e devices misturados)
+      items.sort((a, b) => a.position - b.position);
+
+      // Limita a 6 totais (caso user tenha cadastrado mais que isso)
+      const limited = items.slice(0, 6);
+
+      console.log(`[Device] /scenes tent=${device.tentId} -> ${limited.length} items (${tentSceneRows.length}s+${tentDeviceRows.length}d)`);
+      res.json({ items: limited });
+    } catch (err: any) {
+      console.error('[Device] scenes list error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao listar itens' });
+    }
+  });
+
+  // POST /api/device/device-toggle — liga/desliga um dispositivo Tuya vinculado
+  // à estufa deste display. Body: {deviceId, state: boolean}.
+  // Valida que o deviceId pertence à tentId do device antes de comandar.
+  app.post('/api/device/device-toggle', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+
+      const deviceId = String(req.body?.deviceId ?? '').trim();
+      const desired = req.body?.state;
+      if (!deviceId || typeof desired !== 'boolean') {
+        return res.status(400).json({ error: 'deviceId e state (boolean) obrigatórios' });
+      }
+
+      // Valida que esse device está vinculado à estufa do display
+      const [bindRows]: any = await pool.execute(
+        `SELECT id FROM tentDevices WHERE tentId = ? AND deviceId = ? LIMIT 1`,
+        [device.tentId, deviceId]
+      );
+      if (bindRows.length === 0) {
+        return res.status(403).json({ error: 'Device não vinculado a esta estufa' });
+      }
+
+      // Busca config Tuya
       const [cfgRows]: any = await pool.execute(
         `SELECT tc.accessId, tc.accessSecret, tc.region
          FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
@@ -265,31 +391,24 @@ function registerDeviceRoutes(app: express.Application) {
         [device.groupId]
       );
       if (cfgRows.length === 0) {
-        return res.json({ scenes: [] });  // sem Tuya configurada
+        return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
       }
       const cfg = cfgRows[0];
 
-      const { listTuyaScenesIoTCore } = await import('../lib/tuya');
-      let allScenes: Array<{ sceneId: string; name: string; type: string }> = [];
-      try {
-        allScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
-      } catch (e: any) {
-        console.warn('[Device] /scenes listTuyaScenesIoTCore:', e?.message);
-        return res.json({ scenes: [] });
+      // Descobre o switchCode do device (varia por modelo)
+      const { getTuyaDeviceSwitchState, controlTuyaDevice } = await import('../lib/tuya');
+      const cur = await getTuyaDeviceSwitchState(deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+      if (!cur.switchCode) {
+        return res.status(422).json({ error: 'Dispositivo não expõe switch (não controlável)' });
       }
 
-      // Filtra so' tap-to-run (manuais) — automacoes nao fazem sentido no
-      // grid (rodam sozinhas). Pega max 6 pra caber no grid 2x3 do ESP.
-      const scenes = allScenes
-        .filter(s => s.type === 'scene')
-        .slice(0, 6)
-        .map(s => ({ id: s.sceneId, name: s.name }));
-
-      console.log(`[Device] /scenes group=${device.groupId} -> ${scenes.length} cenas`);
-      res.json({ scenes });
+      const r = await controlTuyaDevice(deviceId, cur.switchCode, desired, cfg.accessId, cfg.accessSecret, cfg.region);
+      console.log(`[Device] device-toggle device=${deviceId} -> ${desired} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''})`);
+      if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
+      res.json({ success: true, deviceId, state: desired });
     } catch (err: any) {
-      console.error('[Device] scenes list error:', err?.message);
-      res.status(500).json({ error: err?.message ?? 'Erro ao listar cenas' });
+      console.error('[Device] device-toggle error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao alternar device' });
     }
   });
 
