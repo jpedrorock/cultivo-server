@@ -1603,8 +1603,10 @@ static int     sceneCountLocal = 0;
 
 static volatile bool scenesNeedsRefresh = false;
 static unsigned long lastScenesFetch = 0;
-// Cenas mudam pouco — fetch a cada 10 min e' suficiente.
-static const unsigned long SCENES_FETCH_INTERVAL = 10UL * 60UL * 1000UL;
+// Cenas raramente mudam, mas STATE de devices pode mudar a qualquer momento
+// (user liga luz pelo SmartLife). Pollar 30s pra captar mudancas externas
+// num tempo razoavel sem stress no Tuya rate limit (~ 2req/min e' OK).
+static const unsigned long SCENES_FETCH_INTERVAL = 30UL * 1000UL;
 
 static inline void copyToBuf(char *dst, size_t cap, const char *src) {
   if (!src) { dst[0] = '\0'; return; }
@@ -1632,6 +1634,12 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
     sceneStateLocal[n] = obj["state"] | false;
     copyToBuf(sceneIconHintLocal[n], sizeof(sceneIconHintLocal[n]),
               obj["iconHint"] | "");
+    // DEBUG: log per-item pra ver o que server tá mandando, especialmente
+    // o STATE dos devices (precisa vir da Tuya em real-time, nao cache)
+    Serial.printf("[net]   [%d] type=%s name=%-15s state=%s iconHint=%s id=%s\n",
+                  n, typeStr, sceneNamesLocal[n],
+                  sceneStateLocal[n] ? "ON" : "OFF",
+                  sceneIconHintLocal[n], sceneIdsLocal[n]);
   }
   return true;
 }
@@ -1764,9 +1772,12 @@ static void refreshHandler() {
   refreshPending = true;
   Serial.println("[ui] tap-to-refresh requested");
 }
-// POST /api/device/device-toggle — manda novo state pro server, retorna true
-// se HTTP 200. Body: {"deviceId":"...", "state":true|false}.
-static bool postDeviceToggle(const char *deviceId, bool newState) {
+// POST /api/device/device-toggle — manda novo state desejado e parseia state
+// REAL retornado (Tuya pode falhar ou tomar caminho diferente). Server
+// resposta esperada: {success:true, deviceId:"...", state:true|false}.
+// Out param outRealState recebe o estado final (apos Tuya executar).
+// Retorna true se HTTP 200 + JSON ok.
+static bool postDeviceToggle(const char *deviceId, bool desiredState, bool *outRealState) {
   if (!wifiOk) return false;
   HTTPClient http;
   char url[160];
@@ -1779,23 +1790,44 @@ static bool postDeviceToggle(const char *deviceId, bool newState) {
   http.addHeader("Content-Type", "application/json");
   char body[128];
   snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"state\":%s}",
-           deviceId, newState ? "true" : "false");
+           deviceId, desiredState ? "true" : "false");
+  http.setTimeout(8000);  // Tuya cloud pode demorar
   int code = http.POST(body);
-  Serial.printf("[device] toggle %s -> %s HTTP %d\n",
-                deviceId, newState ? "ON" : "OFF", code);
+  if (code != 200) {
+    Serial.printf("[device] toggle %s -> %s HTTP %d (FAIL)\n",
+                  deviceId, desiredState ? "ON" : "OFF", code);
+    http.end();
+    return false;
+  }
+  // Parsear response p/ pegar STATE real (server pode retornar diferente
+  // se Tuya executou mas com outro estado — race condition, dispositivo
+  // offline, etc).
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
   http.end();
-  return code == 200;
+  if (err != DeserializationError::Ok) {
+    Serial.printf("[device] toggle JSON err: %s\n", err.c_str());
+    if (outRealState) *outRealState = desiredState;  // assume desired
+    return true;  // HTTP foi OK, so' falhou parse
+  }
+  bool realState = doc["state"] | desiredState;
+  if (outRealState) *outRealState = realState;
+  Serial.printf("[device] toggle %s -> desired=%s realState=%s OK\n",
+                deviceId, desiredState ? "ON" : "OFF",
+                realState ? "ON" : "OFF");
+  return true;
 }
 
 // Tap em botao do grid CENAS — diferencia scene vs device:
 //   - scene  : POST /api/device/scene-by-id/<id>/trigger (one-shot)
-//   - device : optimistic toggle (UI ja' inverteu sceneStateLocal via
-//              applyItems anterior); manda novo state pro server, reverte se
-//              falhou via cultivoUI_setDeviceState.
+//   - device : optimistic toggle (UI ja' inverteu via sceneClickCb), POST,
+//              entao SOBRESCREVE com state REAL retornado pelo server (que
+//              vem da Tuya). Isso captura: device offline, Tuya rejeitou,
+//              algo mudou entre toggle e response, etc.
 //
-// IMPORTANTE: o callback da UI (sceneClickCb em cultivo_ui.cpp) JA' inverte
-// items[idx].state localmente antes de chamar este handler — entao aqui o
-// server recebe o state DESEJADO (= storage atual da UI).
+// IMPORTANTE: o callback da UI (sceneClickCb) JA' inverte items[idx].state
+// localmente antes de chamar este handler — feedback imediato. Aqui a gente
+// confirma com o real-state do server.
 static void sceneTriggerHandler(int idx) {
   if (idx < 0 || idx >= sceneCountLocal) {
     Serial.printf("[scene] idx=%d fora do range (count=%d)\n", idx, sceneCountLocal);
@@ -1805,25 +1837,29 @@ static void sceneTriggerHandler(int idx) {
   const char *name = sceneNamesLocal[idx];
 
   if (sceneTypeLocal[idx] == 1) {
-    // Device — manda novo state. UI ja' inverteu visualmente; se POST falhar,
-    // reverte tanto o state interno quanto o visual via setDeviceState.
-    bool desired = !sceneStateLocal[idx];  // UI inverteu, o "novo" pro server e' o oposto do storage
-    // Espera: storage no main_lvgl ainda tem state ANTIGO (so' UI inverteu).
-    // Vamos sincronizar: assumimos toggle, escrevemos desired no storage.
-    sceneStateLocal[idx] = desired;
-    Serial.printf("[device] toggle idx=%d id=%s name=%s -> %s\n",
+    // Device — UI ja' inverteu visualmente (cultivoUI_applyItems sera'
+    // chamado SOMENTE no proximo poll. O storage main_lvgl ainda tem state
+    // ANTIGO — UI inverteu so' visual). Calculamos desired = !old_state.
+    bool desired = !sceneStateLocal[idx];
+    Serial.printf("[device] toggle idx=%d id=%s name=%s -> desired=%s\n",
                   idx, id, name, desired ? "ON" : "OFF");
     if (!wifiOk) {
       Serial.println("[device] WiFi offline — reverte UI");
-      sceneStateLocal[idx] = !desired;
-      cultivoUI_setDeviceState(idx, !desired);
+      cultivoUI_setDeviceState(idx, sceneStateLocal[idx]);  // volta ao antigo
       return;
     }
-    if (!postDeviceToggle(id, desired)) {
+    bool realState = desired;
+    if (!postDeviceToggle(id, desired, &realState)) {
+      // POST falhou — reverte UI pro estado antigo (storage nao mudou)
       Serial.println("[device] POST falhou — reverte UI");
-      sceneStateLocal[idx] = !desired;
-      cultivoUI_setDeviceState(idx, !desired);
+      cultivoUI_setDeviceState(idx, sceneStateLocal[idx]);
+      return;
     }
+    // POST OK — adota o STATE REAL retornado (pode ser diferente do desired
+    // se Tuya/dispositivo responderam de outro jeito). Atualiza tanto o
+    // storage interno quanto o visual da UI.
+    sceneStateLocal[idx] = realState;
+    cultivoUI_setDeviceState(idx, realState);
     return;
   }
 

@@ -176,3 +176,86 @@ Isso é trabalho meu — me avisa quando o backend tiver:
 
 Endpoints antigos `/scene/:slotIdx/trigger` (env-mapped) podem ser removidos
 depois — ninguém mais deve usar quando esse fluxo estiver no ar.
+
+---
+
+## ⚠️ ADENDO sprint 1 — state real-time da Tuya (descoberto após deploy)
+
+### Problema observado em produção
+
+ESP32 testado em prod com 1 device vinculado (LED 65W), poll a cada 30s.
+Logs do firmware mostram `state=OFF` em **todas** as chamadas `/api/device/scenes`,
+mesmo quando o user liga a luz pelo SmartLife. Isso quebra a ideia do display
+refletir o estado real (ponto principal de ter device toggle).
+
+```
+[net] items: 2 total (1 cenas, 1 devices) [novo]
+[net]   [1] type=device name=LED 65W state=OFF iconHint=light id=eb35a5...
+[net] items: 2 total (1 cenas, 1 devices) [novo]   ← 30s depois, ainda OFF
+[net]   [1] type=device name=LED 65W state=OFF iconHint=light id=eb35a5...
+```
+
+### Causa provável
+
+O endpoint `GET /api/device/scenes` provavelmente retorna o `state` cacheado
+(da última escrita via `/api/device/device-toggle` ou default `false` da
+tabela `tentDevices.state`). Não consulta a Tuya em tempo real.
+
+### O que precisa mudar no server
+
+1. **`GET /api/device/scenes`** — pra cada item `type='device'`, fazer
+   chamada Tuya `GET /v1.0/devices/{deviceId}/status` (ou `/v2.0/cloud/...`)
+   e retornar o `state` real (booleano do datapoint switch_1, switch_led, etc).
+
+   Custo: ~1 chamada Tuya por device por poll. Com 6 devices max e poll
+   10min, e' ~36 calls/hora — bem dentro do rate limit Tuya (100k/dia).
+
+   Otimizacao: cache de 10s no server (se duas chamadas /scenes vierem em
+   sequencia, usa o mesmo state).
+
+2. **`POST /api/device/device-toggle`** — response deve retornar o `state`
+   final REAL (releitura da Tuya apos o toggle), nao o `desiredState`.
+   Tuya as vezes ignora ou inverte o comando dependendo do tipo do device.
+   ESP ja' parseia `{state: bool}` da resposta — so' precisa o server
+   colocar la' (em vez de echar o request).
+
+### Endpoint Tuya pra ler state
+
+```ts
+// server/lib/tuya.ts — funcao ja' existe? (readTuyaDeviceStatus retorna
+// tempC/rh, mas pra device generico precisa do datapoint correto):
+
+// GET /v1.0/devices/{deviceId}/status
+// Resposta: {result: [{code: "switch_1", value: true}, ...]}
+// Pra um plug/luz simples, pegar code = "switch_1" ou "switch_led".
+```
+
+### O que o ESP firmware ja' tá pronto pra fazer
+
+- ✅ Parsea `state` em `parseItemSlot` (vê na linha do log acima)
+- ✅ Pinta visual ON/OFF claramente diferenciado (bg primary cheio + ícone
+  branco vs bg neutro + ícone dim, glow primary quando ON)
+- ✅ Poll a cada 30s (temporário pra debug — vou voltar pra 10min depois
+  que server estiver consultando real-time, daí faz sentido o intervalo
+  maior já que cada chamada vai fazer round-trip Tuya)
+- ✅ Tap no device parseia `state` retornado pelo POST `/device-toggle`
+  (sobrescreve storage local com o real)
+- ✅ Reverte UI se POST falhou (offline, timeout, server 500)
+
+### TODO do meu lado quando server estiver pronto
+
+- Reverter `SCENES_FETCH_INTERVAL` de 30s pra 10min (já que cada poll vai
+  custar mais round-trip Tuya, vale o intervalo maior)
+- Talvez adicionar: ao entrar na aba CENAS, forçar 1 fetch imediato pra UI
+  refletir state mais fresco que o último poll automático
+
+### Teste end-to-end depois do fix
+
+1. User liga LED 65W pelo SmartLife
+2. Em até 30s o display ESP atualiza pra ON visualmente (bg verde + glow)
+3. User toca no card LED no display → desliga
+4. Volta no SmartLife — luz tá apagada
+5. Outro user liga manual → display volta pra ON em <30s
+
+Sem fechar essa parte, o feature de device toggle fica meio inutil — UI
+mente sobre o estado real.
