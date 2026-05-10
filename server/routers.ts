@@ -966,10 +966,13 @@ const tentScenesRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Limite de 6 itens (cenas + devices) por estufa atingido' });
       }
 
-      // position = max+1 (apêndice no final)
+      // position = max+1 ENTRE AS DUAS TABELAS (apêndice no final do grid combinado)
       const [maxRow]: any = await pool.execute(
-        `SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM tentScenes WHERE tentId = ?`,
-        [input.tentId]
+        `SELECT GREATEST(
+           COALESCE((SELECT MAX(position) FROM tentScenes  WHERE tentId = ?), -1),
+           COALESCE((SELECT MAX(position) FROM tentDevices WHERE tentId = ?), -1)
+         ) + 1 AS next_pos`,
+        [input.tentId, input.tentId]
       );
       const nextPos = maxRow[0].next_pos;
 
@@ -1074,9 +1077,13 @@ const tentDevicesRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Limite de 6 itens (cenas + devices) por estufa atingido' });
       }
 
+      // position = max+1 ENTRE AS DUAS TABELAS (apêndice no final do grid combinado)
       const [maxRow]: any = await pool.execute(
-        `SELECT COALESCE(MAX(position), -1) + 1 AS next_pos FROM tentDevices WHERE tentId = ?`,
-        [input.tentId]
+        `SELECT GREATEST(
+           COALESCE((SELECT MAX(position) FROM tentScenes  WHERE tentId = ?), -1),
+           COALESCE((SELECT MAX(position) FROM tentDevices WHERE tentId = ?), -1)
+         ) + 1 AS next_pos`,
+        [input.tentId, input.tentId]
       );
       const nextPos = maxRow[0].next_pos;
 
@@ -1127,12 +1134,104 @@ const tentDevicesRouter = router({
     }),
 });
 
+// ─── tentDisplay router (operações que cruzam scenes + devices) ────────────────
+//
+// Endpoint reorder unificado: aceita lista combinada [{type, id, position}]
+// e atualiza positions nas duas tabelas em sequência. Sem transação MySQL —
+// se cair no meio, fica inconsistente, mas como é só UI ordering, baixo risco.
+const tentDisplayRouter = router({
+  /**
+   * Lista TUDO (scenes + devices) já merged, ordenado por position.
+   * Usado pra pintar o grid 2x3 de preview no app web.
+   */
+  listItems: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      const [scenes]: any = await pool.execute(
+        `SELECT id, sceneId, name, position FROM tentScenes WHERE tentId = ?`,
+        [input.tentId]
+      );
+      const [devices]: any = await pool.execute(
+        `SELECT id, deviceId, name, position, iconHint FROM tentDevices WHERE tentId = ?`,
+        [input.tentId]
+      );
+      const items = [
+        ...(scenes as any[]).map((s: any) => ({
+          type: 'scene' as const,
+          id: s.id as number,
+          refId: s.sceneId as string,
+          name: s.name as string,
+          position: s.position as number,
+          iconHint: null as string | null,
+        })),
+        ...(devices as any[]).map((d: any) => ({
+          type: 'device' as const,
+          id: d.id as number,
+          refId: d.deviceId as string,
+          name: d.name as string,
+          position: d.position as number,
+          iconHint: d.iconHint as string | null,
+        })),
+      ];
+      items.sort((a, b) => a.position - b.position || a.id - b.id);
+      return items;
+    }),
+
+  /**
+   * Reordena combinando scenes + devices. Aceita batch de [{type, id, position}].
+   * Tipo decide qual tabela atualizar.
+   */
+  reorder: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      order: z.array(z.object({
+        type: z.enum(['scene', 'device']),
+        id: z.number(),
+        position: z.number().int().min(0).max(99),
+      })).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+
+      // Anti-tamper: valida que cada (id,type) pertence à tentId
+      const sceneIds = input.order.filter(o => o.type === 'scene').map(o => o.id);
+      const deviceIds = input.order.filter(o => o.type === 'device').map(o => o.id);
+
+      if (sceneIds.length > 0) {
+        const ph = sceneIds.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentScenes WHERE tentId = ? AND id IN (${ph})`,
+          [input.tentId, ...sceneIds]
+        );
+        if (rows.length !== sceneIds.length) throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs de cena inválidos' });
+      }
+      if (deviceIds.length > 0) {
+        const ph = deviceIds.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentDevices WHERE tentId = ? AND id IN (${ph})`,
+          [input.tentId, ...deviceIds]
+        );
+        if (rows.length !== deviceIds.length) throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs de device inválidos' });
+      }
+
+      for (const o of input.order) {
+        const table = o.type === 'scene' ? 'tentScenes' : 'tentDevices';
+        await pool.execute(`UPDATE ${table} SET position = ? WHERE id = ?`, [o.position, o.id]);
+      }
+      return { ok: true };
+    }),
+});
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   tuya: tuyaRouter,
   tentScenes: tentScenesRouter,
   tentDevices: tentDevicesRouter,
+  tentDisplay: tentDisplayRouter,
   // Auth real está em /api/auth/* (REST) — registerAuthRoutes em _core/authRoutes.ts.
   // O sub-router tRPC `auth` foi removido: retornava { id:1, name:"Local User" }
   // hardcoded mesmo dentro de protectedProcedure (bug latente — qualquer caller

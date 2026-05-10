@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -259,6 +259,18 @@ const ICON_HINT_LABELS: Record<string, string> = {
   other: 'Outro',
 };
 
+const ICON_HINT_COMPONENTS: Record<string, React.ComponentType<{ className?: string }>> = {
+  light: Lightbulb,
+  fan: Fan,
+  pump: Droplet,
+  heater: Flame,
+  ac: Snowflake,
+  humidifier: Cloud,
+  dehumidifier: Wind,
+  co2: Cloud,
+  other: Zap,
+};
+
 function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const utils = trpc.useUtils();
   const [showSceneAdd, setShowSceneAdd] = useState(false);
@@ -267,9 +279,8 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [selectedIconHint, setSelectedIconHint] = useState<string>('other');
 
-  // Cenas + Devices vinculados à estufa
-  const { data: tentScenes = [] } = trpc.tentScenes.list.useQuery({ tentId });
-  const { data: tentDevices = [] } = trpc.tentDevices.list.useQuery({ tentId });
+  // Lista combinada (já merged + ordenada por position)
+  const { data: items = [] } = trpc.tentDisplay.listItems.useQuery({ tentId });
 
   // Listas globais Tuya (só busca quando user abre os dropdowns)
   const { data: allScenes = [], isLoading: scenesLoading } = trpc.tuya.listScenes.useQuery(
@@ -281,41 +292,37 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
     { enabled: showDeviceAdd, retry: false }
   );
 
-  const linkedSceneIds = new Set(tentScenes.map((s: any) => s.sceneId));
-  const linkedDeviceIds = new Set(tentDevices.map((d: any) => d.deviceId));
+  const linkedSceneRefIds = new Set((items as any[]).filter((i: any) => i.type === 'scene').map((i: any) => i.refId));
+  const linkedDeviceRefIds = new Set((items as any[]).filter((i: any) => i.type === 'device').map((i: any) => i.refId));
 
-  const totalCount = tentScenes.length + tentDevices.length;
+  const totalCount = items.length;
   const atLimit = totalCount >= 6;
 
+  const invalidateAll = () => {
+    utils.tentDisplay.listItems.invalidate({ tentId });
+    utils.tentScenes.list.invalidate({ tentId });
+    utils.tentDevices.list.invalidate({ tentId });
+  };
+
   const addScene = trpc.tentScenes.add.useMutation({
-    onSuccess: () => {
-      toast.success('Cena adicionada');
-      utils.tentScenes.list.invalidate({ tentId });
-      setSelectedSceneId('');
-      setShowSceneAdd(false);
-    },
+    onSuccess: () => { toast.success('Cena adicionada'); invalidateAll(); setSelectedSceneId(''); setShowSceneAdd(false); },
     onError: (e) => toast.error(e.message),
   });
-
   const removeScene = trpc.tentScenes.remove.useMutation({
-    onSuccess: () => { utils.tentScenes.list.invalidate({ tentId }); toast.success('Removida'); },
+    onSuccess: () => { invalidateAll(); toast.success('Removida'); },
     onError: (e) => toast.error(e.message),
   });
-
   const addDevice = trpc.tentDevices.add.useMutation({
-    onSuccess: () => {
-      toast.success('Dispositivo adicionado');
-      utils.tentDevices.list.invalidate({ tentId });
-      setSelectedDeviceId('');
-      setSelectedIconHint('other');
-      setShowDeviceAdd(false);
-    },
+    onSuccess: () => { toast.success('Dispositivo adicionado'); invalidateAll(); setSelectedDeviceId(''); setSelectedIconHint('other'); setShowDeviceAdd(false); },
     onError: (e) => toast.error(e.message),
   });
-
   const removeDevice = trpc.tentDevices.remove.useMutation({
-    onSuccess: () => { utils.tentDevices.list.invalidate({ tentId }); toast.success('Removido'); },
+    onSuccess: () => { invalidateAll(); toast.success('Removido'); },
     onError: (e) => toast.error(e.message),
+  });
+  const reorder = trpc.tentDisplay.reorder.useMutation({
+    onSuccess: () => invalidateAll(),
+    onError: (e) => { toast.error(`Reorder: ${e.message}`); invalidateAll(); },
   });
 
   const handleAddScene = () => {
@@ -324,18 +331,35 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
     if (!scene) return;
     addScene.mutate({ tentId, sceneId: scene.sceneId, name: scene.name });
   };
-
   const handleAddDevice = () => {
     if (!selectedDeviceId) return;
     const dev = (allDevices as any[]).find((d: any) => d.id === selectedDeviceId);
     if (!dev) return;
-    addDevice.mutate({
+    addDevice.mutate({ tentId, deviceId: dev.id, name: dev.name, iconHint: selectedIconHint as any });
+  };
+
+  // Move o item idx pra cima/baixo trocando position com o vizinho
+  const handleMove = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= items.length) return;
+    const a = items[idx];
+    const b = items[target];
+    reorder.mutate({
       tentId,
-      deviceId: dev.id,
-      name: dev.name,
-      iconHint: selectedIconHint as any,
+      order: [
+        { type: a.type, id: a.id, position: b.position },
+        { type: b.type, id: b.id, position: a.position },
+      ],
     });
   };
+
+  const handleRemove = (item: any) => {
+    if (item.type === 'scene') removeScene.mutate({ id: item.id });
+    else removeDevice.mutate({ id: item.id });
+  };
+
+  // Preview do grid 2x3 (preenche slots vazios pra mostrar como vai aparecer)
+  const previewSlots = Array.from({ length: 6 }, (_, i) => items[i] ?? null);
 
   return (
     <Card className="bg-card border-border">
@@ -357,53 +381,84 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3 pb-4">
-        {/* Lista de cenas vinculadas */}
-        {tentScenes.length > 0 && (
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Cenas</p>
-            {(tentScenes as any[]).map((s: any) => (
-              <div key={s.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-muted/40">
-                <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
-                </div>
-                <p className="flex-1 text-sm text-foreground truncate">{s.name}</p>
-                <button
-                  onClick={() => removeScene.mutate({ id: s.id })}
-                  disabled={removeScene.isPending}
-                  className="shrink-0 w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+      <CardContent className="space-y-4 pb-4">
+        {/* Preview do grid 2x3 (réplica do que aparece no ESP32) */}
+        {totalCount > 0 && (
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Preview do display</p>
+            <div className="rounded-xl border border-border/60 bg-background/60 p-2.5">
+              <div className="grid grid-cols-3 gap-1.5">
+                {previewSlots.map((slot: any, i) => {
+                  if (!slot) return (
+                    <div key={i} className="aspect-square rounded-lg border border-dashed border-border/40 bg-muted/20" />
+                  );
+                  const Icon = slot.type === 'device'
+                    ? (ICON_HINT_COMPONENTS[slot.iconHint ?? 'other'] ?? Zap)
+                    : Zap;
+                  const ringColor = slot.type === 'device' ? 'ring-blue-500/30' : 'ring-amber-500/30';
+                  const iconColor = slot.type === 'device' ? 'text-blue-500' : 'text-amber-500';
+                  return (
+                    <div key={i} className={`aspect-square rounded-lg ring-1 ${ringColor} bg-muted/40 flex flex-col items-center justify-center gap-1 p-1`}>
+                      <Icon className={`w-4 h-4 ${iconColor}`} />
+                      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
           </div>
         )}
 
-        {/* Lista de dispositivos vinculados */}
-        {tentDevices.length > 0 && (
+        {/* Lista combinada com ↑↓ */}
+        {totalCount > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Dispositivos</p>
-            {(tentDevices as any[]).map((d: any) => (
-              <div key={d.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-muted/40">
-                <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center shrink-0">
-                  <Zap className="w-3.5 h-3.5 text-blue-500" />
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Itens vinculados</p>
+            {(items as any[]).map((item: any, idx: number) => {
+              const isScene = item.type === 'scene';
+              const Icon = isScene ? Zap : (ICON_HINT_COMPONENTS[item.iconHint ?? 'other'] ?? Zap);
+              const iconBg = isScene ? 'bg-amber-500/15' : 'bg-blue-500/15';
+              const iconColor = isScene ? 'text-amber-500' : 'text-blue-500';
+              return (
+                <div key={`${item.type}-${item.id}`} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-muted/40">
+                  {/* Setas ↑↓ */}
+                  <div className="flex flex-col -space-y-0.5 shrink-0">
+                    <button
+                      onClick={() => handleMove(idx, -1)}
+                      disabled={idx === 0 || reorder.isPending}
+                      title="Mover pra cima"
+                      className="w-5 h-4 rounded hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleMove(idx, 1)}
+                      disabled={idx === items.length - 1 || reorder.isPending}
+                      title="Mover pra baixo"
+                      className="w-5 h-4 rounded hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  <div className={`w-7 h-7 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
+                    <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {isScene ? 'Cena' : (ICON_HINT_LABELS[item.iconHint ?? 'other'] ?? 'Dispositivo')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleRemove(item)}
+                    disabled={removeScene.isPending || removeDevice.isPending}
+                    className="shrink-0 w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-foreground truncate">{d.name}</p>
-                  {d.iconHint && (
-                    <p className="text-[10px] text-muted-foreground">{ICON_HINT_LABELS[d.iconHint] ?? d.iconHint}</p>
-                  )}
-                </div>
-                <button
-                  onClick={() => removeDevice.mutate({ id: d.id })}
-                  disabled={removeDevice.isPending}
-                  className="shrink-0 w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -431,7 +486,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                 >
                   <option value="">— Escolha uma cena —</option>
                   {(allScenes as any[])
-                    .filter((s: any) => !linkedSceneIds.has(s.sceneId))
+                    .filter((s: any) => !linkedSceneRefIds.has(s.sceneId))
                     .map((s: any) => (
                       <option key={s.sceneId} value={s.sceneId}>
                         {s.name} {s.homeName ? `(${s.homeName})` : ''}
@@ -466,7 +521,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                 >
                   <option value="">— Escolha um dispositivo —</option>
                   {(allDevices as any[])
-                    .filter((d: any) => !linkedDeviceIds.has(d.id))
+                    .filter((d: any) => !linkedDeviceRefIds.has(d.id))
                     .map((d: any) => (
                       <option key={d.id} value={d.id}>
                         {d.name} {d.online ? '🟢' : '⚫'}
