@@ -77,9 +77,45 @@ extern "C" void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb)   { onCon
 extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRefresh    = cb; }
 extern "C" void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb) { onSceneTrigger = cb; }
 
-// Estado de refresh em andamento — UI mostra pulse no anel TEMP enquanto ativo
+// Estado de refresh em andamento + spin do icone refresh top-right.
+// refreshIcon = ponteiro pro ic_refresh do header (setado em buildHome).
+// Spin tick incrementa angulo a cada 50ms. Para sozinho quando isRefreshing
+// vira false (refreshHomeValues seta) ou quando timeout (10s sem resposta).
 static bool isRefreshing = false;
 static lv_timer_t *refreshSpinTimer = nullptr;
+static lv_obj_t  *refreshIcon       = nullptr;
+static uint32_t   refreshStartedAt  = 0;
+static int32_t    refreshAngle      = 0;
+#define REFRESH_TIMEOUT_MS 10000
+
+// Forward decl — definida apos showToast
+static void showToast(const char *msg);
+
+static void refreshSpinTick(lv_timer_t *t) {
+  // Timeout — server nao respondeu em 10s, libera flag + avisa user
+  if (isRefreshing && (lv_tick_get() - refreshStartedAt > REFRESH_TIMEOUT_MS)) {
+    isRefreshing = false;
+    showToast("Falha — tente novamente");
+  }
+
+  if (!isRefreshing) {
+    // Para timer + reseta rotacao do icone (volta ao angulo 0)
+    lv_timer_del(t);
+    refreshSpinTimer = nullptr;
+    refreshAngle = 0;
+    if (refreshIcon) {
+      lv_obj_set_style_transform_rotation(refreshIcon, 0, 0);
+    }
+    return;
+  }
+
+  // Incremento de 36 decimos = 3.6 graus por tick. 50ms tick → 72 graus/s
+  // → ~5s por volta completa. Visualmente "trabalhando", nao frenetico.
+  refreshAngle = (refreshAngle + 36) % 3600;
+  if (refreshIcon) {
+    lv_obj_set_style_transform_rotation(refreshIcon, refreshAngle, 0);
+  }
+}
 
 extern "C" void cultivoUI_setRefreshing(bool active) {
   isRefreshing = active;
@@ -279,33 +315,31 @@ static void buildHome(lv_obj_t *tab) {
   }, LV_EVENT_CLICKED, NULL);
 
   // Refresh manual — botao top-right entre gear e wifi. Tap dispara onRefresh
-  // (server poll Tuya); icone roda 360 no proprio eixo enquanto refreshing.
+  // (server poll Tuya); icone gira continuamente enquanto refreshing.
   // Pivot centralizado (16,16 p/ icone 32x32) — sem isso girava em torno do
   // top-left e o icone "viajava" pelo header.
-  lv_obj_t *btnRefresh = lv_image_create(tab);
-  lv_image_set_src(btnRefresh, &ic_refresh);
-  lv_obj_set_style_image_recolor(btnRefresh, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_image_recolor_opa(btnRefresh, LV_OPA_COVER, 0);
-  lv_obj_set_style_transform_pivot_x(btnRefresh, 16, 0);
-  lv_obj_set_style_transform_pivot_y(btnRefresh, 16, 0);
-  lv_obj_align(btnRefresh, LV_ALIGN_TOP_RIGHT, -sw(80), sh(4));
-  lv_obj_add_flag(btnRefresh, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_set_ext_click_area(btnRefresh, sw(10));
-  lv_obj_add_event_cb(btnRefresh, [](lv_event_t *e) {
-    lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
+  refreshIcon = lv_image_create(tab);
+  lv_image_set_src(refreshIcon, &ic_refresh);
+  lv_obj_set_style_image_recolor(refreshIcon, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_image_recolor_opa(refreshIcon, LV_OPA_COVER, 0);
+  lv_obj_set_style_transform_pivot_x(refreshIcon, 16, 0);
+  lv_obj_set_style_transform_pivot_y(refreshIcon, 16, 0);
+  lv_obj_align(refreshIcon, LV_ALIGN_TOP_RIGHT, -sw(80), sh(4));
+  lv_obj_add_flag(refreshIcon, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(refreshIcon, sw(10));
+  lv_obj_add_event_cb(refreshIcon, [](lv_event_t *e) {
+    (void)e;
     if (onRefresh && !isRefreshing) {
       isRefreshing = true;
+      refreshStartedAt = lv_tick_get();
       onRefresh();
-      // Animacao rotacao 360 no centro (pivot setado no buildHome).
-      lv_anim_t a;
-      lv_anim_init(&a);
-      lv_anim_set_var(&a, btn);
-      lv_anim_set_values(&a, 0, 3600);
-      lv_anim_set_time(&a, MOTION_SLOW);
-      lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-        lv_obj_set_style_transform_rotation((lv_obj_t*)obj, v, 0);
-      });
-      lv_anim_start(&a);
+      showToast("Atualizando...");
+      // Spin continuo via timer — para sozinho quando isRefreshing=false
+      // (refreshHomeValues seta apos dados frescos) ou quando timeout (10s).
+      // Era anim one-shot 600ms — usuario perdia se nao olhasse direto.
+      if (!refreshSpinTimer) {
+        refreshSpinTimer = lv_timer_create(refreshSpinTick, 50, NULL);
+      }
     }
   }, LV_EVENT_CLICKED, NULL);
 
