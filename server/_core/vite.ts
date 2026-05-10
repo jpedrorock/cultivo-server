@@ -63,8 +63,34 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // SPA fallback — devolve index.html SÓ pra rotas de página (HTML).
+  //
+  // BUG ANTIGO: o `app.use("*")` devolvia index.html pra QUALQUER 404,
+  // incluindo `/assets/<chunk-antigo>.js`. Quando o usuário ficava com a
+  // app aberta durante um deploy, ao navegar pra outra rota o lazy-loader
+  // pedia chunks com hashes antigos. O servidor (que já tinha a build
+  // nova com hashes diferentes) não achava o arquivo, caía no fallback
+  // e devolvia index.html com Content-Type: text/html. Browser:
+  //
+  //   "Failed to load module script: Expected a JavaScript-or-Wasm module
+  //    script but the server responded with a MIME type of text/html"
+  //
+  // → app travada até user fazer hard reload.
+  //
+  // FIX: extensões de asset (.js, .css, .map, .wasm, .png, etc.) que não
+  // existirem viram 404 cru. O cliente (main.tsx) tem handler de
+  // `vite:preloadError` que captura e recarrega a página → user pega a
+  // build nova de forma transparente.
+  const ASSET_EXT_RE = /\.(?:js|mjs|cjs|css|map|wasm|json|woff2?|ttf|otf|eot|png|jpe?g|gif|svg|webp|avif|ico|mp4|webm|mp3|wav|pdf|txt|xml)$/i;
+
+  app.use("*", (req, res) => {
+    if (ASSET_EXT_RE.test(req.originalUrl.split("?")[0])) {
+      // Asset que não existe — 404 explícito pro browser detectar e o
+      // client recarregar.
+      res.status(404).type("text/plain").send("Not Found");
+      return;
+    }
+    // Rota de página (sem extensão de asset) → SPA fallback OK
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

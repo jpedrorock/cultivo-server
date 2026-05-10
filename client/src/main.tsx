@@ -71,6 +71,43 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+// ─── Lazy-chunk fail-safe ──────────────────────────────────────────────────
+// Quando um deploy roda e o user tem a app aberta, navegar pra outra rota
+// pede chunks com hashes antigos (ex: TentDetails-OLD_HASH.js). Server agora
+// devolve 404 nesses casos (em vez de index.html, que causava o famoso
+// "Failed to load module script: ... text/html"). Aqui captamos o erro e
+// fazemos reload — user pega a build nova de forma transparente.
+//
+// 1) Vite emite `vite:preloadError` quando o preload de chunk falha.
+// 2) Catch genérico de unhandledrejection com mensagem padrão de
+//    "Failed to fetch dynamically imported module" cobre o resto.
+//
+// Guard `reloadingForChunkError` evita loop se o reload por algum motivo
+// também falhar.
+let reloadingForChunkError = false;
+function reloadOnChunkError(reason: string) {
+  if (reloadingForChunkError) return;
+  reloadingForChunkError = true;
+  console.warn('[chunk] reload pra pegar build nova:', reason);
+  // Pequeno delay pra que o aviso chegue no console antes do reload
+  setTimeout(() => window.location.reload(), 100);
+}
+
+window.addEventListener('vite:preloadError', (event) => {
+  reloadOnChunkError(`vite:preloadError ${(event as any).payload?.message ?? ''}`);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = String(event.reason?.message ?? event.reason ?? '');
+  if (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes("Importing a module script failed") ||
+    msg.includes('Failed to load module script')
+  ) {
+    reloadOnChunkError(`unhandledrejection: ${msg.slice(0, 100)}`);
+  }
+});
+
 // Registrar Service Worker para PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
