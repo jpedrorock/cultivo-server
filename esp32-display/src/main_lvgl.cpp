@@ -1856,10 +1856,18 @@ static bool postDeviceToggle(const char *deviceId, bool desiredState, bool *outR
     if (outRealState) *outRealState = desiredState;
     return true;
   }
-  bool realState = doc["state"] | desiredState;
-  if (outRealState) *outRealState = realState;
-  Serial.printf("[device] toggle desired=%s realState=%s OK\n",
-                desiredState ? "ON" : "OFF", realState ? "ON" : "OFF");
+  // ANTES: usavamos `realState = doc["state"]` (do response do server). Mas o
+  // server faz re-consulta apos 500ms que as vezes retorna state ANTIGO
+  // (Tuya nao propagou ainda) → display "voltava" pro estado anterior.
+  //
+  // AGORA: ignora `realState` do server e assume `desiredState`. UI fica
+  // optimistic ate' o proximo poll de /scenes (~30s) que confirma estado
+  // REAL da Tuya (ja' propagado a essa altura). Se Tuya nao executou,
+  // poll reverte; se executou, fica.
+  bool serverState = doc["state"] | desiredState;
+  if (outRealState) *outRealState = desiredState;  // optimistic
+  Serial.printf("[device] toggle desired=%s server_state=%s (optimistic)\n",
+                desiredState ? "ON" : "OFF", serverState ? "ON" : "OFF");
   return true;
 }
 
