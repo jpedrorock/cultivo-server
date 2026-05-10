@@ -691,7 +691,7 @@ const tentDevicesRouter = router({
       await validateTentOwnership(input.tentId, ctx.user.groupId);
       const pool = getMysqlPool();
       const [rows]: any = await pool.execute(
-        `SELECT id, deviceId, name, position, iconHint FROM tentDevices WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        `SELECT id, deviceId, name, position, iconHint, switchCode FROM tentDevices WHERE tentId = ? ORDER BY position ASC, id ASC`,
         [input.tentId]
       );
       return (rows as any[]).map(r => ({
@@ -700,6 +700,7 @@ const tentDevicesRouter = router({
         name: r.name as string,
         position: r.position as number,
         iconHint: r.iconHint as string | null,
+        switchCode: r.switchCode as string | null,
       }));
     }),
 
@@ -740,11 +741,35 @@ const tentDevicesRouter = router({
       );
       const nextPos = maxRow[0].next_pos;
 
+      // Descobre switchCode AGORA (não depende disso pra criar — falha silenciosa
+      // se Tuya estiver lenta/offline; o /device-toggle faz fallback de discovery
+      // pra rows sem switchCode salvo).
+      // Bug fix: ANTES o switchCode era descoberto a cada toggle e podia escolher
+      // o DP errado (ex: switch_1 em vez de switch_led pra LEDs). Agora salvamos
+      // o switchCode de uma vez e o toggle usa direto — alinha com o pattern do
+      // app web (tuyaSensorMappings.switchCode).
+      let switchCode: string | null = null;
+      try {
+        const [cfgRows]: any = await pool.execute(
+          `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
+          [ctx.user.id]
+        );
+        if (cfgRows.length > 0) {
+          const cfg = cfgRows[0];
+          const { getTuyaDeviceSwitchState } = await import("./lib/tuya");
+          const state = await getTuyaDeviceSwitchState(input.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+          switchCode = state.switchCode;
+          console.log(`[tentDevices.add] device=${input.deviceId} switchCode descoberto: ${switchCode ?? '(null — device não expõe switch)'}`);
+        }
+      } catch (e: any) {
+        console.warn(`[tentDevices.add] device=${input.deviceId} falhou descoberta de switchCode: ${e?.message} — segue NULL, /device-toggle vai re-tentar`);
+      }
+
       const [ins]: any = await pool.execute(
-        `INSERT INTO tentDevices (tentId, deviceId, name, position, iconHint) VALUES (?, ?, ?, ?, ?)`,
-        [input.tentId, input.deviceId, input.name, nextPos, input.iconHint ?? null]
+        `INSERT INTO tentDevices (tentId, deviceId, name, position, iconHint, switchCode) VALUES (?, ?, ?, ?, ?, ?)`,
+        [input.tentId, input.deviceId, input.name, nextPos, input.iconHint ?? null, switchCode]
       );
-      return { id: ins.insertId as number, position: nextPos };
+      return { id: ins.insertId as number, position: nextPos, switchCode };
     }),
 
   remove: protectedProcedure
