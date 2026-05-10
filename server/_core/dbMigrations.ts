@@ -590,6 +590,20 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // Bug em prod (HANDOFF_CENAS_ESTUFA.md ADENDO 2): /api/device/device-toggle
+    // descobria switchCode on-the-fly via getTuyaDeviceSwitchState que pegava
+    // o PRIMEIRO match de SWITCH_CODES — pra device LED, podia pegar 'switch_1'
+    // (que Tuya aceita silenciosamente sem fazer nada) em vez de 'switch_led'
+    // (correto). Agora salvamos o switchCode na hora de adicionar o device,
+    // igual o app web faz com tuyaSensorMappings.switchCode. Toggle usa o
+    // valor salvo direto. Fallback pra discovery se NULL (rows antigas).
+    id: 'add-tentDevices-switchCode',
+    description: 'Adiciona tentDevices.switchCode (DP do switch — fix toggle)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'tentDevices', 'switchCode', 'VARCHAR(50) NULL AFTER `iconHint`');
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

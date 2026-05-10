@@ -386,14 +386,20 @@ function registerDeviceRoutes(app: express.Application) {
         return res.status(400).json({ error: 'deviceId e state (boolean) obrigatórios' });
       }
 
-      // Valida que esse device está vinculado à estufa do display
+      // Valida que esse device está vinculado à estufa do display E pega o
+      // switchCode salvo (HANDOFF_CENAS_ESTUFA.md ADENDO 2 — bug fix). Antes
+      // descobríamos on-the-fly via getTuyaDeviceSwitchState, que pegava o
+      // primeiro DP de SWITCH_CODES. Pra LED 65W podia pegar 'switch_1' (que
+      // Tuya aceita silenciosamente sem fazer nada) em vez de 'switch_led'.
+      // Agora salvamos no add() e usamos direto.
       const [bindRows]: any = await pool.execute(
-        `SELECT id FROM tentDevices WHERE tentId = ? AND deviceId = ? LIMIT 1`,
+        `SELECT id, switchCode FROM tentDevices WHERE tentId = ? AND deviceId = ? LIMIT 1`,
         [device.tentId, deviceId]
       );
       if (bindRows.length === 0) {
         return res.status(403).json({ error: 'Device não vinculado a esta estufa' });
       }
+      const bindRow = bindRows[0];
 
       // Busca config Tuya
       const [cfgRows]: any = await pool.execute(
@@ -407,15 +413,25 @@ function registerDeviceRoutes(app: express.Application) {
       }
       const cfg = cfgRows[0];
 
-      // Descobre o switchCode do device (varia por modelo)
+      // Resolve switchCode: 1) usa o salvo se houver, 2) descobre + persiste se NULL
+      // (rows criadas antes desse fix, ou casos onde a discovery falhou no add)
       const { getTuyaDeviceSwitchState, controlTuyaDevice } = await import('../lib/tuya');
-      const cur = await getTuyaDeviceSwitchState(deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
-      if (!cur.switchCode) {
+      let switchCode: string | null = bindRow.switchCode;
+      if (!switchCode) {
+        const cur = await getTuyaDeviceSwitchState(deviceId, cfg.accessId, cfg.accessSecret, cfg.region, { debug: true });
+        switchCode = cur.switchCode;
+        if (switchCode) {
+          // Persiste pra próximas vezes — uma única descoberta cura todas as rows antigas
+          await pool.execute(`UPDATE tentDevices SET switchCode = ? WHERE id = ?`, [switchCode, bindRow.id]);
+          console.log(`[Device] device-toggle backfilled switchCode=${switchCode} for device=${deviceId} (dps=[${(cur as any).debugDps?.join(',') ?? ''}])`);
+        }
+      }
+      if (!switchCode) {
         return res.status(422).json({ error: 'Dispositivo não expõe switch (não controlável)' });
       }
 
-      const r = await controlTuyaDevice(deviceId, cur.switchCode, desired, cfg.accessId, cfg.accessSecret, cfg.region);
-      console.log(`[Device] device-toggle device=${deviceId} -> ${desired} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''})`);
+      const r = await controlTuyaDevice(deviceId, switchCode, desired, cfg.accessId, cfg.accessSecret, cfg.region);
+      console.log(`[Device] device-toggle device=${deviceId} switchCode=${switchCode} -> ${desired} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''})`);
       if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
 
       // Re-consulta após o toggle pra confirmar estado real (Tuya às vezes leva
@@ -429,7 +445,7 @@ function registerDeviceRoutes(app: express.Application) {
         if (after.switchOn !== null) {
           confirmedState = after.switchOn;
           if (after.switchOn !== desired) {
-            console.warn(`[Device] device-toggle device=${deviceId} desired=${desired} but Tuya reports ${after.switchOn} (propagation lag?)`);
+            console.warn(`[Device] device-toggle device=${deviceId} switchCode=${switchCode} desired=${desired} but Tuya reports ${after.switchOn} (propagation lag?)`);
           }
         }
       } catch (e: any) {
