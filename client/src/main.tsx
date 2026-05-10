@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+import { toast } from "sonner";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
@@ -78,6 +79,46 @@ if ('serviceWorker' in navigator) {
       .then((registration) => {
         if (import.meta.env.DEV) console.log('[PWA] Service Worker registered:', registration.scope);
 
+        // ─── Update prompt (substitui o auto-skipWaiting silencioso) ──────
+        // Antes, o sw.js fazia self.skipWaiting() no install — versão nova
+        // virava ativa no próximo refresh sem aviso (formulário recarregando
+        // no meio, comportamento mudando, etc.).
+        //
+        // Agora: detecta quando um novo SW termina de instalar e está
+        // "waiting" pra assumir. Mostra toast persistente "Atualizar".
+        // Click → posta SKIP_WAITING → SW novo assume → controllerchange
+        // dispara → recarrega a página de forma controlada.
+        const showUpdatePrompt = (waitingSW: ServiceWorker) => {
+          toast("Nova versão disponível", {
+            description: "Atualize para ver as últimas melhorias.",
+            duration: Infinity,                        // não some sozinho
+            action: {
+              label: "Atualizar",
+              onClick: () => {
+                waitingSW.postMessage({ type: 'SKIP_WAITING' });
+                // O reload será disparado pelo controllerchange listener abaixo
+              },
+            },
+          });
+        };
+
+        // Caso 1: já existe um SW novo aguardando ativação no momento do load
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          showUpdatePrompt(registration.waiting);
+        }
+
+        // Caso 2: SW novo é detectado durante a sessão (via update() periódico)
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            // installed + tem controller existente = é update, não primeiro install
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdatePrompt(newWorker);
+            }
+          });
+        });
+
         // Verificar atualizações a cada 60 segundos
         setInterval(() => {
           registration.update();
@@ -86,6 +127,15 @@ if ('serviceWorker' in navigator) {
       .catch((error) => {
         if (import.meta.env.DEV) console.error('[PWA] Service Worker registration failed:', error);
       });
+
+    // Reload quando o SW novo assumir o controle (após user clicar "Atualizar")
+    // Guard pra não recarregar em loop em DEV / Chrome devtools "Update on reload"
+    let reloadingForUpdate = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloadingForUpdate) return;
+      reloadingForUpdate = true;
+      window.location.reload();
+    });
 
     // Ouvir mensagem do SW para sincronizar logs offline
     // O SW não tem cookies, então delega o sync para a página via postMessage
