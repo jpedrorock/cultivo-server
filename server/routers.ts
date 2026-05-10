@@ -6934,39 +6934,83 @@ export const appRouter = router({
         const withGroup = (rows: any[]): any[] =>
           sanitizeDates(rows).map((row) => ({ ...row, groupId: gid }));
 
+        // groupId obrigatório — sem ele não dá pra escopar os deletes e o
+        // import vira destrutivo global (vazaria pra outros tenants).
+        if (gid == null) throw new Error("Usuário sem groupId — import bloqueado por segurança");
+
         // Tudo dentro de uma transação: se qualquer operação falhar,
         // o banco volta ao estado original automaticamente.
         await database.transaction(async (tx: any) => {
-          // Deletar dados existentes (ordem reversa de dependências)
-          await tx.delete(wateringApplications);
-          await tx.delete(nutrientApplications);
-          await tx.delete(plantRunoffLogs);
-          await tx.delete(plantTrichomeLogs);
-          await tx.delete(plantLSTLogs);
-          await tx.delete(plantObservations);
-          await tx.delete(plantHealthLogs);
-          await tx.delete(plantPhotos);
-          await tx.delete(plantTentHistory);
-          await tx.delete(recipeTemplates);
-          await tx.delete(wateringPresets);
-          await tx.delete(fertilizationPresets);
-          await tx.delete(recipes);
-          await tx.delete(notificationHistory);
-          await tx.delete(alertHistory);
-          await tx.delete(alerts);
-          await tx.delete(alertSettings);
-          await tx.delete(taskInstances);
-          await tx.delete(taskTemplates);
-          await tx.delete(dailyLogs);
-          await tx.delete(plants);
-          await tx.delete(cloningEvents);
-          await tx.delete(tentAState);
-          await tx.delete(cycles);
-          await tx.delete(weeklyTargets);
-          await tx.delete(strains);
-          await tx.delete(tents);
+          // ════════════════════════════════════════════════════════════════
+          // SEGURANÇA MULTI-TENANCY:
+          // Antes, todo `tx.delete(table)` era SEM .where() — em DB com
+          // múltiplos users/groups, importar backup APAGAVA dados de TODOS
+          // os tenants. Agora cada delete filtra por groupId (direto ou via
+          // FK CASCADE).
+          //
+          // Tabelas com groupId direto: tents, plants, strains, taskTemplates,
+          //   recipeTemplates, wateringPresets, fertilizationPresets,
+          //   notificationHistory.
+          // Tabelas que cascateiam de tents (via FK ON DELETE CASCADE):
+          //   cycles, dailyLogs, alerts, alertSettings, alertHistory, recipes,
+          //   taskInstances, cloningEvents, tentAState.
+          // Tabelas que cascateiam de plants (FK CASCADE):
+          //   plantPhotos, plantHealthLogs, plantObservations, plantRunoffLogs,
+          //   plantTrichomeLogs, plantLSTLogs, plantTentHistory.
+          // Tabelas que cascateiam de strains (FK CASCADE): weeklyTargets.
+          // Tabelas SEM FK CASCADE (delete explícito via subquery):
+          //   nutrientApplications, wateringApplications.
+          //
+          // Ordem importa: plants antes de strains (FK RESTRICT).
+          // ════════════════════════════════════════════════════════════════
 
-          // Inserir dados do backup — tents/plants/templates recebem o groupId do usuário
+          // 1) Tabelas SEM FK CASCADE — limpar via subquery por tents do grupo
+          await tx
+            .delete(nutrientApplications)
+            .where(
+              inArray(
+                nutrientApplications.tentId,
+                tx.select({ id: tents.id }).from(tents).where(eq(tents.groupId, gid))
+              )
+            );
+          await tx
+            .delete(wateringApplications)
+            .where(
+              inArray(
+                wateringApplications.tentId,
+                tx.select({ id: tents.id }).from(tents).where(eq(tents.groupId, gid))
+              )
+            );
+
+          // 2) plants do grupo → CASCADE remove plant_* (Photos, Health, Obs,
+          //    Runoff, Trichome, LST, TentHistory). Antes de strains pra
+          //    liberar o RESTRICT da FK plants.strainId.
+          await tx.delete(plants).where(eq(plants.groupId, gid));
+
+          // 3) tents do grupo → CASCADE remove cycles, dailyLogs, alerts,
+          //    alertSettings, alertHistory, recipes, taskInstances,
+          //    cloningEvents, tentAState.
+          await tx.delete(tents).where(eq(tents.groupId, gid));
+
+          // 4) strains do grupo → CASCADE remove weeklyTargets
+          await tx.delete(strains).where(eq(strains.groupId, gid));
+
+          // 5) Templates / presets / histórico — independentes, com groupId direto
+          await tx.delete(taskTemplates).where(eq(taskTemplates.groupId, gid));
+          await tx.delete(recipeTemplates).where(eq(recipeTemplates.groupId, gid));
+          await tx.delete(wateringPresets).where(eq(wateringPresets.groupId, gid));
+          await tx.delete(fertilizationPresets).where(eq(fertilizationPresets.groupId, gid));
+          await tx.delete(notificationHistory).where(eq(notificationHistory.groupId, gid));
+
+          // Inserir dados do backup — tents/plants/templates recebem o groupId do usuário.
+          //
+          // ⚠️ NOTA MULTI-TENANCY: o backup preserva os IDs originais (auto-increment
+          // PRIMARY KEY). Se algum dos IDs do backup já existir em outra tenant
+          // do mesmo DB, o INSERT abaixo falhará com "Duplicate entry for key
+          // 'PRIMARY'" e a transação inteira faz rollback (dados ficam intactos).
+          // Solução completa exige re-mapear IDs (build old→new map e reescrever
+          // FKs em cascata). Pra deploy single-tenant atual (1 group por DB),
+          // isso não acontece. Se o app ganhar multi-tenancy real, refazer.
           if (input.data.tents?.length) await tx.insert(tents).values(withGroup(input.data.tents));
           if (input.data.strains?.length) await tx.insert(strains).values(sanitizeDates(input.data.strains));
           if (input.data.cycles?.length) await tx.insert(cycles).values(sanitizeDates(input.data.cycles));
