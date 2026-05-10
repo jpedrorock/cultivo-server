@@ -11,6 +11,8 @@
 //   GET  /api/device/tasks/:tentId          → tarefas pendentes
 //   POST /api/device/task-complete          → toggle done
 //   POST /api/device/scene/:slotIdx/trigger → trigger cena Tuya (slot 0-9 -> env TUYA_SCENE_X)
+//   GET  /api/device/scenes                 → lista cenas Tuya manuais do user (max 6)
+//   POST /api/device/scene-by-id/:sceneId/trigger → trigger por sceneId real (do GET /scenes)
 //   POST /api/device/refresh-tuya/:tentId   → forca poll Tuya (cria dailyLog)
 //   GET  /api/device/history/:tentId        → 24h/7d/30d history p/ chart
 //   GET  /api/device/history-all/:tentId    → 4 metricas em uma chamada (sparklines)
@@ -241,6 +243,85 @@ function registerDeviceRoutes(app: express.Application) {
       res.json({ success: true, slotIdx });
     } catch (err: any) {
       console.error('[Device] scene trigger error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao disparar cena' });
+    }
+  });
+
+  // GET /api/device/scenes — lista cenas Tuya manuais (tap-to-run) do grupo
+  // do device. ESP usa pra popular o grid Cenas dinamicamente em vez de
+  // SCENES[] hardcoded. Max 6 cenas (grid 2x3 do display ESP32).
+  // Resposta: { scenes: [{id, name}, ...] } — id = sceneId Tuya real,
+  // usado depois em POST /api/device/scene-by-id/:sceneId/trigger.
+  // Usa listTuyaScenesIoTCore (mesmo helper do app web).
+  app.get('/api/device/scenes', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+
+      const [cfgRows]: any = await pool.execute(
+        `SELECT tc.accessId, tc.accessSecret, tc.region
+         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
+         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
+        [device.groupId]
+      );
+      if (cfgRows.length === 0) {
+        return res.json({ scenes: [] });  // sem Tuya configurada
+      }
+      const cfg = cfgRows[0];
+
+      const { listTuyaScenesIoTCore } = await import('../lib/tuya');
+      let allScenes: Array<{ sceneId: string; name: string; type: string }> = [];
+      try {
+        allScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
+      } catch (e: any) {
+        console.warn('[Device] /scenes listTuyaScenesIoTCore:', e?.message);
+        return res.json({ scenes: [] });
+      }
+
+      // Filtra so' tap-to-run (manuais) — automacoes nao fazem sentido no
+      // grid (rodam sozinhas). Pega max 6 pra caber no grid 2x3 do ESP.
+      const scenes = allScenes
+        .filter(s => s.type === 'scene')
+        .slice(0, 6)
+        .map(s => ({ id: s.sceneId, name: s.name }));
+
+      console.log(`[Device] /scenes group=${device.groupId} -> ${scenes.length} cenas`);
+      res.json({ scenes });
+    } catch (err: any) {
+      console.error('[Device] scenes list error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao listar cenas' });
+    }
+  });
+
+  // POST /api/device/scene-by-id/:sceneId/trigger — dispara cena Tuya por
+  // ID real (sceneId vem de GET /api/device/scenes). Diferente do
+  // /scene/:slotIdx/trigger que usa env vars TUYA_SCENE_X.
+  app.post('/api/device/scene-by-id/:sceneId/trigger', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const sceneId = String(req.params.sceneId ?? '').trim();
+      if (!sceneId) return res.status(400).json({ error: 'sceneId vazio' });
+
+      const [cfgRows]: any = await pool.execute(
+        `SELECT tc.accessId, tc.accessSecret, tc.region
+         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
+         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
+        [device.groupId]
+      );
+      if (cfgRows.length === 0) {
+        return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
+      }
+      const cfg = cfgRows[0];
+      const homeId = parseInt(process.env.TUYA_HOME_ID ?? '0') || 0;
+
+      const { triggerTuyaScene } = await import('../lib/tuya');
+      const result = await triggerTuyaScene(homeId, sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
+      console.log(`[Device] scene-by-id ${sceneId} -> ${result.success ? 'OK' : 'FAIL'} (${result.msg ?? ''})`);
+      if (!result.success) return res.status(502).json({ error: result.msg ?? 'Tuya retornou falha' });
+      res.json({ success: true, sceneId });
+    } catch (err: any) {
+      console.error('[Device] scene-by-id trigger error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao disparar cena' });
     }
   });
