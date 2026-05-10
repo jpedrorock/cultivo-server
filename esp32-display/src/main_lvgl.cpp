@@ -1605,7 +1605,7 @@ static int  sceneCountLocal = 0;
 
 static volatile bool scenesNeedsRefresh = false;
 static unsigned long lastScenesFetch = 0;
-// Cenas mudam pouco — fetch a cada 10 min e' suficiente
+// Cenas mudam pouco — fetch a cada 10 min e' suficiente.
 static const unsigned long SCENES_FETCH_INTERVAL = 10UL * 60UL * 1000UL;
 
 // fetchScenes: GET /api/device/scenes → JSON {scenes: [{id, name}, ...]}.
