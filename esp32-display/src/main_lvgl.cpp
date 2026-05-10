@@ -1704,9 +1704,19 @@ static bool fetchScenes() {
   return true;
 }
 
+// Forward declaration — definido logo abaixo (depois do netTaskFn)
+static void processSceneTap();
+
 static void netTaskFn(void *param) {
   for (;;) {
     if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
+
+    // Tap pendente em scene/device — prioritario (UX: user clicou agora)
+    if (sceneTapPending) {
+      uint32_t t0 = millis();
+      processSceneTap();
+      logIfSlow("sceneTap", t0, 9000);
+    }
 
     if (refreshPending) {
       refreshPending = false;
@@ -1842,38 +1852,52 @@ static bool postDeviceToggle(const char *deviceId, bool desiredState, bool *outR
 // IMPORTANTE: o callback da UI (sceneClickCb) JA' inverte items[idx].state
 // localmente antes de chamar este handler — feedback imediato. Aqui a gente
 // confirma com o real-state do server.
+// Handler LVGL — minimal, so' enfileira pro netTask processar.
+// IMPORTANTE: nao pode chamar HTTP/TLS aqui (estouro de stack -> reset).
 static void sceneTriggerHandler(int idx) {
   if (idx < 0 || idx >= sceneCountLocal) {
-    Serial.printf("[scene] idx=%d fora do range (count=%d)\n", idx, sceneCountLocal);
+    Serial.printf("[tap] idx=%d fora do range (count=%d)\n", idx, sceneCountLocal);
     return;
   }
+  if (sceneTapPending) {
+    Serial.println("[tap] outro tap pending — ignorado");
+    return;
+  }
+  sceneTapIdx = idx;
+  sceneTapPending = true;  // netTask processa
+}
+
+// Executa o tap pendente — chamado APENAS de netTaskFn (core 0, stack OK).
+// Faz HTTP/TLS, atualiza storage, sinaliza loop() pra atualizar UI se device.
+static void processSceneTap() {
+  if (!sceneTapPending) return;
+  int idx = sceneTapIdx;
+  sceneTapPending = false;
+
+  if (idx < 0 || idx >= sceneCountLocal) return;
   const char *id   = sceneIdsLocal[idx];
   const char *name = sceneNamesLocal[idx];
 
   if (sceneTypeLocal[idx] == 1) {
-    // Device — UI ja' inverteu visualmente (cultivoUI_applyItems sera'
-    // chamado SOMENTE no proximo poll. O storage main_lvgl ainda tem state
-    // ANTIGO — UI inverteu so' visual). Calculamos desired = !old_state.
+    // Device — UI ja' inverteu visualmente. Storage main_lvgl ainda tem
+    // state ANTIGO. Calcula desired = !old_state, faz POST, sinaliza UI
+    // com state real (ou reverte se falhou).
     bool desired = !sceneStateLocal[idx];
     Serial.printf("[device] toggle idx=%d id=%s name=%s -> desired=%s\n",
                   idx, id, name, desired ? "ON" : "OFF");
-    if (!wifiOk) {
-      Serial.println("[device] WiFi offline — reverte UI");
-      cultivoUI_setDeviceState(idx, sceneStateLocal[idx]);  // volta ao antigo
-      return;
-    }
     bool realState = desired;
-    if (!postDeviceToggle(id, desired, &realState)) {
-      // POST falhou — reverte UI pro estado antigo (storage nao mudou)
-      Serial.println("[device] POST falhou — reverte UI");
-      cultivoUI_setDeviceState(idx, sceneStateLocal[idx]);
+    bool ok = wifiOk && postDeviceToggle(id, desired, &realState);
+    if (!ok) {
+      Serial.println("[device] POST falhou ou offline — reverte UI");
+      deviceToggleResIdx    = idx;
+      deviceToggleResState  = sceneStateLocal[idx];  // antigo
+      deviceTogglePendingUI = true;
       return;
     }
-    // POST OK — adota o STATE REAL retornado (pode ser diferente do desired
-    // se Tuya/dispositivo responderam de outro jeito). Atualiza tanto o
-    // storage interno quanto o visual da UI.
-    sceneStateLocal[idx] = realState;
-    cultivoUI_setDeviceState(idx, realState);
+    sceneStateLocal[idx]  = realState;
+    deviceToggleResIdx    = idx;
+    deviceToggleResState  = realState;
+    deviceTogglePendingUI = true;
     return;
   }
 
@@ -1892,6 +1916,7 @@ static void sceneTriggerHandler(int idx) {
     return;
   }
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(8000);
   int code = http.POST("");
   Serial.printf("[scene] id=%s HTTP %d\n", id, code);
   http.end();
@@ -2244,6 +2269,12 @@ void loop() {
       buf[i].iconHint = sceneIconHintLocal[i];
     }
     cultivoUI_applyItems(buf, sceneCountLocal);
+  }
+  // Resultado de device toggle vindo do netTask — atualiza visual on/off
+  // do card. Roda no main thread (LVGL nao e' thread-safe).
+  if (deviceTogglePendingUI) {
+    deviceTogglePendingUI = false;
+    cultivoUI_setDeviceState(deviceToggleResIdx, deviceToggleResState);
   }
 
   // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI
