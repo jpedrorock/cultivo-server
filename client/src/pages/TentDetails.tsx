@@ -271,6 +271,88 @@ const ICON_HINT_COMPONENTS: Record<string, React.ComponentType<{ className?: str
   other: Zap,
 };
 
+/**
+ * Botão de toggle pra um device Tuya vinculado à estufa.
+ *
+ * Usa o MESMO caminho do app web /smartlife (tuya.getDeviceCurrentStatus +
+ * tuya.sendDeviceCommand) — autenticado via JWT do user logado, usa
+ * getTuyaConfig(ctx.user.id). Diferente do REST /api/device/device-toggle
+ * que o ESP usa.
+ *
+ * Vale como teste isolado: se este botão funciona mas o ESP não, sabemos
+ * que o problema está no caminho REST especificamente (provavelmente cfg
+ * Tuya errada selecionada, ver fix em commit 2332d5c).
+ *
+ * Refetch automático a cada 30s pra refletir mudanças feitas pelo SmartLife
+ * ou pelo display ESP.
+ */
+function DeviceToggleButton({
+  deviceId,
+  savedSwitchCode,
+}: {
+  deviceId: string;
+  savedSwitchCode: string | null;
+}) {
+  const { data: status, isLoading, refetch } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId },
+    { refetchInterval: 30_000, retry: false, staleTime: 5_000 }
+  );
+
+  const cmd = trpc.tuya.sendDeviceCommand.useMutation({
+    onSuccess: () => {
+      // Re-fetch após pequeno delay pra Tuya propagar
+      setTimeout(() => refetch(), 600);
+    },
+    onError: (e) => toast.error(`Toggle: ${e.message}`),
+  });
+
+  const isOn = status?.switchOn ?? false;
+  const isOnline = status?.online ?? false;
+  const pending = cmd.isPending;
+
+  const handleToggle = () => {
+    // Prefere switchCode descoberto live; fallback pro salvo no add()
+    const code = status?.switchCode ?? savedSwitchCode ?? 'switch_1';
+    cmd.mutate({ deviceId, switchCode: code, value: !isOn });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="shrink-0 w-10 h-7 flex items-center justify-center">
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isOnline) {
+    return (
+      <span
+        title="Dispositivo offline"
+        className="shrink-0 w-10 h-7 flex items-center justify-center rounded-lg bg-muted text-muted-foreground"
+      >
+        <WifiOff className="w-3.5 h-3.5" />
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleToggle}
+      disabled={pending}
+      title={isOn ? 'Desligar' : 'Ligar'}
+      className={`shrink-0 w-10 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${
+        isOn
+          ? 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
+          : 'bg-muted text-muted-foreground hover:bg-muted-foreground/10'
+      }`}
+    >
+      {pending
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : (isOn ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />)}
+    </button>
+  );
+}
+
 function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const utils = trpc.useUtils();
   const [showSceneAdd, setShowSceneAdd] = useState(false);
@@ -449,6 +531,10 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                       {isScene ? 'Cena' : (ICON_HINT_LABELS[item.iconHint ?? 'other'] ?? 'Dispositivo')}
                     </p>
                   </div>
+                  {/* Toggle on/off SÓ pra devices (não faz sentido pra cenas — cenas são one-shot) */}
+                  {!isScene && (
+                    <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />
+                  )}
                   <button
                     onClick={() => handleRemove(item)}
                     disabled={removeScene.isPending || removeDevice.isPending}
