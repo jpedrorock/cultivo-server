@@ -472,6 +472,148 @@ function AutomationToggleButton({ automationId, automationName }: { automationId
   );
 }
 
+// ─── Functional preview slots ────────────────────────────────────────────────
+//
+// Os 3 sub-componentes abaixo renderizam o slot do grid 2x3 de preview como
+// um BOTÃO funcional (não mais decorativo). Click dispara a mesma ação do
+// display ESP físico. Reusam exatamente os hooks tRPC dos botões da row
+// (DeviceToggleButton/ScenePlayButton/AutomationToggleButton) — então
+// quando uma luz é alterada num card, o outro reflete via React Query
+// cache (eles compartilham a mesma query key).
+
+interface PreviewSlotProps {
+  slot: any;     // item do listItems (type:'device'|'scene', refId, name, iconHint, sceneType, switchCode)
+  Icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  iconColorClass: string;  // 'text-amber-500' / 'text-blue-500'
+  ringColorClass: string;  // 'ring-amber-500/30' / 'ring-blue-500/30'
+}
+
+const SLOT_BASE = 'relative aspect-square rounded-lg ring-1 flex flex-col items-center justify-center gap-1 p-1 transition-all active:scale-95 disabled:cursor-not-allowed';
+
+/** Slot funcional pra DEVICE — toggle on/off com state ao vivo. */
+function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const utils = trpc.useUtils();
+  const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId: slot.refId },
+    { refetchInterval: 30_000, refetchOnWindowFocus: true, retry: false, staleTime: 5_000 }
+  );
+  const cmd = trpc.tuya.sendDeviceCommand.useMutation({
+    onSuccess: () => setTimeout(() => utils.tuya.getDeviceCurrentStatus.invalidate({ deviceId: slot.refId }), 600),
+    onError: (e) => toast.error(`${slot.name}: ${e.message}`),
+  });
+
+  const isOn = status?.switchOn ?? false;
+  const isOnline = status?.online ?? false;
+  const pending = cmd.isPending;
+
+  const handleClick = () => {
+    if (!isOnline || pending) return;
+    const code = status?.switchCode ?? slot.switchCode ?? 'switch_1';
+    cmd.mutate({ deviceId: slot.refId, switchCode: code, value: !isOn });
+  };
+
+  // Visual: opacity reduz quando offline; ring/icon mais brilhante quando ON.
+  const stateClass = !isOnline
+    ? 'opacity-40 bg-muted/40'
+    : isOn
+      ? 'bg-blue-500/15 ring-blue-500/60'
+      : 'bg-muted/40';
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={!isOnline || pending || isLoading}
+      title={!isOnline ? `${slot.name} (offline)` : isOn ? `${slot.name} ligado — clique pra desligar` : `${slot.name} desligado — clique pra ligar`}
+      className={`${SLOT_BASE} ${ringColorClass} ${stateClass}`}
+    >
+      {pending || isLoading ? (
+        <Loader2 className={`w-4 h-4 animate-spin ${iconColorClass}`} />
+      ) : (
+        <Icon className={`w-4 h-4 ${isOn ? 'text-blue-400' : iconColorClass}`} />
+      )}
+      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+    </button>
+  );
+}
+
+/** Slot funcional pra SCENE one-shot — click dispara, animação curta de feedback. */
+function PreviewSceneSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const trigger = trpc.tuya.triggerScene.useMutation({
+    onSuccess: () => toast.success(`▶ ${slot.name}`),
+    onError: (e) => toast.error(`Falha: ${e.message}`),
+  });
+
+  const handleClick = () => {
+    if (trigger.isPending) return;
+    trigger.mutate({ sceneId: slot.refId });
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={trigger.isPending}
+      title={`Disparar: ${slot.name}`}
+      className={`${SLOT_BASE} ${ringColorClass} bg-muted/40 hover:bg-amber-500/10`}
+    >
+      {trigger.isPending
+        ? <Loader2 className={`w-4 h-4 animate-spin ${iconColorClass}`} />
+        : <Icon className={`w-4 h-4 ${iconColorClass}`} />}
+      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+    </button>
+  );
+}
+
+/** Slot funcional pra AUTOMATION — toggle ativa/pausa schedule. */
+function PreviewAutomationSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
+    { automationId: slot.refId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+  const toggle = trpc.tuya.toggleAutomation.useMutation({
+    onSuccess: ({ enabled }) => {
+      toast.success(`⏰ ${slot.name} ${enabled ? 'ativada' : 'pausada'}`);
+      setTimeout(() => utils.tuya.getAutomationEnabled.invalidate({ automationId: slot.refId }), 600);
+    },
+    onError: (e) => toast.error(`${slot.name}: ${e.message}`),
+  });
+
+  const isEnabled = data?.enabled;
+  const pending = toggle.isPending;
+
+  const handleClick = () => {
+    if (pending) return;
+    // null/undefined → tenta habilitar; senão inverte
+    toggle.mutate({ automationId: slot.refId, enabled: !isEnabled });
+  };
+
+  const stateClass = isEnabled === true
+    ? 'bg-blue-500/15 ring-blue-500/60'
+    : 'bg-muted/40 opacity-70';
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={pending || isLoading}
+      title={isEnabled ? `${slot.name} ativa — clique pra pausar` : `${slot.name} pausada — clique pra ativar`}
+      className={`${SLOT_BASE} ${ringColorClass} ${stateClass}`}
+    >
+      {pending || isLoading ? (
+        <Loader2 className={`w-4 h-4 animate-spin ${iconColorClass}`} />
+      ) : (
+        <Icon className={`w-4 h-4 ${iconColorClass}`} />
+      )}
+      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+      {/* Badge ⏰ se iconHint não for já 'schedule' */}
+      {slot.iconHint !== 'schedule' && (
+        <span className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-blue-500/90 ring-1 ring-card flex items-center justify-center">
+          <Clock className="w-2 h-2 text-white" strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  );
+}
+
 function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const utils = trpc.useUtils();
   const [showSceneAdd, setShowSceneAdd] = useState(false);
@@ -593,38 +735,40 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
       </CardHeader>
 
       <CardContent className="space-y-4 pb-4">
-        {/* Preview do grid 2x3 (réplica do que aparece no ESP32) */}
+        {/* Preview FUNCIONAL do grid 2x3 — réplica do display ESP, agora
+            clicável: cada slot dispara a mesma ação que o botão da row.
+            Estado (on/off pra device, enabled/disabled pra automation) sincroniza
+            via React Query cache (mesmo query key dos botões da row). */}
         {totalCount > 0 && (
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Preview do display</p>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+              Preview do display <span className="text-muted-foreground/50 normal-case font-normal">— clicável</span>
+            </p>
             <div className="rounded-xl border border-border/60 bg-background/60 p-2.5">
               <div className="grid grid-cols-3 gap-1.5">
                 {previewSlots.map((slot: any, i) => {
                   if (!slot) return (
                     <div key={i} className="aspect-square rounded-lg border border-dashed border-border/40 bg-muted/20" />
                   );
-                  // Mesma lógica de fallback da row abaixo (manter consistência):
-                  // cena sem hint → 'pump' (gota), device sem hint → 'other' (raio).
-                  // ANTES: cenas eram hardcoded Zap aqui — bug visível: rega manual
-                  // sem iconHint salvo aparecia como ⚡ raio em vez de 💧 gota.
+                  // Mesma lógica de fallback da row: cena sem hint → 'pump' (gota),
+                  // device sem hint → 'other' (raio).
                   const isSceneSlot = slot.type === 'scene';
                   const sceneDefault = isSceneSlot ? 'pump' : 'other';
                   const Icon = ICON_HINT_COMPONENTS[slot.iconHint ?? sceneDefault] ?? Zap;
                   const ringColor = isSceneSlot ? 'ring-amber-500/30' : 'ring-blue-500/30';
                   const iconColor = isSceneSlot ? 'text-amber-500' : 'text-blue-500';
                   const isAutomationSlot = isSceneSlot && slot.sceneType === 'automation';
-                  return (
-                    <div key={i} className={`relative aspect-square rounded-lg ring-1 ${ringColor} bg-muted/40 flex flex-col items-center justify-center gap-1 p-1`}>
-                      <Icon className={`w-4 h-4 ${iconColor}`} />
-                      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
-                      {/* Badge ⏰ pra automations (só se iconHint não for já 'schedule') */}
-                      {isAutomationSlot && slot.iconHint !== 'schedule' && (
-                        <span className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-blue-500/90 ring-1 ring-card flex items-center justify-center">
-                          <Clock className="w-2 h-2 text-white" strokeWidth={3} />
-                        </span>
-                      )}
-                    </div>
-                  );
+
+                  // Despacha pro componente certo. Cada um tem seus próprios
+                  // hooks tRPC (queries + mutations) — React Query cache faz a
+                  // sync com a row.
+                  if (slot.type === 'device') {
+                    return <PreviewDeviceSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
+                  }
+                  if (isAutomationSlot) {
+                    return <PreviewAutomationSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
+                  }
+                  return <PreviewSceneSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
                 })}
               </div>
             </div>
