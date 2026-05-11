@@ -1080,24 +1080,31 @@ static const uint32_t SCENE_COLOR_PALETTE[SCENES_MAX] = {
 
 // Resolve iconHint string -> ic_* image. Default = ic_zap (raio).
 // Tambem usado no fallback de cena sem iconHint definido.
-static const lv_image_dsc_t* resolveIcon(const char *hint, bool isScene, int slotIdx) {
+// type: 0=scene, 1=device, 2=automation
+static const lv_image_dsc_t* resolveIcon(const char *hint, uint8_t type, int slotIdx) {
   if (!hint || !*hint) {
-    // Cena sem hint: cycling por slot (variedade visual). Device sem hint: zap.
-    if (isScene) {
+    if (type == 0) {
+      // Scene sem hint: cycling palette por slot (variedade visual)
       static const lv_image_dsc_t *cyc[SCENES_MAX] = {
         &ic_droplet, &ic_lightbulb, &ic_sprout,
-        &ic_activity, &ic_flask, &ic_thermometer
+        &ic_wind, &ic_flask, &ic_thermometer
       };
       return cyc[slotIdx % SCENES_MAX];
     }
-    return &ic_zap;
+    if (type == 2) return &ic_timer;  // automation default = relogio+play
+    return &ic_zap;                    // device default
   }
-  // iconHint conhecidos do server (sprint 1)
-  if (!strcmp(hint, "light"))  return &ic_lightbulb;
-  if (!strcmp(hint, "fan"))    return &ic_activity;     // wave/wind
-  if (!strcmp(hint, "pump"))   return &ic_droplet;
-  if (!strcmp(hint, "heater")) return &ic_thermometer;
-  if (!strcmp(hint, "ac"))     return &ic_thermometer;
+  // iconHint conhecidos do server
+  if (!strcmp(hint, "light"))      return &ic_lightbulb;
+  if (!strcmp(hint, "fan"))        return &ic_wind;          // exaustor/ventilador
+  if (!strcmp(hint, "pump"))       return &ic_droplet;       // rega manual (gota)
+  if (!strcmp(hint, "heater"))     return &ic_thermometer;
+  if (!strcmp(hint, "ac"))         return &ic_thermometer;
+  if (!strcmp(hint, "schedule"))   return &ic_timer;         // rega automatica (relogio+play)
+  if (!strcmp(hint, "automation")) return &ic_timer;
+  if (!strcmp(hint, "refresh"))    return &ic_refresh;       // sensor refresh
+  if (!strcmp(hint, "sensor"))     return &ic_refresh;
+  if (!strcmp(hint, "clock"))      return &ic_clock;
   return &ic_zap;
 }
 
@@ -1274,7 +1281,7 @@ static void rebuildSceneGrid() {
     int y = row * (btnH + gap);
 
     bool isScene = (items[i].type == 0);
-    const lv_image_dsc_t *iconImg = resolveIcon(items[i].iconHint, isScene, i);
+    const lv_image_dsc_t *iconImg = resolveIcon(items[i].iconHint, items[i].type, i);
     // Cor scene = paleta cycling (decorativo). Device = pintada por paintDeviceState
     uint32_t iconColor = isScene ? SCENE_COLOR_PALETTE[i] : COL_DIM;
 

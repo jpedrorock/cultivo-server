@@ -43,6 +43,10 @@ ICONS = {
     "refresh-cw":    "ic_refresh",      # visual hint em cards tapaveis (TEMP/UMID)
     "check-circle":  "ic_check_circle", # confirmacao apos trigger de cena
     "alert-circle":  "ic_alert",        # warning quando valor fora da faixa ideal
+    # Cenas/devices novos (item types: scene/device/automation/refresh)
+    "wind":          "ic_wind",         # iconHint=fan (exaustor) — substitui ic_activity
+    "timer":         "ic_timer",        # iconHint=schedule (rega automatica = relogio+play)
+    "clock":         "ic_clock",        # alternativa a timer p/ schedules
 }
 
 SRC_DIR = Path("esp32-display/assets/icons/64px")

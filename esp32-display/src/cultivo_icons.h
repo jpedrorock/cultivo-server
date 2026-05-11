@@ -26,6 +26,9 @@ extern const lv_image_dsc_t ic_play;
 extern const lv_image_dsc_t ic_refresh;
 extern const lv_image_dsc_t ic_check_circle;
 extern const lv_image_dsc_t ic_alert;
+extern const lv_image_dsc_t ic_wind;
+extern const lv_image_dsc_t ic_timer;
+extern const lv_image_dsc_t ic_clock;
 
 #ifdef __cplusplus
 }
