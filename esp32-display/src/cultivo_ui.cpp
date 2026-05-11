@@ -1105,15 +1105,15 @@ static const lv_image_dsc_t* resolveIcon(const char *hint, uint8_t type, int slo
     if (type == 2) return &ic_clock;  // automation default = relogio
     return &ic_zap;                    // device default
   }
-  // Devices fisicos
+  // Devices fisicos (todos com icones REAIS do Lucide agora)
   if (!strcmp(hint, "light"))        return &ic_lightbulb;     // 💡 LED, lampada
-  if (!strcmp(hint, "fan"))          return &ic_wind;          // 🌀 exaustor/ventilador
+  if (!strcmp(hint, "fan"))          return &ic_fan;           // 🌀 exaustor com pas
   if (!strcmp(hint, "pump"))         return &ic_droplet;       // 💧 bomba, rega manual
-  if (!strcmp(hint, "heater"))       return &ic_thermometer;   // 🔥 (idealmente flame)
-  if (!strcmp(hint, "ac"))           return &ic_thermometer;   // ❄ (idealmente snowflake)
-  if (!strcmp(hint, "humidifier"))   return &ic_droplets;      // ☁ (idealmente cloud)
+  if (!strcmp(hint, "heater"))       return &ic_flame;         // 🔥 aquecedor (chama)
+  if (!strcmp(hint, "ac"))           return &ic_snowflake;     // ❄ ar-condicionado
+  if (!strcmp(hint, "humidifier"))   return &ic_cloud;         // ☁ umidificador
   if (!strcmp(hint, "dehumidifier")) return &ic_wind;          // 💨 vento remove umidade
-  if (!strcmp(hint, "co2"))          return &ic_sprout;        // ☁ (idealmente cloud)
+  if (!strcmp(hint, "co2"))          return &ic_cloud;         // ☁ CO2
   // Cenas / automations / refresh
   if (!strcmp(hint, "schedule"))     return &ic_clock;         // ⏰ rega automatica
   if (!strcmp(hint, "automation"))   return &ic_clock;
@@ -1162,27 +1162,20 @@ static void paintDeviceState(int idx) {
 
   bool on = items[idx].state;
   if (on) {
-    // ON: card "aceso". Cor do icone varia por iconHint pra dar mais
-    // realismo (lampada ligada = amarela, nao branca).
+    // ON: card "aceso". COR DO FUNDO (bg) varia por iconHint pra dar
+    // realismo — lampada acesa = card amarelo, aquecedor = vermelho, etc.
+    // Icone fica branco (max contraste sobre fundo colorido).
     const char *hint = items[idx].iconHint;
-    uint32_t iconC = COL_TEXT;       // default branco
-    uint32_t glowC = COL_PRIMARY;    // default glow verde brand
-    if (!strcmp(hint, "light")) {
-      iconC = COL_YEL;               // 💡 lampada amarela quando acesa
-      glowC = COL_YEL;               // glow amarelo tbm
-    } else if (!strcmp(hint, "heater")) {
-      iconC = COL_RED;               // aquecedor vermelho
-      glowC = COL_RED;
-    } else if (!strcmp(hint, "ac")) {
-      iconC = COL_CYN;               // ar-condicionado ciano
-      glowC = COL_CYN;
-    }
-    lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_PRIMARY), 0);
-    lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_30, 0);
-    lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
-    lv_obj_set_style_image_recolor(itemIcons[idx], lv_color_hex(iconC), 0);
+    uint32_t bgC = COL_PRIMARY;   // default verde brand
+    if      (!strcmp(hint, "light"))  bgC = COL_YEL;   // 💡 fundo amarelo
+    else if (!strcmp(hint, "heater")) bgC = COL_RED;   // 🔥 fundo vermelho
+    else if (!strcmp(hint, "ac"))     bgC = COL_CYN;   // ❄ fundo ciano
+    lv_obj_set_style_bg_color(itemBtns[idx],       lv_color_hex(bgC), 0);
+    lv_obj_set_style_bg_opa(itemBtns[idx],         LV_OPA_30, 0);
+    lv_obj_set_style_border_color(itemBtns[idx],   lv_color_hex(bgC), 0);
+    lv_obj_set_style_image_recolor(itemIcons[idx], lv_color_hex(COL_TEXT), 0);
     // Shadow na cor do device pra dar feel "irradiando"
-    lv_obj_set_style_shadow_color(itemBtns[idx], lv_color_hex(glowC), 0);
+    lv_obj_set_style_shadow_color(itemBtns[idx], lv_color_hex(bgC), 0);
     lv_obj_set_style_shadow_width(itemBtns[idx], 12, 0);
     lv_obj_set_style_shadow_opa(itemBtns[idx],   LV_OPA_30, 0);
     lv_obj_set_style_shadow_spread(itemBtns[idx], 0, 0);

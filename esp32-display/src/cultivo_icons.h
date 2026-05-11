@@ -27,8 +27,12 @@ extern const lv_image_dsc_t ic_refresh;
 extern const lv_image_dsc_t ic_check_circle;
 extern const lv_image_dsc_t ic_alert;
 extern const lv_image_dsc_t ic_wind;
+extern const lv_image_dsc_t ic_fan;
 extern const lv_image_dsc_t ic_timer;
 extern const lv_image_dsc_t ic_clock;
+extern const lv_image_dsc_t ic_flame;
+extern const lv_image_dsc_t ic_snowflake;
+extern const lv_image_dsc_t ic_cloud;
 
 #ifdef __cplusplus
 }
