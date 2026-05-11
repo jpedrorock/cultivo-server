@@ -518,7 +518,7 @@ export const notificationHistory = mysqlTable(
   "notificationHistory",
   {
     id: int("id").autoincrement().primaryKey(),
-    type: mysqlEnum("type", ["daily_reminder", "environment_alert", "task_reminder"]).notNull(),
+    type: mysqlEnum("type", ["daily_reminder", "environment_alert", "task_reminder", "incomplete_log"]).notNull(),
     title: varchar("title", { length: 255 }).notNull(),
     message: text("message").notNull(),
     metadata: text("metadata"), // JSON string with additional data

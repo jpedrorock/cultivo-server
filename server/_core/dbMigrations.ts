@@ -634,6 +634,28 @@ const MIGRATIONS: Migration[] = [
       await addColumnIfNotExists(c, 'tentScenes', 'type', "VARCHAR(20) NOT NULL DEFAULT 'scene' AFTER `name`");
     },
   },
+  {
+    // Cron novo (incompleteRegistrationReminder) precisa de um type novo pra
+    // não confundir com daily_reminder. notificationHistory é usado tambem
+    // pra dedupe — não notificar a mesma estufa 2x em 24h.
+    id: 'add-notificationHistory-incomplete-log-enum',
+    description: 'Adiciona valor "incomplete_log" no enum notificationHistory.type',
+    run: async (c) => {
+      const [rows] = (await c.execute(
+        `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'notificationHistory'
+           AND COLUMN_NAME = 'type'
+         LIMIT 1`
+      )) as [Array<{ COLUMN_TYPE: string }>, unknown];
+      if (rows.length === 0) return; // tabela ainda não existe
+      if (rows[0].COLUMN_TYPE.includes("'incomplete_log'")) return; // já tem
+      await c.query(`
+        ALTER TABLE \`notificationHistory\`
+        MODIFY COLUMN \`type\` ENUM('daily_reminder','environment_alert','task_reminder','incomplete_log') NOT NULL
+      `);
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
