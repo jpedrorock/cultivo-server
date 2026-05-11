@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud, Camera } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud, Camera, Maximize2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -528,16 +528,36 @@ function CameraStreamDialog({
         </div>
 
         <div className="px-4 py-2 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>URL renova a cada 8min (Tuya expira em ~10min)</span>
-          <button
-            onClick={loadStream}
-            disabled={loading}
-            className="flex items-center gap-1 hover:text-foreground disabled:opacity-50"
-            title="Renovar stream agora"
-          >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-            Renovar
-          </button>
+          <span>URL renova a cada 8min</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const v = videoRef.current;
+                if (!v) return;
+                // requestFullscreen disponível em desktop + iOS Safari (com webkit prefix).
+                // Fallback pro webkitEnterFullscreen do iOS (só funciona em <video>).
+                if (v.requestFullscreen) {
+                  v.requestFullscreen().catch(() => {/* user cancelou ou bloqueio do browser */});
+                } else if ((v as any).webkitEnterFullscreen) {
+                  (v as any).webkitEnterFullscreen();
+                }
+              }}
+              className="flex items-center gap-1 hover:text-foreground"
+              title="Tela cheia"
+            >
+              <Maximize2 className="w-3 h-3" />
+              Tela cheia
+            </button>
+            <button
+              onClick={loadStream}
+              disabled={loading}
+              className="flex items-center gap-1 hover:text-foreground disabled:opacity-50"
+              title="Renovar stream agora"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              Renovar
+            </button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -551,12 +571,30 @@ function CameraStreamDialog({
  */
 function CameraButton({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
   const [open, setOpen] = useState(false);
+  // Polling do status — câmera offline não vai conseguir alocar stream, então
+  // dar feedback ANTES de o user clicar (em vez de erro depois do dialog abrir).
+  const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+  const isOnline = status?.online ?? true;  // default true enquanto loading (não bloqueia)
+
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
-        title={`Ver câmera: ${deviceName}`}
-        className="shrink-0 w-10 h-7 rounded-lg flex items-center justify-center bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25 transition-all active:scale-95"
+        onClick={() => {
+          if (!isOnline) {
+            toast.error(`${deviceName} está offline. Reabra no SmartLife e tente de novo.`);
+            return;
+          }
+          setOpen(true);
+        }}
+        title={isOnline ? `Ver câmera: ${deviceName}` : `${deviceName} (offline)`}
+        className={`shrink-0 w-10 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 ${
+          isOnline
+            ? 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
+            : 'bg-muted text-muted-foreground/50 cursor-not-allowed'
+        }`}
       >
         <Camera className="w-3.5 h-3.5" />
       </button>
@@ -728,15 +766,38 @@ function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
 /** Slot funcional pra CÂMERA — click abre dialog com stream HLS ao vivo. */
 function PreviewCameraSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
   const [open, setOpen] = useState(false);
+  // Poll de status pra mostrar offline antes de o user clicar e tomar erro
+  const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId: slot.refId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+  const isOnline = status?.online ?? true;
+
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
-        title={`Ver câmera: ${slot.name}`}
-        className={`${SLOT_BASE} ${ringColorClass} bg-muted/40 hover:bg-indigo-500/10`}
+        onClick={() => {
+          if (!isOnline) {
+            toast.error(`${slot.name} está offline.`);
+            return;
+          }
+          setOpen(true);
+        }}
+        title={isOnline ? `Ver câmera: ${slot.name}` : `${slot.name} (offline)`}
+        className={`${SLOT_BASE} ${ringColorClass} ${
+          isOnline
+            ? 'bg-muted/40 hover:bg-indigo-500/10'
+            : 'bg-muted/20 opacity-50 cursor-not-allowed'
+        }`}
       >
         <Icon className={`w-4 h-4 ${iconColorClass}`} />
         <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+        {/* Badge offline no canto */}
+        {!isOnline && (
+          <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded text-[8px] font-semibold bg-muted-foreground/60 text-card uppercase">
+            off
+          </span>
+        )}
       </button>
       <CameraStreamDialog
         deviceId={slot.refId}
