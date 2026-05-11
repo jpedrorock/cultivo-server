@@ -722,10 +722,15 @@ extern "C" void refreshHomeValues() {
     lv_label_set_text(lblVpd, buf);
   }
 
-  // Card CICLO — atualiza valor "Sem X/Y" + badge fase (texto + cor). Cor
-  // do phase token muda automatico se ciclo passou (ex: VEGA -> FLORA).
+  // Card CICLO — "Sem X/Y" + badge fase. Quando semana=0 (estufa de
+  // MANUTENCAO/DRYING — sem ciclo VEGA/FLORA), esconde a contagem e mostra
+  // so' o badge da fase. Server fix: PR #13 envia semana=0 pra essas categorias.
   if (lblCycleVal) {
-    snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
+    if (semana > 0 && totalSem > 0) {
+      snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
+    } else {
+      buf[0] = '\0';  // sem ciclo — badge fase fica sozinho
+    }
     lv_label_set_text(lblCycleVal, buf);
   }
   if (lblCycleBadge) {
