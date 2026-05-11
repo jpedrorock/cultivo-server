@@ -564,6 +564,27 @@ const tuyaRouter = router({
       if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao disparar cena" });
       return { ok: true };
     }),
+
+  /** Lê o estado enabled/disabled de uma automation Tuya (cena programada). */
+  getAutomationEnabled: protectedProcedure
+    .input(z.object({ automationId: z.string(), homeId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { getTuyaAutomationEnabled } = await import("./lib/tuya");
+      const enabled = await getTuyaAutomationEnabled(input.automationId, cfg.accessId, cfg.accessSecret, cfg.region, input.homeId ?? 0);
+      return { enabled };
+    }),
+
+  /** Habilita/desabilita uma automation Tuya (cena programada). */
+  toggleAutomation: protectedProcedure
+    .input(z.object({ automationId: z.string(), enabled: z.boolean(), homeId: z.number().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { setTuyaAutomationEnabled } = await import("./lib/tuya");
+      const result = await setTuyaAutomationEnabled(input.automationId, input.enabled, cfg.accessId, cfg.accessSecret, cfg.region, input.homeId ?? 0);
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao alterar automação" });
+      return { ok: true, enabled: input.enabled };
+    }),
 });
 
 // ─── tentScenes router (cenas Tuya vinculadas a estufa) ────────────────────────
@@ -579,7 +600,7 @@ const tentScenesRouter = router({
       await validateTentOwnership(input.tentId, ctx.user.groupId);
       const pool = getMysqlPool();
       const [rows]: any = await pool.execute(
-        `SELECT id, sceneId, name, position FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        `SELECT id, sceneId, name, position, type FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
         [input.tentId]
       );
       return (rows as any[]).map(r => ({
@@ -587,6 +608,7 @@ const tentScenesRouter = router({
         sceneId: r.sceneId as string,
         name: r.name as string,
         position: r.position as number,
+        type: (r.type === 'automation' ? 'automation' : 'scene') as 'scene' | 'automation',
       }));
     }),
 
@@ -596,6 +618,10 @@ const tentScenesRouter = router({
       tentId: z.number(),
       sceneId: z.string().min(1).max(64),
       name: z.string().min(1).max(100),
+      // Tipo vindo da listagem Tuya — afeta qual botão a UI mostra
+      // (scene = Tap-to-Run → ▶ play one-shot;
+      //  automation = scheduled rule → ⏰ toggle enable/disable).
+      type: z.enum(['scene', 'automation']).default('scene'),
     }))
     .mutation(async ({ ctx, input }) => {
       await validateTentOwnership(input.tentId, ctx.user.groupId);
@@ -630,10 +656,10 @@ const tentScenesRouter = router({
       const nextPos = maxRow[0].next_pos;
 
       const [ins]: any = await pool.execute(
-        `INSERT INTO tentScenes (tentId, sceneId, name, position) VALUES (?, ?, ?, ?)`,
-        [input.tentId, input.sceneId, input.name, nextPos]
+        `INSERT INTO tentScenes (tentId, sceneId, name, position, type) VALUES (?, ?, ?, ?, ?)`,
+        [input.tentId, input.sceneId, input.name, nextPos, input.type]
       );
-      return { id: ins.insertId as number, position: nextPos };
+      return { id: ins.insertId as number, position: nextPos, type: input.type };
     }),
 
   /** Remove uma cena vinculada (compacta positions depois). */
@@ -828,7 +854,7 @@ const tentDisplayRouter = router({
       await validateTentOwnership(input.tentId, ctx.user.groupId);
       const pool = getMysqlPool();
       const [scenes]: any = await pool.execute(
-        `SELECT id, sceneId, name, position FROM tentScenes WHERE tentId = ?`,
+        `SELECT id, sceneId, name, position, type FROM tentScenes WHERE tentId = ?`,
         [input.tentId]
       );
       const [devices]: any = await pool.execute(
@@ -837,7 +863,10 @@ const tentDisplayRouter = router({
       );
       const items = [
         ...(scenes as any[]).map((s: any) => ({
+          // 'type' aqui é tipo do item (scene vs device pra UI saber qual lista),
+          // 'sceneType' é tipo da CENA Tuya (scene one-shot vs automation enable/disable)
           type: 'scene' as const,
+          sceneType: (s.type === 'automation' ? 'automation' : 'scene') as 'scene' | 'automation',
           id: s.id as number,
           refId: s.sceneId as string,
           name: s.name as string,
@@ -847,6 +876,7 @@ const tentDisplayRouter = router({
         })),
         ...(devices as any[]).map((d: any) => ({
           type: 'device' as const,
+          sceneType: null as 'scene' | 'automation' | null,
           id: d.id as number,
           refId: d.deviceId as string,
           name: d.name as string,

@@ -620,6 +620,20 @@ const MIGRATIONS: Migration[] = [
       await addColumnIfNotExists(c, 'deviceTokens', 'ownerUserId', 'INT NULL AFTER `groupId`');
     },
   },
+  {
+    // Tuya separa "scenes" (Tap-to-Run, one-shot) de "automations" (cenas
+    // programadas com gatilho — ex: "Se hora=18:00, ligar luz"). UI precisa
+    // diferenciar pra mostrar o botão certo:
+    //   scene      → ▶ Disparar (one-shot)
+    //   automation → ⏰ Toggle ativa/desativa
+    // Antes não salvava o tipo no INSERT — toda cena vinculada virava "scene"
+    // por default. Agora salva o tipo real vindo da API Tuya.
+    id: 'add-tentScenes-type',
+    description: 'Adiciona tentScenes.type (scene | automation — UI usa pra escolher botão)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'tentScenes', 'type', "VARCHAR(20) NOT NULL DEFAULT 'scene' AFTER `name`");
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
