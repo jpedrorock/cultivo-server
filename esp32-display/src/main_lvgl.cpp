@@ -1615,7 +1615,7 @@ static bool fetchHistoryAll(const char *period = "24h") {
 #define SCENES_LOCAL_MAX 6
 static char    sceneIdsLocal     [SCENES_LOCAL_MAX][48] = {{0}};
 static char    sceneNamesLocal   [SCENES_LOCAL_MAX][24] = {{0}};
-static char    sceneIconHintLocal[SCENES_LOCAL_MAX][12] = {{0}};
+static char    sceneIconHintLocal[SCENES_LOCAL_MAX][16] = {{0}};  // 16 cabe "dehumidifier"
 // 0=scene (trigger one-shot) | 1=device (toggle ON/OFF, state da Tuya) |
 // 2=automation (toggle ON/OFF, state local — Tuya nao expoe enabled status
 // pelo /devices/.../status, entao gerenciamos o ultimo desejado)

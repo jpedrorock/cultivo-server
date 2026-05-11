@@ -1081,6 +1081,11 @@ static const uint32_t SCENE_COLOR_PALETTE[SCENES_MAX] = {
 // Resolve iconHint string -> ic_* image. Default = ic_zap (raio).
 // Tambem usado no fallback de cena sem iconHint definido.
 // type: 0=scene, 1=device, 2=automation
+//
+// Mapping completo dos iconHints que o server pode enviar (espelha os
+// dropdowns da UI web em /tent/X). Sem conversor SVG local pra baixar mais
+// icones do Lucide, alguns hints (heater/ac/humidifier/dehumidifier/co2)
+// reusam icones existentes como aproximacao razoavel ate' ter assets reais.
 static const lv_image_dsc_t* resolveIcon(const char *hint, uint8_t type, int slotIdx) {
   if (!hint || !*hint) {
     if (type == 0) {
@@ -1091,20 +1096,26 @@ static const lv_image_dsc_t* resolveIcon(const char *hint, uint8_t type, int slo
       };
       return cyc[slotIdx % SCENES_MAX];
     }
-    if (type == 2) return &ic_timer;  // automation default = relogio+play
+    if (type == 2) return &ic_clock;  // automation default = relogio
     return &ic_zap;                    // device default
   }
-  // iconHint conhecidos do server
-  if (!strcmp(hint, "light"))      return &ic_lightbulb;
-  if (!strcmp(hint, "fan"))        return &ic_wind;          // exaustor/ventilador
-  if (!strcmp(hint, "pump"))       return &ic_droplet;       // rega manual (gota)
-  if (!strcmp(hint, "heater"))     return &ic_thermometer;
-  if (!strcmp(hint, "ac"))         return &ic_thermometer;
-  if (!strcmp(hint, "schedule"))   return &ic_timer;         // rega automatica (relogio+play)
-  if (!strcmp(hint, "automation")) return &ic_timer;
-  if (!strcmp(hint, "refresh"))    return &ic_refresh;       // sensor refresh
-  if (!strcmp(hint, "sensor"))     return &ic_refresh;
-  if (!strcmp(hint, "clock"))      return &ic_clock;
+  // Devices fisicos
+  if (!strcmp(hint, "light"))        return &ic_lightbulb;     // 💡 LED, lampada
+  if (!strcmp(hint, "fan"))          return &ic_wind;          // 🌀 exaustor/ventilador
+  if (!strcmp(hint, "pump"))         return &ic_droplet;       // 💧 bomba, rega manual
+  if (!strcmp(hint, "heater"))       return &ic_thermometer;   // 🔥 (idealmente flame)
+  if (!strcmp(hint, "ac"))           return &ic_thermometer;   // ❄ (idealmente snowflake)
+  if (!strcmp(hint, "humidifier"))   return &ic_droplets;      // ☁ (idealmente cloud)
+  if (!strcmp(hint, "dehumidifier")) return &ic_wind;          // 💨 vento remove umidade
+  if (!strcmp(hint, "co2"))          return &ic_sprout;        // ☁ (idealmente cloud)
+  // Cenas / automations / refresh
+  if (!strcmp(hint, "schedule"))     return &ic_clock;         // ⏰ rega automatica
+  if (!strcmp(hint, "automation"))   return &ic_clock;
+  if (!strcmp(hint, "timer"))        return &ic_timer;         // alternativa
+  if (!strcmp(hint, "clock"))        return &ic_clock;
+  if (!strcmp(hint, "refresh"))      return &ic_refresh;       // 🔄 sensor refresh
+  if (!strcmp(hint, "sensor"))       return &ic_refresh;
+  if (!strcmp(hint, "other"))        return &ic_zap;           // ⚡ default fallback
   return &ic_zap;
 }
 
@@ -1114,7 +1125,7 @@ typedef struct {
   char     name[24];        // label
   uint8_t  type;            // 0=scene, 1=device
   bool     state;           // device on/off
-  char     iconHint[12];    // "light"/"fan"/etc
+  char     iconHint[16];    // "light"/"fan"/"dehumidifier"/etc (12 chars+null)
 } ItemStorage;
 static ItemStorage items[SCENES_MAX];
 static int sceneCount = 0;  // mantem nome legado p/ minimizar diff
