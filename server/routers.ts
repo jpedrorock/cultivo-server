@@ -832,7 +832,7 @@ const tentDisplayRouter = router({
         [input.tentId]
       );
       const [devices]: any = await pool.execute(
-        `SELECT id, deviceId, name, position, iconHint FROM tentDevices WHERE tentId = ?`,
+        `SELECT id, deviceId, name, position, iconHint, switchCode FROM tentDevices WHERE tentId = ?`,
         [input.tentId]
       );
       const items = [
@@ -843,6 +843,7 @@ const tentDisplayRouter = router({
           name: s.name as string,
           position: s.position as number,
           iconHint: null as string | null,
+          switchCode: null as string | null,
         })),
         ...(devices as any[]).map((d: any) => ({
           type: 'device' as const,
@@ -851,6 +852,7 @@ const tentDisplayRouter = router({
           name: d.name as string,
           position: d.position as number,
           iconHint: d.iconHint as string | null,
+          switchCode: d.switchCode as string | null,
         })),
       ];
       items.sort((a, b) => a.position - b.position || a.id - b.id);

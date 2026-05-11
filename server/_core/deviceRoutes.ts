@@ -61,24 +61,49 @@ async function validateDeviceToken(req: express.Request): Promise<{ tentId: numb
  *   2. Senão (rows antigas pré-migration) → fallback pro LIMIT 1 antigo.
  *
  * Retorna null se nenhuma config for encontrada.
+ *
+ * IMPORTANTE: `accessSecret` no banco e' CRIPTOGRAFADO. Esta funcao decifra
+ * (igual `getTuyaConfig` do routers.ts faz pro tRPC do app web). Sem decifrar,
+ * a auth Tuya silenciosamente falha — controlTuyaDevice retorna success=false,
+ * endpoint retorna 502, ESP reverte UI ("liga e apaga"). Bug descoberto em
+ * prod apos 3 re-pairs nao resolverem.
  */
 async function getTuyaCfgForDevice(device: { groupId: number; ownerUserId: number | null }): Promise<{ accessId: string; accessSecret: string; region: TuyaRegion } | null> {
   const pool = getMysqlPool();
+  let row: { accessId: string; accessSecret: string; region: TuyaRegion; userId: number } | null = null;
+
   if (device.ownerUserId) {
     const [rows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
+      `SELECT accessId, accessSecret, region, userId FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
       [device.ownerUserId]
     );
-    if (rows.length > 0) return rows[0] as { accessId: string; accessSecret: string; region: TuyaRegion };
+    if (rows.length > 0) row = rows[0];
     // Fallback: se owner não tem config (raro), tenta grupo
   }
-  const [rows]: any = await pool.execute(
-    `SELECT tc.accessId, tc.accessSecret, tc.region
-     FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-     WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-    [device.groupId]
-  );
-  return rows.length > 0 ? (rows[0] as { accessId: string; accessSecret: string; region: TuyaRegion }) : null;
+  if (!row) {
+    const [rows]: any = await pool.execute(
+      `SELECT tc.accessId, tc.accessSecret, tc.region, tc.userId
+       FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
+       WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
+      [device.groupId]
+    );
+    if (rows.length > 0) row = rows[0];
+  }
+  if (!row) return null;
+
+  // Decifrar accessSecret (igual o tRPC faz). decryptAndMigrate tambem
+  // re-criptografa com chave atual e atualiza row no DB se a chave mudou.
+  try {
+    const { decryptAndMigrate } = await import("../aiCrypto");
+    const userId = row.userId;
+    row.accessSecret = await decryptAndMigrate(row.accessSecret, async (newCipher) => {
+      await pool.execute(`UPDATE tuyaConfig SET accessSecret = ? WHERE userId = ?`, [newCipher, userId]);
+    });
+  } catch (err: any) {
+    console.error('[Device] getTuyaCfgForDevice decrypt failed:', err?.message);
+    return null;
+  }
+  return { accessId: row.accessId, accessSecret: row.accessSecret, region: row.region };
 }
 
 function registerDeviceRoutes(app: express.Application) {
