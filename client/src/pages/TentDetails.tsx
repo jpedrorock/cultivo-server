@@ -397,6 +397,77 @@ function ScenePlayButton({ sceneId, sceneName }: { sceneId: string; sceneName: s
   );
 }
 
+/**
+ * Botão de toggle pra AUTOMATIONS (cenas programadas — diferente de Tap-to-Run).
+ *
+ * Automations rodam por gatilho (horário, sensor, etc) — não faz sentido
+ * "disparar" elas pelo botão. Faz sentido HABILITAR/DESABILITAR a regra
+ * inteira (ex: "rega automática" desabilitada quando você vai viajar).
+ *
+ * Exibe ícone Clock (representa schedule) com cor por estado:
+ * - Ativa: blue (azul como ⏰ ativo)
+ * - Inativa: cinza
+ * - Desconhecido (Tuya não retornou estado): outline cinza com "?"
+ */
+function AutomationToggleButton({ automationId, automationName }: { automationId: string; automationName: string }) {
+  const utils = trpc.useUtils();
+
+  const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
+    { automationId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+
+  const toggle = trpc.tuya.toggleAutomation.useMutation({
+    onSuccess: ({ enabled }) => {
+      toast.success(`⏰ ${automationName} ${enabled ? 'ativada' : 'pausada'}`);
+      setTimeout(() => utils.tuya.getAutomationEnabled.invalidate({ automationId }), 600);
+    },
+    onError: (e) => toast.error(`Falha: ${e.message}`),
+  });
+
+  const isEnabled = data?.enabled;
+  const pending = toggle.isPending;
+
+  if (isLoading) {
+    return (
+      <div className="shrink-0 w-10 h-7 flex items-center justify-center">
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Tuya não retornou estado — mostra botão neutral, click tenta habilitar
+  if (isEnabled === null || isEnabled === undefined) {
+    return (
+      <button
+        onClick={() => toggle.mutate({ automationId, enabled: true })}
+        disabled={pending}
+        title="Estado desconhecido — clicar tenta ativar"
+        className="shrink-0 w-10 h-7 rounded-lg flex items-center justify-center bg-muted text-muted-foreground hover:bg-muted-foreground/10 transition-all disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => toggle.mutate({ automationId, enabled: !isEnabled })}
+      disabled={pending}
+      title={isEnabled ? 'Pausar automação' : 'Ativar automação'}
+      className={`shrink-0 w-10 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${
+        isEnabled
+          ? 'bg-blue-500/20 text-blue-500 hover:bg-blue-500/30'
+          : 'bg-muted text-muted-foreground hover:bg-muted-foreground/10'
+      }`}
+    >
+      {pending
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : (isEnabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />)}
+    </button>
+  );
+}
+
 function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const utils = trpc.useUtils();
   const [showSceneAdd, setShowSceneAdd] = useState(false);
@@ -455,7 +526,10 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
     if (!selectedSceneId) return;
     const scene = (allScenes as any[]).find((s: any) => s.sceneId === selectedSceneId);
     if (!scene) return;
-    addScene.mutate({ tentId, sceneId: scene.sceneId, name: scene.name });
+    // Salva o type vindo da API Tuya (homeName === 'Automações' = automation,
+    // senão = scene one-shot). UI usa pra escolher botão certo: ▶ play ou ⏰ toggle.
+    const type = scene.homeName === 'Automações' ? 'automation' : 'scene';
+    addScene.mutate({ tentId, sceneId: scene.sceneId, name: scene.name, type });
   };
   const handleAddDevice = () => {
     if (!selectedDeviceId) return;
@@ -572,13 +646,19 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground truncate">{item.name}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {isScene ? 'Cena' : (ICON_HINT_LABELS[item.iconHint ?? 'other'] ?? 'Dispositivo')}
+                      {isScene
+                        ? (item.sceneType === 'automation' ? 'Automação programada' : 'Cena (one-shot)')
+                        : (ICON_HINT_LABELS[item.iconHint ?? 'other'] ?? 'Dispositivo')}
                     </p>
                   </div>
-                  {/* Ação inline: toggle on/off pra devices, ▶ disparar pra cenas.
-                      Espelha exatamente o que aparece no display ESP32. */}
+                  {/* Ação inline — espelha o que aparece no display ESP32:
+                      - device:     toggle on/off
+                      - scene:      ▶ disparar (one-shot)
+                      - automation: ⏰ toggle ativa/pausa schedule */}
                   {isScene
-                    ? <ScenePlayButton sceneId={item.refId} sceneName={item.name} />
+                    ? (item.sceneType === 'automation'
+                        ? <AutomationToggleButton automationId={item.refId} automationName={item.name} />
+                        : <ScenePlayButton sceneId={item.refId} sceneName={item.name} />)
                     : <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />
                   }
                   <button

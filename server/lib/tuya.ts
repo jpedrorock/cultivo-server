@@ -674,6 +674,91 @@ export async function triggerTuyaScene(
 }
 
 /**
+ * Habilita ou desabilita uma AUTOMATION (cena programada).
+ *
+ * Diferente de scenes (Tap-to-Run, one-shot via trigger), automations rodam
+ * por gatilho (horário, sensor, etc) — só faz sentido ligar/desligar.
+ *
+ * Tenta múltiplos endpoints em ordem porque Tuya tem 2 sistemas (IoT Core
+ * e Smart Home Home) e qual responde depende do tipo do projeto.
+ */
+export async function setTuyaAutomationEnabled(
+  automationId: string,
+  enabled: boolean,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion,
+  homeId = 0
+): Promise<{ success: boolean; msg?: string }> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+  const action = enabled ? "enable" : "disable";
+
+  const attempts: string[] = [
+    // IoT Core actions endpoint
+    `/v2.0/cloud/scene/rule/${automationId}/actions/${action}`,
+  ];
+  if (homeId) {
+    attempts.push(
+      `/v1.0/homes/${homeId}/automations/${automationId}/actions/${action}`,
+      `/v2.0/homes/${homeId}/automations/${automationId}/actions/${action}`,
+    );
+  }
+  attempts.push(
+    `/v1.0/automations/${automationId}/actions/${action}`,
+    `/v2.0/automations/${automationId}/actions/${action}`,
+  );
+
+  let lastMsg = "";
+  for (const path of attempts) {
+    try {
+      const data = await tuyaPost(path, {}, accessId, accessSecret, accessToken, region);
+      if (data.success) return { success: true };
+      lastMsg = data.msg ?? data.code ?? "";
+    } catch (e: any) {
+      lastMsg = e?.message ?? String(e);
+    }
+  }
+  return { success: false, msg: lastMsg || "Nenhum endpoint funcionou" };
+}
+
+/**
+ * Lê o estado atual (enabled/disabled) de uma automation.
+ * Tuya retorna `enabled: true|false` ou `is_enable: true|false` no detail.
+ */
+export async function getTuyaAutomationEnabled(
+  automationId: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion,
+  homeId = 0
+): Promise<boolean | null> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+
+  const attempts: string[] = [
+    `/v2.0/cloud/scene/rule/${automationId}`,
+  ];
+  if (homeId) {
+    attempts.push(
+      `/v1.0/homes/${homeId}/automations/${automationId}`,
+      `/v2.0/homes/${homeId}/automations/${automationId}`,
+    );
+  }
+
+  for (const path of attempts) {
+    try {
+      const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+      if (data.success && data.result) {
+        const r = data.result;
+        if (typeof r.enabled === 'boolean') return r.enabled;
+        if (typeof r.is_enable === 'boolean') return r.is_enable;
+        if (typeof r.status === 'string') return r.status.toLowerCase() === 'enable';
+      }
+    } catch {}
+  }
+  return null;  // não conseguiu determinar — UI mostra "?"
+}
+
+/**
  * Lista cenas e automações via IoT Core (/v2.0/cloud/scene/rule).
  * Não precisa de homeId — usa o space_id do projeto.
  * Retorna apenas itens do tipo "scene" (tap-to-run) e "automation".
