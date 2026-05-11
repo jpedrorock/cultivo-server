@@ -1597,10 +1597,11 @@ static void applyHistData() {
   if (!histChart || !histSer) return;
   auto &m = HIST_METRICS[histMetric];
   lv_chart_set_range(histChart, LV_CHART_AXIS_PRIMARY_Y, m.ymin, m.ymax);
-  // Linha do chart pega cor da metrica (decorativo); outline pulse nao muda
-  // (fica COL_PRIMARY fixo via applyRingPulse no buildHistorico).
+  // Tudo na cor da metrica: linha, indicator, outline pulse — display
+  // "respira" na cor do que esta sendo monitorado.
   lv_obj_set_style_line_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_INDICATOR);
+  lv_obj_set_style_outline_color(histChart, lv_color_hex(m.color), 0);
 
   const float *arr = histArrayFor(histMetric);
   // histCount = pontos validos. Resto dos 24 fica como LV_CHART_POINT_NONE
@@ -1625,17 +1626,20 @@ extern "C" void cultivoUI_applyHistory(void) {
 
 static lv_obj_t *histMetricBtns[4] = {nullptr};
 
-// Aplica visual de pill DS aos botoes — ativo: bg primary + texto branco;
-// inativo: bg transparent + border neutra + texto dim. Estilo iOS segmented.
+// Aplica visual de pill DS aos botoes. Cada metrica tem SUA propria cor:
+//   - ativo:   bg cor-da-metrica + border cor-da-metrica + texto branco
+//   - inativo: bg transparent + border neutra + texto dim
+// Antes era tudo COL_PRIMARY (verde) fixo — user pediu cor por metrica.
 static void histStylePills(int activeIdx) {
   for (int i = 0; i < 4; i++) {
     bool sel = (i == activeIdx);
+    uint32_t metricC = HIST_METRICS[i].color;
     lv_obj_set_style_bg_color(histMetricBtns[i],
-      lv_color_hex(sel ? COL_PRIMARY : COL_CARD), 0);
+      lv_color_hex(sel ? metricC : COL_CARD), 0);
     lv_obj_set_style_bg_opa(histMetricBtns[i],
       sel ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_color(histMetricBtns[i],
-      lv_color_hex(sel ? COL_PRIMARY : COL_BORDER), 0);
+      lv_color_hex(sel ? metricC : COL_BORDER), 0);
     lv_obj_t *lbl = lv_obj_get_child(histMetricBtns[i], 0);
     if (lbl) lv_obj_set_style_text_color(lbl,
       lv_color_hex(sel ? COL_TEXT : COL_DIM), 0);
@@ -1684,10 +1688,10 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(histChart, sw(6), 0);
   histSer = lv_chart_add_series(histChart, lv_color_hex(COL_PRIMARY), LV_CHART_AXIS_PRIMARY_Y);
 
-  // Pulse "live" no outline do chart — feel de monitor ativo. Usa motion
-  // breath token (2500ms) pra alinhar com --motion-breath do CSS, e cor
-  // PRIMARY (nao muda por metrica) — assim a "respiracao" e' brand-coerente.
-  applyRingPulse(histChart, COL_PRIMARY, MOTION_BREATH, 0);
+  // Pulse "live" no outline do chart — feel de monitor ativo. Cor inicial
+  // = TEMP (laranja); applyHistData troca a cor do outline conforme metrica
+  // selecionada (laranja/ciano/roxo/amber).
+  applyRingPulse(histChart, HIST_METRICS[0].color, MOTION_BREATH, 0);
 
   // Botoes pill (segmented control) — DS style. Inicializa como botoes
   // neutros; histStylePills aplica o estado visual logo abaixo.
