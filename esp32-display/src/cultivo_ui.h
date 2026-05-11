@@ -113,6 +113,32 @@ void cultivoUI_setTaskToggleHandler(CultivoTaskToggleFn cb);
 // Confirma flip do done (chamado pelo app apos POST OK ou reverter se falhou)
 void cultivoUI_setTaskDone(int taskId, bool done);
 
+// ── Plantas (aba 5) ───────────────────────────────────────────────────────────
+// App preenche lista via cultivoUI_applyPlants. Tap em planta abre tela de
+// detalhe que dispara onPlantPhotoRequest(plantId) — app faz fetch da foto
+// e devolve via cultivoUI_applyPlantPhoto (bytes JPEG + status + data).
+#define PLANTS_MAX 10
+typedef struct {
+  int         id;            // plantId (pra GET /plant/:id/photo)
+  const char *name;          // ex: "Northern Lights #1"
+  const char *code;          // ex: "NL-001" ou NULL
+  uint8_t     stage;         // 0=CLONE, 1=SEEDLING, 2=PLANT
+  uint8_t     healthStatus;  // 0=NULL, 1=HEALTHY, 2=STRESSED, 3=SICK, 4=RECOVERING
+  bool        hasPhoto;
+  const char *lastPhotoDate; // ISO 8601 ou NULL
+} CultivoPlant;
+void cultivoUI_applyPlants(const CultivoPlant *items, int count);
+
+typedef void (*CultivoPlantPhotoRequestFn)(int plantId);
+void cultivoUI_setPlantPhotoRequestHandler(CultivoPlantPhotoRequestFn cb);
+
+// Entrega da foto. jpegBytes==NULL OR len==0 → placeholder "indisponivel".
+// dateStr e' curto (ex: "08/05 12:30"). UI decoda via TJPGD nativo do LVGL.
+void cultivoUI_applyPlantPhoto(int plantId,
+                                const uint8_t *jpegBytes, size_t len,
+                                uint8_t healthStatus,
+                                const char *dateStr);
+
 // ── Build entry point ─────────────────────────────────────────────────────────
 void buildCultivoUI(void);
 

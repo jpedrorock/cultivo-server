@@ -26,6 +26,16 @@
 #include <cmath>
 #include <cstdlib>
 
+// PSRAM alloc (firmware) ou stub stdlib (sim)
+#ifdef REAL_HARDWARE
+  #include "esp_heap_caps.h"
+#else
+  #define heap_caps_malloc(sz, caps) malloc(sz)
+  #define heap_caps_free(p)          free(p)
+  #define MALLOC_CAP_SPIRAM 0
+  #define MALLOC_CAP_8BIT   0
+#endif
+
 // ════════════════════════════════════════════════════════════════════════════════
 // Aliases de tela / helpers de escala
 // ════════════════════════════════════════════════════════════════════════════════
@@ -124,18 +134,17 @@ extern "C" void cultivoUI_setRefreshing(bool active) {
 // ════════════════════════════════════════════════════════════════════════════════
 // Widgets compartilhados entre screens (idem main_lvgl.cpp)
 // ════════════════════════════════════════════════════════════════════════════════
-// Navbar 3 tabs: Home / Hist / Cenas
+// Navbar 5 tabs: Home / Hist / Dispositivos / Tarefas / Plantas
 // DS: ativo SEMPRE em COL_PRIMARY (verde brand) com indicador linha 2px
-// no topo do tab. 4 tabs: Home / Historico / Dispositivos / Tarefas.
-// (Renomeado de "Cenas" pra "Dispositivos" pq na pratica mistura cenas +
-// devices + automations vinculados a estufa.)
-#define NAV_COUNT 4
+// no topo do tab. Largura por tab: 480/5 = 96px (alvo de tap confortavel,
+// icone 24-32px ao centro). Indicator ajusta proporcionalmente.
+#define NAV_COUNT 5
 static const lv_image_dsc_t *NAV_ICONS_IMG[NAV_COUNT] = {
-  &ic_home, &ic_activity, &ic_zap, &ic_tasks
+  &ic_home, &ic_activity, &ic_zap, &ic_tasks, &ic_sprout
 };
 
 static lv_obj_t *contentArea;
-static lv_obj_t *screenHome, *screenTarefa, *screenGrafic, *screenTasks;
+static lv_obj_t *screenHome, *screenTarefa, *screenGrafic, *screenTasks, *screenPlants;
 static lv_obj_t *screenLux = nullptr, *screenPhEc = nullptr;  // legacy refs
 static lv_obj_t *navbar;
 static lv_obj_t *navIcons[NAV_COUNT];
@@ -1751,9 +1760,9 @@ static void navSetActive(int idx) {
 
 static void switchScreen(int idx) {
   if (idx == activeScreen) return;
-  // 4 tabs: 0=Home, 1=Historico, 2=Dispositivos, 3=Tarefas
+  // 5 tabs: 0=Home, 1=Historico, 2=Dispositivos, 3=Tarefas, 4=Plantas
   lv_obj_t *screens[NAV_COUNT] = {
-    screenHome, screenGrafic, screenTarefa, screenTasks
+    screenHome, screenGrafic, screenTarefa, screenTasks, screenPlants
   };
   if (idx < 0 || idx >= NAV_COUNT) return;
 
@@ -2041,6 +2050,389 @@ static void buildTasksScreen(lv_obj_t *tab) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Aba PLANTAS — lista de plantas da estufa + detalhe c/ foto
+//
+// Layout:
+//  - Header: ic_sprout + "PLANTAS" + sub "Da estufa"
+//  - Lista scrollable (max 10): cada row = stage icon + name + healthBadge + 📷
+//  - Tap em row -> dispara onPlantPhotoRequest(id), abre overlay de detalhe
+//  - Overlay: foto centralizada (320x240) + status + data + tap back
+//
+// healthStatus encoding (sincronizado com server):
+//  0 = NULL (cinza dim "—")
+//  1 = HEALTHY (verde primary)
+//  2 = STRESSED (amber)
+//  3 = SICK (red)
+//  4 = RECOVERING (laranja phase_harvest)
+// ════════════════════════════════════════════════════════════════════════════════
+typedef struct {
+  int  id;
+  char name[64];
+  char code[32];
+  uint8_t stage;
+  uint8_t healthStatus;
+  bool hasPhoto;
+  char lastPhotoDate[32];
+} PlantStorage;
+static PlantStorage plants[PLANTS_MAX];
+static int plantCount = 0;
+static lv_obj_t *plantsTab   = nullptr;
+static lv_obj_t *plantsList  = nullptr;
+static lv_obj_t *plantsEmpty = nullptr;
+
+// Tela de detalhe (overlay sobre o tab)
+static lv_obj_t *plantDetailScreen = nullptr;
+static lv_obj_t *plantDetailImage  = nullptr;
+static lv_obj_t *plantDetailStatus = nullptr;
+static lv_obj_t *plantDetailDate   = nullptr;
+static lv_obj_t *plantDetailName   = nullptr;
+static int       plantDetailId     = -1;  // qual planta esta sendo exibida
+
+// Buffer JPEG global na PSRAM (alocado lazy, 128KB folgado)
+static uint8_t      *plantJpegBuf  = nullptr;
+static size_t        plantJpegLen  = 0;
+static lv_image_dsc_t plantJpegDsc = {};
+
+static CultivoPlantPhotoRequestFn onPlantPhotoRequest = nullptr;
+extern "C" void cultivoUI_setPlantPhotoRequestHandler(CultivoPlantPhotoRequestFn cb) {
+  onPlantPhotoRequest = cb;
+}
+
+static uint32_t healthColor(uint8_t status) {
+  switch (status) {
+    case 1: return COL_PRIMARY;          // HEALTHY = verde
+    case 2: return COL_AMBER;            // STRESSED = amber
+    case 3: return COL_RED;              // SICK = vermelho
+    case 4: return COL_PHASE_HARVEST;    // RECOVERING = laranja
+    default: return COL_DIM;             // NULL = cinza
+  }
+}
+static const char* healthLabel(uint8_t status) {
+  switch (status) {
+    case 1: return "HEALTHY";
+    case 2: return "STRESSED";
+    case 3: return "SICK";
+    case 4: return "RECOVERING";
+    default: return "—";
+  }
+}
+static const lv_image_dsc_t* stageIcon(uint8_t stage) {
+  // 0=CLONE, 1=SEEDLING, 2=PLANT — todos viram ic_sprout por enquanto
+  // (sem icones diferentes pra cada). Stage e' textual no label.
+  (void)stage;
+  return &ic_sprout;
+}
+static const char* stageLabel(uint8_t stage) {
+  switch (stage) {
+    case 0: return "CLONE";
+    case 1: return "SEEDLING";
+    case 2: return "PLANT";
+    default: return "?";
+  }
+}
+
+// Forward decl
+static void openPlantDetail(int idx);
+static void closePlantDetail();
+static void rebuildPlantsList();
+
+static void plantRowClickCb(lv_event_t *e) {
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  if (idx < 0 || idx >= plantCount) return;
+  openPlantDetail(idx);
+}
+
+static void rebuildPlantsList() {
+  if (!plantsTab) return;
+  if (plantsList)  { lv_obj_del(plantsList);  plantsList = nullptr; }
+  if (plantsEmpty) { lv_obj_del(plantsEmpty); plantsEmpty = nullptr; }
+
+  if (plantCount == 0) {
+    plantsEmpty = lv_label_create(plantsTab);
+    lv_label_set_text(plantsEmpty,
+      "Nenhuma planta ativa\n"
+      "Cadastre plantas no app web");
+    lv_obj_set_style_text_color(plantsEmpty, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(plantsEmpty, FONT_CAPTION, 0);
+    lv_obj_set_style_text_align(plantsEmpty, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(plantsEmpty, LV_ALIGN_CENTER, 0, sh(8));
+    return;
+  }
+
+  int listY = sh(28);
+  int listH = TAB_H - listY - sh(4);
+  plantsList = lv_obj_create(plantsTab);
+  lv_obj_set_size(plantsList, SCREEN_W, listH);
+  lv_obj_set_pos(plantsList, 0, listY);
+  lv_obj_set_style_bg_opa(plantsList, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(plantsList, 0, 0);
+  lv_obj_set_style_pad_all(plantsList, sw(6), 0);
+  lv_obj_set_flex_flow(plantsList, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(plantsList, sh(4), 0);
+  lv_obj_set_scroll_dir(plantsList, LV_DIR_VER);
+
+  for (int i = 0; i < plantCount && i < PLANTS_MAX; i++) {
+    lv_obj_t *row = lv_obj_create(plantsList);
+    lv_obj_set_size(row, LV_PCT(100), sh(44));
+    lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(row, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(row, 1, 0);
+    lv_obj_set_style_radius(row, RADIUS_MD, 0);
+    lv_obj_set_style_pad_hor(row, sw(8), 0);
+    lv_obj_set_style_pad_ver(row, sh(4), 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(row, plantRowClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+
+    // Stage icon esquerda
+    lv_obj_t *stIcon = lv_image_create(row);
+    lv_image_set_src(stIcon, stageIcon(plants[i].stage));
+    lv_obj_set_style_image_recolor(stIcon, lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_image_recolor_opa(stIcon, LV_OPA_COVER, 0);
+    lv_obj_align(stIcon, LV_ALIGN_LEFT_MID, 0, 0);
+
+    // Name + code/stage
+    lv_obj_t *nameLbl = lv_label_create(row);
+    lv_label_set_text(nameLbl, plants[i].name);
+    lv_label_set_long_mode(nameLbl, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(nameLbl, sw(220));
+    lv_obj_set_style_text_font(nameLbl, FONT_CAPTION, 0);
+    lv_obj_set_style_text_color(nameLbl, lv_color_hex(COL_TEXT), 0);
+    lv_obj_align(nameLbl, LV_ALIGN_LEFT_MID, sw(32), -sh(8));
+
+    // Code · stage
+    char subBuf[64];
+    if (plants[i].code[0]) {
+      snprintf(subBuf, sizeof(subBuf), "%s · %s",
+               plants[i].code, stageLabel(plants[i].stage));
+    } else {
+      snprintf(subBuf, sizeof(subBuf), "%s%s", stageLabel(plants[i].stage),
+               plants[i].hasPhoto ? "" : " · sem foto");
+    }
+    lv_obj_t *subLbl = lv_label_create(row);
+    lv_label_set_text(subLbl, subBuf);
+    lv_obj_set_style_text_font(subLbl, FONT_CAPTION, 0);
+    lv_obj_set_style_text_color(subLbl, lv_color_hex(COL_DIM), 0);
+    lv_obj_align(subLbl, LV_ALIGN_LEFT_MID, sw(32), sh(8));
+
+    // Health badge (right)
+    lv_obj_t *hb = lv_label_create(row);
+    lv_label_set_text(hb, healthLabel(plants[i].healthStatus));
+    uint32_t hc = healthColor(plants[i].healthStatus);
+    lv_obj_set_style_text_color(hb, lv_color_hex(hc), 0);
+    lv_obj_set_style_bg_color(hb, lv_color_hex(hc), 0);
+    lv_obj_set_style_bg_opa(hb, plants[i].healthStatus ? LV_OPA_20 : LV_OPA_10, 0);
+    lv_obj_set_style_pad_hor(hb, sw(6), 0);
+    lv_obj_set_style_pad_ver(hb, sh(1), 0);
+    lv_obj_set_style_radius(hb, RADIUS_SM, 0);
+    lv_obj_set_style_text_font(hb, FONT_CAPTION, 0);
+    lv_obj_align(hb, LV_ALIGN_RIGHT_MID, plants[i].hasPhoto ? -sw(28) : 0, 0);
+
+    // 📷 indicador (canto direito) se hasPhoto
+    if (plants[i].hasPhoto) {
+      lv_obj_t *camIcon = lv_image_create(row);
+      lv_image_set_src(camIcon, &ic_refresh);  // placeholder — sem ic_camera ainda
+      lv_obj_set_style_image_recolor(camIcon, lv_color_hex(COL_DIM), 0);
+      lv_obj_set_style_image_recolor_opa(camIcon, LV_OPA_COVER, 0);
+      lv_obj_set_style_transform_zoom(camIcon, 128, 0);  // ~50%
+      lv_obj_align(camIcon, LV_ALIGN_RIGHT_MID, 0, 0);
+    }
+  }
+}
+
+extern "C" void cultivoUI_applyPlants(const CultivoPlant *items, int count) {
+  if (count < 0) count = 0;
+  if (count > PLANTS_MAX) count = PLANTS_MAX;
+  plantCount = count;
+  for (int i = 0; i < count; i++) {
+    plants[i].id = items[i].id;
+    if (items[i].name) {
+      strncpy(plants[i].name, items[i].name, sizeof(plants[i].name) - 1);
+      plants[i].name[sizeof(plants[i].name) - 1] = '\0';
+    } else { plants[i].name[0] = '\0'; }
+    if (items[i].code) {
+      strncpy(plants[i].code, items[i].code, sizeof(plants[i].code) - 1);
+      plants[i].code[sizeof(plants[i].code) - 1] = '\0';
+    } else { plants[i].code[0] = '\0'; }
+    plants[i].stage = items[i].stage;
+    plants[i].healthStatus = items[i].healthStatus;
+    plants[i].hasPhoto = items[i].hasPhoto;
+    if (items[i].lastPhotoDate) {
+      strncpy(plants[i].lastPhotoDate, items[i].lastPhotoDate,
+              sizeof(plants[i].lastPhotoDate) - 1);
+      plants[i].lastPhotoDate[sizeof(plants[i].lastPhotoDate) - 1] = '\0';
+    } else { plants[i].lastPhotoDate[0] = '\0'; }
+  }
+  for (int i = count; i < PLANTS_MAX; i++) {
+    plants[i].id = 0;
+    plants[i].name[0] = plants[i].code[0] = plants[i].lastPhotoDate[0] = '\0';
+    plants[i].stage = plants[i].healthStatus = 0;
+    plants[i].hasPhoto = false;
+  }
+  printf("[ui] applyPlants count=%d\n", count);
+  rebuildPlantsList();
+}
+
+// ─── Tela de detalhe ──────────────────────────────────────────────────────────
+
+static void plantDetailBackCb(lv_event_t *e) {
+  (void)e;
+  closePlantDetail();
+}
+
+static void openPlantDetail(int idx) {
+  if (idx < 0 || idx >= plantCount) return;
+  plantDetailId = plants[idx].id;
+
+  // Cria overlay fullscreen
+  if (plantDetailScreen) lv_obj_del(plantDetailScreen);
+  plantDetailScreen = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(plantDetailScreen);
+  lv_obj_set_size(plantDetailScreen, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(plantDetailScreen, 0, 0);
+  lv_obj_set_style_bg_color(plantDetailScreen, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(plantDetailScreen, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(plantDetailScreen, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Header: ← + nome
+  lv_obj_t *backBtn = lv_label_create(plantDetailScreen);
+  lv_label_set_text(backBtn, LV_SYMBOL_LEFT);
+  lv_obj_set_style_text_color(backBtn, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(backBtn, &lv_font_montserrat_24, 0);
+  lv_obj_align(backBtn, LV_ALIGN_TOP_LEFT, sw(8), sh(8));
+  lv_obj_add_flag(backBtn, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(backBtn, sw(12));
+  lv_obj_add_event_cb(backBtn, plantDetailBackCb, LV_EVENT_CLICKED, NULL);
+
+  plantDetailName = lv_label_create(plantDetailScreen);
+  lv_label_set_text(plantDetailName, plants[idx].name);
+  lv_label_set_long_mode(plantDetailName, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(plantDetailName, SCREEN_W - sw(60));
+  lv_obj_set_style_text_color(plantDetailName, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(plantDetailName, FONT_BODY, 0);
+  lv_obj_align(plantDetailName, LV_ALIGN_TOP_LEFT, sw(40), sh(10));
+
+  // Container da foto (centralizado)
+  plantDetailImage = lv_image_create(plantDetailScreen);
+  lv_obj_set_size(plantDetailImage, sw(280), sh(200));
+  lv_obj_align(plantDetailImage, LV_ALIGN_CENTER, 0, -sh(12));
+  // Placeholder ate' a foto chegar — mostra mensagem loading
+  lv_obj_t *loadLbl = lv_label_create(plantDetailScreen);
+  lv_label_set_text(loadLbl, plants[idx].hasPhoto ? "Carregando foto..." : "Sem foto ainda\nRegistre uma no app");
+  lv_obj_set_style_text_align(loadLbl, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(loadLbl, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(loadLbl, FONT_CAPTION, 0);
+  lv_obj_align(loadLbl, LV_ALIGN_CENTER, 0, -sh(12));
+
+  // Status + data (rodape)
+  plantDetailStatus = lv_label_create(plantDetailScreen);
+  char sbuf[64];
+  snprintf(sbuf, sizeof(sbuf), "Status: %s", healthLabel(plants[idx].healthStatus));
+  lv_label_set_text(plantDetailStatus, sbuf);
+  lv_obj_set_style_text_color(plantDetailStatus, lv_color_hex(healthColor(plants[idx].healthStatus)), 0);
+  lv_obj_set_style_text_font(plantDetailStatus, FONT_CAPTION, 0);
+  lv_obj_align(plantDetailStatus, LV_ALIGN_BOTTOM_LEFT, sw(12), -sh(28));
+
+  plantDetailDate = lv_label_create(plantDetailScreen);
+  if (plants[idx].lastPhotoDate[0]) {
+    lv_label_set_text_fmt(plantDetailDate, "Foto: %.16s", plants[idx].lastPhotoDate);
+  } else {
+    lv_label_set_text(plantDetailDate, "");
+  }
+  lv_obj_set_style_text_color(plantDetailDate, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(plantDetailDate, FONT_CAPTION, 0);
+  lv_obj_align(plantDetailDate, LV_ALIGN_BOTTOM_LEFT, sw(12), -sh(8));
+
+  // Pede a foto ao app (so' se hasPhoto)
+  if (plants[idx].hasPhoto && onPlantPhotoRequest) {
+    onPlantPhotoRequest(plantDetailId);
+  }
+}
+
+static void closePlantDetail() {
+  if (plantDetailScreen) { lv_obj_del(plantDetailScreen); plantDetailScreen = nullptr; }
+  plantDetailImage = plantDetailStatus = plantDetailDate = plantDetailName = nullptr;
+  plantDetailId = -1;
+}
+
+extern "C" void cultivoUI_applyPlantPhoto(int plantId,
+                                           const uint8_t *jpegBytes, size_t len,
+                                           uint8_t healthStatus,
+                                           const char *dateStr) {
+  if (plantId != plantDetailId) {
+    // User ja' fechou ou abriu outra — ignora
+    return;
+  }
+  if (!plantDetailImage) return;
+
+  if (!jpegBytes || len == 0) {
+    printf("[ui] plant photo indisponivel (len=%u)\n", (unsigned)len);
+    return;
+  }
+
+  // Copia o JPEG pra buffer persistente em PSRAM (LVGL precisa do ponteiro
+  // valido enquanto a image estiver renderizada)
+  if (plantJpegBuf && plantJpegLen < len) {
+    heap_caps_free(plantJpegBuf);
+    plantJpegBuf = nullptr;
+  }
+  if (!plantJpegBuf) {
+    plantJpegBuf = (uint8_t*)heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!plantJpegBuf) {
+      printf("[ui] plant photo malloc fail (%u bytes)\n", (unsigned)len);
+      return;
+    }
+  }
+  memcpy(plantJpegBuf, jpegBytes, len);
+  plantJpegLen = len;
+
+  // Cria descriptor LVGL apontando pro JPEG raw (TJPGD decoda on-the-fly)
+  plantJpegDsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+  plantJpegDsc.header.cf    = LV_COLOR_FORMAT_RAW;
+  plantJpegDsc.header.flags = 0;
+  plantJpegDsc.header.w     = 0;  // descoberto pelo decoder
+  plantJpegDsc.header.h     = 0;
+  plantJpegDsc.data         = plantJpegBuf;
+  plantJpegDsc.data_size    = len;
+
+  lv_image_set_src(plantDetailImage, &plantJpegDsc);
+
+  // Atualiza badge de status (vem do header X-Health-Status — pode diferir
+  // do health "atual" da planta)
+  if (plantDetailStatus) {
+    char sbuf[64];
+    snprintf(sbuf, sizeof(sbuf), "Status: %s", healthLabel(healthStatus));
+    lv_label_set_text(plantDetailStatus, sbuf);
+    lv_obj_set_style_text_color(plantDetailStatus,
+                                 lv_color_hex(healthColor(healthStatus)), 0);
+  }
+  if (plantDetailDate && dateStr && *dateStr) {
+    lv_label_set_text_fmt(plantDetailDate, "Foto: %s", dateStr);
+  }
+  printf("[ui] plant photo applied plant=%d len=%u status=%u\n",
+         plantId, (unsigned)len, healthStatus);
+}
+
+static void buildPlantsScreen(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, 0, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
+
+  lv_obj_t *hdrIcon = lv_image_create(tab);
+  lv_image_set_src(hdrIcon, &ic_sprout);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
+  makeLabel(tab, "PLANTAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
+  makeLabel(tab, "Da estufa", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+
+  plantsTab = tab;
+  rebuildPlantsList();
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // buildCultivoUI — entrypoint (equivalente ao buildUI() do main_lvgl.cpp)
 // ════════════════════════════════════════════════════════════════════════════════
 extern "C" void buildCultivoUI(void) {
@@ -2108,12 +2500,14 @@ extern "C" void buildCultivoUI(void) {
   screenTarefa = makeScreen();
   screenGrafic = makeScreen();
   screenTasks  = makeScreen();  // 4a tab: lista de tarefas
+  screenPlants = makeScreen();  // 5a tab: lista de plantas + foto detail
   // screenLux/PhEc nao construidas — registro vai pelo app mobile.
 
   buildHome(screenHome);
   buildTarefas(screenTarefa);
   buildHistorico(screenGrafic);
   buildTasksScreen(screenTasks);
+  buildPlantsScreen(screenPlants);
   // buildLux/PhEc nao chamados (telas removidas — registro vai pelo app)
 
   lv_obj_clear_flag(screenHome, LV_OBJ_FLAG_HIDDEN);

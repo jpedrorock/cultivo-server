@@ -1681,6 +1681,214 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════════
+// PLANTAS — aba 5. fetchPlants GET /api/device/plants/<tentId> retorna lista.
+// Tap em uma planta dispara fetchPlantPhoto GET /api/device/plant/<id>/photo
+// (binario JPEG + headers X-Health-Status, X-Log-Date). UI mostra modal de
+// detalhe com a foto decodada via TJPGD.
+// ════════════════════════════════════════════════════════════════════════════════
+#define PLANTS_LOCAL_MAX 10
+struct PlantSlot {
+  int     id;
+  char    name[64];
+  char    code[32];
+  uint8_t stage;          // 0=CLONE, 1=SEEDLING, 2=PLANT
+  uint8_t healthStatus;   // 0..4
+  bool    hasPhoto;
+  char    lastPhotoDate[32];
+};
+static PlantSlot plantsLocal[PLANTS_LOCAL_MAX];
+static int       plantCountLocal = 0;
+static volatile bool plantsNeedsRefresh = false;
+static unsigned long lastPlantsFetch = 0;
+// 10min — lista de plantas muda pouco (user adiciona/remove no app raro)
+static const unsigned long PLANTS_FETCH_INTERVAL = 10UL * 60UL * 1000UL;
+
+// Buffer pra foto JPEG (PSRAM, lazy malloc). Max 128KB cobre 800x600 q=90.
+#define PLANT_JPEG_MAX_BYTES (128 * 1024)
+static uint8_t *plantPhotoBuf       = nullptr;
+static size_t   plantPhotoLen       = 0;
+static uint8_t  plantPhotoHealth    = 0;
+static char     plantPhotoDate[24]  = {0};
+static int      plantPhotoPlantId   = 0;
+static volatile bool plantPhotoNeedsApply = false;
+// Request pendente (tap → tapTask processa)
+static volatile bool plantPhotoTapPending = false;
+static int           plantPhotoTapId      = 0;
+
+static uint8_t parseHealthStatus(const char *s) {
+  if (!s) return 0;
+  if (!strcmp(s, "HEALTHY"))    return 1;
+  if (!strcmp(s, "STRESSED"))   return 2;
+  if (!strcmp(s, "SICK"))       return 3;
+  if (!strcmp(s, "RECOVERING")) return 4;
+  return 0;
+}
+static uint8_t parseStage(const char *s) {
+  if (!s) return 0;
+  if (!strcmp(s, "CLONE"))    return 0;
+  if (!strcmp(s, "SEEDLING")) return 1;
+  if (!strcmp(s, "PLANT"))    return 2;
+  return 0;
+}
+
+static bool fetchPlants() {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/plants/%d", SERVER_URL, TENT_ID);
+  httpBegin(http, url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(8000);
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[net] plants HTTP %d\n", code);
+    http.end();
+    return false;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) {
+    Serial.printf("[net] plants JSON err: %s\n", err.c_str());
+    return false;
+  }
+  JsonArray arr = doc["plants"].as<JsonArray>();
+  int n = 0;
+  for (JsonObject p : arr) {
+    if (n >= PLANTS_LOCAL_MAX) break;
+    int id = p["id"] | 0;
+    if (id <= 0) continue;
+    plantsLocal[n].id = id;
+    const char *name = p["name"] | "";
+    strncpy(plantsLocal[n].name, name, sizeof(plantsLocal[n].name) - 1);
+    plantsLocal[n].name[sizeof(plantsLocal[n].name) - 1] = '\0';
+    const char *codev = p["code"] | "";
+    strncpy(plantsLocal[n].code, codev, sizeof(plantsLocal[n].code) - 1);
+    plantsLocal[n].code[sizeof(plantsLocal[n].code) - 1] = '\0';
+    plantsLocal[n].stage = parseStage(p["stage"] | "");
+    plantsLocal[n].healthStatus = parseHealthStatus(p["healthStatus"] | "");
+    plantsLocal[n].hasPhoto = p["hasPhoto"] | false;
+    const char *lpd = p["lastPhotoDate"] | "";
+    strncpy(plantsLocal[n].lastPhotoDate, lpd,
+            sizeof(plantsLocal[n].lastPhotoDate) - 1);
+    plantsLocal[n].lastPhotoDate[sizeof(plantsLocal[n].lastPhotoDate) - 1] = '\0';
+    n++;
+  }
+  plantCountLocal = n;
+  Serial.printf("[net] plants: %d carregadas\n", plantCountLocal);
+  plantsNeedsRefresh = true;
+  return true;
+}
+
+// Formata "2026-05-08T12:30:00Z" -> "08/05 12:30" (curto pra display)
+static void formatPhotoDate(const char *iso, char *out, size_t outLen) {
+  if (!iso || !*iso || outLen < 12) { if (out && outLen > 0) out[0] = '\0'; return; }
+  // Espera YYYY-MM-DDTHH:MM:...
+  int y, mo, d, h, mi;
+  if (sscanf(iso, "%d-%d-%dT%d:%d", &y, &mo, &d, &h, &mi) == 5) {
+    snprintf(out, outLen, "%02d/%02d %02d:%02d", d, mo, h, mi);
+  } else {
+    strncpy(out, iso, outLen - 1);
+    out[outLen - 1] = '\0';
+  }
+}
+
+// Le JPEG binario do stream HTTP em chunks pro buffer PSRAM. Cap em
+// PLANT_JPEG_MAX_BYTES — passou disso, descarta. Retorna bytes lidos
+// (0 se erro). Tambem parseia headers X-Health-Status e X-Log-Date.
+static size_t fetchPlantPhoto(int plantId,
+                              uint8_t *outHealth,
+                              char *outDateStr, size_t outDateLen) {
+  if (!wifiOk) return 0;
+  HTTPClient http;
+  char url[192];
+  // 320x240 q=70 — alvo do display 480x320 com margem pros labels
+  snprintf(url, sizeof(url),
+           "%s/api/device/plant/%d/photo?w=320&h=240&q=70",
+           SERVER_URL, plantId);
+  httpBegin(http, url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  // Solicita headers extras p/ parsing (HTTPClient ESP32 precisa)
+  const char *collectHdrs[] = {"X-Health-Status", "X-Log-Date", "Content-Length"};
+  http.collectHeaders(collectHdrs, 3);
+  http.setTimeout(15000);  // foto pode demorar
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[net] plant/%d/photo HTTP %d\n", plantId, code);
+    http.end();
+    return 0;
+  }
+  // Parse headers
+  if (outHealth) {
+    String hs = http.header("X-Health-Status");
+    *outHealth = parseHealthStatus(hs.c_str());
+  }
+  if (outDateStr && outDateLen) {
+    String ld = http.header("X-Log-Date");
+    formatPhotoDate(ld.c_str(), outDateStr, outDateLen);
+  }
+
+  // Aloca buffer (uma vez, reusa)
+  if (!plantPhotoBuf) {
+    plantPhotoBuf = (uint8_t*)heap_caps_malloc(PLANT_JPEG_MAX_BYTES,
+                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!plantPhotoBuf) {
+      Serial.println("[net] plant photo PSRAM malloc fail");
+      http.end();
+      return 0;
+    }
+  }
+
+  // Le body em chunks pro buffer
+  WiFiClient *stream = http.getStreamPtr();
+  size_t total = 0;
+  unsigned long start = millis();
+  while (http.connected() && (millis() - start < 15000)) {
+    size_t avail = stream->available();
+    if (avail == 0) { delay(5); continue; }
+    if (total + avail > PLANT_JPEG_MAX_BYTES) {
+      Serial.printf("[net] plant photo overflow %u + %u > %u\n",
+                    (unsigned)total, (unsigned)avail, (unsigned)PLANT_JPEG_MAX_BYTES);
+      break;
+    }
+    int read = stream->readBytes(plantPhotoBuf + total, avail);
+    if (read <= 0) break;
+    total += read;
+    if (total > 0 && stream->available() == 0 && !http.connected()) break;
+  }
+  http.end();
+  Serial.printf("[net] plant/%d/photo %u bytes\n", plantId, (unsigned)total);
+  return total;
+}
+
+// Handler enfileira o request — tapTask processa (HTTP/PSRAM/JPEG decode
+// nao podem rodar no thread LVGL — estouro de stack).
+static void plantPhotoRequestHandler(int plantId) {
+  if (plantPhotoTapPending) {
+    Serial.println("[plant] outro photo request pending — ignorado");
+    return;
+  }
+  plantPhotoTapId = plantId;
+  plantPhotoTapPending = true;
+}
+
+static void processPlantPhotoTap() {
+  if (!plantPhotoTapPending) return;
+  int id = plantPhotoTapId;
+  plantPhotoTapPending = false;
+  uint8_t health = 0;
+  char dateBuf[24] = {0};
+  size_t got = fetchPlantPhoto(id, &health, dateBuf, sizeof(dateBuf));
+  // Sinaliza UI (mesmo se got==0 → mostra "indisponivel")
+  plantPhotoPlantId = id;
+  plantPhotoLen     = got;
+  plantPhotoHealth  = health;
+  strncpy(plantPhotoDate, dateBuf, sizeof(plantPhotoDate) - 1);
+  plantPhotoDate[sizeof(plantPhotoDate) - 1] = '\0';
+  plantPhotoNeedsApply = true;
+}
+
 // TAREFAS — aba 4 do display. fetchTasks GET /api/device/tasks/<tentId>
 // retorna lista de standaloneTasks ({id, texto, feito}). UI mostra
 // checkbox + label + scroll. Tap dispara POST /api/device/task-complete.
@@ -1867,6 +2075,11 @@ static void tapTaskFn(void *param) {
       processTaskTap();
       logIfSlow("taskTap", t0, 6000);
     }
+    if (plantPhotoTapPending && wifiOk) {
+      uint32_t t0 = millis();
+      processPlantPhotoTap();
+      logIfSlow("plantPhoto", t0, 16000);  // foto pode demorar
+    }
     vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
@@ -1914,6 +2127,14 @@ static void netTaskFn(void *param) {
       uint32_t t0 = millis();
       fetchTasks();
       logIfSlow("tasks", t0, 6000);
+    }
+
+    // Plantas — lista raramente muda, refresh 10min
+    if (millis() - lastPlantsFetch >= PLANTS_FETCH_INTERVAL) {
+      lastPlantsFetch = millis();
+      uint32_t t0 = millis();
+      fetchPlants();
+      logIfSlow("plants", t0, 9000);
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -2167,6 +2388,7 @@ static void buildUI() {
   cultivoUI_setRefreshHandler(refreshHandler);
   cultivoUI_setSceneTriggerHandler(sceneTriggerHandler);
   cultivoUI_setTaskToggleHandler(taskToggleHandler);
+  cultivoUI_setPlantPhotoRequestHandler(plantPhotoRequestHandler);
   buildCultivoUI();
 }
 
@@ -2530,6 +2752,31 @@ void loop() {
   if (taskUiPending) {
     taskUiPending = false;
     cultivoUI_setTaskDone(taskUiId, taskUiDone);
+  }
+
+  // Plantas — apply lista quando fetch terminou
+  if (plantsNeedsRefresh) {
+    plantsNeedsRefresh = false;
+    CultivoPlant buf[PLANTS_LOCAL_MAX] = {};
+    for (int i = 0; i < plantCountLocal; i++) {
+      buf[i].id            = plantsLocal[i].id;
+      buf[i].name          = plantsLocal[i].name;
+      buf[i].code          = plantsLocal[i].code[0] ? plantsLocal[i].code : nullptr;
+      buf[i].stage         = plantsLocal[i].stage;
+      buf[i].healthStatus  = plantsLocal[i].healthStatus;
+      buf[i].hasPhoto      = plantsLocal[i].hasPhoto;
+      buf[i].lastPhotoDate = plantsLocal[i].lastPhotoDate[0] ? plantsLocal[i].lastPhotoDate : nullptr;
+    }
+    cultivoUI_applyPlants(buf, plantCountLocal);
+  }
+  // Foto da planta chegou — entrega pra UI (decoda JPEG via TJPGD)
+  if (plantPhotoNeedsApply) {
+    plantPhotoNeedsApply = false;
+    cultivoUI_applyPlantPhoto(plantPhotoPlantId,
+                              plantPhotoLen > 0 ? plantPhotoBuf : nullptr,
+                              plantPhotoLen,
+                              plantPhotoHealth,
+                              plantPhotoDate);
   }
 
   // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI
