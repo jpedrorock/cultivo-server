@@ -627,7 +627,7 @@ const tentScenesRouter = router({
       // Mesmo enum dos devices — UI escolhe ícone do mapeamento (light=Lightbulb,
       // pump=Droplet pra rega, fan=Fan, schedule=Timer pra automações, etc).
       // Opcional — fallback Zap (raio).
-      iconHint: z.enum(['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'other']).optional(),
+      iconHint: z.enum(['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'camera', 'other']).optional(),
       // Duração real da cena em segundos. ESP usa pra mostrar spinner "executando"
       // até a duração real terminar (em vez de 5s fixo). Range 1-600s (10min).
       // Default 5 (= comportamento antigo).
@@ -718,7 +718,7 @@ const tentScenesRouter = router({
 });
 
 // ─── tentDevices router (dispositivos Tuya vinculados a estufa) ────────────────
-const ICON_HINTS = ['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'other'] as const;
+const ICON_HINTS = ['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'camera', 'other'] as const;
 
 const tentDevicesRouter = router({
   list: protectedProcedure
