@@ -1162,13 +1162,27 @@ static void paintDeviceState(int idx) {
 
   bool on = items[idx].state;
   if (on) {
-    // ON: card "aceso"
+    // ON: card "aceso". Cor do icone varia por iconHint pra dar mais
+    // realismo (lampada ligada = amarela, nao branca).
+    const char *hint = items[idx].iconHint;
+    uint32_t iconC = COL_TEXT;       // default branco
+    uint32_t glowC = COL_PRIMARY;    // default glow verde brand
+    if (!strcmp(hint, "light")) {
+      iconC = COL_YEL;               // 💡 lampada amarela quando acesa
+      glowC = COL_YEL;               // glow amarelo tbm
+    } else if (!strcmp(hint, "heater")) {
+      iconC = COL_RED;               // aquecedor vermelho
+      glowC = COL_RED;
+    } else if (!strcmp(hint, "ac")) {
+      iconC = COL_CYN;               // ar-condicionado ciano
+      glowC = COL_CYN;
+    }
     lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_PRIMARY), 0);
     lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_30, 0);
     lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
-    lv_obj_set_style_image_recolor(itemIcons[idx], lv_color_hex(COL_TEXT), 0);
-    // Shadow primary suave pra dar feel de "irradiando luz"
-    lv_obj_set_style_shadow_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_image_recolor(itemIcons[idx], lv_color_hex(iconC), 0);
+    // Shadow na cor do device pra dar feel "irradiando"
+    lv_obj_set_style_shadow_color(itemBtns[idx], lv_color_hex(glowC), 0);
     lv_obj_set_style_shadow_width(itemBtns[idx], 12, 0);
     lv_obj_set_style_shadow_opa(itemBtns[idx],   LV_OPA_30, 0);
     lv_obj_set_style_shadow_spread(itemBtns[idx], 0, 0);
@@ -1214,7 +1228,8 @@ static void itemSpinTick(lv_timer_t *t) {
     itemSpinStopInternal();
     return;
   }
-  itemSpinAngle = (itemSpinAngle + 36) % 3600;
+  // 90 decimos/tick × 20 ticks/s = 180°/s = ~2s/volta (era ~5s — lento)
+  itemSpinAngle = (itemSpinAngle + 90) % 3600;
   lv_obj_set_style_transform_rotation(itemIcons[itemSpinIdx], itemSpinAngle, 0);
 }
 
@@ -1254,9 +1269,12 @@ static void sceneClickCb(lv_event_t *e) {
   if (onSceneTrigger) onSceneTrigger(idx);
 
   // Refresh/sensor — animacao de rotacao no icone enquanto refresh roda.
+  // Seta isRefreshing=true pra que refreshHomeValues mostre toast "Atualizado"
+  // quando dados frescos chegarem (mesmo mecanismo do botao header antigo).
   // App vai chamar cultivoUI_stopItemSpin quando dados frescos chegarem.
   if (!strcmp(items[idx].iconHint, "refresh") ||
       !strcmp(items[idx].iconHint, "sensor")) {
+    isRefreshing = true;
     cultivoUI_startItemSpin(idx);
     return;
   }
