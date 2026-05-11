@@ -16,6 +16,7 @@
 //                                             legacy fallback: {scenes:[{id,name}]} se sem vínculos
 //   POST /api/device/scene-by-id/:sceneId/trigger → trigger por sceneId real
 //   POST /api/device/device-toggle          → liga/desliga device Tuya vinculado
+//   POST /api/device/automation-toggle      → ativa/pausa automation (cena programada)
 //   POST /api/device/refresh-tuya/:tentId   → forca poll Tuya (cria dailyLog)
 //   GET  /api/device/history/:tentId        → 24h/7d/30d history p/ chart
 //   GET  /api/device/history-all/:tentId    → 4 metricas em uma chamada (sparklines)
@@ -326,7 +327,7 @@ function registerDeviceRoutes(app: express.Application) {
 
       // 1) Carrega vínculos da estufa
       const [tentSceneRows]: any = await pool.execute(
-        `SELECT sceneId, name, position FROM tentScenes WHERE tentId = ? ORDER BY position ASC LIMIT 6`,
+        `SELECT sceneId, name, position, type FROM tentScenes WHERE tentId = ? ORDER BY position ASC LIMIT 6`,
         [device.tentId]
       );
       const [tentDeviceRows]: any = await pool.execute(
@@ -354,11 +355,14 @@ function registerDeviceRoutes(app: express.Application) {
         }
       }
 
-      // 3) Tem vínculos: monta itens, busca state dos devices em paralelo
+      // 3) Tem vínculos: monta itens, busca state dos devices em paralelo.
+      // tentScenes.type pode ser 'scene' (tap-to-run) ou 'automation' (programada).
+      // Display ESP usa pra escolher visual: scene = botao trigger one-shot,
+      // automation = toggle ON/OFF (dispara enable/disable na Tuya).
       const items: Array<any> = [];
       for (const r of tentSceneRows) {
         items.push({
-          type: 'scene',
+          type: (r.type as string) === 'automation' ? 'automation' : 'scene',
           id: r.sceneId as string,
           name: r.name as string,
           position: r.position as number,
@@ -505,6 +509,43 @@ function registerDeviceRoutes(app: express.Application) {
     } catch (err: any) {
       console.error('[Device] device-toggle error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao alternar device' });
+    }
+  });
+
+  // POST /api/device/automation-toggle — ativa/desativa cena PROGRAMADA Tuya
+  // (automation, type='automation' em tentScenes). Body: {automationId, enabled}.
+  // Tuya nao expoe state atual de automation pelo /v1.0/devices/.../status, entao
+  // o cliente (ESP) mantem state local; este endpoint so' aplica o desejado.
+  app.post('/api/device/automation-toggle', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const automationId = String(req.body?.automationId ?? '').trim();
+      const enabled = req.body?.enabled;
+      if (!automationId || typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'automationId e enabled (boolean) obrigatórios' });
+      }
+
+      // Valida que essa automation está vinculada à estufa (type='automation')
+      const [bindRows]: any = await pool.execute(
+        `SELECT id FROM tentScenes WHERE tentId = ? AND sceneId = ? AND type = 'automation' LIMIT 1`,
+        [device.tentId, automationId]
+      );
+      if (bindRows.length === 0) {
+        return res.status(403).json({ error: 'Automação não vinculada a esta estufa' });
+      }
+
+      const cfg = await getTuyaCfgForDevice(device);
+      if (!cfg) return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
+
+      const { setTuyaAutomationEnabled } = await import('../lib/tuya');
+      const r = await setTuyaAutomationEnabled(automationId, enabled, cfg.accessId, cfg.accessSecret, cfg.region);
+      console.log(`[Device] automation-toggle ${automationId} -> ${enabled ? 'ENABLED' : 'DISABLED'} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''})`);
+      if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
+      res.json({ success: true, automationId, enabled });
+    } catch (err: any) {
+      console.error('[Device] automation-toggle error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao alternar automação' });
     }
   });
 
