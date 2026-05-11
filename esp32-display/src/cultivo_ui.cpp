@@ -1137,9 +1137,10 @@ static const lv_image_dsc_t* resolveIcon(const char *hint, uint8_t type, int slo
 typedef struct {
   char     id[48];          // sceneId/deviceId Tuya
   char     name[24];        // label
-  uint8_t  type;            // 0=scene, 1=device
-  bool     state;           // device on/off
-  char     iconHint[16];    // "light"/"fan"/"dehumidifier"/etc (12 chars+null)
+  uint8_t  type;            // 0=scene, 1=device, 2=automation
+  bool     state;           // device/automation on/off
+  char     iconHint[16];    // "light"/"fan"/"dehumidifier"/etc
+  uint16_t executionSec;    // duracao scene em segundos (0 = default 5s)
 } ItemStorage;
 static ItemStorage items[SCENES_MAX];
 static int sceneCount = 0;  // mantem nome legado p/ minimizar diff
@@ -1316,7 +1317,7 @@ static void sceneClickCb(lv_event_t *e) {
 // Reset visual do card scene apos timeout do "executando"
 static lv_timer_t *sceneActiveTimer = nullptr;
 static int         sceneActiveIdx   = -1;
-static const uint32_t SCENE_ACTIVE_MS = 5000;  // 5s default
+static const uint32_t SCENE_ACTIVE_MS_DEFAULT = 5000;  // fallback se server nao enviou executionSec
 
 static void sceneActiveResetCb(lv_timer_t *t) {
   lv_timer_del(t);
@@ -1347,8 +1348,12 @@ static void sceneActivePulse(int idx) {
   lv_obj_set_style_shadow_width(itemBtns[idx], 12, 0);
   lv_obj_set_style_shadow_opa(itemBtns[idx],   LV_OPA_30, 0);
   lv_obj_set_style_shadow_spread(itemBtns[idx], 0, 0);
-  // Timer one-shot pra voltar ao normal
-  sceneActiveTimer = lv_timer_create(sceneActiveResetCb, SCENE_ACTIVE_MS, NULL);
+  // Timer one-shot pra voltar ao normal. Duracao vem do server (executionSec
+  // — campo configurado pelo user em /tent/X). Fallback 5s se ausente/0.
+  uint32_t durMs = items[idx].executionSec > 0
+                   ? (uint32_t)items[idx].executionSec * 1000UL
+                   : SCENE_ACTIVE_MS_DEFAULT;
+  sceneActiveTimer = lv_timer_create(sceneActiveResetCb, durMs, NULL);
   lv_timer_set_repeat_count(sceneActiveTimer, 1);
 }
 
@@ -1486,13 +1491,14 @@ extern "C" void cultivoUI_applyItems(const CultivoItem *src, int count) {
     copyStr(items[i].id,       sizeof(items[i].id),       src[i].id);
     copyStr(items[i].name,     sizeof(items[i].name),     src[i].name);
     copyStr(items[i].iconHint, sizeof(items[i].iconHint), src[i].iconHint);
-    items[i].type  = src[i].type;
-    items[i].state = src[i].state;
+    items[i].type         = src[i].type;
+    items[i].state        = src[i].state;
+    items[i].executionSec = src[i].executionSec;
   }
   // Limpa slots nao usados (evita render de lixo se shrink)
   for (int i = count; i < SCENES_MAX; i++) {
     items[i].id[0] = items[i].name[0] = items[i].iconHint[0] = '\0';
-    items[i].type = 0; items[i].state = false;
+    items[i].type = 0; items[i].state = false; items[i].executionSec = 0;
   }
   printf("[ui] cultivoUI_applyItems count=%d\n", count);
   rebuildSceneGrid();

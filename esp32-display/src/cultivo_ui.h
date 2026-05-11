@@ -69,11 +69,12 @@ void cultivoUI_applyHistory(void);
 #define SCENES_MAX 6
 
 typedef struct {
-  const char *id;        // sceneId ou deviceId Tuya
-  const char *name;      // label exibido
-  uint8_t     type;      // 0=scene, 1=device
-  bool        state;     // device on/off (ignorado p/ scene)
-  const char *iconHint;  // "light"|"fan"|"pump"|"heater"|"ac"|"" (default)
+  const char *id;          // sceneId ou deviceId Tuya
+  const char *name;        // label exibido
+  uint8_t     type;        // 0=scene, 1=device, 2=automation
+  bool        state;       // device/automation on/off (ignorado p/ scene)
+  const char *iconHint;    // "light"|"fan"|"pump"|"heater"|"ac"|"" (default)
+  uint16_t    executionSec; // duracao da cena em segundos (scene only); 0 = default 5s
 } CultivoItem;
 
 void cultivoUI_applyItems(const CultivoItem *items, int count);

@@ -1619,9 +1619,10 @@ static char    sceneIconHintLocal[SCENES_LOCAL_MAX][16] = {{0}};  // 16 cabe "de
 // 0=scene (trigger one-shot) | 1=device (toggle ON/OFF, state da Tuya) |
 // 2=automation (toggle ON/OFF, state local — Tuya nao expoe enabled status
 // pelo /devices/.../status, entao gerenciamos o ultimo desejado)
-static uint8_t sceneTypeLocal    [SCENES_LOCAL_MAX]     = {0};
-static bool    sceneStateLocal   [SCENES_LOCAL_MAX]     = {false};
-static int     sceneCountLocal = 0;
+static uint8_t  sceneTypeLocal        [SCENES_LOCAL_MAX] = {0};
+static bool     sceneStateLocal       [SCENES_LOCAL_MAX] = {false};
+static uint16_t sceneExecutionSecLocal[SCENES_LOCAL_MAX] = {0};  // duracao p/ scenes (0=default 5s)
+static int      sceneCountLocal = 0;
 
 static volatile bool scenesNeedsRefresh = false;
 static unsigned long lastScenesFetch = 0;
@@ -1646,9 +1647,10 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
   copyToBuf(sceneNamesLocal[n], sizeof(sceneNamesLocal[n]), name);
   if (isLegacyFormat) {
     // Legacy {scenes:[...]} sempre type=scene, sem iconHint, sem state
-    sceneTypeLocal[n]  = 0;
-    sceneStateLocal[n] = false;
-    sceneIconHintLocal[n][0] = '\0';
+    sceneTypeLocal[n]         = 0;
+    sceneStateLocal[n]        = false;
+    sceneIconHintLocal[n][0]  = '\0';
+    sceneExecutionSecLocal[n] = 0;  // = default 5s no UI side
   } else {
     // Novo {items:[...]}: type "scene"|"device"|"automation"
     const char *typeStr = obj["type"] | "scene";
@@ -1656,27 +1658,24 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
     else if (!strcmp(typeStr, "automation")) sceneTypeLocal[n] = 2;
     else                                      sceneTypeLocal[n] = 0;
 
-    // State handling:
-    //  - device : server envia state real da Tuya — sempre adota
-    //  - automation : Tuya nao expoe enabled status, server manda null.
-    //    Preservamos o ultimo state local (sceneStateLocal[n] de antes)
-    //    pra UI ficar "acesa" depois do user tocar.
-    //  - scene  : irrelevante (sem visual state)
+    // State handling (mesma logica de antes — ver comentario abaixo)
     JsonVariant stateVar = obj["state"];
     if (!stateVar.isNull()) {
       sceneStateLocal[n] = stateVar.as<bool>();
     }
-    // Se server nao envia state e for automation, mantem o que ja' tinha.
-    // (Pra type=scene tambem mantem, mas e' irrelevante visualmente.)
 
     copyToBuf(sceneIconHintLocal[n], sizeof(sceneIconHintLocal[n]),
               obj["iconHint"] | "");
-    // DEBUG: log per-item pra ver o que server tá mandando, especialmente
-    // o STATE dos devices (precisa vir da Tuya em real-time, nao cache)
-    Serial.printf("[net]   [%d] type=%s name=%-15s state=%s iconHint=%s id=%s\n",
+
+    // executionSec — duracao da cena em segundos (so' faz sentido pra
+    // type=scene; devices/automations recebem 0 = irrelevante). Default 5s
+    // no UI quando ausente ou 0.
+    sceneExecutionSecLocal[n] = (uint16_t)(obj["executionSec"] | 0);
+
+    Serial.printf("[net]   [%d] type=%s name=%-15s state=%s iconHint=%s execSec=%u id=%s\n",
                   n, typeStr, sceneNamesLocal[n],
                   sceneStateLocal[n] ? "ON" : "OFF",
-                  sceneIconHintLocal[n], sceneIdsLocal[n]);
+                  sceneIconHintLocal[n], sceneExecutionSecLocal[n], sceneIdsLocal[n]);
   }
   return true;
 }
@@ -2318,11 +2317,12 @@ void setup() {
       // Monta CultivoItem[] a partir do storage e aplica na UI
       CultivoItem buf[SCENES_LOCAL_MAX] = {};
       for (int i = 0; i < sceneCountLocal; i++) {
-        buf[i].id       = sceneIdsLocal[i];
-        buf[i].name     = sceneNamesLocal[i];
-        buf[i].type     = sceneTypeLocal[i];
-        buf[i].state    = sceneStateLocal[i];
-        buf[i].iconHint = sceneIconHintLocal[i];
+        buf[i].id           = sceneIdsLocal[i];
+        buf[i].name         = sceneNamesLocal[i];
+        buf[i].type         = sceneTypeLocal[i];
+        buf[i].state        = sceneStateLocal[i];
+        buf[i].iconHint     = sceneIconHintLocal[i];
+        buf[i].executionSec = sceneExecutionSecLocal[i];
       }
       cultivoUI_applyItems(buf, sceneCountLocal);
     }
@@ -2364,14 +2364,15 @@ void loop() {
   }
   if (scenesNeedsRefresh) {
     scenesNeedsRefresh = false;
-    // Monta CultivoItem[] a partir do storage (scene + device + iconHint + state)
+    // Monta CultivoItem[] a partir do storage (scene + device + iconHint + state + executionSec)
     CultivoItem buf[SCENES_LOCAL_MAX] = {};
     for (int i = 0; i < sceneCountLocal; i++) {
-      buf[i].id       = sceneIdsLocal[i];
-      buf[i].name     = sceneNamesLocal[i];
-      buf[i].type     = sceneTypeLocal[i];
-      buf[i].state    = sceneStateLocal[i];
-      buf[i].iconHint = sceneIconHintLocal[i];
+      buf[i].id           = sceneIdsLocal[i];
+      buf[i].name         = sceneNamesLocal[i];
+      buf[i].type         = sceneTypeLocal[i];
+      buf[i].state        = sceneStateLocal[i];
+      buf[i].iconHint     = sceneIconHintLocal[i];
+      buf[i].executionSec = sceneExecutionSecLocal[i];
     }
     cultivoUI_applyItems(buf, sceneCountLocal);
   }
