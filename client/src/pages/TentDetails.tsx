@@ -293,15 +293,27 @@ function DeviceToggleButton({
   deviceId: string;
   savedSwitchCode: string | null;
 }) {
-  const { data: status, isLoading, refetch } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+  const utils = trpc.useUtils();
+
+  // refetchOnWindowFocus garante que ao voltar pra tab a app capta mudancas
+  // feitas pelo display ESP / pelo SmartLife app sem esperar o intervalo.
+  // refetchInterval cobre o caso da tab ficar aberta sem foco.
+  const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId },
-    { refetchInterval: 30_000, retry: false, staleTime: 5_000 }
+    {
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      retry: false,
+      staleTime: 5_000,
+    }
   );
 
   const cmd = trpc.tuya.sendDeviceCommand.useMutation({
     onSuccess: () => {
-      // Re-fetch após pequeno delay pra Tuya propagar
-      setTimeout(() => refetch(), 600);
+      // Tuya as vezes leva ate ~1s pra propagar o comando. Espera, depois
+      // invalida o cache da query — re-fetch global (qualquer outro componente
+      // observando o mesmo deviceId tambem atualiza).
+      setTimeout(() => utils.tuya.getDeviceCurrentStatus.invalidate({ deviceId }), 600);
     },
     onError: (e) => toast.error(`Toggle: ${e.message}`),
   });
