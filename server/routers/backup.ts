@@ -221,7 +221,11 @@ export const backupRouter = router({
           // FKs em cascata). Pra deploy single-tenant atual (1 group por DB),
           // isso não acontece. Se o app ganhar multi-tenancy real, refazer.
           if (input.data.tents?.length) await tx.insert(tents).values(withGroup(input.data.tents));
-          if (input.data.strains?.length) await tx.insert(strains).values(sanitizeDates(input.data.strains));
+          // strains tem groupId — usa withGroup pra carimbar com gid do user logado.
+          // Antes era sanitizeDates (preservava groupId do backup). Backup malicioso
+          // podia injetar strain com groupId de OUTRO tenant — strain ficaria
+          // visível pra outro user. Agora todas as strains do import sao do user atual.
+          if (input.data.strains?.length) await tx.insert(strains).values(withGroup(input.data.strains));
           if (input.data.cycles?.length) await tx.insert(cycles).values(sanitizeDates(input.data.cycles));
           if (input.data.plants?.length) await tx.insert(plants).values(withGroup(input.data.plants));
           if (input.data.dailyLogs?.length) await tx.insert(dailyLogs).values(sanitizeDates(input.data.dailyLogs));
