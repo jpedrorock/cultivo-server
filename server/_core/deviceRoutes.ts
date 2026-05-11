@@ -12,7 +12,7 @@
 //   POST /api/device/task-complete          → toggle done
 //   POST /api/device/scene/:slotIdx/trigger → trigger cena Tuya (slot 0-9 -> env TUYA_SCENE_X)
 //   GET  /api/device/scenes                 → itens vinculados à estufa (cenas+devices)
-//                                             novo formato: {items:[{type,id,name,position,iconHint?,state?}]}
+//                                             novo formato: {items:[{type,id,name,position,iconHint?,state?,sceneType?}]}
 //                                             legacy fallback: {scenes:[{id,name}]} se sem vínculos
 //   POST /api/device/scene-by-id/:sceneId/trigger → trigger por sceneId real
 //   POST /api/device/device-toggle          → liga/desliga device Tuya vinculado
@@ -344,9 +344,15 @@ function registerDeviceRoutes(app: express.Application) {
       const device = await validateDeviceToken(req);
       if (!device) return res.status(401).json({ error: 'Token inválido' });
 
-      // 1) Carrega vínculos da estufa
+      // 1) Carrega vínculos da estufa.
+      // SELECT inclui iconHint + type pra cenas — antes ESP recebia só
+      // sceneId+name, sem nenhuma info pra escolher ícone certo (toda cena
+      // virava ícone default no display, mesmo após user salvar 'schedule'/'pump'
+      // pelo dropdown no app web). Agora ESP pode usar:
+      //   - iconHint pra mapear pro icone correto (light, pump, schedule, etc)
+      //   - sceneType pra mostrar badge de "agendado" se for automation
       const [tentSceneRows]: any = await pool.execute(
-        `SELECT sceneId, name, position FROM tentScenes WHERE tentId = ? ORDER BY position ASC LIMIT 6`,
+        `SELECT sceneId, name, position, iconHint, type FROM tentScenes WHERE tentId = ? ORDER BY position ASC LIMIT 6`,
         [device.tentId]
       );
       const [tentDeviceRows]: any = await pool.execute(
@@ -382,6 +388,8 @@ function registerDeviceRoutes(app: express.Application) {
           id: r.sceneId as string,
           name: r.name as string,
           position: r.position as number,
+          iconHint: r.iconHint as string | null,                                              // novo
+          sceneType: (r.type === 'automation' ? 'automation' : 'scene') as 'scene' | 'automation', // novo
         });
       }
 
