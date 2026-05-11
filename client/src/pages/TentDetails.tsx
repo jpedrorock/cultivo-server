@@ -603,15 +603,26 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                   if (!slot) return (
                     <div key={i} className="aspect-square rounded-lg border border-dashed border-border/40 bg-muted/20" />
                   );
-                  const Icon = slot.type === 'device'
-                    ? (ICON_HINT_COMPONENTS[slot.iconHint ?? 'other'] ?? Zap)
-                    : Zap;
-                  const ringColor = slot.type === 'device' ? 'ring-blue-500/30' : 'ring-amber-500/30';
-                  const iconColor = slot.type === 'device' ? 'text-blue-500' : 'text-amber-500';
+                  // Mesma lógica de fallback da row abaixo (manter consistência):
+                  // cena sem hint → 'pump' (gota), device sem hint → 'other' (raio).
+                  // ANTES: cenas eram hardcoded Zap aqui — bug visível: rega manual
+                  // sem iconHint salvo aparecia como ⚡ raio em vez de 💧 gota.
+                  const isSceneSlot = slot.type === 'scene';
+                  const sceneDefault = isSceneSlot ? 'pump' : 'other';
+                  const Icon = ICON_HINT_COMPONENTS[slot.iconHint ?? sceneDefault] ?? Zap;
+                  const ringColor = isSceneSlot ? 'ring-amber-500/30' : 'ring-blue-500/30';
+                  const iconColor = isSceneSlot ? 'text-amber-500' : 'text-blue-500';
+                  const isAutomationSlot = isSceneSlot && slot.sceneType === 'automation';
                   return (
-                    <div key={i} className={`aspect-square rounded-lg ring-1 ${ringColor} bg-muted/40 flex flex-col items-center justify-center gap-1 p-1`}>
+                    <div key={i} className={`relative aspect-square rounded-lg ring-1 ${ringColor} bg-muted/40 flex flex-col items-center justify-center gap-1 p-1`}>
                       <Icon className={`w-4 h-4 ${iconColor}`} />
                       <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+                      {/* Badge ⏰ pra automations (só se iconHint não for já 'schedule') */}
+                      {isAutomationSlot && slot.iconHint !== 'schedule' && (
+                        <span className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-blue-500/90 ring-1 ring-card flex items-center justify-center">
+                          <Clock className="w-2 h-2 text-white" strokeWidth={3} />
+                        </span>
+                      )}
                     </div>
                   );
                 })}
