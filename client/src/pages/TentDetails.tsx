@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -383,6 +383,193 @@ function DeviceToggleButton({
  * - Click: spinner curto
  * - Sucesso: toast "Cena disparada"
  */
+/**
+ * Botão de câmera — click abre modal com player HLS ao vivo.
+ *
+ * Tuya entrega URLs HLS (.m3u8) temporárias (~10min). Player usa hls.js,
+ * que funciona em Chrome/Firefox/Edge (Safari já tem HLS nativo mas hls.js
+ * cobre os 2 cenários).
+ *
+ * Renew automático: a cada 8 min re-aloca URL (margem de 2min antes da
+ * expiração default da Tuya). Se renew falhar, player segue rodando até
+ * Tuya cortar; user vê erro inline + botão "Tentar de novo".
+ */
+function CameraStreamDialog({
+  deviceId,
+  deviceName,
+  open,
+  onOpenChange,
+}: {
+  deviceId: string;
+  deviceName: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<any>(null);
+  const renewTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const allocate = trpc.tuya.getCameraStream.useMutation();
+
+  // Carrega ou renova a URL
+  const loadStream = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { url } = await allocate.mutateAsync({ deviceId, type: 'hls' });
+      setStreamUrl(url);
+    } catch (e: any) {
+      setError(e?.message ?? 'Falha ao alocar stream');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Ao abrir o dialog: aloca primeira URL
+  useEffect(() => {
+    if (!open) return;
+    loadStream();
+    // Renova a cada 8 min (Tuya expira ~10min)
+    renewTimerRef.current = setInterval(loadStream, 8 * 60 * 1000);
+    return () => {
+      if (renewTimerRef.current) clearInterval(renewTimerRef.current);
+      renewTimerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, deviceId]);
+
+  // Plug hls.js no <video> quando streamUrl mudar
+  useEffect(() => {
+    if (!streamUrl || !videoRef.current) return;
+    const video = videoRef.current;
+
+    // Cleanup do hls anterior
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    // Safari tem HLS nativo — só atribui o src
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = streamUrl;
+      video.play().catch(() => {/* user precisa tocar pra autoplay com som */});
+      return;
+    }
+
+    // Resto dos browsers: usa hls.js (carregamento dinâmico — só importa quando
+    // user abre o dialog, não vai no bundle inicial)
+    import('hls.js').then(({ default: Hls }) => {
+      if (!Hls.isSupported()) {
+        setError('Browser não suporta HLS');
+        return;
+      }
+      const hls = new Hls({ maxBufferLength: 5 });  // baixa latência
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {/* autoplay sem som ok */});
+      });
+      hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
+        if (data.fatal) {
+          console.warn('[CameraStream] HLS fatal:', data.type, data.details);
+          // Não set error visível — re-allocate vai tentar resolver
+        }
+      });
+      hlsRef.current = hls;
+    });
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [streamUrl]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <DialogTitle className="text-base flex items-center gap-2">
+            <Camera className="w-4 h-4" />
+            {deviceName}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Stream ao vivo (HLS) — Tuya/SmartLife
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="relative bg-black aspect-video">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center text-white/70">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          )}
+          {error && !loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70 p-4">
+              <AlertTriangle className="w-6 h-6 text-amber-400" />
+              <p className="text-xs text-center">{error}</p>
+              <Button size="sm" variant="outline" onClick={loadStream}>
+                <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                Tentar de novo
+              </Button>
+            </div>
+          )}
+          <video
+            ref={videoRef}
+            controls
+            playsInline
+            muted
+            className="w-full h-full object-contain"
+          />
+        </div>
+
+        <div className="px-4 py-2 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>URL renova a cada 8min (Tuya expira em ~10min)</span>
+          <button
+            onClick={loadStream}
+            disabled={loading}
+            className="flex items-center gap-1 hover:text-foreground disabled:opacity-50"
+            title="Renovar stream agora"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            Renovar
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Botão "câmera" — substitui o toggle pra devices com iconHint='camera'.
+ * Click abre <CameraStreamDialog>. Compartilha o style do DeviceToggleButton
+ * pra encaixar visualmente na row.
+ */
+function CameraButton({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        title={`Ver câmera: ${deviceName}`}
+        className="shrink-0 w-10 h-7 rounded-lg flex items-center justify-center bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25 transition-all active:scale-95"
+      >
+        <Camera className="w-3.5 h-3.5" />
+      </button>
+      <CameraStreamDialog
+        deviceId={deviceId}
+        deviceName={deviceName}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
+
 function ScenePlayButton({ sceneId, sceneName }: { sceneId: string; sceneName: string }) {
   const trigger = trpc.tuya.triggerScene.useMutation({
     onSuccess: () => toast.success(`▶ ${sceneName}`),
@@ -535,6 +722,29 @@ function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
       )}
       <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
     </button>
+  );
+}
+
+/** Slot funcional pra CÂMERA — click abre dialog com stream HLS ao vivo. */
+function PreviewCameraSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        title={`Ver câmera: ${slot.name}`}
+        className={`${SLOT_BASE} ${ringColorClass} bg-muted/40 hover:bg-indigo-500/10`}
+      >
+        <Icon className={`w-4 h-4 ${iconColorClass}`} />
+        <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+      </button>
+      <CameraStreamDialog
+        deviceId={slot.refId}
+        deviceName={slot.name}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
   );
 }
 
@@ -769,6 +979,10 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                   // hooks tRPC (queries + mutations) — React Query cache faz a
                   // sync com a row.
                   if (slot.type === 'device') {
+                    // Câmera não tem toggle on/off — abre dialog com stream
+                    if (slot.iconHint === 'camera') {
+                      return <PreviewCameraSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
+                    }
                     return <PreviewDeviceSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
                   }
                   if (isAutomationSlot) {
@@ -843,7 +1057,9 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                     ? (item.sceneType === 'automation'
                         ? <AutomationToggleButton automationId={item.refId} automationName={item.name} />
                         : <ScenePlayButton sceneId={item.refId} sceneName={item.name} />)
-                    : <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />
+                    : (item.iconHint === 'camera'
+                        ? <CameraButton deviceId={item.refId} deviceName={item.name} />
+                        : <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />)
                   }
                   <button
                     onClick={() => handleRemove(item)}

@@ -387,6 +387,48 @@ export async function getTuyaDeviceSwitchState(
 }
 
 /**
+ * Aloca uma URL de stream pra uma câmera IP Tuya/SmartLife.
+ *
+ * Tuya não dá um stream público fixo — você pede via API e ele aloca uma
+ * URL temporária (HLS .m3u8 ou RTSP). URL expira em ~10 minutos; precisa
+ * re-alocar pra renovar.
+ *
+ * Endpoint: POST /v2.0/devices/{deviceId}/stream/actions/allocate
+ *           body: {"type": "hls"|"rtsp"}
+ *
+ * @param deviceId  device Tuya da câmera
+ * @param type      'hls' (web) ou 'rtsp' (player nativo)
+ */
+export async function allocateTuyaCameraStream(
+  deviceId: string,
+  type: 'hls' | 'rtsp',
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<{ url: string | null; msg?: string }> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+
+  // Tenta v2.0 primeiro (versão atual), fallback v1.0 (compat)
+  const attempts = [
+    `/v2.0/devices/${deviceId}/stream/actions/allocate`,
+    `/v1.0/devices/${deviceId}/stream/actions/allocate`,
+  ];
+  let lastMsg = '';
+  for (const path of attempts) {
+    try {
+      const data = await tuyaPost(path, { type }, accessId, accessSecret, accessToken, region);
+      if (data.success && data.result?.url) {
+        return { url: data.result.url as string };
+      }
+      lastMsg = data.msg ?? data.code ?? '';
+    } catch (e: any) {
+      lastMsg = e?.message ?? String(e);
+    }
+  }
+  return { url: null, msg: lastMsg || 'Nenhum endpoint de stream funcionou' };
+}
+
+/**
  * Liga ou desliga um dispositivo via DP command.
  */
 export async function controlTuyaDevice(

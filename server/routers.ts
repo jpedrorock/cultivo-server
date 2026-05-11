@@ -585,6 +585,28 @@ const tuyaRouter = router({
       if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao alterar automação" });
       return { ok: true, enabled: input.enabled };
     }),
+
+  /**
+   * Aloca uma URL de stream pra uma câmera Tuya/SmartLife.
+   *
+   * Mutation (não query) porque a chamada ao Tuya tem side-effect de alocar
+   * recursos no lado deles + URL expira (~10min). Cliente chama uma vez
+   * pra abrir o player, e re-chama periodicamente pra renovar.
+   *
+   * Type default 'hls' (player web via hls.js).
+   */
+  getCameraStream: protectedProcedure
+    .input(z.object({
+      deviceId: z.string().min(1).max(64),
+      type: z.enum(['hls', 'rtsp']).default('hls'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { allocateTuyaCameraStream } = await import("./lib/tuya");
+      const result = await allocateTuyaCameraStream(input.deviceId, input.type, cfg.accessId, cfg.accessSecret, cfg.region);
+      if (!result.url) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Tuya não retornou URL de stream" });
+      return { url: result.url, type: input.type };
+    }),
 });
 
 // ─── tentScenes router (cenas Tuya vinculadas a estufa) ────────────────────────
