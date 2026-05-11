@@ -1119,8 +1119,11 @@ static const lv_image_dsc_t* resolveIcon(const char *hint, uint8_t type, int slo
   if (!strcmp(hint, "automation"))   return &ic_clock;
   if (!strcmp(hint, "timer"))        return &ic_timer;         // alternativa
   if (!strcmp(hint, "clock"))        return &ic_clock;
-  if (!strcmp(hint, "refresh"))      return &ic_refresh;       // 🔄 sensor refresh
-  if (!strcmp(hint, "sensor"))       return &ic_refresh;
+  // Sensor card: visual padrao e' "activity" (wave — sugere monitoramento).
+  // Durante tap, startItemSpin troca o src pra ic_refresh + rotaciona; quando
+  // termina (stopItemSpin), restaura ic_activity.
+  if (!strcmp(hint, "refresh"))      return &ic_activity;
+  if (!strcmp(hint, "sensor"))       return &ic_activity;
   if (!strcmp(hint, "other"))        return &ic_zap;           // ⚡ default fallback
   return &ic_zap;
 }
@@ -1191,12 +1194,16 @@ static void paintDeviceState(int idx) {
 
 // ── Spin do icone de um item (refresh em andamento) ──────────────────────────
 // Usado pelo card iconHint=refresh/sensor enquanto o server processa o
-// refreshTuya. Timer 50ms incrementa angulo 3.6 graus → ~5s por volta.
-// Auto-stop apos 10s caso esqueca de stopItemSpin (defensive).
+// refreshTuya. Visual: troca o icone "activity" (wave/sensor) pelo ic_refresh
+// + rotaciona rapido (~1s/volta). Quando termina (stopItemSpin), volta pra
+// ic_activity. Auto-stop apos 10s caso esqueca de stopItemSpin (defensive).
 static lv_timer_t *itemSpinTimer = nullptr;
 static int        itemSpinIdx    = -1;
 static int32_t    itemSpinAngle  = 0;
 static uint32_t   itemSpinStart  = 0;
+
+// Forward decl pra restaurar icone original
+static const lv_image_dsc_t* resolveIcon(const char *hint, uint8_t type, int slotIdx);
 
 static void itemSpinStopInternal() {
   if (itemSpinTimer) {
@@ -1204,7 +1211,13 @@ static void itemSpinStopInternal() {
     itemSpinTimer = nullptr;
   }
   if (itemSpinIdx >= 0 && itemSpinIdx < SCENES_MAX && itemIcons[itemSpinIdx]) {
+    // Reset rotation
     lv_obj_set_style_transform_rotation(itemIcons[itemSpinIdx], 0, 0);
+    // Restaura icone original (provavelmente ic_activity p/ sensor)
+    const lv_image_dsc_t *orig = resolveIcon(items[itemSpinIdx].iconHint,
+                                              items[itemSpinIdx].type,
+                                              itemSpinIdx);
+    lv_image_set_src(itemIcons[itemSpinIdx], orig);
   }
   itemSpinIdx = -1;
   itemSpinAngle = 0;
@@ -1221,8 +1234,8 @@ static void itemSpinTick(lv_timer_t *t) {
     itemSpinStopInternal();
     return;
   }
-  // 90 decimos/tick × 20 ticks/s = 180°/s = ~2s/volta (era ~5s — lento)
-  itemSpinAngle = (itemSpinAngle + 90) % 3600;
+  // 180 decimos/tick × 33 ticks/s (30ms) = ~6000 décimos/s ≈ 600°/s ≈ ~1s/volta
+  itemSpinAngle = (itemSpinAngle + 180) % 3600;
   lv_obj_set_style_transform_rotation(itemIcons[itemSpinIdx], itemSpinAngle, 0);
 }
 
@@ -1238,7 +1251,10 @@ extern "C" void cultivoUI_startItemSpin(int idx) {
   // canto top-left e o icone "viaja" pelo card
   lv_obj_set_style_transform_pivot_x(itemIcons[idx], 16, 0);
   lv_obj_set_style_transform_pivot_y(itemIcons[idx], 16, 0);
-  itemSpinTimer = lv_timer_create(itemSpinTick, 50, NULL);
+  // Troca o icone do card pra ic_refresh (so' durante o spin)
+  lv_image_set_src(itemIcons[idx], &ic_refresh);
+  // Tick 30ms pra animacao mais fluida (era 50ms)
+  itemSpinTimer = lv_timer_create(itemSpinTick, 30, NULL);
 }
 
 extern "C" void cultivoUI_stopItemSpin(int idx) {
