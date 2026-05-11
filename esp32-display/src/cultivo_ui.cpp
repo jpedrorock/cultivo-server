@@ -682,6 +682,9 @@ static void showToast(const char *msg) {
   lv_timer_set_repeat_count(t, 1);
 }
 
+// Forward decl — definida apos paintDeviceState (~500 linhas abaixo)
+extern "C" void cultivoUI_stopItemSpin(int idx);
+
 extern "C" void refreshHomeValues() {
   // Refresh trouxe valores frescos. Se estava refreshing (user tocou no
   // botao manual), mostra toast "Atualizado" pra confirmar conclusao.
@@ -690,8 +693,9 @@ extern "C" void refreshHomeValues() {
   bool wasManualRefresh = isRefreshing;
   isRefreshing = false;
   if (wasManualRefresh) showToast("Atualizado");
-  // Para spin de card refresh (caso user tenha tocado em item iconHint=refresh)
-  itemSpinStopInternal();
+  // Para spin de card refresh (caso user tenha tocado em item iconHint=refresh).
+  // Chamamos via API publica pra evitar forward decl da static interna.
+  cultivoUI_stopItemSpin(-1);
   char buf[64];
 
   // Header agora SO' tem nome da estufa (semana/fase migrou pro card CICLO).
