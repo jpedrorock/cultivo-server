@@ -117,30 +117,50 @@ function registerDeviceRoutes(app: express.Application) {
       const tentId = parseInt(req.params.tentId);
       if (device.tentId !== tentId) return res.status(403).json({ error: 'Token não autorizado para esta estufa' });
 
-      const [tentRows]: any = await pool.execute(`SELECT name FROM tents WHERE id = ? LIMIT 1`, [tentId]);
+      // SELECT inclui category — pra estufas de MAINTENANCE/DRYING, o ciclo
+      // VEGA/FLORA nao se aplica (display mostrava "Sem 1/8 VEGA" errado).
+      const [tentRows]: any = await pool.execute(
+        `SELECT name, category FROM tents WHERE id = ? LIMIT 1`, [tentId]);
       const tentName: string = tentRows[0]?.name ?? 'ESTUFA';
+      const category: string = (tentRows[0]?.category ?? 'VEGA').toUpperCase();
 
-      const [cycleRows]: any = await pool.execute(
-        `SELECT c.startDate, c.floraStartDate, s.floraWeeks, s.vegaWeeks
-         FROM cycles c
-         LEFT JOIN strains s ON s.id = c.strainId
-         WHERE c.tentId = ? AND c.status = 'ACTIVE'
-         LIMIT 1`,
-        [tentId]
-      );
+      let fase: string;
+      let semana = 0;
+      let totalSem = 0;
 
-      let fase = 'VEGA', semana = 1, totalSem = 8;
-      if (cycleRows.length > 0) {
-        const cy = cycleRows[0];
-        const now = Date.now();
-        if (cy.floraStartDate) {
-          fase = 'FLORA';
-          semana = Math.max(1, Math.ceil((now - new Date(cy.floraStartDate).getTime()) / 604800000));
-          totalSem = cy.floraWeeks ?? 8;
-        } else {
-          fase = 'VEGA';
-          semana = Math.max(1, Math.ceil((now - new Date(cy.startDate).getTime()) / 604800000));
-          totalSem = cy.vegaWeeks ?? 4;
+      // Pra estufas que NAO sao VEGA/FLORA (= sem cycle do tipo plantando),
+      // a fase vem da categoria da tent. Semana=0 indica "sem ciclo ativo"
+      // (display pode ocultar "Sem X/Y" e so' mostrar a fase).
+      if (category === 'MAINTENANCE') {
+        fase = 'MAINTENANCE';
+      } else if (category === 'DRYING') {
+        fase = 'DRYING';
+      } else {
+        // VEGA / FLORA / outros: olha cycle ativo pra refinar fase + semana
+        const [cycleRows]: any = await pool.execute(
+          `SELECT c.startDate, c.floraStartDate, s.floraWeeks, s.vegaWeeks
+           FROM cycles c
+           LEFT JOIN strains s ON s.id = c.strainId
+           WHERE c.tentId = ? AND c.status = 'ACTIVE'
+           LIMIT 1`,
+          [tentId]
+        );
+
+        fase = 'VEGA';
+        semana = 1;
+        totalSem = 8;
+        if (cycleRows.length > 0) {
+          const cy = cycleRows[0];
+          const now = Date.now();
+          if (cy.floraStartDate) {
+            fase = 'FLORA';
+            semana = Math.max(1, Math.ceil((now - new Date(cy.floraStartDate).getTime()) / 604800000));
+            totalSem = cy.floraWeeks ?? 8;
+          } else {
+            fase = 'VEGA';
+            semana = Math.max(1, Math.ceil((now - new Date(cy.startDate).getTime()) / 604800000));
+            totalSem = cy.vegaWeeks ?? 4;
+          }
         }
       }
 
