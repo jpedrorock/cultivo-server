@@ -132,6 +132,11 @@ void cultivoUI_applyPlants(const CultivoPlant *items, int count);
 typedef void (*CultivoPlantPhotoRequestFn)(int plantId);
 void cultivoUI_setPlantPhotoRequestHandler(CultivoPlantPhotoRequestFn cb);
 
+// Notificado quando user fecha o detalhe — app aproveita pra liberar o
+// buffer de DOWNLOAD HTTP (128KB PSRAM) que ficaria pinado entre views.
+typedef void (*CultivoPlantDetailClosedFn)(void);
+void cultivoUI_setPlantDetailClosedHandler(CultivoPlantDetailClosedFn cb);
+
 // Entrega da foto. jpegBytes==NULL OR len==0 → placeholder "indisponivel".
 // dateStr e' curto (ex: "08/05 12:30"). UI decoda via TJPGD nativo do LVGL.
 void cultivoUI_applyPlantPhoto(int plantId,

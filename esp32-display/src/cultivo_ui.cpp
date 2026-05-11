@@ -2094,8 +2094,12 @@ static size_t        plantJpegLen  = 0;
 static lv_image_dsc_t plantJpegDsc = {};
 
 static CultivoPlantPhotoRequestFn onPlantPhotoRequest = nullptr;
+static CultivoPlantDetailClosedFn onPlantDetailClosed = nullptr;
 extern "C" void cultivoUI_setPlantPhotoRequestHandler(CultivoPlantPhotoRequestFn cb) {
   onPlantPhotoRequest = cb;
+}
+extern "C" void cultivoUI_setPlantDetailClosedHandler(CultivoPlantDetailClosedFn cb) {
+  onPlantDetailClosed = cb;
 }
 
 static uint32_t healthColor(uint8_t status) {
@@ -2354,6 +2358,15 @@ static void closePlantDetail() {
   if (plantDetailScreen) { lv_obj_del(plantDetailScreen); plantDetailScreen = nullptr; }
   plantDetailImage = plantDetailStatus = plantDetailDate = plantDetailName = nullptr;
   plantDetailId = -1;
+  // Libera buffer JPEG da PSRAM — sem isso ficariam ~128KB pinados entre
+  // aberturas. PSRAM realloca rapido na proxima foto.
+  if (plantJpegBuf) {
+    heap_caps_free(plantJpegBuf);
+    plantJpegBuf = nullptr;
+    plantJpegLen = 0;
+  }
+  // Notifica app — main_lvgl libera o buffer de DOWNLOAD (outros 128KB)
+  if (onPlantDetailClosed) onPlantDetailClosed();
 }
 
 extern "C" void cultivoUI_applyPlantPhoto(int plantId,

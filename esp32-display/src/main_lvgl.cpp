@@ -1873,6 +1873,17 @@ static void plantPhotoRequestHandler(int plantId) {
   plantPhotoTapPending = true;
 }
 
+// User fechou detalhe — libera buffer de DOWNLOAD (128KB PSRAM). Copia
+// que LVGL/TJPGD usou (em cultivo_ui.cpp) ja' foi liberada la'. Sem isso,
+// ~128KB ficariam pinados entre views — desnecessario.
+static void plantDetailClosedHandler() {
+  if (plantPhotoBuf) {
+    heap_caps_free(plantPhotoBuf);
+    plantPhotoBuf = nullptr;
+    Serial.println("[plant] photo buf liberado (128KB)");
+  }
+}
+
 static void processPlantPhotoTap() {
   if (!plantPhotoTapPending) return;
   int id = plantPhotoTapId;
@@ -2389,6 +2400,7 @@ static void buildUI() {
   cultivoUI_setSceneTriggerHandler(sceneTriggerHandler);
   cultivoUI_setTaskToggleHandler(taskToggleHandler);
   cultivoUI_setPlantPhotoRequestHandler(plantPhotoRequestHandler);
+  cultivoUI_setPlantDetailClosedHandler(plantDetailClosedHandler);
   buildCultivoUI();
 }
 
