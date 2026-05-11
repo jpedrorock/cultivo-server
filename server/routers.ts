@@ -600,7 +600,7 @@ const tentScenesRouter = router({
       await validateTentOwnership(input.tentId, ctx.user.groupId);
       const pool = getMysqlPool();
       const [rows]: any = await pool.execute(
-        `SELECT id, sceneId, name, position, type, iconHint FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        `SELECT id, sceneId, name, position, type, iconHint, executionSec FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
         [input.tentId]
       );
       return (rows as any[]).map(r => ({
@@ -610,6 +610,7 @@ const tentScenesRouter = router({
         position: r.position as number,
         type: (r.type === 'automation' ? 'automation' : 'scene') as 'scene' | 'automation',
         iconHint: r.iconHint as string | null,
+        executionSec: (r.executionSec as number | null) ?? 5,
       }));
     }),
 
@@ -627,6 +628,10 @@ const tentScenesRouter = router({
       // pump=Droplet pra rega, fan=Fan, schedule=Timer pra automações, etc).
       // Opcional — fallback Zap (raio).
       iconHint: z.enum(['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'other']).optional(),
+      // Duração real da cena em segundos. ESP usa pra mostrar spinner "executando"
+      // até a duração real terminar (em vez de 5s fixo). Range 1-600s (10min).
+      // Default 5 (= comportamento antigo).
+      executionSec: z.number().int().min(1).max(600).default(5),
     }))
     .mutation(async ({ ctx, input }) => {
       await validateTentOwnership(input.tentId, ctx.user.groupId);
@@ -661,8 +666,8 @@ const tentScenesRouter = router({
       const nextPos = maxRow[0].next_pos;
 
       const [ins]: any = await pool.execute(
-        `INSERT INTO tentScenes (tentId, sceneId, name, position, type, iconHint) VALUES (?, ?, ?, ?, ?, ?)`,
-        [input.tentId, input.sceneId, input.name, nextPos, input.type, input.iconHint ?? null]
+        `INSERT INTO tentScenes (tentId, sceneId, name, position, type, iconHint, executionSec) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [input.tentId, input.sceneId, input.name, nextPos, input.type, input.iconHint ?? null, input.executionSec]
       );
       return { id: ins.insertId as number, position: nextPos, type: input.type };
     }),
@@ -859,7 +864,7 @@ const tentDisplayRouter = router({
       await validateTentOwnership(input.tentId, ctx.user.groupId);
       const pool = getMysqlPool();
       const [scenes]: any = await pool.execute(
-        `SELECT id, sceneId, name, position, type, iconHint FROM tentScenes WHERE tentId = ?`,
+        `SELECT id, sceneId, name, position, type, iconHint, executionSec FROM tentScenes WHERE tentId = ?`,
         [input.tentId]
       );
       const [devices]: any = await pool.execute(
@@ -878,6 +883,7 @@ const tentDisplayRouter = router({
           position: s.position as number,
           iconHint: s.iconHint as string | null,
           switchCode: null as string | null,
+          executionSec: (s.executionSec as number | null) ?? 5,
         })),
         ...(devices as any[]).map((d: any) => ({
           type: 'device' as const,
@@ -888,6 +894,7 @@ const tentDisplayRouter = router({
           position: d.position as number,
           iconHint: d.iconHint as string | null,
           switchCode: d.switchCode as string | null,
+          executionSec: null as number | null,  // só faz sentido pra cenas
         })),
       ];
       items.sort((a, b) => a.position - b.position || a.id - b.id);
