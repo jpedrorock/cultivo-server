@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -365,6 +365,38 @@ function DeviceToggleButton({
   );
 }
 
+/**
+ * Botão "▶ Disparar" pra cenas Tuya vinculadas à estufa.
+ *
+ * Cenas são one-shot (Tap-to-Run no Tuya) — não têm estado on/off como
+ * devices. Só dispara o conjunto de ações que o user configurou no app
+ * SmartLife (ex: "Modo noite": apaga luz + liga exaustor + ajusta umid).
+ *
+ * Mesmo path do app web (tuya.triggerScene). Feedback visual:
+ * - Hover: highlight
+ * - Click: spinner curto
+ * - Sucesso: toast "Cena disparada"
+ */
+function ScenePlayButton({ sceneId, sceneName }: { sceneId: string; sceneName: string }) {
+  const trigger = trpc.tuya.triggerScene.useMutation({
+    onSuccess: () => toast.success(`▶ ${sceneName}`),
+    onError: (e) => toast.error(`Falha ao disparar: ${e.message}`),
+  });
+
+  return (
+    <button
+      onClick={() => trigger.mutate({ sceneId })}
+      disabled={trigger.isPending}
+      title={`Disparar cena: ${sceneName}`}
+      className="shrink-0 w-10 h-7 rounded-lg flex items-center justify-center bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 transition-all active:scale-95 disabled:opacity-50"
+    >
+      {trigger.isPending
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : <Play className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
 function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const utils = trpc.useUtils();
   const [showSceneAdd, setShowSceneAdd] = useState(false);
@@ -543,10 +575,12 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                       {isScene ? 'Cena' : (ICON_HINT_LABELS[item.iconHint ?? 'other'] ?? 'Dispositivo')}
                     </p>
                   </div>
-                  {/* Toggle on/off SÓ pra devices (não faz sentido pra cenas — cenas são one-shot) */}
-                  {!isScene && (
-                    <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />
-                  )}
+                  {/* Ação inline: toggle on/off pra devices, ▶ disparar pra cenas.
+                      Espelha exatamente o que aparece no display ESP32. */}
+                  {isScene
+                    ? <ScenePlayButton sceneId={item.refId} sceneName={item.name} />
+                    : <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />
+                  }
                   <button
                     onClick={() => handleRemove(item)}
                     disabled={removeScene.isPending || removeDevice.isPending}
@@ -1569,11 +1603,13 @@ export default function TentDetails() {
             <TentPlantsTab tentId={tentId} tentName={tent.name} />
           </TabsContent>
 
-          {/* Tab SmartLife — sensor + pareamento ESP32 + cenas/devices em um só lugar */}
+          {/* Tab SmartLife — ESP primeiro (vínculos display + ações inline),
+              depois pareamento, depois sensor.
+              Hierarquia: o que o user usa mais frequente fica no topo. */}
           <TabsContent value="smartlife" className="space-y-4">
-            <TentSensorCard tentId={tentId} />
-            <PairDisplayCard tentId={tentId} />
             <TentDisplayItemsCard tentId={tentId} />
+            <PairDisplayCard tentId={tentId} />
+            <TentSensorCard tentId={tentId} />
           </TabsContent>
 
           {/* Tab Métricas (gráficos — antes era a tab "charts") */}
