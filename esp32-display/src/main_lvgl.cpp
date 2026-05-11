@@ -1655,7 +1655,20 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
     if      (!strcmp(typeStr, "device"))     sceneTypeLocal[n] = 1;
     else if (!strcmp(typeStr, "automation")) sceneTypeLocal[n] = 2;
     else                                      sceneTypeLocal[n] = 0;
-    sceneStateLocal[n] = obj["state"] | false;
+
+    // State handling:
+    //  - device : server envia state real da Tuya — sempre adota
+    //  - automation : Tuya nao expoe enabled status, server manda null.
+    //    Preservamos o ultimo state local (sceneStateLocal[n] de antes)
+    //    pra UI ficar "acesa" depois do user tocar.
+    //  - scene  : irrelevante (sem visual state)
+    JsonVariant stateVar = obj["state"];
+    if (!stateVar.isNull()) {
+      sceneStateLocal[n] = stateVar.as<bool>();
+    }
+    // Se server nao envia state e for automation, mantem o que ja' tinha.
+    // (Pra type=scene tambem mantem, mas e' irrelevante visualmente.)
+
     copyToBuf(sceneIconHintLocal[n], sizeof(sceneIconHintLocal[n]),
               obj["iconHint"] | "");
     // DEBUG: log per-item pra ver o que server tá mandando, especialmente
@@ -1938,6 +1951,16 @@ static void processSceneTap() {
   if (idx < 0 || idx >= sceneCountLocal) return;
   const char *id   = sceneIdsLocal[idx];
   const char *name = sceneNamesLocal[idx];
+  const char *hint = sceneIconHintLocal[idx];
+
+  // SPECIAL: iconHint=refresh/sensor — nao dispara cena, faz refresh dos
+  // sensores Tuya. Roda em paralelo com qualquer fetch periodico (flag).
+  // UI ja' iniciou spin (set no callback de tap em cultivo_ui).
+  if (!strcmp(hint, "refresh") || !strcmp(hint, "sensor")) {
+    Serial.printf("[refresh] tap idx=%d name=%s -> refresh sensores\n", idx, name);
+    refreshPending = true;  // netTaskFn vai chamar refreshTuyaNow
+    return;
+  }
 
   if (sceneTypeLocal[idx] == 1) {
     // Device — UI ja' inverteu visualmente. Storage main_lvgl ainda tem

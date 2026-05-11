@@ -85,6 +85,12 @@ void cultivoUI_applyScenes(const char *names[], int count);
 // atualiza visual on/off. Util quando POST /device-toggle responde.
 void cultivoUI_setDeviceState(int idx, bool state);
 
+// Spin do icone de um item no grid Cenas (feedback visual de refresh em
+// andamento — card com iconHint=refresh/sensor). startItemSpin gira o
+// icone continuamente; stopItemSpin reseta angulo. Timeout interno 10s.
+void cultivoUI_startItemSpin(int idx);
+void cultivoUI_stopItemSpin(int idx);
+
 // ── Build entry point ─────────────────────────────────────────────────────────
 void buildCultivoUI(void);
 

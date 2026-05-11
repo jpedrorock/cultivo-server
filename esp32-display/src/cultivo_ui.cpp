@@ -690,6 +690,8 @@ extern "C" void refreshHomeValues() {
   bool wasManualRefresh = isRefreshing;
   isRefreshing = false;
   if (wasManualRefresh) showToast("Atualizado");
+  // Para spin de card refresh (caso user tenha tocado em item iconHint=refresh)
+  itemSpinStopInternal();
   char buf[64];
 
   // Header agora SO' tem nome da estufa (semana/fase migrou pro card CICLO).
@@ -1176,6 +1178,62 @@ static void paintDeviceState(int idx) {
   }
 }
 
+// ── Spin do icone de um item (refresh em andamento) ──────────────────────────
+// Usado pelo card iconHint=refresh/sensor enquanto o server processa o
+// refreshTuya. Timer 50ms incrementa angulo 3.6 graus → ~5s por volta.
+// Auto-stop apos 10s caso esqueca de stopItemSpin (defensive).
+static lv_timer_t *itemSpinTimer = nullptr;
+static int        itemSpinIdx    = -1;
+static int32_t    itemSpinAngle  = 0;
+static uint32_t   itemSpinStart  = 0;
+
+static void itemSpinStopInternal() {
+  if (itemSpinTimer) {
+    lv_timer_del(itemSpinTimer);
+    itemSpinTimer = nullptr;
+  }
+  if (itemSpinIdx >= 0 && itemSpinIdx < SCENES_MAX && itemIcons[itemSpinIdx]) {
+    lv_obj_set_style_transform_rotation(itemIcons[itemSpinIdx], 0, 0);
+  }
+  itemSpinIdx = -1;
+  itemSpinAngle = 0;
+}
+
+static void itemSpinTick(lv_timer_t *t) {
+  (void)t;
+  // Timeout 10s (refresh deveria voltar bem antes)
+  if (lv_tick_get() - itemSpinStart > 10000) {
+    itemSpinStopInternal();
+    return;
+  }
+  if (itemSpinIdx < 0 || itemSpinIdx >= SCENES_MAX || !itemIcons[itemSpinIdx]) {
+    itemSpinStopInternal();
+    return;
+  }
+  itemSpinAngle = (itemSpinAngle + 36) % 3600;
+  lv_obj_set_style_transform_rotation(itemIcons[itemSpinIdx], itemSpinAngle, 0);
+}
+
+extern "C" void cultivoUI_startItemSpin(int idx) {
+  if (idx < 0 || idx >= sceneCount) return;
+  if (!itemIcons[idx]) return;
+  // Para spin anterior se ainda rodando em outro item
+  if (itemSpinTimer) itemSpinStopInternal();
+  itemSpinIdx   = idx;
+  itemSpinAngle = 0;
+  itemSpinStart = lv_tick_get();
+  // Pivot no centro do icone (32x32 = 16,16) — sem isso gira em torno do
+  // canto top-left e o icone "viaja" pelo card
+  lv_obj_set_style_transform_pivot_x(itemIcons[idx], 16, 0);
+  lv_obj_set_style_transform_pivot_y(itemIcons[idx], 16, 0);
+  itemSpinTimer = lv_timer_create(itemSpinTick, 50, NULL);
+}
+
+extern "C" void cultivoUI_stopItemSpin(int idx) {
+  (void)idx;  // sempre para o spin ativo (so' tem 1 por vez)
+  itemSpinStopInternal();
+}
+
 // Feedback de tap:
 //   scene  : flash border primary (one-shot) — sem state, so' confirma trigger
 //   device : NAO inverte state localmente (era "optimistic toggle" e gerava
@@ -1190,6 +1248,14 @@ static void sceneClickCb(lv_event_t *e) {
   printf("[ui] item tap idx=%d type=%d (%s)\n",
          idx, items[idx].type, items[idx].name);
   if (onSceneTrigger) onSceneTrigger(idx);
+
+  // Refresh/sensor — animacao de rotacao no icone enquanto refresh roda.
+  // App vai chamar cultivoUI_stopItemSpin quando dados frescos chegarem.
+  if (!strcmp(items[idx].iconHint, "refresh") ||
+      !strcmp(items[idx].iconHint, "sensor")) {
+    cultivoUI_startItemSpin(idx);
+    return;
+  }
 
   if (items[idx].type == 1 || items[idx].type == 2) {
     // Device OU automation — feedback "carregando" sem mudar state local.
