@@ -656,6 +656,16 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // Devices já tem iconHint pra mostrar ícone certo no display ESP + UI.
+    // Cenas precisam do mesmo: "Rega Manual" → gota, "Lâmpada noite" →
+    // lâmpada, etc. Antes era hardcoded Zap pra TODA cena, sem distinção.
+    id: 'add-tentScenes-iconHint',
+    description: 'Adiciona tentScenes.iconHint (mesmo padrão de tentDevices)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'tentScenes', 'iconHint', 'VARCHAR(20) NULL AFTER `type`');
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

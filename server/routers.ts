@@ -600,7 +600,7 @@ const tentScenesRouter = router({
       await validateTentOwnership(input.tentId, ctx.user.groupId);
       const pool = getMysqlPool();
       const [rows]: any = await pool.execute(
-        `SELECT id, sceneId, name, position, type FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        `SELECT id, sceneId, name, position, type, iconHint FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
         [input.tentId]
       );
       return (rows as any[]).map(r => ({
@@ -609,6 +609,7 @@ const tentScenesRouter = router({
         name: r.name as string,
         position: r.position as number,
         type: (r.type === 'automation' ? 'automation' : 'scene') as 'scene' | 'automation',
+        iconHint: r.iconHint as string | null,
       }));
     }),
 
@@ -622,6 +623,10 @@ const tentScenesRouter = router({
       // (scene = Tap-to-Run → ▶ play one-shot;
       //  automation = scheduled rule → ⏰ toggle enable/disable).
       type: z.enum(['scene', 'automation']).default('scene'),
+      // Mesmo enum dos devices — UI escolhe ícone do mapeamento (light=Lightbulb,
+      // pump=Droplet pra rega, fan=Fan, schedule=Timer pra automações, etc).
+      // Opcional — fallback Zap (raio).
+      iconHint: z.enum(['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'other']).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await validateTentOwnership(input.tentId, ctx.user.groupId);
@@ -656,8 +661,8 @@ const tentScenesRouter = router({
       const nextPos = maxRow[0].next_pos;
 
       const [ins]: any = await pool.execute(
-        `INSERT INTO tentScenes (tentId, sceneId, name, position, type) VALUES (?, ?, ?, ?, ?)`,
-        [input.tentId, input.sceneId, input.name, nextPos, input.type]
+        `INSERT INTO tentScenes (tentId, sceneId, name, position, type, iconHint) VALUES (?, ?, ?, ?, ?, ?)`,
+        [input.tentId, input.sceneId, input.name, nextPos, input.type, input.iconHint ?? null]
       );
       return { id: ins.insertId as number, position: nextPos, type: input.type };
     }),
@@ -708,7 +713,7 @@ const tentScenesRouter = router({
 });
 
 // ─── tentDevices router (dispositivos Tuya vinculados a estufa) ────────────────
-const ICON_HINTS = ['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'other'] as const;
+const ICON_HINTS = ['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'other'] as const;
 
 const tentDevicesRouter = router({
   list: protectedProcedure
@@ -854,7 +859,7 @@ const tentDisplayRouter = router({
       await validateTentOwnership(input.tentId, ctx.user.groupId);
       const pool = getMysqlPool();
       const [scenes]: any = await pool.execute(
-        `SELECT id, sceneId, name, position, type FROM tentScenes WHERE tentId = ?`,
+        `SELECT id, sceneId, name, position, type, iconHint FROM tentScenes WHERE tentId = ?`,
         [input.tentId]
       );
       const [devices]: any = await pool.execute(
@@ -871,7 +876,7 @@ const tentDisplayRouter = router({
           refId: s.sceneId as string,
           name: s.name as string,
           position: s.position as number,
-          iconHint: null as string | null,
+          iconHint: s.iconHint as string | null,
           switchCode: null as string | null,
         })),
         ...(devices as any[]).map((d: any) => ({

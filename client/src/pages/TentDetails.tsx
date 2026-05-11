@@ -256,6 +256,8 @@ const ICON_HINT_LABELS: Record<string, string> = {
   humidifier: 'Umidificador',
   dehumidifier: 'Desumidificador',
   co2: 'CO₂',
+  schedule: 'Agendado / Timer',
+  refresh: 'Sensor / Atualizar',
   other: 'Outro',
 };
 
@@ -268,6 +270,8 @@ const ICON_HINT_COMPONENTS: Record<string, React.ComponentType<{ className?: str
   humidifier: Cloud,
   dehumidifier: Wind,
   co2: Cloud,
+  schedule: Clock,        // cena programada (rega automática etc)
+  refresh: RefreshCw,     // sensor / ação que atualiza dados
   other: Zap,
 };
 
@@ -473,6 +477,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const [showSceneAdd, setShowSceneAdd] = useState(false);
   const [showDeviceAdd, setShowDeviceAdd] = useState(false);
   const [selectedSceneId, setSelectedSceneId] = useState<string>('');
+  const [selectedSceneIconHint, setSelectedSceneIconHint] = useState<string>('pump'); // default droplet (rega)
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [selectedIconHint, setSelectedIconHint] = useState<string>('other');
 
@@ -502,7 +507,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   };
 
   const addScene = trpc.tentScenes.add.useMutation({
-    onSuccess: () => { toast.success('Cena adicionada'); invalidateAll(); setSelectedSceneId(''); setShowSceneAdd(false); },
+    onSuccess: () => { toast.success('Cena adicionada'); invalidateAll(); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); setShowSceneAdd(false); },
     onError: (e) => toast.error(e.message),
   });
   const removeScene = trpc.tentScenes.remove.useMutation({
@@ -529,7 +534,13 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
     // Salva o type vindo da API Tuya (homeName === 'Automações' = automation,
     // senão = scene one-shot). UI usa pra escolher botão certo: ▶ play ou ⏰ toggle.
     const type = scene.homeName === 'Automações' ? 'automation' : 'scene';
-    addScene.mutate({ tentId, sceneId: scene.sceneId, name: scene.name, type });
+    addScene.mutate({
+      tentId,
+      sceneId: scene.sceneId,
+      name: scene.name,
+      type,
+      iconHint: selectedSceneIconHint as any,
+    });
   };
   const handleAddDevice = () => {
     if (!selectedDeviceId) return;
@@ -615,9 +626,14 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Itens vinculados</p>
             {(items as any[]).map((item: any, idx: number) => {
               const isScene = item.type === 'scene';
-              const Icon = isScene ? Zap : (ICON_HINT_COMPONENTS[item.iconHint ?? 'other'] ?? Zap);
+              // Cenas e devices ambos usam iconHint salvo (ICON_HINT_COMPONENTS).
+              // Cenas sem hint caem em pump (gota — default razoável: maioria das
+              // cenas vinculadas é rega manual). Devices sem hint caem em other (Zap).
+              const sceneDefault = isScene ? 'pump' : 'other';
+              const Icon = ICON_HINT_COMPONENTS[item.iconHint ?? sceneDefault] ?? Zap;
               const iconBg = isScene ? 'bg-amber-500/15' : 'bg-blue-500/15';
               const iconColor = isScene ? 'text-amber-500' : 'text-blue-500';
+              const isAutomation = isScene && item.sceneType === 'automation';
               return (
                 <div key={`${item.type}-${item.id}`} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-muted/40">
                   {/* Setas ↑↓ */}
@@ -640,8 +656,15 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                     </button>
                   </div>
 
-                  <div className={`w-7 h-7 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
+                  {/* Container do ícone com badge Clock no canto pra automations
+                      (só quando o iconHint não é 'schedule' — senão fica redundante). */}
+                  <div className={`relative w-7 h-7 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
                     <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+                    {isAutomation && item.iconHint !== 'schedule' && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500/90 ring-1 ring-card flex items-center justify-center">
+                        <Clock className="w-2 h-2 text-white" strokeWidth={3} />
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground truncate">{item.name}</p>
@@ -705,8 +728,20 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                       </option>
                     ))}
                 </select>
+                {/* Dropdown de iconHint — escolhe ícone que aparece no display ESP
+                    e na lista. Default 'pump' (gota) porque maioria das cenas
+                    vinculadas é rega manual. */}
+                <select
+                  value={selectedSceneIconHint}
+                  onChange={e => setSelectedSceneIconHint(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  {Object.entries(ICON_HINT_LABELS).map(([k, label]) => (
+                    <option key={k} value={k}>{label}</option>
+                  ))}
+                </select>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowSceneAdd(false); setSelectedSceneId(''); }}>Cancelar</Button>
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowSceneAdd(false); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); }}>Cancelar</Button>
                   <Button size="sm" className="flex-1" disabled={!selectedSceneId || addScene.isPending} onClick={handleAddScene}>
                     {addScene.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Adicionar'}
                   </Button>
