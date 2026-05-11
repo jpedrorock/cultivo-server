@@ -1680,6 +1680,124 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
   return true;
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// TAREFAS — aba 4 do display. fetchTasks GET /api/device/tasks/<tentId>
+// retorna lista de standaloneTasks ({id, texto, feito}). UI mostra
+// checkbox + label + scroll. Tap dispara POST /api/device/task-complete.
+// ════════════════════════════════════════════════════════════════════════════════
+#define TASKS_LOCAL_MAX 10
+static int  taskIdsLocal   [TASKS_LOCAL_MAX] = {0};
+static char taskTitlesLocal[TASKS_LOCAL_MAX][64] = {{0}};
+static bool taskDoneLocal  [TASKS_LOCAL_MAX] = {false};
+static int  taskCountLocal = 0;
+static volatile bool tasksNeedsRefresh = false;
+static unsigned long lastTasksFetch = 0;
+static const unsigned long TASKS_FETCH_INTERVAL = 60UL * 1000UL;  // 1 min
+
+static bool fetchTasks() {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/tasks/%d", SERVER_URL, TENT_ID);
+  httpBegin(http, url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[net] tasks HTTP %d\n", code);
+    http.end();
+    return false;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) {
+    Serial.printf("[net] tasks JSON err: %s\n", err.c_str());
+    return false;
+  }
+  // Response: array de {id, texto, feito} (formato definido no deviceRoutes)
+  JsonArray arr = doc.as<JsonArray>();
+  int n = 0;
+  for (JsonObject t : arr) {
+    if (n >= TASKS_LOCAL_MAX) break;
+    int id = t["id"] | 0;
+    const char *texto = t["texto"] | "";
+    bool feito = t["feito"] | false;
+    if (id <= 0 || !*texto) continue;
+    taskIdsLocal[n] = id;
+    strncpy(taskTitlesLocal[n], texto, sizeof(taskTitlesLocal[n]) - 1);
+    taskTitlesLocal[n][sizeof(taskTitlesLocal[n]) - 1] = '\0';
+    taskDoneLocal[n] = feito;
+    n++;
+  }
+  taskCountLocal = n;
+  Serial.printf("[net] tasks: %d carregadas\n", taskCountLocal);
+  tasksNeedsRefresh = true;
+  return true;
+}
+
+// POST /api/device/task-complete — server toggla isDone e retorna novo state.
+// Body: {"taskId": <id>}
+static bool postTaskComplete(int taskId, bool *outDone) {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/task-complete", SERVER_URL);
+  if (!httpBegin(http, url)) return false;
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.addHeader("Content-Type", "application/json");
+  char body[48];
+  snprintf(body, sizeof(body), "{\"taskId\":%d}", taskId);
+  http.setTimeout(5000);
+  int code = http.POST(body);
+  if (code != 200) {
+    Serial.printf("[task] toggle id=%d HTTP %d\n", taskId, code);
+    http.end();
+    return false;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return true;  // assume OK
+  if (outDone) *outDone = doc["feito"] | false;
+  Serial.printf("[task] toggle id=%d -> %s OK\n", taskId, *outDone ? "DONE" : "TODO");
+  return true;
+}
+
+// Pending tap (handler LVGL nao chama HTTP — enfileira pra tapTask processar)
+static volatile bool taskTapPending = false;
+static int           taskTapId      = 0;
+static volatile bool taskUiPending  = false;
+static int           taskUiId       = 0;
+static bool          taskUiDone     = false;
+
+static void taskToggleHandler(int taskId) {
+  if (taskTapPending) {
+    Serial.println("[task] outro tap pending — ignorado");
+    return;
+  }
+  taskTapId = taskId;
+  taskTapPending = true;
+}
+
+static void processTaskTap() {
+  if (!taskTapPending) return;
+  int id = taskTapId;
+  taskTapPending = false;
+  bool newDone = false;
+  bool ok = postTaskComplete(id, &newDone);
+  // Atualiza storage local + sinaliza UI
+  for (int i = 0; i < taskCountLocal; i++) {
+    if (taskIdsLocal[i] == id) {
+      taskDoneLocal[i] = ok ? newDone : !taskDoneLocal[i];  // revert se falhou (UI ja' inverteu)
+      taskUiId   = id;
+      taskUiDone = taskDoneLocal[i];
+      taskUiPending = true;
+      break;
+    }
+  }
+}
+
 // fetchScenes: GET /api/device/scenes. Aceita {items:[...]} (formato novo
 // sprint 1) OU {scenes:[...]} (legacy) — server decide qual mandar baseado
 // em ter vinculos na tentScenes/tentDevices.
@@ -1744,6 +1862,11 @@ static void tapTaskFn(void *param) {
       processSceneTap();
       logIfSlow("sceneTap", t0, 9000);
     }
+    if (taskTapPending && wifiOk) {
+      uint32_t t0 = millis();
+      processTaskTap();
+      logIfSlow("taskTap", t0, 6000);
+    }
     vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
@@ -1783,6 +1906,14 @@ static void netTaskFn(void *param) {
       uint32_t t0 = millis();
       fetchScenes();
       logIfSlow("scenes", t0, 9000);
+    }
+
+    // Tarefas — refresh a cada 1min (mudam quando user marca no app)
+    if (millis() - lastTasksFetch >= TASKS_FETCH_INTERVAL) {
+      lastTasksFetch = millis();
+      uint32_t t0 = millis();
+      fetchTasks();
+      logIfSlow("tasks", t0, 6000);
     }
 
     vTaskDelay(pdMS_TO_TICKS(100));
@@ -2035,6 +2166,7 @@ static void buildUI() {
   cultivoUI_setConfigOpenHandler(openConfigModal);
   cultivoUI_setRefreshHandler(refreshHandler);
   cultivoUI_setSceneTriggerHandler(sceneTriggerHandler);
+  cultivoUI_setTaskToggleHandler(taskToggleHandler);
   buildCultivoUI();
 }
 
@@ -2381,6 +2513,23 @@ void loop() {
   if (deviceTogglePendingUI) {
     deviceTogglePendingUI = false;
     cultivoUI_setDeviceState(deviceToggleResIdx, deviceToggleResState);
+  }
+
+  // Tarefas — apply lista quando fetch terminou
+  if (tasksNeedsRefresh) {
+    tasksNeedsRefresh = false;
+    CultivoTask buf[TASKS_LOCAL_MAX] = {};
+    for (int i = 0; i < taskCountLocal; i++) {
+      buf[i].id    = taskIdsLocal[i];
+      buf[i].title = taskTitlesLocal[i];
+      buf[i].done  = taskDoneLocal[i];
+    }
+    cultivoUI_applyTasks(buf, taskCountLocal);
+  }
+  // Resultado de task toggle — sinaliza UI com state final
+  if (taskUiPending) {
+    taskUiPending = false;
+    cultivoUI_setTaskDone(taskUiId, taskUiDone);
   }
 
   // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI

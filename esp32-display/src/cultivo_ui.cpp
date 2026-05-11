@@ -126,15 +126,16 @@ extern "C" void cultivoUI_setRefreshing(bool active) {
 // ════════════════════════════════════════════════════════════════════════════════
 // Navbar 3 tabs: Home / Hist / Cenas
 // DS: ativo SEMPRE em COL_PRIMARY (verde brand) com indicador linha 2px
-// no topo do tab. Era 3 cores diferentes (GRN/CYN/AMBER) — ficava parecendo
-// botoes desconectados, agora sao "tabs" coerentes igual app/iOS.
-#define NAV_COUNT 3
+// no topo do tab. 4 tabs: Home / Historico / Dispositivos / Tarefas.
+// (Renomeado de "Cenas" pra "Dispositivos" pq na pratica mistura cenas +
+// devices + automations vinculados a estufa.)
+#define NAV_COUNT 4
 static const lv_image_dsc_t *NAV_ICONS_IMG[NAV_COUNT] = {
-  &ic_home, &ic_activity, &ic_zap
+  &ic_home, &ic_activity, &ic_zap, &ic_tasks
 };
 
 static lv_obj_t *contentArea;
-static lv_obj_t *screenHome, *screenTarefa, *screenGrafic;
+static lv_obj_t *screenHome, *screenTarefa, *screenGrafic, *screenTasks;
 static lv_obj_t *screenLux = nullptr, *screenPhEc = nullptr;  // legacy refs
 static lv_obj_t *navbar;
 static lv_obj_t *navIcons[NAV_COUNT];
@@ -1540,8 +1541,8 @@ static void buildTarefas(lv_obj_t *tab) {
   lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
-  makeLabel(tab, "CENAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
-  makeLabel(tab, "Atalhos Tuya", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+  makeLabel(tab, "DISPOSITIVOS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
+  makeLabel(tab, "Cenas + controles", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
 
   // Guarda parent pra rebuild dinamico quando applyScenes for chamado
   sceneTab = tab;
@@ -1750,9 +1751,9 @@ static void navSetActive(int idx) {
 
 static void switchScreen(int idx) {
   if (idx == activeScreen) return;
-  // 3 tabs: Home / Hist / Cenas
+  // 4 tabs: 0=Home, 1=Historico, 2=Dispositivos, 3=Tarefas
   lv_obj_t *screens[NAV_COUNT] = {
-    screenHome, screenGrafic, screenTarefa
+    screenHome, screenGrafic, screenTarefa, screenTasks
   };
   if (idx < 0 || idx >= NAV_COUNT) return;
 
@@ -1865,6 +1866,181 @@ static void mockTimerCb(lv_timer_t *t) {
 #endif  // CULTIVO_SIM
 
 // ════════════════════════════════════════════════════════════════════════════════
+// Aba TAREFAS — lista vertical scrollable. App preenche via applyTasks.
+// Tap em qualquer row dispara onTaskToggle(taskId) e UI inverte visual
+// (optimistic, server confirma ou reverte via setTaskDone).
+// ════════════════════════════════════════════════════════════════════════════════
+typedef struct {
+  int  id;
+  char title[64];
+  bool done;
+} TaskStorage;
+static TaskStorage tasks[TASKS_MAX];
+static int taskCount = 0;
+static lv_obj_t *tasksTab     = nullptr;
+static lv_obj_t *tasksList    = nullptr;  // container scrollable
+static lv_obj_t *tasksEmpty   = nullptr;  // empty state
+static lv_obj_t *taskRows[TASKS_MAX] = {nullptr};
+static lv_obj_t *taskChecks[TASKS_MAX] = {nullptr};
+static lv_obj_t *taskLabels[TASKS_MAX] = {nullptr};
+
+static CultivoTaskToggleFn onTaskToggle = nullptr;
+extern "C" void cultivoUI_setTaskToggleHandler(CultivoTaskToggleFn cb) {
+  onTaskToggle = cb;
+}
+
+// Pinta row conforme done: ✓ verde sobre bg primary opa 20 + label dim
+// strikethrough; OFF: ⬜ vazio + label COL_TEXT
+static void paintTaskRow(int idx) {
+  if (idx < 0 || idx >= TASKS_MAX) return;
+  if (!taskRows[idx] || !taskChecks[idx] || !taskLabels[idx]) return;
+  bool done = tasks[idx].done;
+  if (done) {
+    lv_image_set_src(taskChecks[idx], &ic_check_circle);
+    lv_obj_set_style_image_recolor(taskChecks[idx], lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_text_color(taskLabels[idx], lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_decor(taskLabels[idx], LV_TEXT_DECOR_STRIKETHROUGH, 0);
+    lv_obj_set_style_bg_opa(taskRows[idx], LV_OPA_10, 0);
+  } else {
+    lv_image_set_src(taskChecks[idx], &ic_check_circle);
+    lv_obj_set_style_image_recolor(taskChecks[idx], lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_color(taskLabels[idx], lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_decor(taskLabels[idx], LV_TEXT_DECOR_NONE, 0);
+    lv_obj_set_style_bg_opa(taskRows[idx], LV_OPA_COVER, 0);
+  }
+}
+
+static void taskRowClickCb(lv_event_t *e) {
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  if (idx < 0 || idx >= taskCount) return;
+  // Optimistic flip
+  tasks[idx].done = !tasks[idx].done;
+  paintTaskRow(idx);
+  printf("[ui] task tap idx=%d id=%d -> %s\n",
+         idx, tasks[idx].id, tasks[idx].done ? "DONE" : "TODO");
+  if (onTaskToggle) onTaskToggle(tasks[idx].id);
+}
+
+static void rebuildTasksList() {
+  if (!tasksTab) return;
+  // Drop estruturas anteriores
+  if (tasksList)  { lv_obj_del(tasksList);  tasksList = nullptr; }
+  if (tasksEmpty) { lv_obj_del(tasksEmpty); tasksEmpty = nullptr; }
+  for (int i = 0; i < TASKS_MAX; i++) {
+    taskRows[i] = taskChecks[i] = taskLabels[i] = nullptr;
+  }
+
+  // Empty state
+  if (taskCount == 0) {
+    tasksEmpty = lv_label_create(tasksTab);
+    lv_label_set_text(tasksEmpty,
+      "Nenhuma tarefa pendente\n"
+      "Cadastre tarefas no app web");
+    lv_obj_set_style_text_color(tasksEmpty, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(tasksEmpty, FONT_CAPTION, 0);
+    lv_obj_set_style_text_align(tasksEmpty, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(tasksEmpty, LV_ALIGN_CENTER, 0, sh(8));
+    return;
+  }
+
+  // Container scrollable
+  int listY = sh(28);
+  int listH = TAB_H - listY - sh(4);
+  tasksList = lv_obj_create(tasksTab);
+  lv_obj_set_size(tasksList, SCREEN_W, listH);
+  lv_obj_set_pos(tasksList, 0, listY);
+  lv_obj_set_style_bg_opa(tasksList, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(tasksList, 0, 0);
+  lv_obj_set_style_pad_all(tasksList, sw(6), 0);
+  lv_obj_set_flex_flow(tasksList, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(tasksList, sh(4), 0);
+  lv_obj_set_scroll_dir(tasksList, LV_DIR_VER);
+
+  for (int i = 0; i < taskCount && i < TASKS_MAX; i++) {
+    lv_obj_t *row = lv_obj_create(tasksList);
+    lv_obj_set_size(row, LV_PCT(100), sh(36));
+    lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(row, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(row, 1, 0);
+    lv_obj_set_style_radius(row, RADIUS_MD, 0);
+    lv_obj_set_style_pad_hor(row, sw(8), 0);
+    lv_obj_set_style_pad_ver(row, sh(4), 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(row, taskRowClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+
+    lv_obj_t *chk = lv_image_create(row);
+    lv_image_set_src(chk, &ic_check_circle);
+    lv_obj_set_style_image_recolor_opa(chk, LV_OPA_COVER, 0);
+    lv_obj_set_style_transform_zoom(chk, 160, 0);  // ~50% (32->16px)
+    lv_obj_align(chk, LV_ALIGN_LEFT_MID, -sw(4), 0);
+
+    lv_obj_t *lbl = lv_label_create(row);
+    lv_label_set_text(lbl, tasks[i].title);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(lbl, SCREEN_W - sw(40));
+    lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
+    lv_obj_align(lbl, LV_ALIGN_LEFT_MID, sw(20), 0);
+
+    taskRows[i]   = row;
+    taskChecks[i] = chk;
+    taskLabels[i] = lbl;
+    paintTaskRow(i);
+  }
+}
+
+extern "C" void cultivoUI_applyTasks(const CultivoTask *items, int count) {
+  if (count < 0) count = 0;
+  if (count > TASKS_MAX) count = TASKS_MAX;
+  taskCount = count;
+  for (int i = 0; i < count; i++) {
+    tasks[i].id = items[i].id;
+    if (items[i].title) {
+      strncpy(tasks[i].title, items[i].title, sizeof(tasks[i].title) - 1);
+      tasks[i].title[sizeof(tasks[i].title) - 1] = '\0';
+    } else {
+      tasks[i].title[0] = '\0';
+    }
+    tasks[i].done = items[i].done;
+  }
+  for (int i = count; i < TASKS_MAX; i++) {
+    tasks[i].id = 0; tasks[i].title[0] = '\0'; tasks[i].done = false;
+  }
+  printf("[ui] applyTasks count=%d\n", count);
+  rebuildTasksList();
+}
+
+extern "C" void cultivoUI_setTaskDone(int taskId, bool done) {
+  for (int i = 0; i < taskCount; i++) {
+    if (tasks[i].id == taskId) {
+      tasks[i].done = done;
+      paintTaskRow(i);
+      return;
+    }
+  }
+}
+
+static void buildTasksScreen(lv_obj_t *tab) {
+  lv_obj_set_style_pad_all(tab, 0, 0);
+  lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(tab, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(tab, LV_OPA_COVER, 0);
+
+  // Header
+  lv_obj_t *hdrIcon = lv_image_create(tab);
+  lv_image_set_src(hdrIcon, &ic_tasks);
+  lv_obj_set_style_image_recolor(hdrIcon, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
+  lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
+  makeLabel(tab, "TAREFAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
+  makeLabel(tab, "Da semana", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+
+  tasksTab = tab;
+  rebuildTasksList();  // primeira build com count=0 -> empty state
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
 // buildCultivoUI — entrypoint (equivalente ao buildUI() do main_lvgl.cpp)
 // ════════════════════════════════════════════════════════════════════════════════
 extern "C" void buildCultivoUI(void) {
@@ -1931,11 +2107,13 @@ extern "C" void buildCultivoUI(void) {
   screenHome   = makeScreen();
   screenTarefa = makeScreen();
   screenGrafic = makeScreen();
+  screenTasks  = makeScreen();  // 4a tab: lista de tarefas
   // screenLux/PhEc nao construidas — registro vai pelo app mobile.
 
   buildHome(screenHome);
   buildTarefas(screenTarefa);
   buildHistorico(screenGrafic);
+  buildTasksScreen(screenTasks);
   // buildLux/PhEc nao chamados (telas removidas — registro vai pelo app)
 
   lv_obj_clear_flag(screenHome, LV_OBJ_FLAG_HIDDEN);

@@ -92,6 +92,27 @@ void cultivoUI_setDeviceState(int idx, bool state);
 void cultivoUI_startItemSpin(int idx);
 void cultivoUI_stopItemSpin(int idx);
 
+// ── Tarefas (aba 4) ───────────────────────────────────────────────────────────
+// App preenche lista de tarefas via cultivoUI_applyTasks(items, count). Cada
+// item tem id (pra POST task-complete), titulo curto e flag done. Max 10
+// (display caberia mais, mas server limita LIMIT 10 hoje). UI: lista vertical
+// scrollable com checkbox + label; tap toggla done via onTaskToggle(taskId).
+#define TASKS_MAX 10
+typedef struct {
+  int         id;       // id da row em standaloneTasks
+  const char *title;    // texto exibido
+  bool        done;     // status atual
+} CultivoTask;
+void cultivoUI_applyTasks(const CultivoTask *items, int count);
+
+// App registra callback chamado quando user tap em uma tarefa — taskId
+// e' o id da row no DB. App faz POST /api/device/task-complete.
+typedef void (*CultivoTaskToggleFn)(int taskId);
+void cultivoUI_setTaskToggleHandler(CultivoTaskToggleFn cb);
+
+// Confirma flip do done (chamado pelo app apos POST OK ou reverter se falhou)
+void cultivoUI_setTaskDone(int taskId, bool done);
+
 // ── Build entry point ─────────────────────────────────────────────────────────
 void buildCultivoUI(void);
 
