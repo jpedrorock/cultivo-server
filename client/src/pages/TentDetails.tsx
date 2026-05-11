@@ -620,6 +620,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const [showDeviceAdd, setShowDeviceAdd] = useState(false);
   const [selectedSceneId, setSelectedSceneId] = useState<string>('');
   const [selectedSceneIconHint, setSelectedSceneIconHint] = useState<string>('pump'); // default droplet (rega)
+  const [selectedSceneExecSec, setSelectedSceneExecSec] = useState<number>(5);  // duração padrão 5s
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [selectedIconHint, setSelectedIconHint] = useState<string>('other');
 
@@ -649,7 +650,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   };
 
   const addScene = trpc.tentScenes.add.useMutation({
-    onSuccess: () => { toast.success('Cena adicionada'); invalidateAll(); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); setShowSceneAdd(false); },
+    onSuccess: () => { toast.success('Cena adicionada'); invalidateAll(); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); setSelectedSceneExecSec(5); setShowSceneAdd(false); },
     onError: (e) => toast.error(e.message),
   });
   const removeScene = trpc.tentScenes.remove.useMutation({
@@ -682,6 +683,9 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
       name: scene.name,
       type,
       iconHint: selectedSceneIconHint as any,
+      // Duração só faz sentido pra cenas one-shot. Pra automation, manda o
+      // default 5 (campo é NOT NULL no DB) — UI nem mostra o input.
+      executionSec: type === 'scene' ? selectedSceneExecSec : 5,
     });
   };
   const handleAddDevice = () => {
@@ -895,8 +899,38 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                     <option key={k} value={k}>{label}</option>
                   ))}
                 </select>
+
+                {/* Duração da cena em segundos — ESP usa pra spinner "executando".
+                    Só faz sentido pra cenas one-shot (Tap-to-Run). Pra automation,
+                    o tempo é controlado pela própria regra do Tuya — esconde input. */}
+                {(() => {
+                  const sel = (allScenes as any[]).find((s: any) => s.sceneId === selectedSceneId);
+                  const isAutomation = sel?.homeName === 'Automações';
+                  if (isAutomation) return null;
+                  return (
+                    <div>
+                      <label className="text-[11px] text-muted-foreground block mb-1">
+                        Duração (segundos)
+                        <span className="ml-1 text-muted-foreground/60">— quanto tempo o display mostra "executando"</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={600}
+                        value={selectedSceneExecSec}
+                        onChange={e => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!Number.isFinite(v)) return;
+                          setSelectedSceneExecSec(Math.max(1, Math.min(600, v)));
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                  );
+                })()}
+
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowSceneAdd(false); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); }}>Cancelar</Button>
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowSceneAdd(false); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); setSelectedSceneExecSec(5); }}>Cancelar</Button>
                   <Button size="sm" className="flex-1" disabled={!selectedSceneId || addScene.isPending} onClick={handleAddScene}>
                     {addScene.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Adicionar'}
                   </Button>

@@ -666,6 +666,18 @@ const MIGRATIONS: Migration[] = [
       await addColumnIfNotExists(c, 'tentScenes', 'iconHint', 'VARCHAR(20) NULL AFTER `type`');
     },
   },
+  {
+    // ESP display mostra cenas como "executando" por 5s fixo após o tap.
+    // Não bate com a realidade — rega manual pode ter 10s, 30s, 1min, etc.
+    // Esse campo permite o user configurar a duração real → ESP usa esse
+    // valor pra spinner/animação até a duração real terminar.
+    // Default 5s (= comportamento antigo). Range 1-600s (10min max).
+    id: 'add-tentScenes-executionSec',
+    description: 'Adiciona tentScenes.executionSec (duração real da cena pro ESP usar)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'tentScenes', 'executionSec', 'INT NOT NULL DEFAULT 5 AFTER `iconHint`');
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
