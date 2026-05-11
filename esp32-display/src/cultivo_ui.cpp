@@ -1133,7 +1133,8 @@ static lv_obj_t *sceneEmpty = nullptr;
 static void paintDeviceState(int idx) {
   if (idx < 0 || idx >= SCENES_MAX) return;
   if (!itemBtns[idx] || !itemIcons[idx]) return;
-  if (items[idx].type != 1) return;  // so' devices
+  // device (type=1) e automation (type=2) tem mesmo visual ON/OFF
+  if (items[idx].type != 1 && items[idx].type != 2) return;
 
   bool on = items[idx].state;
   if (on) {
@@ -1172,8 +1173,8 @@ static void sceneClickCb(lv_event_t *e) {
          idx, items[idx].type, items[idx].name);
   if (onSceneTrigger) onSceneTrigger(idx);
 
-  if (items[idx].type == 1) {
-    // Device — feedback "carregando" sem mudar state local.
+  if (items[idx].type == 1 || items[idx].type == 2) {
+    // Device OU automation — feedback "carregando" sem mudar state local.
     // Border primary + opacidade reduzida. setDeviceState restaura full opa.
     if (itemBtns[idx]) {
       lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
@@ -1361,7 +1362,7 @@ extern "C" void cultivoUI_applyScenes(const char *names[], int count) {
 
 extern "C" void cultivoUI_setDeviceState(int idx, bool state) {
   if (idx < 0 || idx >= sceneCount) return;
-  if (items[idx].type != 1) return;  // so' devices
+  if (items[idx].type != 1 && items[idx].type != 2) return;  // device + automation
   items[idx].state = state;
   // Restaura opacidade cheia (sceneClickCb baixou pra 70 enquanto carregava)
   if (itemBtns[idx]) lv_obj_set_style_opa(itemBtns[idx], LV_OPA_COVER, 0);

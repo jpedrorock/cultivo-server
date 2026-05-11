@@ -1616,7 +1616,10 @@ static bool fetchHistoryAll(const char *period = "24h") {
 static char    sceneIdsLocal     [SCENES_LOCAL_MAX][48] = {{0}};
 static char    sceneNamesLocal   [SCENES_LOCAL_MAX][24] = {{0}};
 static char    sceneIconHintLocal[SCENES_LOCAL_MAX][12] = {{0}};
-static uint8_t sceneTypeLocal    [SCENES_LOCAL_MAX]     = {0};   // 0=scene, 1=device
+// 0=scene (trigger one-shot) | 1=device (toggle ON/OFF, state da Tuya) |
+// 2=automation (toggle ON/OFF, state local — Tuya nao expoe enabled status
+// pelo /devices/.../status, entao gerenciamos o ultimo desejado)
+static uint8_t sceneTypeLocal    [SCENES_LOCAL_MAX]     = {0};
 static bool    sceneStateLocal   [SCENES_LOCAL_MAX]     = {false};
 static int     sceneCountLocal = 0;
 
@@ -1647,9 +1650,11 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
     sceneStateLocal[n] = false;
     sceneIconHintLocal[n][0] = '\0';
   } else {
-    // Novo {items:[...]}: type pode ser "scene"|"device" string ou numero
+    // Novo {items:[...]}: type "scene"|"device"|"automation"
     const char *typeStr = obj["type"] | "scene";
-    sceneTypeLocal[n]  = (!strcmp(typeStr, "device")) ? 1 : 0;
+    if      (!strcmp(typeStr, "device"))     sceneTypeLocal[n] = 1;
+    else if (!strcmp(typeStr, "automation")) sceneTypeLocal[n] = 2;
+    else                                      sceneTypeLocal[n] = 0;
     sceneStateLocal[n] = obj["state"] | false;
     copyToBuf(sceneIconHintLocal[n], sizeof(sceneIconHintLocal[n]),
               obj["iconHint"] | "");
@@ -1701,10 +1706,14 @@ static bool fetchScenes() {
   sceneCountLocal = n;
 
   // Conta scenes vs devices p/ log
-  int nScenes = 0, nDevices = 0;
-  for (int i = 0; i < n; i++) (sceneTypeLocal[i] == 0 ? nScenes : nDevices)++;
-  Serial.printf("[net] items: %d total (%d cenas, %d devices) [%s]\n",
-                n, nScenes, nDevices, isLegacy ? "legacy" : "novo");
+  int nScenes = 0, nDevices = 0, nAutomations = 0;
+  for (int i = 0; i < n; i++) {
+    if      (sceneTypeLocal[i] == 0) nScenes++;
+    else if (sceneTypeLocal[i] == 1) nDevices++;
+    else if (sceneTypeLocal[i] == 2) nAutomations++;
+  }
+  Serial.printf("[net] items: %d total (%d cenas, %d devices, %d autom) [%s]\n",
+                n, nScenes, nDevices, nAutomations, isLegacy ? "legacy" : "novo");
   scenesNeedsRefresh = true;
   return true;
 }
@@ -1871,6 +1880,29 @@ static bool postDeviceToggle(const char *deviceId, bool desiredState, bool *outR
   return true;
 }
 
+// POST /api/device/automation-toggle — ativa/desativa cena programada Tuya.
+// Tuya nao expoe state atual de automation, entao server confia no enabled
+// passado e responde {success, automationId, enabled}.
+static bool postAutomationToggle(const char *automationId, bool enabled) {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/automation-toggle", SERVER_URL);
+  if (!httpBegin(http, url)) return false;
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.addHeader("Content-Type", "application/json");
+  char body[160];
+  snprintf(body, sizeof(body),
+           "{\"automationId\":\"%s\",\"enabled\":%s}",
+           automationId, enabled ? "true" : "false");
+  http.setTimeout(8000);
+  int code = http.POST(body);
+  Serial.printf("[automation] toggle %s -> %s HTTP %d\n",
+                automationId, enabled ? "ENABLED" : "DISABLED", code);
+  http.end();
+  return code == 200;
+}
+
 // Tap em botao do grid CENAS — diferencia scene vs device:
 //   - scene  : POST /api/device/scene-by-id/<id>/trigger (one-shot)
 //   - device : optimistic toggle (UI ja' inverteu via sceneClickCb), POST,
@@ -1926,6 +1958,27 @@ static void processSceneTap() {
     sceneStateLocal[idx]  = realState;
     deviceToggleResIdx    = idx;
     deviceToggleResState  = realState;
+    deviceTogglePendingUI = true;
+    return;
+  }
+
+  if (sceneTypeLocal[idx] == 2) {
+    // Automation — toggle ENABLED/DISABLED da cena programada Tuya.
+    // Tuya nao expoe state real; mantemos local. POST OK = adota desired.
+    bool desired = !sceneStateLocal[idx];
+    Serial.printf("[automation] toggle idx=%d id=%s name=%s -> %s\n",
+                  idx, id, name, desired ? "ENABLED" : "DISABLED");
+    bool ok = wifiOk && postAutomationToggle(id, desired);
+    if (!ok) {
+      Serial.println("[automation] POST falhou — reverte UI");
+      deviceToggleResIdx    = idx;
+      deviceToggleResState  = sceneStateLocal[idx];
+      deviceTogglePendingUI = true;
+      return;
+    }
+    sceneStateLocal[idx]  = desired;
+    deviceToggleResIdx    = idx;
+    deviceToggleResState  = desired;
     deviceTogglePendingUI = true;
     return;
   }
