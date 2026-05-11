@@ -129,6 +129,11 @@ async function startServer() {
   const { startDailyReminderCron } = await import("../cron/dailyReminder");
   startDailyReminderCron();
 
+  // Inicializar cron de "registro incompleto" — só pra estufas COM Tuya
+  // ativo, notifica se sem registro completo (pH+EC+foto) há 3 dias
+  const { startIncompleteRegistrationCron } = await import("../cron/incompleteRegistration");
+  startIncompleteRegistrationCron();
+
   // Inicializar cron job de leitura de sensores Tuya/SmartLife
   const { startTuyaPollerCron } = await import("../cron/tuyaPoller");
   startTuyaPollerCron();

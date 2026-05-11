@@ -340,3 +340,117 @@ export async function checkAndSendDailyReminders(): Promise<void> {
 
   if (sent > 0) console.log(`[PushService] Sent ${sent} daily reminder(s)`);
 }
+
+// ── Incomplete registration reminder ─────────────────────────────────────────
+
+/**
+ * Checa estufas COM integração Tuya (sensor mapeado) e notifica se há mais
+ * de N dias sem registro completo (pH + EC manual + foto de saúde).
+ *
+ * Por que só estufas com Tuya: estufas sem auto-data já caem no
+ * dailyReminder normal (que dispara em horário fixo). Com Tuya ligado,
+ * o user pensa que registrou (porque temp/RH aparecem) e esquece dos
+ * outros campos — daí a notif extra.
+ *
+ * Dedup: usa notificationHistory.type='incomplete_log' + metadata.tentId
+ * pra não notificar a mesma estufa 2x em 24h.
+ *
+ * Roda a cada hora (via cron). Cada execução verifica todos os users
+ * com push ativo e dispara só pra estufas que precisam.
+ */
+const INCOMPLETE_DAYS_WINDOW = 3;        // sem registro completo há 3 dias
+const INCOMPLETE_DEDUP_HOURS = 24;       // não re-notifica antes de 24h
+
+export async function checkIncompleteRegistrationReminders(): Promise<void> {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+
+  const { getMysqlPool } = await import("./mysql-pool");
+  const pool = getMysqlPool();
+
+  const since = new Date(Date.now() - INCOMPLETE_DAYS_WINDOW * 24 * 60 * 60 * 1000);
+  const dedupSince = new Date(Date.now() - INCOMPLETE_DEDUP_HOURS * 60 * 60 * 1000);
+
+  // 1) Lista estufas com integração Tuya ativa (sensor mapeado + tuyaConfig
+  //    enabled) E ciclo ativo (não tem sentido cobrar registro de estufa parada).
+  //    JOIN com users pra pegar groupId (notif vai pra todos do grupo).
+  const [tents]: any = await pool.execute(
+    `SELECT DISTINCT t.id AS tentId, t.name AS tentName, t.groupId
+     FROM tents t
+     INNER JOIN cycles c ON c.tentId = t.id AND c.status = 'ACTIVE'
+     INNER JOIN tuyaSensorMappings tsm ON tsm.tentId = t.id AND tsm.enabled = 1
+     INNER JOIN users u ON u.groupId = t.groupId
+     INNER JOIN tuyaConfig tc ON tc.userId = u.id AND tc.enabled = 1`
+  );
+
+  if (tents.length === 0) return;  // ninguém com Tuya rodando
+
+  let sent = 0;
+  for (const tent of tents as Array<{ tentId: number; tentName: string; groupId: number }>) {
+    // 2) Verifica completude: tem dailyLog MANUAL com pH+EC nos últimos N dias?
+    const [logRows]: any = await pool.execute(
+      `SELECT id FROM dailyLogs
+       WHERE tentId = ? AND logDate >= ?
+         AND ph IS NOT NULL AND ec IS NOT NULL
+         AND (source IS NULL OR source = 'MANUAL')
+       LIMIT 1`,
+      [tent.tentId, since]
+    );
+    const hasPhEc = logRows.length > 0;
+
+    // 3) Tem plantHealthLog com photoUrl nos últimos N dias?
+    //    JOIN com plants pra filtrar por tentId via currentTentId.
+    const [healthRows]: any = await pool.execute(
+      `SELECT phl.id FROM plantHealthLogs phl
+       INNER JOIN plants p ON p.id = phl.plantId
+       WHERE p.currentTentId = ? AND phl.logDate >= ? AND phl.photoUrl IS NOT NULL AND phl.photoUrl <> ''
+       LIMIT 1`,
+      [tent.tentId, since]
+    );
+    const hasHealthPhoto = healthRows.length > 0;
+
+    if (hasPhEc && hasHealthPhoto) continue;  // estufa OK, próxima
+
+    // 4) Dedup — já notificou essa estufa nas últimas 24h?
+    const [dedupRows]: any = await pool.execute(
+      `SELECT id FROM notificationHistory
+       WHERE type = 'incomplete_log' AND groupId = ? AND sentAt >= ?
+         AND metadata LIKE ? LIMIT 1`,
+      [tent.groupId, dedupSince, `%"tentId":${tent.tentId}%`]
+    );
+    if (dedupRows.length > 0) continue;
+
+    // 5) Monta mensagem específica do que falta
+    const missing: string[] = [];
+    if (!hasPhEc) missing.push("pH/EC");
+    if (!hasHealthPhoto) missing.push("foto de saúde");
+
+    const subs = await getSubscriptionsForGroup(tent.groupId);
+    if (subs.length === 0) continue;
+
+    const pushed = await sendToSubscriptions(subs, {
+      title: `📋 ${tent.tentName} — registro pendente`,
+      body: `Sem ${missing.join(" + ")} há ${INCOMPLETE_DAYS_WINDOW} dias. Tuya não substitui registro manual.`,
+      url: `/tent/${tent.tentId}`,
+      tag: `incomplete-log-${tent.tentId}`,
+    });
+    sent += pushed;
+
+    // 6) Marca histórico (pra dedup das próximas 24h)
+    try {
+      await pool.execute(
+        `INSERT INTO notificationHistory (type, title, message, metadata, groupId)
+         VALUES ('incomplete_log', ?, ?, ?, ?)`,
+        [
+          `${tent.tentName} — registro pendente`,
+          `Sem ${missing.join(" + ")} há ${INCOMPLETE_DAYS_WINDOW} dias`,
+          JSON.stringify({ tentId: tent.tentId, missing }),
+          tent.groupId,
+        ]
+      );
+    } catch (e: any) {
+      console.warn("[PushService] notif history insert falhou:", e?.message);
+    }
+  }
+
+  if (sent > 0) console.log(`[PushService] Sent ${sent} incomplete-log reminder(s)`);
+}

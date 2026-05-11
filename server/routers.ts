@@ -1200,7 +1200,7 @@ export const appRouter = router({
     create: protectedProcedure
       .input(
         z.object({
-          type: z.enum(["daily_reminder", "environment_alert", "task_reminder"]),
+          type: z.enum(["daily_reminder", "environment_alert", "task_reminder", "incomplete_log"]),
           title: z.string(),
           message: z.string(),
           metadata: z.string().optional(),
