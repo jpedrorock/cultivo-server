@@ -1275,6 +1275,9 @@ extern "C" void cultivoUI_stopItemSpin(int idx) {
 //            reduzido) e aguarda cultivoUI_setDeviceState do app pra pintar
 //            estado real. App garante chamar setDeviceState mesmo em falha
 //            (com state antigo).
+// Forward decl — definida apos sceneClickCb
+static void sceneActivePulse(int idx);
+
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   if (idx < 0 || idx >= sceneCount) return;
@@ -1303,20 +1306,50 @@ static void sceneClickCb(lv_event_t *e) {
     return;
   }
 
-  // Scene — flash border primary -> volta ao neutro
-  lv_obj_t *btn = (lv_obj_t*)lv_event_get_target(e);
-  lv_obj_set_style_border_color(btn, lv_color_hex(COL_PRIMARY), 0);
-  lv_anim_t a;
-  lv_anim_init(&a);
-  lv_anim_set_var(&a, btn);
-  lv_anim_set_values(&a, 0xFF, 0x00);  // marker — usado p/ trigger reset
-  lv_anim_set_time(&a, MOTION_FAST + MOTION_MED);
-  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-    if (v < 0x40) {
-      lv_obj_set_style_border_color((lv_obj_t*)obj, lv_color_hex(COL_BORDER), 0);
-    }
-  });
-  lv_anim_start(&a);
+  // Scene — visual "executando" por SCENE_ACTIVE_MS (5s default). Card
+  // fica aceso (igual device ON) e volta ao normal apos timeout. Sem
+  // checar state real (Tuya nao expoe). Quando outra IA implementar
+  // executionSec em tentScenes, basta sobrescrever esse default.
+  sceneActivePulse(idx);
+}
+
+// Reset visual do card scene apos timeout do "executando"
+static lv_timer_t *sceneActiveTimer = nullptr;
+static int         sceneActiveIdx   = -1;
+static const uint32_t SCENE_ACTIVE_MS = 5000;  // 5s default
+
+static void sceneActiveResetCb(lv_timer_t *t) {
+  lv_timer_del(t);
+  if (sceneActiveTimer == t) sceneActiveTimer = nullptr;
+  int idx = sceneActiveIdx;
+  sceneActiveIdx = -1;
+  if (idx < 0 || idx >= SCENES_MAX || !itemBtns[idx]) return;
+  // Volta ao visual neutro (sem aceso)
+  lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_shadow_width(itemBtns[idx], 0, 0);
+}
+
+static void sceneActivePulse(int idx) {
+  if (idx < 0 || idx >= SCENES_MAX || !itemBtns[idx]) return;
+  // Cancela pulse anterior (se outra cena estava "executando")
+  if (sceneActiveTimer) {
+    lv_timer_del(sceneActiveTimer);
+    sceneActiveTimer = nullptr;
+  }
+  sceneActiveIdx = idx;
+  // Pinta card aceso (mesmo visual de device ON)
+  lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_30, 0);
+  lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_shadow_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_shadow_width(itemBtns[idx], 12, 0);
+  lv_obj_set_style_shadow_opa(itemBtns[idx],   LV_OPA_30, 0);
+  lv_obj_set_style_shadow_spread(itemBtns[idx], 0, 0);
+  // Timer one-shot pra voltar ao normal
+  sceneActiveTimer = lv_timer_create(sceneActiveResetCb, SCENE_ACTIVE_MS, NULL);
+  lv_timer_set_repeat_count(sceneActiveTimer, 1);
 }
 
 // Constroi (ou reconstroi) o grid de cenas. Chamado em buildTarefas (1a vez)
