@@ -23,8 +23,25 @@
 // ════════════════════════════════════════════════════════════════════════════════
 import express from "express";
 import crypto from "crypto";
+import path from "path";
+import fsp from "fs/promises";
+import { createRequire } from "module";
 import { getMysqlPool } from "../mysql-pool";
 import type { TuyaRegion } from "../lib/tuya";
+
+const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+
+// Sharp via createRequire pra resolver módulo nativo no bundle ESM
+// (mesmo padrão de uploadRouter.ts). Usado pelo /plant/:id/photo pra
+// resizar a foto de saúde antes de enviar pro ESP32 — se falhar, o
+// endpoint devolve a imagem original sem resize.
+const _require = createRequire(import.meta.url);
+let sharpLib: typeof import("sharp") | null = null;
+try {
+  sharpLib = _require("sharp");
+} catch {
+  console.warn("[device] sharp indisponível — fotos vão sem resize");
+}
 
 /**
  * Valida o X-Device-Token e devolve dados pra contextualizar a request.
@@ -563,6 +580,170 @@ function registerDeviceRoutes(app: express.Application) {
     } catch (err: any) {
       console.error('[Device] scene-by-id trigger error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao disparar cena' });
+    }
+  });
+
+  // GET /api/device/plants/:tentId — lista plantas ATIVAS da estufa pro display
+  //
+  // Pro menu "Plantas" no ESP. Retorna metadata leve (sem foto ainda) +
+  // healthStatus mais recente. ESP usa essa lista pra renderizar o menu;
+  // quando user toca uma planta, vai em /plant/:id/photo pra baixar o JPEG.
+  //
+  // Resposta:
+  //   {
+  //     plants: [
+  //       {
+  //         id, name, code, stage,
+  //         healthStatus: 'HEALTHY'|'STRESSED'|'SICK'|'RECOVERING'|null,
+  //         lastPhotoDate: ISO string | null,
+  //         hasPhoto: boolean
+  //       }, ...
+  //     ]
+  //   }
+  app.get('/api/device/plants/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+
+      const tentId = parseInt(req.params.tentId);
+      if (!Number.isInteger(tentId) || tentId <= 0) {
+        return res.status(400).json({ error: 'tentId inválido' });
+      }
+      // Garante que o token bate com a estufa pedida (mesmo padrão dos
+      // outros endpoints — evita um device-token de outra estufa listar
+      // plantas alheias).
+      if (device.tentId !== tentId) {
+        return res.status(403).json({ error: 'Token não autoriza essa estufa' });
+      }
+
+      // Subselects correlacionados: 1 por planta. Como cada estufa tem
+      // poucas plantas (<30), o overhead é desprezível e o índice
+      // (plantHealthLogs.plantIdx) cobre as buscas.
+      const [rows]: any = await pool.execute(
+        `SELECT
+           p.id, p.name, p.code, p.plantStage AS stage,
+           (SELECT healthStatus FROM plantHealthLogs WHERE plantId = p.id ORDER BY id DESC LIMIT 1) AS healthStatus,
+           (SELECT logDate FROM plantHealthLogs WHERE plantId = p.id AND photoKey IS NOT NULL ORDER BY id DESC LIMIT 1) AS lastPhotoDate
+         FROM plants p
+         WHERE p.currentTentId = ?
+           AND p.status = 'ACTIVE'
+           AND p.deletedAt IS NULL
+         ORDER BY p.name ASC`,
+        [tentId]
+      );
+
+      const plants = (rows as any[]).map(r => ({
+        id: r.id as number,
+        name: r.name as string,
+        code: (r.code as string | null) ?? null,
+        stage: r.stage as 'CLONE' | 'SEEDLING' | 'PLANT',
+        healthStatus: (r.healthStatus as string | null) ?? null,
+        lastPhotoDate: r.lastPhotoDate ? new Date(r.lastPhotoDate).toISOString() : null,
+        hasPhoto: r.lastPhotoDate != null,
+      }));
+
+      res.json({ plants });
+    } catch (err: any) {
+      console.error('[Device] plants list error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao listar plantas' });
+    }
+  });
+
+  // GET /api/device/plant/:plantId/photo — última foto do registro de saúde
+  //
+  // Lê o arquivo do disco (`uploads/<photoKey>`), resiza com Sharp pro
+  // tamanho amigável ao display, devolve JPEG binário.
+  //
+  // Multi-tenancy: planta precisa pertencer ao groupId do token.
+  //
+  // Query params (opcionais):
+  //   - ?w=320&h=240  — dimensões (default 320x240, max 1280x720)
+  //   - &q=70         — qualidade JPEG (default 70, range 20-95)
+  //
+  // Status:
+  //   200 → image/jpeg + binário
+  //   404 → planta sem foto de saúde registrada (ESP mostra placeholder)
+  //   403 → planta de outro grupo
+  //   500 → erro lendo arquivo
+  app.get('/api/device/plant/:plantId/photo', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+
+      const plantId = parseInt(req.params.plantId);
+      if (!Number.isInteger(plantId) || plantId <= 0) {
+        return res.status(400).json({ error: 'plantId inválido' });
+      }
+
+      const w = Math.min(1280, Math.max(80, parseInt(String(req.query.w ?? '320')) || 320));
+      const h = Math.min(720, Math.max(60, parseInt(String(req.query.h ?? '240')) || 240));
+      const q = Math.min(95, Math.max(20, parseInt(String(req.query.q ?? '70')) || 70));
+
+      // Busca o photoKey da última foto + verifica ownership por groupId.
+      // Join com plants pra garantir multi-tenancy.
+      const [rows]: any = await pool.execute(
+        `SELECT h.photoKey, h.logDate, h.healthStatus, p.groupId
+         FROM plantHealthLogs h
+         INNER JOIN plants p ON p.id = h.plantId
+         WHERE h.plantId = ?
+           AND h.photoKey IS NOT NULL
+         ORDER BY h.id DESC
+         LIMIT 1`,
+        [plantId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Planta sem foto de saúde registrada' });
+      }
+      const row = rows[0];
+      if (row.groupId !== device.groupId) {
+        return res.status(403).json({ error: 'Planta de outro grupo' });
+      }
+
+      // Lê o arquivo do disco. photoKey é um caminho relativo dentro
+      // de UPLOADS_DIR — normaliza com path.join e valida que continua
+      // dentro de UPLOADS_DIR (defesa contra `../../etc/passwd`).
+      const fileKey = String(row.photoKey).replace(/^\/+/, '');
+      const filePath = path.join(UPLOADS_DIR, fileKey);
+      if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
+        return res.status(400).json({ error: 'photoKey inválido' });
+      }
+
+      let inputBuffer: Buffer;
+      try {
+        inputBuffer = await fsp.readFile(filePath);
+      } catch (err: any) {
+        if (err?.code === 'ENOENT') {
+          console.warn(`[Device] photoKey aponta pra arquivo inexistente: ${fileKey}`);
+          return res.status(404).json({ error: 'Arquivo da foto não encontrado no disco' });
+        }
+        throw err;
+      }
+
+      // Resize via Sharp (se disponível). Se falhar, devolve original.
+      let outBuffer: Buffer = inputBuffer;
+      if (sharpLib) {
+        try {
+          outBuffer = await sharpLib(inputBuffer)
+            .rotate()                                                    // respeita EXIF orientation
+            .resize({ width: w, height: h, fit: 'inside' })
+            .jpeg({ quality: q, mozjpeg: true })
+            .toBuffer();
+        } catch (e: any) {
+          console.warn(`[Device] sharp resize falhou, devolvendo original: ${e?.message}`);
+        }
+      }
+
+      // Headers úteis pro ESP — healthStatus + logDate em headers custom
+      // pra evitar chamar /plants antes de mostrar a foto.
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=30');
+      res.setHeader('Content-Length', String(outBuffer.length));
+      res.setHeader('X-Health-Status', String(row.healthStatus ?? ''));
+      res.setHeader('X-Log-Date', new Date(row.logDate).toISOString());
+      res.status(200).end(outBuffer);
+    } catch (err: any) {
+      console.error('[Device] plant photo error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao ler foto' });
     }
   });
 
