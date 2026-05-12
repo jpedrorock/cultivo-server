@@ -670,6 +670,9 @@ function registerDeviceRoutes(app: express.Application) {
 
       // 3) Tambem inclui standaloneTasks (lembretes) — id negativo pra
       // diferenciar de taskInstance no toggle (-id == standaloneId)
+      // LIMIT inlined: mysql2 pool.execute() com prepared statements tem
+      // bug conhecido em LIMIT ? — causava HTTP 500 quando range=7d.
+      // Como standaloneLimit e' computed (nao user input), inlineamos safe.
       const standaloneLimit = range === '7d' ? 10 : 5;
       const [standalone]: any = await pool.execute(
         `SELECT t.id, t.title, t.isDone, UNIX_TIMESTAMP(t.dueDate) AS dueDate
@@ -678,8 +681,8 @@ function registerDeviceRoutes(app: express.Application) {
          WHERE u.groupId = ?
            AND (t.tentId = ? OR t.tentId IS NULL)
          ORDER BY t.isDone ASC, t.createdAt DESC
-         LIMIT ?`,
-        [device.groupId, tentId, standaloneLimit]
+         LIMIT ${standaloneLimit}`,
+        [device.groupId, tentId]
       );
       for (const r of standalone as any[]) {
         results.push({
@@ -694,8 +697,9 @@ function registerDeviceRoutes(app: express.Application) {
       const cap = range === '7d' ? 25 : 10;
       res.json(results.slice(0, cap));
     } catch (err: any) {
-      console.error('[Device] tasks error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
+      // Stack completo pra debug — sem isso so' aparecia err.message generico
+      console.error('[Device] tasks error:', err?.message, err?.stack);
+      res.status(500).json({ error: 'Erro interno', detail: err?.message });
     }
   });
 
