@@ -228,13 +228,40 @@ function registerDeviceRoutes(app: express.Application) {
         // sem mapping Tuya — fica null, ESP mostra "sem sensor" / cinza
       }
 
+      // Light schedule da fase atual — ESP usa pra dormir automaticamente
+      // no periodo escuro (luz off da estufa). Defaults padrao de cultivo:
+      //   VEGA / CLONING:        18/6 (luz 6h-24h, escuro 24h-6h)
+      //   FLORA:                 12/12 (luz 6h-18h, escuro 18h-6h)
+      //   MAINTENANCE:           24/0 (sempre on)
+      //   DRYING / CURING:       0/24 (sempre off)
+      // lightOnHour e lightOffHour sao 0-23 (hora do dia local).
+      // lightOnHour == lightOffHour significa "sempre" (on ou off conforme
+      // semantica) — ESP trata especial.
+      let lightOnHour: number = 6;   // default veg-friendly
+      let lightOffHour: number = 24; // 18/6
+      const faseUpper = (fase || '').toUpperCase();
+      if (faseUpper.startsWith('FLO')) {
+        // FLORA / FLORACAO -> 12/12
+        lightOnHour = 6;
+        lightOffHour = 18;
+      } else if (faseUpper.startsWith('MAN') || faseUpper.startsWith('MAINT')) {
+        // MANUTENCAO -> 24h on
+        lightOnHour = 0;
+        lightOffHour = 0;  // (off==on) = sempre on
+      } else if (faseUpper.startsWith('DRY') || faseUpper.startsWith('SEC') || faseUpper.startsWith('CUR')) {
+        // DRYING / SECAGEM / CURING -> sempre off
+        lightOnHour = 24; lightOffHour = 24;  // never on
+      }
+
       res.json({
         tentName, tempC, rh, vpd, ph, ec, lux, ppfd, fase, semana, totalSem,
         // Idades em segundos pra ESP renderizar badge de freshness.
-        // sensorAgeSec = ultimo poll Tuya (mais "live"), dailyLogAgeSec
-        // inclui entradas manuais via app/display (pH/EC).
         sensorAgeSec,
         dailyLogAgeSec,
+        // Horario da luz (timezone do tent — assume BRT-3 por enquanto).
+        // ESP usa pra dormir automaticamente no periodo escuro.
+        lightOnHour,
+        lightOffHour,
       });
     } catch (err: any) {
       console.error('[Device] display error:', err?.message);
