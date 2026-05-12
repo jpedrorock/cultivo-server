@@ -394,59 +394,82 @@ extern "C" void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb) {
   onAlertAck = cb;
 }
 
+// Banner alerta no TOPO da tela — ~64px altura, slide-in animado.
+// Antes era full-screen modal cobrindo tudo. Agora mostra info essencial
+// sem bloquear interacao com o app abaixo (tap no banner dispensa).
+//
+// Layout:
+//  [icon] [SEVERIDADE — METRICA   x]
+//         [mensagem curta...        ]
+//
+// Severidade -> cor da border esquerda (stripe colorido)
 extern "C" void cultivoUI_showAlert(int alertId, const char *type, const char *metric, const char *message) {
   if (alertOverlay) lv_obj_del(alertOverlay);
   alertOverlay = lv_obj_create(lv_layer_top());
   alertOverlayId = alertId;
   lv_obj_remove_style_all(alertOverlay);
-  lv_obj_set_size(alertOverlay, SCREEN_W, SCREEN_H);
-  lv_obj_set_pos(alertOverlay, 0, 0);
-  // Cor de fundo conforme severidade do alertType
-  uint32_t bgC = COL_RED;
-  if (type && !strcmp(type, "OUT_OF_RANGE")) bgC = COL_YEL;
-  else if (type && !strcmp(type, "TREND"))   bgC = COL_AMBER;
-  lv_obj_set_style_bg_color(alertOverlay, lv_color_hex(bgC), 0);
-  lv_obj_set_style_bg_opa(alertOverlay, LV_OPA_90, 0);
+
+  // Banner: ~64px altura, margem horizontal de 8px (nao toca bordas)
+  const int bannerH = sh(60);
+  const int bannerW = SCREEN_W - sw(16);
+  lv_obj_set_size(alertOverlay, bannerW, bannerH);
+  lv_obj_align(alertOverlay, LV_ALIGN_TOP_MID, 0, sh(8));
+  lv_obj_set_style_bg_color(alertOverlay, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_bg_opa(alertOverlay, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(alertOverlay, RADIUS_LG, 0);
+  lv_obj_set_style_shadow_width(alertOverlay, 16, 0);
+  lv_obj_set_style_shadow_color(alertOverlay, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_shadow_opa(alertOverlay, LV_OPA_50, 0);
+  lv_obj_set_style_shadow_ofs_y(alertOverlay, 4, 0);
+  lv_obj_set_style_pad_all(alertOverlay, sw(10), 0);
   lv_obj_clear_flag(alertOverlay, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Icone de alerta no topo
+  // Cor da stripe esquerda por severidade
+  uint32_t sevC = COL_RED;
+  if (type && !strcmp(type, "OUT_OF_RANGE")) sevC = COL_YEL;
+  else if (type && !strcmp(type, "TREND"))   sevC = COL_AMBER;
+  lv_obj_set_style_border_color(alertOverlay, lv_color_hex(sevC), 0);
+  lv_obj_set_style_border_width(alertOverlay, sw(4), 0);
+  lv_obj_set_style_border_side(alertOverlay, LV_BORDER_SIDE_LEFT, 0);
+
+  // Icone alert na esquerda
   lv_obj_t *ico = lv_image_create(alertOverlay);
   lv_image_set_src(ico, &ic_alert);
-  lv_obj_set_style_image_recolor(ico, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_image_recolor(ico, lv_color_hex(sevC), 0);
   lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-  lv_obj_set_style_transform_zoom(ico, 384, 0);  // 1.5x ~48px visible
-  lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(20));
+  lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
 
-  // Header com tipo + metrica
+  // Header curto: "SEVERIDADE — METRICA" na linha de cima
   lv_obj_t *lblHdr = lv_label_create(alertOverlay);
   char hdrBuf[48];
-  snprintf(hdrBuf, sizeof(hdrBuf), "%s — %s",
-           type ? type : "ALERTA",
-           metric ? metric : "?");
+  // Encurta severity pra cabeçalho: OUT_OF_RANGE -> "FORA RANGE" etc
+  const char *sevShort = type;
+  if      (type && !strcmp(type, "OUT_OF_RANGE")) sevShort = "FORA RANGE";
+  else if (type && !strcmp(type, "SAFETY_LIMIT")) sevShort = "LIMITE";
+  else if (type && !strcmp(type, "TREND"))         sevShort = "TENDENCIA";
+  snprintf(hdrBuf, sizeof(hdrBuf), "%s  %s", sevShort ? sevShort : "ALERTA", metric ? metric : "");
   lv_label_set_text(lblHdr, hdrBuf);
-  lv_obj_set_style_text_color(lblHdr, lv_color_hex(COL_TEXT), 0);
-  lv_obj_set_style_text_font(lblHdr, FONT_BODY, 0);
-  lv_obj_align(lblHdr, LV_ALIGN_CENTER, 0, -sh(20));
+  lv_obj_set_style_text_color(lblHdr, lv_color_hex(sevC), 0);
+  lv_obj_set_style_text_font(lblHdr, FONT_CAPTION, 0);
+  lv_obj_align(lblHdr, LV_ALIGN_TOP_LEFT, sw(40), 0);
 
-  // Mensagem corrida
+  // Mensagem corrida (1 linha, dot overflow)
   lv_obj_t *lblMsg = lv_label_create(alertOverlay);
   lv_label_set_text(lblMsg, message ? message : "");
-  lv_label_set_long_mode(lblMsg, LV_LABEL_LONG_WRAP);
-  lv_obj_set_width(lblMsg, SCREEN_W - sw(40));
-  lv_obj_set_style_text_align(lblMsg, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_long_mode(lblMsg, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(lblMsg, bannerW - sw(60));
   lv_obj_set_style_text_color(lblMsg, lv_color_hex(COL_TEXT), 0);
-  lv_obj_set_style_text_font(lblMsg, FONT_CAPTION, 0);
-  lv_obj_align(lblMsg, LV_ALIGN_CENTER, 0, sh(10));
+  lv_obj_set_style_text_font(lblMsg, FONT_BODY, 0);
+  lv_obj_align(lblMsg, LV_ALIGN_LEFT_MID, sw(40), sh(8));
 
-  // Hint "toque pra dispensar"
-  lv_obj_t *lblHint = lv_label_create(alertOverlay);
-  lv_label_set_text(lblHint, "Toque pra dispensar");
-  lv_obj_set_style_text_color(lblHint, lv_color_hex(COL_TEXT), 0);
-  lv_obj_set_style_text_opa(lblHint, LV_OPA_70, 0);
-  lv_obj_set_style_text_font(lblHint, FONT_CAPTION, 0);
-  lv_obj_align(lblHint, LV_ALIGN_BOTTOM_MID, 0, -sh(20));
+  // "x" pra dispensar no canto superior direito
+  lv_obj_t *lblClose = lv_label_create(alertOverlay);
+  lv_label_set_text(lblClose, LV_SYMBOL_CLOSE);
+  lv_obj_set_style_text_color(lblClose, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(lblClose, &lv_font_montserrat_14, 0);
+  lv_obj_align(lblClose, LV_ALIGN_TOP_RIGHT, 0, 0);
 
-  // Tap em qualquer lugar — dispara ack
+  // Tap em qualquer lugar do banner — dispara ack + remove banner
   lv_obj_add_flag(alertOverlay, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(alertOverlay, [](lv_event_t *e) {
     int id = alertOverlayId;
@@ -456,6 +479,19 @@ extern "C" void cultivoUI_showAlert(int alertId, const char *type, const char *m
     }
     if (onAlertAck) onAlertAck(id);
   }, LV_EVENT_CLICKED, NULL);
+
+  // Anim slide-in do topo (efeito sutil de notificacao chegando)
+  lv_obj_set_y(alertOverlay, -bannerH);
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, alertOverlay);
+  lv_anim_set_values(&a, -bannerH, sh(8));
+  lv_anim_set_time(&a, MOTION_MED);
+  lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+    lv_obj_set_y((lv_obj_t*)obj, v);
+  });
+  lv_anim_start(&a);
 }
 
 extern "C" void cultivoUI_tickIdleOverlay(void) {
