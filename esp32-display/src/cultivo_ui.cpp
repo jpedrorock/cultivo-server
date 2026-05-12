@@ -336,14 +336,18 @@ static uint32_t freshnessColor(int ageSec) {
 // AMBIENT IDLE OVERLAY — screensaver minimalista
 // Mostrado quando display fica idle (firmware chama show/hide via API publica).
 // Layout:
-//        HH:MM
-//      24.5°C
-//      62% UMID
+//          HH:MM
+//   24.5°C  62%  0.85kPa
+//
+// IMPORTANTE: NAO usar lv_label_set_text_fmt com %f — o lv_snprintf
+// interno do LVGL nao suporta floating-point format (default config).
+// Usar snprintf padrao do C numa string buffer + lv_label_set_text.
 // ════════════════════════════════════════════════════════════════════════════════
 static lv_obj_t *idleOverlay = nullptr;
 static lv_obj_t *idleClockLbl = nullptr;
 static lv_obj_t *idleTempLbl  = nullptr;
 static lv_obj_t *idleRhLbl    = nullptr;
+static lv_obj_t *idleVpdLbl   = nullptr;
 
 extern "C" void cultivoUI_showIdleOverlay(void) {
   if (idleOverlay) return;  // ja mostrando
@@ -355,6 +359,8 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_set_style_bg_opa(idleOverlay, LV_OPA_COVER, 0);
   lv_obj_clear_flag(idleOverlay, LV_OBJ_FLAG_SCROLLABLE);
 
+  char buf[32];
+
   // Clock gigante centro-superior (FONT_VALUE = 40px no real hw)
   idleClockLbl = lv_label_create(idleOverlay);
   lv_label_set_text(idleClockLbl, "--:--");
@@ -362,19 +368,29 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_set_style_text_font(idleClockLbl, FONT_VALUE, 0);
   lv_obj_align(idleClockLbl, LV_ALIGN_CENTER, 0, -sh(40));
 
-  // Temp grande (esquerda)
+  // Temp (esquerda) — laranja PHASE_HARVEST
   idleTempLbl = lv_label_create(idleOverlay);
-  lv_label_set_text_fmt(idleTempLbl, "%.1f\xC2\xB0""C", tempC);
+  snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
+  lv_label_set_text(idleTempLbl, buf);
   lv_obj_set_style_text_color(idleTempLbl, lv_color_hex(COL_PHASE_HARVEST), 0);
   lv_obj_set_style_text_font(idleTempLbl, FONT_TITLE, 0);
-  lv_obj_align(idleTempLbl, LV_ALIGN_CENTER, -sw(60), sh(40));
+  lv_obj_align(idleTempLbl, LV_ALIGN_CENTER, -sw(80), sh(40));
 
-  // Umid grande (direita)
+  // Umid (centro) — ciano
   idleRhLbl = lv_label_create(idleOverlay);
-  lv_label_set_text_fmt(idleRhLbl, "%.0f%%", rh);
+  snprintf(buf, sizeof(buf), "%.0f%%", rh);
+  lv_label_set_text(idleRhLbl, buf);
   lv_obj_set_style_text_color(idleRhLbl, lv_color_hex(COL_CYN), 0);
   lv_obj_set_style_text_font(idleRhLbl, FONT_TITLE, 0);
-  lv_obj_align(idleRhLbl, LV_ALIGN_CENTER, sw(60), sh(40));
+  lv_obj_align(idleRhLbl, LV_ALIGN_CENTER, 0, sh(40));
+
+  // VPD (direita) — verde PRIMARY (consistente com card VPD da Home)
+  idleVpdLbl = lv_label_create(idleOverlay);
+  snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
+  lv_label_set_text(idleVpdLbl, buf);
+  lv_obj_set_style_text_color(idleVpdLbl, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_text_font(idleVpdLbl, FONT_TITLE, 0);
+  lv_obj_align(idleVpdLbl, LV_ALIGN_CENTER, sw(80), sh(40));
 
   cultivoUI_tickIdleOverlay();  // update inicial do clock
 }
@@ -382,7 +398,7 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
 extern "C" void cultivoUI_hideIdleOverlay(void) {
   if (!idleOverlay) return;
   lv_obj_del(idleOverlay);
-  idleOverlay = idleClockLbl = idleTempLbl = idleRhLbl = nullptr;
+  idleOverlay = idleClockLbl = idleTempLbl = idleRhLbl = idleVpdLbl = nullptr;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -502,14 +518,31 @@ extern "C" void cultivoUI_tickIdleOverlay(void) {
   // localtime_r e thread-safe; usado pra evitar buffer estatico.
   time_t now = time(nullptr);
   struct tm tmInfo;
+  char buf[32];
   if (now > 1700000000 && localtime_r(&now, &tmInfo)) {  // sanity: time pos-2023
-    lv_label_set_text_fmt(idleClockLbl, "%02d:%02d", tmInfo.tm_hour, tmInfo.tm_min);
+    // %d e' integer — lv_snprintf suporta. Mas usamos snprintf padrao
+    // pra consistencia com os labels float abaixo.
+    snprintf(buf, sizeof(buf), "%02d:%02d", tmInfo.tm_hour, tmInfo.tm_min);
+    lv_label_set_text(idleClockLbl, buf);
   } else {
     lv_label_set_text(idleClockLbl, "--:--");  // NTP ainda nao sincronizou
   }
-  // Refresh tambem dos valores ambientais
-  if (idleTempLbl) lv_label_set_text_fmt(idleTempLbl, "%.1f\xC2\xB0""C", tempC);
-  if (idleRhLbl)   lv_label_set_text_fmt(idleRhLbl,   "%.0f%%", rh);
+  // Refresh tambem dos valores ambientais.
+  // CRITICO: usar snprintf padrao + lv_label_set_text — lv_label_set_text_fmt
+  // usa lv_snprintf INTERNO que NAO suporta %f no default config; renderiza
+  // como "F°C" literal sem o numero (bug visto em produção).
+  if (idleTempLbl) {
+    snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
+    lv_label_set_text(idleTempLbl, buf);
+  }
+  if (idleRhLbl) {
+    snprintf(buf, sizeof(buf), "%.0f%%", rh);
+    lv_label_set_text(idleRhLbl, buf);
+  }
+  if (idleVpdLbl) {
+    snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
+    lv_label_set_text(idleVpdLbl, buf);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -3153,9 +3186,14 @@ static void openQuickLogPicker(const char *type, const char *title,
   lv_obj_set_style_bg_color(qlSpinV1, lv_color_hex(COL_PRIMARY), LV_PART_KNOB);
   lv_obj_set_user_data(qlSpinV1, (void*)(intptr_t)(int)(step1 * 100));  // step *100 stored as int
 
-  // Label que mostra o valor selecionado, atualizada via callback
+  // Label que mostra o valor selecionado, atualizada via callback.
+  // NAO usar lv_label_set_text_fmt com %f — lv_snprintf interno NAO
+  // suporta float. snprintf padrao + set_text e' o caminho seguro.
   lv_obj_t *lblVal1 = lv_label_create(card);
-  lv_label_set_text_fmt(lblVal1, "%.2f", def1);
+  {
+    char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", def1);
+    lv_label_set_text(lblVal1, vbuf);
+  }
   lv_obj_set_style_text_color(lblVal1, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_text_font(lblVal1, FONT_BODY, 0);
   lv_obj_align(lblVal1, LV_ALIGN_RIGHT_MID, -sw(10), -sh(10));
@@ -3164,7 +3202,8 @@ static void openQuickLogPicker(const char *type, const char *title,
     int stepInt = (int)(intptr_t)lv_obj_get_user_data(s);
     float step = (float)stepInt / 100.0f;
     float v = lv_slider_get_value(s) * step;
-    lv_label_set_text_fmt((lv_obj_t*)lv_event_get_user_data(e), "%.2f", v);
+    char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", v);
+    lv_label_set_text((lv_obj_t*)lv_event_get_user_data(e), vbuf);
   }, LV_EVENT_VALUE_CHANGED, lblVal1);
 
   // Spinbox 2 (opcional — feed tem ph + ec)
@@ -3180,7 +3219,10 @@ static void openQuickLogPicker(const char *type, const char *title,
     lv_obj_set_user_data(qlSpinV2, (void*)(intptr_t)(int)(step2 * 100));
 
     lv_obj_t *lblVal2 = lv_label_create(card);
-    lv_label_set_text_fmt(lblVal2, "%.2f", def2);
+    {
+      char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", def2);
+      lv_label_set_text(lblVal2, vbuf);
+    }
     lv_obj_set_style_text_color(lblVal2, lv_color_hex(COL_AMBER), 0);
     lv_obj_set_style_text_font(lblVal2, FONT_BODY, 0);
     lv_obj_align(lblVal2, LV_ALIGN_RIGHT_MID, -sw(10), sh(28));
@@ -3189,7 +3231,8 @@ static void openQuickLogPicker(const char *type, const char *title,
       int stepInt = (int)(intptr_t)lv_obj_get_user_data(s);
       float step = (float)stepInt / 100.0f;
       float v = lv_slider_get_value(s) * step;
-      lv_label_set_text_fmt((lv_obj_t*)lv_event_get_user_data(e), "%.2f", v);
+      char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", v);
+      lv_label_set_text((lv_obj_t*)lv_event_get_user_data(e), vbuf);
     }, LV_EVENT_VALUE_CHANGED, lblVal2);
   }
 
