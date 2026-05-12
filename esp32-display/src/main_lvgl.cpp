@@ -637,6 +637,96 @@ static void cfgCancelCb(lv_event_t *e) {
   if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
 }
 
+// Pages do config modal — submenu navigation:
+//   0 = menu raiz (lista de categorias)
+//   1 = Rede (WiFi + Server URL + AP)
+//   2 = Display (sleep timeout)
+//   3 = Atualizacoes (OTA GitHub + version)
+//   4 = Sistema (info read-only)
+//   5 = Avancado (re-pairing + reset)
+enum {
+  CFG_PAGE_MENU = 0, CFG_PAGE_REDE, CFG_PAGE_DISPLAY,
+  CFG_PAGE_UPDATES, CFG_PAGE_SISTEMA, CFG_PAGE_AVANCADO,
+  CFG_PAGES_N
+};
+static lv_obj_t *cfgPages[CFG_PAGES_N] = {nullptr};
+
+static void cfgShowPage(int idx) {
+  for (int i = 0; i < CFG_PAGES_N; i++) {
+    if (!cfgPages[i]) continue;
+    if (i == idx) lv_obj_clear_flag(cfgPages[i], LV_OBJ_FLAG_HIDDEN);
+    else          lv_obj_add_flag(cfgPages[i], LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+// Helper: cria container de pagina (full-screen, hidden por default).
+// Pages compartilham mesmo pai (configModal) e sao toggled via HIDDEN flag.
+static lv_obj_t *cfgMakePage(lv_obj_t *parent) {
+  lv_obj_t *p = lv_obj_create(parent);
+  lv_obj_set_size(p, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(p, 0, 0);
+  lv_obj_set_style_bg_color(p, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(p, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(p, 0, 0);
+  lv_obj_set_style_radius(p, 0, 0);
+  lv_obj_set_style_pad_all(p, sw(6), 0);
+  lv_obj_clear_flag(p, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(p, LV_OBJ_FLAG_HIDDEN);
+  return p;
+}
+
+// Helper: cria botao "← Title" no topo da sub-pagina + retorna container
+// pra adicionar o body. Tap no back volta pro menu raiz.
+static lv_obj_t *cfgMakeSubHeader(lv_obj_t *page, const char *title) {
+  lv_obj_t *back = lv_label_create(page);
+  lv_label_set_text(back, LV_SYMBOL_LEFT);
+  lv_obj_set_style_text_color(back, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(back, &lv_font_montserrat_24, 0);
+  lv_obj_align(back, LV_ALIGN_TOP_LEFT, 0, 0);
+  lv_obj_add_flag(back, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(back, sw(12));
+  lv_obj_add_event_cb(back, [](lv_event_t *e) {
+    cfgShowPage(CFG_PAGE_MENU);
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(page, title, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(36), sh(2));
+
+  // Body container scrollable (deixa espaco pro header)
+  lv_obj_t *body = lv_obj_create(page);
+  lv_obj_set_size(body, SCREEN_W - sw(12), SCREEN_H - sh(32));
+  lv_obj_align(body, LV_ALIGN_TOP_LEFT, 0, sh(28));
+  lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(body, 0, 0);
+  lv_obj_set_style_pad_all(body, sw(2), 0);
+  lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_row(body, sh(6), 0);
+  lv_obj_set_scroll_dir(body, LV_DIR_VER);
+  return body;
+}
+
+// Helper: button generico estilo DS pra usar nas pages.
+//   primary=true -> bg COL_PRIMARY (CTA)
+//   primary=false -> ghost (border only)
+static lv_obj_t *cfgMakeButton(lv_obj_t *parent, const char *label,
+                                 bool primary, lv_event_cb_t cb) {
+  lv_obj_t *btn = lv_btn_create(parent);
+  lv_obj_set_width(btn, lv_pct(100));
+  lv_obj_set_height(btn, sh(34));
+  if (primary) {
+    lv_obj_set_style_bg_color(btn, lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(btn, 0, 0);
+  } else {
+    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(btn, 1, 0);
+  }
+  lv_obj_set_style_radius(btn, RADIUS_LG, 0);
+  lv_obj_set_style_shadow_width(btn, 0, 0);
+  lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
+  makeLabel(btn, label, COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  return btn;
+}
+
 static void openConfigModal() {
   if (configModal) return;  // ja aberto
   configModal = lv_obj_create(lv_scr_act());
@@ -647,203 +737,236 @@ static void openConfigModal() {
   lv_obj_set_style_bg_opa(configModal, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(configModal, 0, 0);
   lv_obj_set_style_radius(configModal, 0, 0);
-  lv_obj_set_style_pad_all(configModal, sw(6), 0);
+  lv_obj_set_style_pad_all(configModal, 0, 0);
   lv_obj_clear_flag(configModal, LV_OBJ_FLAG_SCROLLABLE);
 
-  makeLabel(configModal, "CONFIGURACAO", COL_PRIMARY, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(2));
-  makeLabel(configModal, "fw " FW_VERSION, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(4));
-
-  // Area scrollavel com os 5 campos. Aumentada (sh(180)) p/ caber inputs maiores
-  // (sh(34) cada, ~45px no hardware real) com tap targets confortaveis.
-  lv_obj_t *list = lv_obj_create(configModal);
-  lv_obj_set_size(list, SCREEN_W - sw(12), sh(180));
-  lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(22));
-  lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_width(list, 0, 0);
-  lv_obj_set_style_pad_all(list, sw(3), 0);
-  lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_style_pad_row(list, sh(4), 0);
-
-  auto addField = [&](const char *label, const char *initVal, lv_obj_t **out,
-                       bool pwd = false, bool numeric = false) {
-    makeLabel(list, label, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_t *ta = lv_textarea_create(list);
-    lv_obj_set_width(ta, lv_pct(100));
-    lv_obj_set_height(ta, sh(34));      // ~45px tap target (era ~29px)
-    lv_textarea_set_one_line(ta, true);
-    lv_textarea_set_text(ta, initVal ? initVal : "");
-    if (pwd)     lv_textarea_set_password_mode(ta, true);
-    if (numeric) lv_textarea_set_accepted_chars(ta, "0123456789");
-    lv_obj_set_style_text_font(ta, FONT_BODY, 0);
-    lv_obj_set_style_bg_color(ta, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_border_color(ta, lv_color_hex(COL_BORDER), 0);
-    lv_obj_set_style_border_width(ta, 1, 0);
-    lv_obj_set_style_radius(ta, RADIUS_MD, 0);
-    lv_obj_set_style_pad_left(ta, sw(6), 0);
-    lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
-    *out = ta;
-  };
-
-  // Helper local — botao secundario (border+texto, sem bg) DS style.
-  auto secondaryBtn = [&](lv_obj_t *parent, const char *label,
-                          lv_event_cb_t cb) -> lv_obj_t* {
-    lv_obj_t *btn = lv_btn_create(parent);
-    lv_obj_set_width(btn, lv_pct(100));
-    lv_obj_set_height(btn, sh(34));
-    lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_color(btn, lv_color_hex(COL_BORDER), 0);
-    lv_obj_set_style_border_width(btn, 1, 0);
-    lv_obj_set_style_radius(btn, RADIUS_LG, 0);
-    lv_obj_set_style_shadow_width(btn, 0, 0);
-    lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
-    return btn;
-  };
-
-  // Botao "Setup via celular" — secundario DS, sem cor especial (era azul/ciano)
-  lv_obj_t *btnAp = secondaryBtn(list, nullptr, [](lv_event_t *e) {
-    Serial.println("[cfg] abrindo AP portal a pedido do usuario");
-    if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
-    startApPortal();
-  });
-  makeLabel(btnAp, "Setup via celular (AP)", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-
-  addField("WiFi SSID",      WIFI_SSID,    &taSsid);
-
-  // Botao SCAN — secundario DS
-  lv_obj_t *btnScan = secondaryBtn(list, nullptr, scanStartCb);
-  makeLabel(btnScan, "Buscar redes WiFi", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-
-  addField("WiFi Senha",     WIFI_PASS,    &taPass,  true);
-  addField("Server URL",     SERVER_URL,   &taUrl);
-  // Device Token + Tent ID removidos — vem automaticamente via pareamento
-  // RFC 8628 quando ESP boot sem token salvo.
-
-  // "Limpar token (re-parear)" — secundario DS, sem cor de destaque (era PRP)
-  lv_obj_t *btnReparear = secondaryBtn(list, nullptr, [](lv_event_t *e) {
-    Serial.println("[cfg] limpar token -> reboot p/ pareamento");
-    clearTokenOnlyNVS();
-    delay(300);
-    ESP.restart();
-  });
-  makeLabel(btnReparear, "Limpar token (re-parear)", COL_TEXT, FONT_BODY,
-            LV_ALIGN_CENTER, 0, 0);
-
   // ═══════════════════════════════════════════════════════════════════
-  // SECAO: DISPLAY — sleep timeout configuravel
+  // PAGE 0 — MENU RAIZ (lista de categorias)
   // ═══════════════════════════════════════════════════════════════════
-  makeLabel(list, "DISPLAY", COL_PRIMARY, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(6));
-  makeLabel(list, "Apagar tela apos:", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-  ddSleep = lv_dropdown_create(list);
-  // Monta string "15s\n30s\n1 min\n..." pro dropdown
+  cfgPages[CFG_PAGE_MENU] = cfgMakePage(configModal);
   {
+    lv_obj_t *page = cfgPages[CFG_PAGE_MENU];
+    makeLabel(page, "CONFIGURACAO", COL_PRIMARY, FONT_TITLE, LV_ALIGN_TOP_LEFT, 0, sh(2));
+    makeLabel(page, "fw " FW_VERSION, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, 0, sh(4));
+
+    // Container scrollavel da lista de categorias
+    lv_obj_t *list = lv_obj_create(page);
+    lv_obj_set_size(list, SCREEN_W - sw(12), SCREEN_H - sh(58));  // -58 deixa espaco header + Fechar
+    lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(28));
+    lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(list, 0, 0);
+    lv_obj_set_style_pad_all(list, sw(2), 0);
+    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(list, sh(6), 0);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
+
+    // Helper local pra criar row tipo "Label                      >"
+    auto addMenuItem = [&](const char *label, int targetPage) {
+      lv_obj_t *row = lv_btn_create(list);
+      lv_obj_set_width(row, lv_pct(100));
+      lv_obj_set_height(row, sh(44));
+      lv_obj_set_style_bg_color(row, lv_color_hex(COL_CARD), 0);
+      lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+      lv_obj_set_style_border_color(row, lv_color_hex(COL_BORDER), 0);
+      lv_obj_set_style_border_width(row, 1, 0);
+      lv_obj_set_style_radius(row, RADIUS_LG, 0);
+      lv_obj_set_style_shadow_width(row, 0, 0);
+      lv_obj_set_style_pad_hor(row, sw(12), 0);
+      makeLabel(row, label, COL_TEXT, FONT_BODY, LV_ALIGN_LEFT_MID, 0, 0);
+      makeLabel(row, LV_SYMBOL_RIGHT, COL_DIM, FONT_BODY, LV_ALIGN_RIGHT_MID, 0, 0);
+      lv_obj_add_event_cb(row, [](lv_event_t *e) {
+        int tp = (int)(intptr_t)lv_event_get_user_data(e);
+        cfgShowPage(tp);
+      }, LV_EVENT_CLICKED, (void*)(intptr_t)targetPage);
+    };
+
+    addMenuItem("Rede / WiFi",       CFG_PAGE_REDE);
+    addMenuItem("Display",           CFG_PAGE_DISPLAY);
+    addMenuItem("Atualizacoes",      CFG_PAGE_UPDATES);
+    addMenuItem("Sistema",           CFG_PAGE_SISTEMA);
+    addMenuItem("Avancado",          CFG_PAGE_AVANCADO);
+
+    // Botao Fechar abaixo da lista — posicao FIXA (nao flutuante)
+    lv_obj_t *btnClose = cfgMakeButton(page, "Fechar", false, [](lv_event_t *e) {
+      if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
+      for (int i = 0; i < CFG_PAGES_N; i++) cfgPages[i] = nullptr;
+    });
+    lv_obj_align(btnClose, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
+    lv_obj_set_width(btnClose, sw(140));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PAGE 1 — REDE (WiFi SSID/senha + Server URL + AP portal + Salvar)
+  // ═══════════════════════════════════════════════════════════════════
+  cfgPages[CFG_PAGE_REDE] = cfgMakePage(configModal);
+  {
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_REDE], "Rede");
+
+    // Field helper inline (reaproveita logica original)
+    auto addField = [&](const char *label, const char *initVal, lv_obj_t **out, bool pwd) {
+      makeLabel(body, label, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+      lv_obj_t *ta = lv_textarea_create(body);
+      lv_obj_set_width(ta, lv_pct(100));
+      lv_obj_set_height(ta, sh(34));
+      lv_textarea_set_one_line(ta, true);
+      lv_textarea_set_text(ta, initVal ? initVal : "");
+      if (pwd) lv_textarea_set_password_mode(ta, true);
+      lv_obj_set_style_text_font(ta, FONT_BODY, 0);
+      lv_obj_set_style_bg_color(ta, lv_color_hex(COL_CARD), 0);
+      lv_obj_set_style_border_color(ta, lv_color_hex(COL_BORDER), 0);
+      lv_obj_set_style_border_width(ta, 1, 0);
+      lv_obj_set_style_radius(ta, RADIUS_MD, 0);
+      lv_obj_set_style_pad_left(ta, sw(6), 0);
+      lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
+      *out = ta;
+    };
+
+    addField("WiFi SSID", WIFI_SSID, &taSsid, false);
+    cfgMakeButton(body, "Buscar redes WiFi", false, scanStartCb);
+    addField("WiFi Senha", WIFI_PASS, &taPass, true);
+    addField("Server URL", SERVER_URL, &taUrl, false);
+    cfgMakeButton(body, "Setup via celular (AP)", false, [](lv_event_t *e) {
+      Serial.println("[cfg] abrindo AP portal");
+      if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
+      for (int i = 0; i < CFG_PAGES_N; i++) cfgPages[i] = nullptr;
+      startApPortal();
+    });
+    cfgMakeButton(body, "Salvar e reiniciar", true, cfgSaveCb);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PAGE 2 — DISPLAY (sleep timeout dropdown)
+  // ═══════════════════════════════════════════════════════════════════
+  cfgPages[CFG_PAGE_DISPLAY] = cfgMakePage(configModal);
+  {
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_DISPLAY], "Display");
+    makeLabel(body, "Apagar tela apos:", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+    ddSleep = lv_dropdown_create(body);
     char optsBuf[128] = {0};
     for (int i = 0; i < SLEEP_OPTS_N; i++) {
       strcat(optsBuf, SLEEP_OPTS[i].label);
       if (i < SLEEP_OPTS_N - 1) strcat(optsBuf, "\n");
     }
     lv_dropdown_set_options(ddSleep, optsBuf);
-    // Pre-seleciona o valor salvo em NVS (compara via screenSleepMs)
     int curSec = (screenSleepMs == UINT32_MAX) ? 0 : (int)(screenSleepMs / 1000);
-    int matchIdx = 1;  // default fallback "30s"
+    int matchIdx = 1;
     for (int i = 0; i < SLEEP_OPTS_N; i++) {
       if (SLEEP_OPTS[i].sec == curSec) { matchIdx = i; break; }
     }
     lv_dropdown_set_selected(ddSleep, matchIdx);
+    lv_obj_set_width(ddSleep, lv_pct(100));
+    lv_obj_set_height(ddSleep, sh(34));
+    lv_obj_set_style_text_font(ddSleep, FONT_BODY, 0);
+    lv_obj_set_style_bg_color(ddSleep, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(ddSleep, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(ddSleep, 1, 0);
+    lv_obj_set_style_radius(ddSleep, RADIUS_MD, 0);
+    // Salva direto ao mudar — sem precisar tap em "Salvar"
+    lv_obj_add_event_cb(ddSleep, [](lv_event_t *e) {
+      if (!ddSleep) return;
+      uint16_t selIdx = lv_dropdown_get_selected(ddSleep);
+      if (selIdx < SLEEP_OPTS_N) {
+        saveSleepTimeoutNVS(SLEEP_OPTS[selIdx].sec);
+      }
+    }, LV_EVENT_VALUE_CHANGED, NULL);
+    makeLabel(body, "Salva automaticamente ao mudar.", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
   }
-  lv_obj_set_width(ddSleep, lv_pct(100));
-  lv_obj_set_height(ddSleep, sh(34));
-  lv_obj_set_style_text_font(ddSleep, FONT_BODY, 0);
-  lv_obj_set_style_bg_color(ddSleep, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(ddSleep, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(ddSleep, 1, 0);
-  lv_obj_set_style_radius(ddSleep, RADIUS_MD, 0);
 
   // ═══════════════════════════════════════════════════════════════════
-  // SECAO: ATUALIZACOES — check via GitHub releases
+  // PAGE 3 — ATUALIZACOES (OTA GitHub)
   // ═══════════════════════════════════════════════════════════════════
-  makeLabel(list, "ATUALIZACOES", COL_PRIMARY, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(6));
-  lv_obj_t *btnOta = secondaryBtn(list, nullptr, [](lv_event_t *e) {
-    Serial.println("[cfg] OTA check requested");
-    otaCheckPending = true;
-    // Toast informativo — feedback final via log serial (futuro: UI overlay)
-    // Mostrar via cultivoUI_showToast nao funciona daqui (statics de outro
-    // module). User precisa ver via serial OU aguardar reboot apos sucesso.
-  });
-  makeLabel(btnOta, "Verificar atualizacao firmware", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-
-  // ═══════════════════════════════════════════════════════════════════
-  // SECAO: SISTEMA — info read-only (versao, MAC, uptime, heap)
-  // ═══════════════════════════════════════════════════════════════════
-  makeLabel(list, "SISTEMA", COL_PRIMARY, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(6));
+  cfgPages[CFG_PAGE_UPDATES] = cfgMakePage(configModal);
   {
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_UPDATES], "Atualizacoes");
+    char verBuf[64];
+    snprintf(verBuf, sizeof(verBuf), "Versao atual: " FW_VERSION);
+    makeLabel(body, verBuf, COL_TEXT, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
+    makeLabel(body,
+      "Verifica releases no GitHub:\n"
+      "jpedrorock/cultivo-server.\nSe houver versao newer + asset .bin,\n"
+      "baixa e reinicia automaticamente.",
+      COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+    cfgMakeButton(body, "Verificar atualizacao", true, [](lv_event_t *e) {
+      Serial.println("[cfg] OTA check requested");
+      otaCheckPending = true;
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PAGE 4 — SISTEMA (info read-only)
+  // ═══════════════════════════════════════════════════════════════════
+  cfgPages[CFG_PAGE_SISTEMA] = cfgMakePage(configModal);
+  {
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_SISTEMA], "Sistema");
     uint8_t mac[6];
     WiFi.macAddress(mac);
     uint32_t uptimeSec = millis() / 1000;
     uint32_t freeHeap  = ESP.getFreeHeap() / 1024;
     uint32_t freePsram = ESP.getFreePsram() / 1024;
-    char infoBuf[160];
+    char infoBuf[256];
     snprintf(infoBuf, sizeof(infoBuf),
-             "Versao: " FW_VERSION "\n"
+             "Versao firmware: " FW_VERSION "\n"
              "MAC: %02X:%02X:%02X:%02X:%02X:%02X\n"
              "Uptime: %luh %lum\n"
-             "Heap: %luKB / PSRAM: %luKB",
+             "Heap livre: %lu KB\n"
+             "PSRAM livre: %lu KB\n"
+             "Tent ID: %d\n"
+             "Server: %s",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
              uptimeSec / 3600, (uptimeSec / 60) % 60,
-             (unsigned long)freeHeap, (unsigned long)freePsram);
-    lv_obj_t *lblInfo = lv_label_create(list);
+             (unsigned long)freeHeap, (unsigned long)freePsram,
+             TENT_ID, SERVER_URL);
+    lv_obj_t *lblInfo = lv_label_create(body);
     lv_label_set_text(lblInfo, infoBuf);
-    lv_obj_set_style_text_color(lblInfo, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_color(lblInfo, lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_text_font(lblInfo, FONT_CAPTION, 0);
-    lv_obj_set_style_text_line_space(lblInfo, sh(2), 0);
+    lv_obj_set_style_text_line_space(lblInfo, sh(4), 0);
   }
 
-  // Footer buttons DS — Cancel (ghost), Reset (destrutivo), Salvar (primary)
-  lv_obj_t *btnCancel = lv_btn_create(configModal);
-  lv_obj_set_size(btnCancel, sw(96), sh(36));
-  lv_obj_align(btnCancel, LV_ALIGN_BOTTOM_LEFT, sw(6), -sh(6));
-  lv_obj_set_style_bg_opa(btnCancel, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_color(btnCancel, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(btnCancel, 1, 0);
-  lv_obj_set_style_radius(btnCancel, RADIUS_LG, 0);
-  lv_obj_set_style_shadow_width(btnCancel, 0, 0);
-  lv_obj_add_event_cb(btnCancel, cfgCancelCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnCancel, "Cancelar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  // ═══════════════════════════════════════════════════════════════════
+  // PAGE 5 — AVANCADO (re-parear, reset full)
+  // ═══════════════════════════════════════════════════════════════════
+  cfgPages[CFG_PAGE_AVANCADO] = cfgMakePage(configModal);
+  {
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_AVANCADO], "Avancado");
+    makeLabel(body,
+      "ACOES DESTRUTIVAS — confirmar antes!",
+      COL_AMBER, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
 
-  lv_obj_t *btnReset = lv_btn_create(configModal);
-  lv_obj_set_size(btnReset, sw(78), sh(36));
-  lv_obj_align(btnReset, LV_ALIGN_BOTTOM_MID, 0, -sh(6));
-  lv_obj_set_style_bg_opa(btnReset, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_RED), 0);
-  lv_obj_set_style_border_width(btnReset, 1, 0);
-  lv_obj_set_style_radius(btnReset, RADIUS_LG, 0);
-  lv_obj_set_style_shadow_width(btnReset, 0, 0);
-  lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
-    Serial.println("[cfg] reset WiFi -> AP portal");
-    clearConfigNVS();
-    delay(300);
-    ESP.restart();
-  }, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnReset, "Reset", COL_RED, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+    cfgMakeButton(body, "Limpar token (re-parear)", false, [](lv_event_t *e) {
+      Serial.println("[cfg] limpar token -> reboot p/ pareamento");
+      clearTokenOnlyNVS();
+      delay(300);
+      ESP.restart();
+    });
+    makeLabel(body, "Pareia display de novo no app web.",
+              COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
 
-  // CTA principal Salvar — primary cheio (sem bloom — DS clean)
-  lv_obj_t *btnSave = lv_btn_create(configModal);
-  lv_obj_set_size(btnSave, sw(110), sh(36));
-  lv_obj_align(btnSave, LV_ALIGN_BOTTOM_RIGHT, -sw(6), -sh(6));
-  lv_obj_set_style_bg_color(btnSave, lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_bg_opa(btnSave, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(btnSave, 0, 0);
-  lv_obj_set_style_radius(btnSave, RADIUS_LG, 0);
-  lv_obj_set_style_shadow_width(btnSave, 0, 0);
-  lv_obj_add_event_cb(btnSave, cfgSaveCb, LV_EVENT_CLICKED, NULL);
-  makeLabel(btnSave, "Salvar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+    // Botao reset com cor RED pra denotar destrutivo
+    lv_obj_t *btnReset = lv_btn_create(body);
+    lv_obj_set_width(btnReset, lv_pct(100));
+    lv_obj_set_height(btnReset, sh(34));
+    lv_obj_set_style_bg_opa(btnReset, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_RED), 0);
+    lv_obj_set_style_border_width(btnReset, 1, 0);
+    lv_obj_set_style_radius(btnReset, RADIUS_LG, 0);
+    lv_obj_set_style_shadow_width(btnReset, 0, 0);
+    lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
+      Serial.println("[cfg] reset full -> AP portal");
+      clearConfigNVS();
+      delay(300);
+      ESP.restart();
+    }, LV_EVENT_CLICKED, NULL);
+    makeLabel(btnReset, "Reset total (apaga WiFi+token)", COL_RED, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+    makeLabel(body, "Volta pro AP portal de setup inicial.",
+              COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+  }
 
-  // Keyboard compartilhado — esconde ao pressionar OK ou Cancelar
+  // Keyboard compartilhado — fica em layer_top pra cobrir tudo quando aparece
   kbCfg = lv_keyboard_create(configModal);
   lv_obj_set_size(kbCfg, SCREEN_W, sh(110));
   lv_obj_align(kbCfg, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
-  // Monserrat 14 tem os glyphs FontAwesome (SHIFT/BKSP/OK/etc).
-  // Manrope (FONT_BODY) nao tem esses glyphs -> botoes apareceriam vazios.
   lv_obj_set_style_text_font(kbCfg, &lv_font_montserrat_14, 0);
   lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
     lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
@@ -851,6 +974,9 @@ static void openConfigModal() {
   lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
     lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
   }, LV_EVENT_CANCEL, NULL);
+
+  // Mostra menu raiz inicialmente
+  cfgShowPage(CFG_PAGE_MENU);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
