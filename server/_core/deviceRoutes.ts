@@ -681,6 +681,17 @@ function registerDeviceRoutes(app: express.Application) {
         return res.status(400).json({ error: 'plantId inválido' });
       }
 
+      // fmt=rgb565 → retorna pixel data raw (320x240x2 = 153600 bytes)
+      // direto pro framebuffer do ESP, sem precisar decodar JPEG no display.
+      // Eliminou tela preta causada por:
+      //  - JFIF marker ausente (Sharp omite)
+      //  - LV_USE_FS_MEMFS heap crash
+      //  - Chunked transfer encoding do Cloudflare
+      // Trade-off: 150KB transfer vs ~10KB JPEG, mas com no-transform e
+      // Content-Length, vem em ~150-300ms via WiFi.
+      const fmt = String(req.query.fmt ?? 'jpeg').toLowerCase();
+      const wantRgb565 = (fmt === 'rgb565');
+
       const w = Math.min(1280, Math.max(80, parseInt(String(req.query.w ?? '320')) || 320));
       const h = Math.min(720, Math.max(60, parseInt(String(req.query.h ?? '240')) || 240));
       const q = Math.min(95, Math.max(20, parseInt(String(req.query.q ?? '70')) || 70));
@@ -730,6 +741,48 @@ function registerDeviceRoutes(app: express.Application) {
       const filePath = path.join(UPLOADS_DIR, fileKey);
       if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
         return res.status(400).json({ error: 'fileKey inválido' });
+      }
+
+      // RGB565 RAW PATH: ESP nao precisa decoder JPEG — recebe pixels
+      // 16-bit big-endian (320x240 = 153600 bytes) prontos pra framebuffer.
+      // Sharp converte JPEG -> raw RGB888, depois empacotamos RGB565.
+      if (wantRgb565) {
+        if (!sharpLib) return res.status(500).json({ error: 'Sharp indisponivel pra RGB565' });
+        try {
+          const inputBuffer = await fsp.readFile(filePath);
+          const { data: rgb888, info } = await sharpLib(inputBuffer)
+            .rotate()
+            .resize({ width: w, height: h, fit: 'cover', position: 'center' })  // cover pra evitar letterbox
+            .removeAlpha()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+          // RGB888 -> RGB565 big-endian (LVGL com LV_COLOR_DEPTH=16 RGB565 LE
+          // por default, mas alguns displays AXS15231B esperam BE). Tentamos
+          // little-endian primeiro; se cores ficarem trocadas ajustamos.
+          const pixelCount = info.width * info.height;
+          const rgb565 = Buffer.allocUnsafe(pixelCount * 2);
+          for (let i = 0, j = 0; i < pixelCount; i++, j += 3) {
+            const r = rgb888[j] >> 3;            // 5 bits
+            const g = rgb888[j + 1] >> 2;        // 6 bits
+            const b = rgb888[j + 2] >> 3;        // 5 bits
+            const px = (r << 11) | (g << 5) | b;
+            // little-endian: low byte first
+            rgb565[i * 2] = px & 0xFF;
+            rgb565[i * 2 + 1] = (px >> 8) & 0xFF;
+          }
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Cache-Control', 'public, max-age=30, no-transform');
+          res.setHeader('Content-Length', String(rgb565.length));
+          res.setHeader('X-Pixel-Format', 'RGB565LE');
+          res.setHeader('X-Pixel-Width', String(info.width));
+          res.setHeader('X-Pixel-Height', String(info.height));
+          res.setHeader('X-Health-Status', String(row.healthStatus ?? ''));
+          res.setHeader('X-Log-Date', new Date(row.logDate).toISOString());
+          return res.status(200).end(rgb565);
+        } catch (e: any) {
+          console.warn(`[Device] rgb565 fail: ${e?.message}`);
+          return res.status(500).json({ error: 'Erro convertendo p/ RGB565' });
+        }
       }
 
       // FAST PATH: tenta servir o variant ESP pre-gerado no upload
