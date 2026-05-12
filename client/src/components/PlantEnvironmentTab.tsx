@@ -11,7 +11,6 @@ import {
   ChevronUp,
   Download,
   Home,
-  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -253,7 +252,7 @@ function PeriodCard({
   return (
     <div
       className={`rounded-2xl border ${color.border} bg-card overflow-hidden`}
-      style={{ background: `linear-gradient(135deg, ${color.glow} 0%, hsl(var(--card)) 50%)` }}
+      style={{ background: `linear-gradient(135deg, ${color.glow} 0%, var(--card) 50%)` }}
     >
       {/* Header colapsável */}
       <button

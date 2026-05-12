@@ -5,6 +5,11 @@ import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { PageTransition } from '@/components/PageTransition';
 import { PageHeader } from '@/components/PageHeader';
 import { toast } from 'sonner';
@@ -14,6 +19,7 @@ export default function AdminUsers() {
   const [, setLocation] = useLocation();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [tab, setTab] = useState<'approved' | 'pending'>('approved');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ userId: number; email: string } | null>(null);
 
   const { data: users, isLoading, refetch } = trpc.admin.listUsers.useQuery();
   const deleteUser = trpc.admin.deleteUser.useMutation({
@@ -28,25 +34,25 @@ export default function AdminUsers() {
     onSuccess: () => refetch(),
     onError: (e) => toast.error(`Erro ao aprovar usuário: ${e.message}`),
   });
-  const revokeUser = trpc.admin.revokeUser.useMutation({
-    onSuccess: () => refetch(),
-    onError: (e) => toast.error(`Erro ao revogar acesso: ${e.message}`),
-  });
-
   // Redirecionar se não for admin
   if (user && user.role !== 'admin') {
     setLocation('/');
     return null;
   }
 
-  const approvedUsers = users?.filter(u => u.approved) ?? [];
-  const pendingUsers = users?.filter(u => !u.approved) ?? [];
+  const approvedUsers = users?.filter((u: any) => u.approved) ?? [];
+  const pendingUsers = users?.filter((u: any) => !u.approved) ?? [];
 
-  const handleDelete = async (userId: number, email: string) => {
-    if (!confirm(`Excluir a conta de ${email}? Esta ação não pode ser desfeita.`)) return;
-    setDeletingId(userId);
+  const handleDelete = (userId: number, email: string) => {
+    setDeleteConfirm({ userId, email });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeletingId(deleteConfirm.userId);
+    setDeleteConfirm(null);
     try {
-      await deleteUser.mutateAsync({ userId });
+      await deleteUser.mutateAsync({ userId: deleteConfirm.userId });
     } finally {
       setDeletingId(null);
     }
@@ -105,7 +111,7 @@ export default function AdminUsers() {
           ) : tab === 'approved' ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground mb-4">{approvedUsers.length} usuário(s) aprovado(s)</p>
-              {approvedUsers.map(u => (
+              {approvedUsers.map((u: any) => (
                 <Card key={u.id}>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -168,7 +174,7 @@ export default function AdminUsers() {
               ) : (
                 <>
                   <p className="text-sm text-muted-foreground mb-4">{pendingUsers.length} usuário(s) aguardando aprovação</p>
-                  {pendingUsers.map(u => (
+                  {pendingUsers.map((u: any) => (
                     <Card key={u.id} className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/10">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
@@ -213,6 +219,28 @@ export default function AdminUsers() {
           )}
         </main>
       </div>
+
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conta</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a conta de{' '}
+              <span className="font-semibold text-foreground">{deleteConfirm?.email}</span>?{' '}
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir conta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageTransition>
   );
 }

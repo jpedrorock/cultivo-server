@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Plus, Edit, Trash2, Loader2, Search, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 
-type Phase = "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
+type Phase = "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
 type Context = "TENT_A" | "TENT_BC";
 
 // O context é derivado automaticamente da fase — o usuário não precisa escolher
@@ -33,6 +33,7 @@ interface TaskTemplate {
 }
 
 const PHASE_LABELS: Record<Phase, string> = {
+  CLONING: "Clonagem",
   VEGA: "Vegetativo",
   FLORA: "Floração",
   MAINTENANCE: "Manutenção",
@@ -40,6 +41,7 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 const PHASE_COLORS: Record<Phase, string> = {
+  CLONING: "bg-blue-500/10 text-blue-700 border-blue-200",
   VEGA: "bg-green-500/10 text-green-700 border-green-200",
   FLORA: "bg-purple-500/10 text-purple-700 border-purple-200",
   MAINTENANCE: "bg-amber-500/10 text-amber-700 border-amber-200",

@@ -33,7 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -58,7 +57,7 @@ export default function HarvestQueue() {
 
   // Estufas disponíveis (sem ciclo ativo)
   const availableTents = allTents?.filter(
-    (tent) => !activeCycles?.some((cycle) => cycle.tentId === tent.id)
+    (tent) => !activeCycles?.some((cycle: any) => cycle.tentId === tent.id)
   );
 
   // Mutations

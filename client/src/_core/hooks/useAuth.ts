@@ -52,7 +52,7 @@ export function useAuth() {
           isAuthenticated: false,
         });
       }
-    } catch (err) {
+    } catch (_err) {
       setState({
         user: null,
         loading: false,
@@ -69,6 +69,15 @@ export function useAuth() {
         credentials: 'include',
       });
     } finally {
+      // Purga cache do Service Worker — sem isso, respostas de API privadas
+      // (fotos, plantas, etc.) do usuário anterior ficavam acessíveis em cache
+      // se outro usuário logasse no mesmo dispositivo offline.
+      try {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
+        }
+      } catch { /* ignora — limpeza best-effort */ }
+
       setState({
         user: null,
         loading: false,

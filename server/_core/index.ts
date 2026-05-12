@@ -4,15 +4,16 @@ import path from "path";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
-import crypto from "node:crypto";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerDeviceRoutes } from "./deviceRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import uploadRouter from "../uploadRouter";
 import { initializeStorageDirectories } from "../storageLocal";
-import { getMysqlPool } from "../mysql-pool";
+import { ENV } from "./env";
+import { httpLogger, logger } from "./logger";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -33,869 +34,91 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-async function ensurePushSubscriptionsTable() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`pushSubscriptions\` (
-        \`id\`              INT AUTO_INCREMENT PRIMARY KEY,
-        \`endpoint\`        TEXT NOT NULL,
-        \`keysJson\`        TEXT NOT NULL,
-        \`reminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0,
-        \`reminderTimes\`   TEXT,
-        \`createdAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        \`updatedAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    await conn.end();
-    console.log("[DB] Tabela pushSubscriptions OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao criar pushSubscriptions:", err?.message);
-  }
-}
+// As migrations de schema vivem em ./dbMigrations.ts (um único arquivo,
+// um único pool MySQL compartilhado). Antes haviam 10 funções `ensure*`
+// aqui, cada uma abrindo sua própria conexão TCP.
+import { runMigrations } from "./dbMigrations";
 
-async function ensureUsersApprovedColumn() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-
-    const [rows]: any = await conn.execute(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
-    );
-    const existingCols = rows.map((r: any) => r.COLUMN_NAME);
-
-    if (!existingCols.includes('approved')) {
-      // Adicionar coluna — usuários existentes recebem approved=TRUE para não perder acesso
-      await conn.execute(`ALTER TABLE \`users\` ADD COLUMN \`approved\` TINYINT(1) NOT NULL DEFAULT 1`);
-      console.log("[DB] Coluna approved adicionada à tabela users (existentes aprovados automaticamente)");
-    }
-
-    await conn.end();
-  } catch (err: any) {
-    console.warn("[DB] Erro ao migrar users.approved:", err?.message);
-  }
-}
-
-async function ensureNotificationSettingsColumns() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-
-    // Verificar quais colunas já existem (compatível com MySQL 5.7+)
-    const [rows]: any = await conn.execute(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notificationSettings'`
-    );
-    const existingCols = rows.map((r: any) => r.COLUMN_NAME);
-
-    if (!existingCols.includes('dailyReminderEnabled')) {
-      await conn.execute(`ALTER TABLE \`notificationSettings\` ADD COLUMN \`dailyReminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0`);
-      console.log("[DB] Coluna dailyReminderEnabled adicionada");
-    }
-    if (!existingCols.includes('reminderTimes')) {
-      await conn.execute(`ALTER TABLE \`notificationSettings\` ADD COLUMN \`reminderTimes\` TEXT DEFAULT '[]'`);
-      console.log("[DB] Coluna reminderTimes adicionada");
-    }
-
-    await conn.end();
-    console.log("[DB] Colunas notificationSettings OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao migrar notificationSettings:", err?.message);
-  }
-}
-
-async function ensureUserAiSettingsTable() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`userAiSettings\` (
-        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
-        \`userId\`    INT NOT NULL,
-        \`provider\`  VARCHAR(32) NOT NULL,
-        \`apiKey\`    TEXT NOT NULL,
-        \`model\`     VARCHAR(64),
-        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
-        UNIQUE KEY \`userAiSettings_userId_unique\` (\`userId\`)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    await conn.end();
-    console.log("[DB] Tabela userAiSettings OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao criar userAiSettings:", err?.message);
-  }
-}
-
-async function ensureAiChatMessagesTable() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`aiChatMessages\` (
-        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
-        \`userId\`    INT NOT NULL,
-        \`plantId\`   INT,
-        \`role\`      ENUM('user','assistant') NOT NULL,
-        \`content\`   TEXT NOT NULL,
-        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        INDEX \`userPlantIdx\` (\`userId\`, \`plantId\`)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    await conn.end();
-    console.log("[DB] Tabela aiChatMessages OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao criar aiChatMessages:", err?.message);
-  }
-}
-
-async function ensureSourceColumn() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-    try {
-      await conn.execute(
-        `ALTER TABLE \`dailyLogs\` ADD COLUMN \`source\` VARCHAR(10) NOT NULL DEFAULT 'MANUAL'`
-      );
-      console.log("[DB] Coluna source adicionada à tabela dailyLogs");
-    } catch (alterErr: any) {
-      if (alterErr?.code === 'ER_DUP_FIELDNAME') {
-        // Coluna já existe — OK
-      } else {
-        throw alterErr;
-      }
-    }
-    await conn.end();
-    console.log("[DB] Coluna dailyLogs.source OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao migrar dailyLogs.source:", err?.message);
-  }
-}
-
-async function ensureTuyaTables() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-
-    // Credenciais Tuya por usuário
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`tuyaConfig\` (
-        \`id\`              INT AUTO_INCREMENT PRIMARY KEY,
-        \`userId\`          INT NOT NULL,
-        \`accessId\`        VARCHAR(100) NOT NULL,
-        \`accessSecret\`    VARCHAR(100) NOT NULL,
-        \`region\`          VARCHAR(10) NOT NULL DEFAULT 'eu',
-        \`pollIntervalMin\` INT NOT NULL DEFAULT 60,
-        \`enabled\`         TINYINT(1) NOT NULL DEFAULT 1,
-        \`createdAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        \`updatedAt\`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
-        UNIQUE KEY \`tuyaConfig_userId\` (\`userId\`)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-
-    // Mapeamento dispositivo ↔ estufa por usuário
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`tuyaSensorMappings\` (
-        \`id\`          INT AUTO_INCREMENT PRIMARY KEY,
-        \`userId\`      INT NOT NULL,
-        \`tentId\`      INT NOT NULL,
-        \`deviceId\`    VARCHAR(100) NOT NULL,
-        \`deviceName\`  VARCHAR(200),
-        \`enabled\`     TINYINT(1) NOT NULL DEFAULT 1,
-        \`createdAt\`   TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        UNIQUE KEY \`tuyaSensorMappings_userId_tentId\` (\`userId\`, \`tentId\`)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-
-    // Cache da última leitura por dispositivo
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`sensorLatestReadings\` (
-        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
-        \`userId\`    INT NOT NULL,
-        \`deviceId\`  VARCHAR(100) NOT NULL,
-        \`tempC\`     DECIMAL(4,1),
-        \`rhPct\`     DECIMAL(4,1),
-        \`readAt\`    TIMESTAMP NOT NULL,
-        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
-        UNIQUE KEY \`sensorLatestReadings_deviceId\` (\`deviceId\`)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-
-    await conn.end();
-    console.log("[DB] Tabelas Tuya OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao criar tabelas Tuya:", err?.message);
-  }
-}
-
-async function ensurePlantLSTLogsColumns() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-
-    const [rows]: any = await conn.execute(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'plantLSTLogs'`
-    );
-    const existingCols = rows.map((r: any) => r.COLUMN_NAME);
-
-    if (!existingCols.includes('techniqueConfig')) {
-      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`techniqueConfig\` TEXT`);
-      console.log("[DB] Coluna techniqueConfig adicionada em plantLSTLogs");
-    }
-    if (!existingCols.includes('actualResult')) {
-      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`actualResult\` TEXT`);
-      console.log("[DB] Coluna actualResult adicionada em plantLSTLogs");
-    }
-    if (!existingCols.includes('nodePosition')) {
-      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`nodePosition\` VARCHAR(200)`);
-      console.log("[DB] Coluna nodePosition adicionada em plantLSTLogs");
-    }
-    if (!existingCols.includes('snapshotJson')) {
-      await conn.execute(`ALTER TABLE \`plantLSTLogs\` ADD COLUMN \`snapshotJson\` LONGTEXT`);
-      console.log("[DB] Coluna snapshotJson adicionada em plantLSTLogs");
-    }
-
-    await conn.end();
-    console.log("[DB] Colunas plantLSTLogs OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao migrar plantLSTLogs:", err?.message);
-  }
-}
-
-async function ensureStandaloneTasksTable() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`standaloneTasks\` (
-        \`id\` INT AUTO_INCREMENT PRIMARY KEY,
-        \`userId\` INT NOT NULL,
-        \`tentId\` INT,
-        \`title\` VARCHAR(200) NOT NULL,
-        \`description\` TEXT,
-        \`priority\` ENUM('LOW','MEDIUM','HIGH') DEFAULT 'MEDIUM' NOT NULL,
-        \`dueDate\` TIMESTAMP NULL,
-        \`isDone\` TINYINT(1) DEFAULT 0 NOT NULL,
-        \`completedAt\` TIMESTAMP NULL,
-        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        INDEX \`standaloneUserIdx\` (\`userId\`)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    await conn.end();
-    console.log("[DB] Tabela standaloneTasks OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao criar standaloneTasks:", err?.message);
-  }
-}
-
-async function ensureStrainOriginColumn() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-    const [rows]: any = await conn.execute(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'strains' AND COLUMN_NAME = 'origin'`
-    );
-    if (rows.length === 0) {
-      await conn.execute(
-        `ALTER TABLE \`strains\` ADD COLUMN \`origin\` ENUM('FEMINIZED','AUTOFLOWER','CLONE') DEFAULT 'FEMINIZED'`
-      );
-      console.log("[DB] Coluna origin adicionada em strains");
-    }
-    await conn.end();
-  } catch (err: any) {
-    console.warn("[DB] Erro ao migrar strains origin:", err?.message);
-  }
-}
-
-async function ensureDeviceTokensTable() {
-  try {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) return;
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.default.createConnection(connectionString);
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS \`deviceTokens\` (
-        \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
-        \`token\`     VARCHAR(64) NOT NULL UNIQUE,
-        \`name\`      VARCHAR(100) NOT NULL,
-        \`tentId\`    INT NOT NULL,
-        \`groupId\`   INT NOT NULL,
-        \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    await conn.end();
-    console.log("[DB] Tabela deviceTokens OK");
-  } catch (err: any) {
-    console.warn("[DB] Erro ao criar deviceTokens:", err?.message);
-  }
-}
-
-async function validateDeviceToken(req: express.Request): Promise<{ tentId: number; groupId: number } | null> {
-  const token = req.headers['x-device-token'] as string | undefined;
-  if (!token) return null;
-  try {
-    const pool = getMysqlPool();
-    const [rows]: any = await pool.execute(
-      `SELECT tentId, groupId FROM deviceTokens WHERE token = ? LIMIT 1`,
-      [token]
-    );
-    return rows.length > 0 ? { tentId: rows[0].tentId, groupId: rows[0].groupId } : null;
-  } catch {
-    return null;
-  }
-}
-
-function registerDeviceRoutes(app: express.Application) {
-  const pool = getMysqlPool();
-
-  // GET /api/device/display/:tentId — dados para o display ESP32
-  app.get('/api/device/display/:tentId', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const tentId = parseInt(req.params.tentId);
-      if (device.tentId !== tentId) return res.status(403).json({ error: 'Token não autorizado para esta estufa' });
-
-      const [tentRows]: any = await pool.execute(`SELECT name FROM tents WHERE id = ? LIMIT 1`, [tentId]);
-      const tentName: string = tentRows[0]?.name ?? 'ESTUFA';
-
-      const [cycleRows]: any = await pool.execute(
-        `SELECT c.startDate, c.floraStartDate, s.floraWeeks, s.vegaWeeks
-         FROM cycles c
-         LEFT JOIN strains s ON s.id = c.strainId
-         WHERE c.tentId = ? AND c.status = 'ACTIVE'
-         LIMIT 1`,
-        [tentId]
-      );
-
-      let fase = 'VEGA', semana = 1, totalSem = 8;
-      if (cycleRows.length > 0) {
-        const cy = cycleRows[0];
-        const now = Date.now();
-        if (cy.floraStartDate) {
-          fase = 'FLORA';
-          semana = Math.max(1, Math.ceil((now - new Date(cy.floraStartDate).getTime()) / 604800000));
-          totalSem = cy.floraWeeks ?? 8;
-        } else {
-          fase = 'VEGA';
-          semana = Math.max(1, Math.ceil((now - new Date(cy.startDate).getTime()) / 604800000));
-          totalSem = cy.vegaWeeks ?? 4;
-        }
-      }
-
-      const [logRows]: any = await pool.execute(
-        `SELECT tempC, rhPct, ph, ec, ppfd FROM dailyLogs WHERE tentId = ? ORDER BY logDate DESC LIMIT 1`,
-        [tentId]
-      );
-
-      let tempC: number | null = null, rh: number | null = null, vpd: number | null = null;
-      let ph: number | null = null, ec: number | null = null;
-      let ppfd: number | null = null, lux: number | null = null;
-      if (logRows.length > 0) {
-        const l = logRows[0];
-        tempC = l.tempC != null ? parseFloat(l.tempC) : null;
-        rh    = l.rhPct != null ? parseFloat(l.rhPct) : null;
-        ph    = l.ph   != null ? parseFloat(l.ph)   : null;
-        ec    = l.ec   != null ? parseFloat(l.ec)   : null;
-        ppfd  = l.ppfd != null ? parseInt(l.ppfd)   : null;
-        // LUX ~ PPFD * 54 (aprox. pra LED cultivo full-spectrum)
-        lux   = ppfd !== null ? Math.round(ppfd * 54) : null;
-        if (tempC !== null && rh !== null) {
-          const svp = 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));
-          vpd = parseFloat((svp * (1 - rh / 100)).toFixed(2));
-        }
-      }
-
-      res.json({ tentName, tempC, rh, vpd, ph, ec, lux, ppfd, fase, semana, totalSem });
-    } catch (err: any) {
-      console.error('[Device] display error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-
-  // POST /api/device/readings — salva medição de pH/EC/PPFD do display
-  app.post('/api/device/readings', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const { tentId, tempC, rh, ph, ec, ppfd, turn = 'AM' } = req.body;
-      if (!tentId || device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
-      const dateOnly = new Date(); dateOnly.setHours(0, 0, 0, 0);
-      await pool.execute(
-        `INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, ph, ec, ppfd, source, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ESP32', NOW())
-         ON DUPLICATE KEY UPDATE
-            tempC = COALESCE(VALUES(tempC), tempC),
-            rhPct = COALESCE(VALUES(rhPct), rhPct),
-            ph    = COALESCE(VALUES(ph), ph),
-            ec    = COALESCE(VALUES(ec), ec),
-            ppfd  = COALESCE(VALUES(ppfd), ppfd),
-            source = 'ESP32'`,
-        [tentId, dateOnly, turn, tempC ?? null, rh ?? null, ph ?? null, ec ?? null, ppfd ?? null]
-      );
-      res.json({ success: true });
-    } catch (err: any) {
-      console.error('[Device] readings error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-
-  // POST /api/device/watering — registra rega
-  app.post('/api/device/watering', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const { tentId, litros } = req.body;
-      if (!tentId || device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
-      const now = new Date(); const turn = now.getHours() < 14 ? 'AM' : 'PM';
-      const dateOnly = new Date(now); dateOnly.setHours(0, 0, 0, 0);
-      const volumeMl = Math.round((parseFloat(litros) || 0) * 1000);
-      await pool.execute(
-        `INSERT INTO dailyLogs (tentId, logDate, turn, wateringVolume, source, createdAt)
-         VALUES (?, ?, ?, ?, 'ESP32', NOW())
-         ON DUPLICATE KEY UPDATE wateringVolume=VALUES(wateringVolume), source='ESP32'`,
-        [tentId, dateOnly, turn, volumeMl]
-      );
-      res.json({ success: true });
-    } catch (err: any) {
-      console.error('[Device] watering error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-
-  // GET /api/device/tasks/:tentId — lista tarefas da estufa
-  app.get('/api/device/tasks/:tentId', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const tentId = parseInt(req.params.tentId);
-      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
-      const [rows]: any = await pool.execute(
-        `SELECT id, title, isDone FROM standaloneTasks WHERE tentId = ? ORDER BY createdAt DESC LIMIT 10`,
-        [tentId]
-      );
-      res.json(rows.map((r: any) => ({ id: r.id, texto: r.title, feito: !!r.isDone })));
-    } catch (err: any) {
-      console.error('[Device] tasks error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-
-  // POST /api/device/task-complete — alterna estado de conclusão de tarefa
-  app.post('/api/device/task-complete', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const { taskId } = req.body;
-      if (!taskId) return res.status(400).json({ error: 'taskId obrigatório' });
-      const [rows]: any = await pool.execute(
-        `SELECT id, isDone FROM standaloneTasks WHERE id = ? AND tentId = ?`,
-        [taskId, device.tentId]
-      );
-      if (rows.length === 0) return res.status(404).json({ error: 'Tarefa não encontrada' });
-      const newState = rows[0].isDone ? 0 : 1;
-      await pool.execute(
-        `UPDATE standaloneTasks SET isDone = ?, completedAt = ? WHERE id = ?`,
-        [newState, newState ? new Date() : null, taskId]
-      );
-      res.json({ success: true, feito: !!newState });
-    } catch (err: any) {
-      console.error('[Device] task-complete error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-
-  // POST /api/device/scene/:slotIdx/trigger — dispara cena Tuya pre-mapeada
-  // Slots 0/1/2 mapeiam p/ env vars TUYA_SCENE_{0,1,2} = '<sceneId>' OU
-  // '<homeId>:<sceneId>' (homeId opcional). Usa a config Tuya do grupo do
-  // device. ESP sem precisar conhecer IDs reais — so' sabe qual slot esta
-  // tocando ('irrigar', 'luz-off', 'custom').
-  app.post('/api/device/scene/:slotIdx/trigger', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const slotIdx = parseInt(req.params.slotIdx);
-      if (isNaN(slotIdx) || slotIdx < 0 || slotIdx > 9) {
-        return res.status(400).json({ error: 'slotIdx fora do range (0-9)' });
-      }
-
-      const envKey = `TUYA_SCENE_${slotIdx}`;
-      const cfgRaw = process.env[envKey];
-      if (!cfgRaw) {
-        return res.status(404).json({ error: `${envKey} nao configurado no servidor` });
-      }
-      // Formato: 'sceneId' ou 'homeId:sceneId' (homeId obrigatorio em Smart Home Home)
-      const [maybeHomeId, maybeSceneId] = cfgRaw.includes(':')
-        ? cfgRaw.split(':', 2)
-        : ['0', cfgRaw];
-      const homeId = parseInt(maybeHomeId) || 0;
-      const sceneId = (maybeSceneId || '').trim();
-      if (!sceneId) return res.status(500).json({ error: `${envKey} formato invalido` });
-
-      // Busca config Tuya do grupo do device (qualquer user com tuya enabled)
-      const [cfgRows]: any = await pool.execute(
-        `SELECT tc.accessId, tc.accessSecret, tc.region
-         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-        [device.groupId]
-      );
-      if (cfgRows.length === 0) {
-        return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
-      }
-      const cfg = cfgRows[0];
-
-      const { triggerTuyaScene } = await import('../lib/tuya');
-      const result = await triggerTuyaScene(homeId, sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
-      console.log(`[Device] scene slot=${slotIdx} -> ${result.success ? 'OK' : 'FAIL'} (${result.msg ?? ''})`);
-      if (!result.success) return res.status(502).json({ error: result.msg ?? 'Tuya retornou falha' });
-      res.json({ success: true, slotIdx });
-    } catch (err: any) {
-      console.error('[Device] scene trigger error:', err?.message);
-      res.status(500).json({ error: err?.message ?? 'Erro ao disparar cena' });
-    }
-  });
-
-  // GET /api/device/scenes — lista cenas Tuya manuais do grupo do device.
-  // ESP usa pra popular o grid Cenas dinamicamente (em vez de SCENES[]
-  // hardcoded). Max 12 cenas (grid 2x6 do display).
-  // Resposta: { scenes: [{id, name}, ...] }
-  // Opt-in homeId via env TUYA_HOME_ID — se nao setado, tenta endpoints
-  // genericos sem space_id.
-  app.get('/api/device/scenes', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-
-      const [cfgRows]: any = await pool.execute(
-        `SELECT tc.accessId, tc.accessSecret, tc.region
-         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-        [device.groupId]
-      );
-      if (cfgRows.length === 0) {
-        return res.json({ scenes: [] });  // sem config Tuya: lista vazia (UI mostra fallback)
-      }
-      const cfg = cfgRows[0];
-      const homeId = parseInt(process.env.TUYA_HOME_ID ?? '0') || 0;
-
-      const { listManualScenes } = await import('../lib/tuya');
-      const scenes = await listManualScenes(homeId, cfg.accessId, cfg.accessSecret, cfg.region);
-      console.log(`[Device] /scenes group=${device.groupId} -> ${scenes.length} cenas`);
-      res.json({ scenes });
-    } catch (err: any) {
-      console.error('[Device] scenes list error:', err?.message);
-      res.status(500).json({ error: err?.message ?? 'Erro ao listar cenas' });
-    }
-  });
-
-  // POST /api/device/scene-by-id/:sceneId/trigger — dispara cena Tuya por ID
-  // real (sceneId vem de /api/device/scenes). Usado pelo grid dinamico de
-  // Cenas no ESP. Diferente do /scene/:slotIdx/trigger que usa env vars.
-  app.post('/api/device/scene-by-id/:sceneId/trigger', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const sceneId = String(req.params.sceneId ?? '').trim();
-      if (!sceneId) return res.status(400).json({ error: 'sceneId vazio' });
-
-      const [cfgRows]: any = await pool.execute(
-        `SELECT tc.accessId, tc.accessSecret, tc.region
-         FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
-         WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
-        [device.groupId]
-      );
-      if (cfgRows.length === 0) {
-        return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
-      }
-      const cfg = cfgRows[0];
-      const homeId = parseInt(process.env.TUYA_HOME_ID ?? '0') || 0;
-
-      const { triggerTuyaScene } = await import('../lib/tuya');
-      const result = await triggerTuyaScene(homeId, sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
-      console.log(`[Device] scene-by-id ${sceneId} -> ${result.success ? 'OK' : 'FAIL'} (${result.msg ?? ''})`);
-      if (!result.success) return res.status(502).json({ error: result.msg ?? 'Tuya retornou falha' });
-      res.json({ success: true, sceneId });
-    } catch (err: any) {
-      console.error('[Device] scene-by-id trigger error:', err?.message);
-      res.status(500).json({ error: err?.message ?? 'Erro ao disparar cena' });
-    }
-  });
-
-  // POST /api/device/refresh-tuya/:tentId — forca leitura imediata do sensor Tuya
-  app.post('/api/device/refresh-tuya/:tentId', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const tentId = parseInt(req.params.tentId);
-      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
-
-      // Busca config Tuya de qualquer usuário do grupo com mapeamento para esta estufa
-      const [cfgRows]: any = await pool.execute(
-        `SELECT tc.accessId, tc.accessSecret, tc.region, tsm.deviceId, tc.userId
-         FROM tuyaConfig tc
-         INNER JOIN tuyaSensorMappings tsm ON tsm.userId = tc.userId AND tsm.tentId = ? AND tsm.enabled = 1
-         INNER JOIN users u ON u.id = tc.userId
-         WHERE tc.enabled = 1 AND u.groupId = ?
-         LIMIT 1`,
-        [tentId, device.groupId]
-      );
-      if (cfgRows.length === 0) {
-        return res.status(404).json({ error: 'Nenhum sensor Tuya ativo para esta estufa' });
-      }
-      const cfg = cfgRows[0];
-
-      const { readTuyaDeviceStatus } = await import("../lib/tuya");
-      const reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
-
-      // Atualiza cache de leituras
-      await pool.execute(
-        `INSERT INTO sensorLatestReadings (userId, deviceId, tempC, rhPct, readAt)
-         VALUES (?, ?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE tempC=VALUES(tempC), rhPct=VALUES(rhPct), readAt=NOW()`,
-        [cfg.userId, cfg.deviceId, reading.tempC ?? null, reading.rhPct ?? null]
-      );
-
-      // Atualiza dailyLogs (AUTO) para a hora atual
-      const turn = new Date().getHours() < 18 ? 'AM' : 'PM';
-      await pool.execute(
-        `INSERT INTO dailyLogs (tentId, logDate, turn, tempC, rhPct, source)
-         VALUES (?, DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), ?, ?, ?, 'AUTO')
-         ON DUPLICATE KEY UPDATE tempC=VALUES(tempC), rhPct=VALUES(rhPct), source='AUTO'`,
-        [tentId, turn, reading.tempC ?? null, reading.rhPct ?? null]
-      );
-
-      let vpd: number | null = null;
-      if (reading.tempC !== null && reading.rhPct !== null) {
-        const svp = 0.6108 * Math.exp((17.27 * reading.tempC) / (reading.tempC + 237.3));
-        vpd = parseFloat((svp * (1 - reading.rhPct / 100)).toFixed(2));
-      }
-      res.json({ tempC: reading.tempC, rh: reading.rhPct, vpd });
-    } catch (err: any) {
-      console.error('[Device] refresh-tuya error:', err?.message);
-      res.status(500).json({ error: err?.message ?? 'Erro ao ler sensor' });
-    }
-  });
-
-  // GET /api/device/history/:tentId?metric=temp&period=24h — historico p/ graficos
-  app.get('/api/device/history/:tentId', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const tentId = parseInt(req.params.tentId);
-      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
-
-      const metric = String(req.query.metric ?? 'temp');
-      const period = String(req.query.period ?? '24h');
-
-      const colMap: Record<string, string> = {
-        temp: 'tempC', rh: 'rhPct', ph: 'ph', ec: 'ec', watering: 'wateringVolume',
-      };
-      const col = colMap[metric];
-      if (!col) return res.status(400).json({ error: 'metric inválido' });
-
-      // Janela de tempo + limite de pontos
-      const hoursMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
-      const hours = hoursMap[period] ?? 24;
-      const limit = period === '24h' ? 48 : period === '7d' ? 56 : 60;
-
-      const [rows]: any = await pool.execute(
-        `SELECT UNIX_TIMESTAMP(logDate) AS t, ${col} AS v
-         FROM dailyLogs
-         WHERE tentId = ? AND logDate >= NOW() - INTERVAL ? HOUR AND ${col} IS NOT NULL
-         ORDER BY logDate ASC
-         LIMIT ?`,
-        [tentId, hours, limit]
-      );
-      res.json(rows.map((r: any) => ({ t: Number(r.t), v: r.v != null ? parseFloat(r.v) : null })));
-    } catch (err: any) {
-      console.error('[Device] history error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-
-  // GET /api/device/history-all/:tentId?period=24h — bulk para sparklines (4 metricas)
-  app.get('/api/device/history-all/:tentId', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const tentId = parseInt(req.params.tentId);
-      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
-      const period = String(req.query.period ?? '24h');
-      const hoursMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
-      const hours = hoursMap[period] ?? 24;
-
-      const [rows]: any = await pool.execute(
-        `SELECT tempC, rhPct, ph, ec
-         FROM dailyLogs
-         WHERE tentId = ? AND logDate >= NOW() - INTERVAL ? HOUR
-         ORDER BY logDate ASC
-         LIMIT 60`,
-        [tentId, hours]
-      );
-      const out: Record<string, number[]> = { temp: [], rh: [], ph: [], ec: [] };
-      for (const r of rows) {
-        if (r.tempC != null) out.temp.push(parseFloat(r.tempC));
-        if (r.rhPct != null) out.rh.push(parseFloat(r.rhPct));
-        if (r.ph    != null) out.ph.push(parseFloat(r.ph));
-        if (r.ec    != null) out.ec.push(parseFloat(r.ec));
-      }
-      res.json(out);
-    } catch (err: any) {
-      console.error('[Device] history-all error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-
-  // GET /api/device/stream/:tentId?since=<lastAlertId> — Server-Sent Events
-  // Conexão long-lived que empurra eventos em tempo real pro ESP. Atual:
-  //  - event: alert  → alerta novo (id, type, metric, message)
-  //  - event: photo  → foto nova de planta (plantId, photoId, photoDate)
-  // ESP usa o evento 'photo' pra prefetch a foto em background, deixando-a
-  // em cache pra exibição instantânea quando user clicar.
-  //
-  // Heartbeat ": ping\n\n" a cada 25s pra manter Cloudflare/keep-alive vivos.
-  // Sem isso, proxies cortam conexão idle aos 60s.
-  app.get('/api/device/stream/:tentId', async (req, res) => {
-    try {
-      const device = await validateDeviceToken(req);
-      if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const tentId = parseInt(req.params.tentId);
-      if (device.tentId !== tentId) return res.status(403).json({ error: 'Token não autorizado para esta estufa' });
-
-      // SSE headers — text/event-stream + flush imediato (sem buffering)
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no');  // Nginx/Cloudflare: disable buffering
-      res.flushHeaders();
-
-      // Replay alertas perdidos (since=<lastId>) — cobre reconexão temporária.
-      const since = parseInt((req.query.since as string) ?? '0') || 0;
-      if (since > 0) {
-        const [missed]: any = await pool.execute(
-          `SELECT id, metric, message, createdAt FROM alertHistory
-           WHERE tentId = ? AND id > ? ORDER BY id ASC LIMIT 20`,
-          [tentId, since]
-        );
-        for (const a of missed) {
-          const payload = {
-            id: a.id,
-            type: 'ENVIRONMENT',
-            metric: a.metric,
-            message: a.message,
-          };
-          res.write(`event: alert\ndata: ${JSON.stringify(payload)}\n\n`);
-        }
-      }
-
-      // Subscribe a eventos do tent. Cleanup garantido via req.on('close').
-      const { deviceEvents } = await import('./deviceEvents');
-      const unsubscribe = deviceEvents.onTent(tentId, (evt) => {
-        try {
-          res.write(`event: ${evt.type}\ndata: ${JSON.stringify(evt)}\n\n`);
-        } catch (e) {
-          // Connection drop — ignora, cleanup pelo close handler
-        }
-      });
-
-      // Heartbeat — 25s mantém conexão viva sob proxies (Cloudflare cuts 60s idle).
-      const hb = setInterval(() => {
-        try { res.write(': ping\n\n'); } catch (e) {}
-      }, 25000);
-
-      req.on('close', () => {
-        clearInterval(hb);
-        unsubscribe();
-      });
-    } catch (err: any) {
-      console.error('[Device] stream error:', err?.message);
-      try { res.status(500).json({ error: 'Erro interno' }); } catch {}
-    }
-  });
-
-  // GET /api/device/tokens — lista tokens (admin via app, protegido por cookie JWT)
-  // Esta rota é usada apenas internamente; gestão real via tRPC device.*
-  app.post('/api/device/generate-token', async (req, res) => {
-    try {
-      const { authenticateRequest } = await import('./auth');
-      const user = await authenticateRequest(req);
-      if (!user) return res.status(401).json({ error: 'Não autenticado' });
-      const { tentId, name } = req.body;
-      if (!tentId || !name) return res.status(400).json({ error: 'tentId e name obrigatórios' });
-      const token = crypto.randomBytes(32).toString('hex');
-      await pool.execute(
-        `INSERT INTO deviceTokens (token, name, tentId, groupId) VALUES (?, ?, ?, ?)`,
-        [token, name, tentId, user.groupId ?? 0]
-      );
-      res.json({ token });
-    } catch (err: any) {
-      console.error('[Device] generate-token error:', err?.message);
-      res.status(500).json({ error: 'Erro interno' });
-    }
-  });
-}
 
 async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Garantir que a tabela pushSubscriptions existe (migration incremental)
-  await ensurePushSubscriptionsTable();
+  // Em produção, app fica atrás de proxy (Traefik/Coolify) — confiar nos
+  // headers X-Forwarded-* para que req.ip retorne o IP real do cliente.
+  // Sem isso, rate-limit veria todos os requests vindo do mesmo IP (proxy).
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);   // 1 hop = só o proxy mais próximo (Traefik)
+  }
 
-  // Garantir que a coluna approved existe na tabela users
-  await ensureUsersApprovedColumn();
+  // Logger HTTP estruturado — anexa req.log e gera linha por request
+  // com requestId (UUID ou X-Request-Id do proxy). Devolve 4xx=warn, 5xx=error.
+  app.use(httpLogger);
+  // Devolve o request id no response (útil pra debug — usuário pode reportar)
+  app.use((req: any, res, next) => {
+    if (req.id) res.setHeader("X-Request-Id", String(req.id));
+    next();
+  });
 
-  // Garantir que as colunas de lembrete diário existem na tabela notificationSettings
-  await ensureNotificationSettingsColumns();
+  // Security headers via Helmet — DEVE vir antes de qualquer route handler
+  // para que os headers sejam aplicados a todas as respostas.
+  // Em prod: CSP estrita (sem 'unsafe-eval'). Em dev: liberta 'unsafe-eval'
+  // para o HMR do Vite e React Refresh funcionarem.
+  const { default: helmet } = await import("helmet");
+  const isProd = process.env.NODE_ENV === 'production';
+  app.use(helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: isProd
+          ? ["'self'", "'unsafe-inline'", "https://static.cloudflareinsights.com"]
+          : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https:", ...(isProd ? [] : ["ws:", "wss:"])],
+        fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: isProd ? [] : null,
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-site" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    strictTransportSecurity: isProd
+      ? { maxAge: 31536000, includeSubDomains: true, preload: false }
+      : false,
+    xPermittedCrossDomainPolicies: { permittedPolicies: "none" },
+    xFrameOptions: { action: "sameorigin" },
+    xContentTypeOptions: true,
+    xPoweredBy: true,                           // remove X-Powered-By: Express
+    xXssProtection: false,                      // header deprecado, melhor não enviar
+  }));
+  app.use((_req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()');
+    next();
+  });
 
-  // Garantir que as colunas extras de plantLSTLogs existem (snapshotJson, techniqueConfig, etc.)
-  await ensurePlantLSTLogsColumns();
+  // Healthcheck — útil para Docker HEALTHCHECK / k8s readiness
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", uptime: Math.floor(process.uptime()), ts: Date.now() });
+  });
 
-  // Garantir que a tabela de configurações de IA do usuário existe
-  await ensureUserAiSettingsTable();
+  // Aplica todas as migrations de schema (CREATE TABLE / ADD COLUMN +
+  // políticas de FK ON DELETE) usando o pool MySQL compartilhado.
+  // Antes: 10 chamadas `ensure*` separadas, cada uma abrindo conexão dedicada.
+  // Não-fatal: erro de migration não derruba o servidor — app continua,
+  // logs mostram o problema e o operador pode corrigir sem downtime total.
+  try {
+    await runMigrations();
+  } catch (migErr) {
+    console.error('[Startup] ⚠️  Migrations falharam (app continua):', (migErr as Error).message);
+  }
 
-  // Garantir que a tabela de histórico do chat de IA existe
-  await ensureAiChatMessagesTable();
-
-  // Garantir que as tabelas de integração Tuya/SmartLife existem
-  await ensureTuyaTables();
-
-  // Garantir que a tabela standaloneTasks existe
-  await ensureStandaloneTasksTable();
-
-  // Garantir que a coluna origin existe na tabela strains
-  await ensureStrainOriginColumn();
-
-  // Garantir que a coluna source existe na tabela dailyLogs
-  await ensureSourceColumn();
-
-  // Garantir que a tabela deviceTokens existe (Fase D — terminais ESP32)
-  await ensureDeviceTokensTable();
 
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();
@@ -908,38 +131,41 @@ async function startServer() {
   const { startDailyReminderCron } = await import("../cron/dailyReminder");
   startDailyReminderCron();
 
+  // Inicializar cron de "registro incompleto" — só pra estufas COM Tuya
+  // ativo, notifica se sem registro completo (pH+EC+foto) há 3 dias
+  const { startIncompleteRegistrationCron } = await import("../cron/incompleteRegistration");
+  startIncompleteRegistrationCron();
+
   // Inicializar cron job de leitura de sensores Tuya/SmartLife
   const { startTuyaPollerCron } = await import("../cron/tuyaPoller");
   startTuyaPollerCron();
 
-  // Security headers inline (sem dependência de pacote externo)
-  if (process.env.NODE_ENV === 'production') {
-    app.use((_req, res, next) => {
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-      res.setHeader('X-XSS-Protection', '0');
-      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-      res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
-      next();
-    });
-  }
-
-  // CORS inline — se ALLOWED_ORIGINS estiver definida, restringir; caso contrário, permitir tudo
-  // (proteção CSRF principal vem do cookie sameSite:lax + httpOnly)
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  // CORS — auto-detecta o próprio host + ALLOWED_ORIGINS opcional
+  // Dev: aceita localhost em qualquer porta
+  // Prod: aceita qualquer origin que bata com o Host da requisição (funciona em qualquer domínio)
+  //       + entradas extras de ALLOWED_ORIGINS
+  const extraOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
     : [];
+
   app.use((req, res, next) => {
     const origin = req.headers.origin as string | undefined;
-    const isProd = process.env.NODE_ENV === 'production';
 
-    // Determinar se origin é permitida
-    let allowed = true;
-    if (origin && isProd && allowedOrigins.length > 0) {
-      allowed = allowedOrigins.includes(origin);
+    // Sem origin = same-origin ou curl/server-to-server → sempre permitido
+    if (!origin) { next(); return; }
+
+    let allowed = false;
+    if (!isProd) {
+      // Dev: aceita qualquer localhost/127.0.0.1
+      allowed = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    } else {
+      // Prod: auto-detecta o próprio host via header (funciona atrás de proxy/Coolify)
+      const host = (req.headers['x-forwarded-host'] as string || req.headers.host || '').split(':')[0];
+      const selfOrigins = host ? [`https://${host}`, `http://${host}`] : [];
+      allowed = [...selfOrigins, ...extraOrigins].includes(origin);
     }
 
-    if (allowed && origin) {
+    if (allowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
@@ -947,12 +173,12 @@ async function startServer() {
     }
 
     if (req.method === 'OPTIONS') {
-      res.sendStatus(204);
+      res.sendStatus(allowed ? 204 : 403);
       return;
     }
 
     if (!allowed) {
-      res.status(403).json({ error: `CORS: origem não permitida — ${origin}` });
+      res.status(403).json({ error: 'CORS: origem não permitida' });
       return;
     }
 
@@ -976,11 +202,213 @@ async function startServer() {
   // Rotas de autenticação JWT (registro, login, logout, me)
   registerAuthRoutes(app);
 
-  // Rotas REST para terminais ESP32 (/api/device/*)
+  // Rotas REST p/ ESP32 display (X-Device-Token auth, sem JWT)
   registerDeviceRoutes(app);
+
+  // Landing page de redirecionamento para QR codes de plantas
+  app.get("/scan/plant/:id", (req, res) => {
+    const plantId = parseInt(req.params.id, 10);
+    if (isNaN(plantId) || plantId <= 0) {
+      res.status(400).send("QR inválido");
+      return;
+    }
+    const appUrl = `/plants/${plantId}`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Cultivo — Abrindo planta...</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: oklch(0.07 0.014 230);
+      --card: oklch(0.14 0.012 240 / 0.85);
+      --border: oklch(0.30 0.015 240 / 0.50);
+      --primary: oklch(0.65 0.20 245);
+      --primary-fg: oklch(0.97 0.01 245);
+      --green: oklch(0.68 0.20 145);
+      --text: oklch(0.97 0 0);
+      --muted: oklch(0.55 0.010 240);
+      --glow: color-mix(in oklch, oklch(0.62 0.17 245) 50%, transparent);
+    }
+    html, body {
+      min-height: 100dvh;
+      background:
+        radial-gradient(ellipse 90% 65% at 5% -10%, var(--glow) 0%, transparent 65%),
+        var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      gap: 0;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 40px;
+    }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: var(--green);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .logo-text { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 340px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .plant-icon {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, oklch(0.22 0.028 155 / 0.8), oklch(0.15 0.015 240 / 0.6));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+    }
+    .card-title { font-size: 18px; font-weight: 700; text-align: center; }
+    .card-sub { font-size: 13px; color: var(--muted); text-align: center; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid oklch(0.30 0.015 240 / 0.4);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap-8px;
+      width: 100%;
+      padding: 15px 24px;
+      background: var(--primary);
+      color: var(--primary-fg);
+      border: none; border-radius: 14px;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      gap: 8px;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .btn:active { opacity: 0.85; }
+    .ios-hint {
+      display: none;
+      background: oklch(0.12 0.012 240 / 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      text-align: center;
+      width: 100%; max-width: 340px;
+      margin-top: 12px;
+    }
+    .ios-hint strong { color: var(--text); }
+    .ios-hint .share-icon {
+      display: inline-block;
+      background: oklch(0.55 0.14 245);
+      color: white;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <div class="logo-icon">🌱</div>
+    <div class="logo-text">Cultivo</div>
+  </div>
+
+  <div class="card">
+    <div class="plant-icon">🪴</div>
+    <div>
+      <div class="card-title">Abrindo planta #${plantId}</div>
+      <div class="card-sub" style="margin-top:4px">Redirecionando para o app...</div>
+    </div>
+    <div class="spinner" id="spinner"></div>
+    <a class="btn" href="${appUrl}" id="btn">
+      <span>🌿</span> Abrir no App
+    </a>
+  </div>
+
+  <div class="ios-hint" id="iosHint">
+    <strong>Abrir sempre direto no app?</strong><br/>
+    No Safari, toque em <span class="share-icon">⬆ Compartilhar</span> e selecione<br/>
+    <strong>"Adicionar à Tela de Início"</strong>
+  </div>
+
+  <script>
+    (function () {
+      var dest = "${appUrl}";
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      var isStandalone = window.navigator.standalone === true;
+      var isSafari = /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(navigator.userAgent);
+
+      // Auto-redirect depois de 1s
+      setTimeout(function () {
+        window.location.href = dest;
+      }, 1000);
+
+      // Mostrar dica de "Adicionar à Tela de Início" para iOS Safari (não PWA)
+      if (isIOS && isSafari && !isStandalone) {
+        document.getElementById('iosHint').style.display = 'block';
+      }
+
+      // Esconder spinner quando chegar a resposta
+      document.getElementById('btn').addEventListener('click', function () {
+        document.getElementById('spinner').style.display = 'none';
+      });
+    })();
+  </script>
+</body>
+</html>`);
+  });
 
   // Upload de imagens (multipart/form-data) — antes do tRPC
   app.use("/api/upload", uploadRouter);
+
+  // ❌ REMOVIDO: rotas /admin/import e /admin/import-photos
+  //
+  // Eram backdoors administrativos autenticados por ?secret=$JWT_SECRET na
+  // querystring — secret vazava em logs de proxy (nginx/Traefik), header
+  // Referer, histórico do browser, screenshots de operação, etc. Quem
+  // descobre o secret pode forjar JWTs de qualquer usuário, dropar todo o
+  // banco, e descriptografar API keys de IA dos usuários (mesmo secret).
+  //
+  // Para importar dump SQL ou ZIP de fotos em produção, use a Terminal do
+  // Coolify (ou SSH) e execute scripts CLI direto no container. Exemplos:
+  //
+  //   # SQL:
+  //   docker exec -i $APP_CONTAINER mysql -u user -p$MYSQL_PASSWORD cultivo < dump.sql
+  //
+  //   # Fotos (zip → /app/uploads):
+  //   docker cp fotos.zip $APP_CONTAINER:/tmp/
+  //   docker exec $APP_CONTAINER sh -c 'cd /tmp && unzip -o fotos.zip -d /app/uploads/'
+  //
+  // Em ambos os casos, o operador tem que ter acesso ao servidor — não dá
+  // para escalar privilégio a partir do navegador.
 
   // tRPC API
   app.use(
@@ -1012,6 +440,41 @@ async function startServer() {
     console.log(`⏰ AlertsChecker: Cron job ativo`);
   console.log(`🔔 DailyReminder: Cron job ativo\n`);
   });
+
+  // Shutdown gracioso — fecha pools MySQL antes de encerrar
+  // para evitar conexões zumbis e dar chance das queries em andamento finalizarem.
+  let shuttingDown = false;
+  const gracefulShutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n[Shutdown] Recebido ${signal} — encerrando graciosamente...`);
+
+    // Para de aceitar novas conexões HTTP
+    server.close((err) => {
+      if (err) console.warn('[Shutdown] Erro ao fechar HTTP server:', err.message);
+      else console.log('[Shutdown] HTTP server fechado');
+    });
+
+    // Fecha pools de banco (Drizzle + raw)
+    try {
+      const { closeDb } = await import('../db');
+      const { closeMysqlPool } = await import('../mysql-pool');
+      await Promise.allSettled([closeDb(), closeMysqlPool()]);
+    } catch (err: any) {
+      console.warn('[Shutdown] Erro ao fechar pools:', err?.message);
+    }
+
+    // Force-exit após 10s caso algo trave (cron, requests pendurados)
+    setTimeout(() => {
+      console.warn('[Shutdown] Timeout — forçando saída');
+      process.exit(1);
+    }, 10_000).unref();
+
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => { void gracefulShutdown('SIGTERM'); });
+  process.on('SIGINT',  () => { void gracefulShutdown('SIGINT'); });
 }
 
 startServer().catch(console.error);

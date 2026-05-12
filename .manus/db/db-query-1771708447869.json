@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE cycles ADD COLUMN harvestWeight DECIMAL(10, 2) NULL;\nALTER TABLE cycles ADD COLUMN harvestNotes TEXT NULL;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute ALTER TABLE cycles ADD COLUMN harvestWeight DECIMAL(10, 2) NULL;\nALTER TABLE cycles ADD COLUMN harvestNotes TEXT NULL;",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 984
-}

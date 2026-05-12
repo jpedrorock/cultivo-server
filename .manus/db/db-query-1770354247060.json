@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE weeklyTargets DROP COLUMN tentId;\nALTER TABLE weeklyTargets ADD CONSTRAINT weeklyTargets_strainId_strains_id_fk FOREIGN KEY (strainId) REFERENCES strains(id) ON DELETE NO ACTION ON UPDATE NO ACTION;\nALTER TABLE weeklyTargets ADD INDEX strainIdx (strainId);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute ALTER TABLE weeklyTargets DROP COLUMN tentId;\nALTER TABLE weeklyTargets ADD CONSTRAINT weeklyTargets_strainId_strains_id_fk FOREIGN KEY (strainId) REFERENCES strains(id) ON DELETE NO ACTION ON UPDATE NO ACTION;\nALTER TABLE weeklyTargets ADD INDEX strainIdx (strainId);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 2148
-}

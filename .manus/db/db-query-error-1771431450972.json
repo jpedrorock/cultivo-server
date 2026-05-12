@@ -1,8 +1,0 @@
-{
-  "query": "\nINSERT INTO plants (name, code, strainId, currentTentId, status, notes, createdAt, updatedAt)\nVALUES \n  ('Tomate Cherry #1', 'TC-001', 4, 1, 'ACTIVE', 'Planta de teste 1', NOW(), NOW()),\n  ('Tomate Cherry #2', 'TC-002', 4, 2, 'ACTIVE', 'Planta de teste 2', NOW(), NOW()),\n  ('Tomate Cherry #3', 'TC-003', 5, 1, 'ACTIVE', 'Planta de teste 3', NOW(), NOW());\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nINSERT INTO plants (name, code, strainId, currentTentId, status, notes, createdAt, updatedAt)\nVALUES \n  ('Tomate Cherry #1', 'TC-001', 4, 1, 'ACTIVE', 'Planta de teste 1', NOW(), NOW()),\n  ('Tomate Cherry #2', 'TC-002', 4, 2, 'ACTIVE', 'Planta de teste 2', NOW(), NOW()),\n  ('Tomate Cherry #3', 'TC-003', 5, 1, 'ACTIVE', 'Planta de teste 3', NOW(), NOW());\n",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1452 (23000) at line 2: Cannot add or update a child row: a foreign key constraint fails (`ahybxv9cdav4csfrqphbxc`.`plants`, CONSTRAINT `fk_1` FOREIGN KEY (`strainId`) REFERENCES `strains` (`id`))"
-  ]
-}

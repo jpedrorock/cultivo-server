@@ -13,7 +13,7 @@ export const ENV = {
   // Aplicação
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '3000', 10),
-  domain: process.env.DOMAIN ?? 'localhost:3000',
+  domain: (process.env.DOMAIN ?? '').trim() || 'localhost:3000',
 
   // Banco de Dados (SQLite local ou MySQL em produção)
   // SQLite: não precisa configurar — usa ./local.db automaticamente
@@ -28,6 +28,10 @@ export const ENV = {
   // Configure em https://console.cloud.google.com → APIs & Services → Credentials
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+
+  // Chave de criptografia para API keys dos usuários (AES-256-GCM)
+  // Gere com: openssl rand -base64 32
+  encryptionKey: process.env.ENCRYPTION_KEY ?? '',
 
   // Helpers
   isProduction: process.env.NODE_ENV === 'production',
@@ -44,5 +48,10 @@ if (ENV.isProduction) {
   if (!ENV.jwtSecret || ENV.jwtSecret === 'cultivo-secret-change-in-production-32chars') {
     console.error('[ENV] JWT_SECRET deve ser alterado para um valor seguro em produção');
     process.exit(1);
+  }
+
+  if (!ENV.encryptionKey) {
+    console.warn('[ENV] AVISO: ENCRYPTION_KEY não configurado — usando JWT_SECRET como fallback para criptografia.');
+    console.warn('[ENV] Para máxima segurança, adicione ENCRYPTION_KEY=<openssl rand -base64 32> nas variáveis de ambiente.');
   }
 }

@@ -1,29 +1,26 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Leaf, Sparkles, Trees, Zap } from "lucide-react";
+import { Check, Leaf, Sparkles, Trees, Zap, Telescope } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
+type ThemeValue = "forest" | "hps" | "monstera" | "vision" | "aurora";
+
 // Theme preview component showing visual representation
-function ThemePreview({
-  type,
-}: {
-  type: "forest" | "hps" | "monstera" | "vision";
-}) {
-  const previewStyles = {
-    forest:   { bg: "bg-[#0d1a0d]", card: "bg-[#152015]", text: "bg-[#d4f0d4]", accent: "bg-[#5cd65c]" },
-    hps:      { bg: "bg-[#080f08]", card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]" },
-    monstera:  { bg: "bg-[#fafffe]", card: "bg-white",    text: "bg-[#1a3322]", accent: "bg-[#9fd9ba]" },
-    vision:   { bg: "bg-[#0a1620]", card: "bg-[#162228]", text: "bg-[#e0f0e8]", accent: "bg-[#40c060]" },
+function ThemePreview({ type }: { type: ThemeValue }) {
+  const previewStyles: Record<ThemeValue, { bg: string; card: string; text: string; accent: string; sidebar: string }> = {
+    forest:   { bg: "bg-[#0d1a0d]",  card: "bg-[#152015]", text: "bg-[#d4f0d4]", accent: "bg-[#5cd65c]", sidebar: "bg-[#0a1408]" },
+    hps:      { bg: "bg-[#080f08]",  card: "bg-[#111a11]", text: "bg-[#f7fff7]", accent: "bg-[#39ff14]", sidebar: "bg-[#050c05]" },
+    monstera: { bg: "bg-[#fafffe]",  card: "bg-white",     text: "bg-[#1a3322]", accent: "bg-[#9fd9ba]", sidebar: "bg-[#1e4d34]" },
+    vision:   { bg: "bg-[#0a1620]",  card: "bg-[#162228]", text: "bg-[#e0f0e8]", accent: "bg-[#40c060]", sidebar: "bg-[#080f18]" },
+    aurora:   { bg: "bg-[#0b0d12]",  card: "bg-[#141820]", text: "bg-[#f0fdf4]", accent: "bg-[#4ade80]", sidebar: "bg-[#080a0f]" },
   };
 
   const colors = previewStyles[type];
 
   return (
-    <div
-      className={`w-14 h-10 sm:w-16 sm:h-12 rounded border-2 border-border overflow-hidden flex-shrink-0 ${colors.bg}`}
-    >
+    <div className={`w-14 h-10 sm:w-16 sm:h-12 rounded border-2 border-border overflow-hidden flex-shrink-0 ${colors.bg}`}>
       <div className="h-full p-1 flex gap-0.5">
-        <div className={`w-3 ${colors.card} rounded-sm`} />
+        <div className={`w-3 ${colors.sidebar} rounded-sm`} />
         <div className="flex-1 flex flex-col gap-0.5">
           <div className={`h-1.5 ${colors.accent} rounded-sm`} />
           <div className={`flex-1 ${colors.card} rounded-sm p-0.5 flex flex-col gap-0.5`}>
@@ -38,39 +35,42 @@ function ThemePreview({
 
 const THEMES = [
   {
-    value: "monstera" as const,
+    value: "monstera" as ThemeValue,
     label: "Claro",
     description: "Botânico minimalista — branco limpo, verde-floresta, acentos menta",
     icon: <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />,
   },
   {
-    value: "vision" as const,
+    value: "vision" as ThemeValue,
     label: "Escuro",
     description: "Glassmorphism dark — cards translúcidos com brilho verde esmeralda",
     icon: <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />,
   },
   {
-    value: "forest" as const,
+    value: "forest" as ThemeValue,
     label: "Floresta",
     description: "Verde escuro profundo, inspirado em apps de cultivo premium",
     icon: <Trees className="w-4 h-4 text-green-500 shrink-0" />,
   },
   {
-    value: "hps" as const,
+    value: "hps" as ThemeValue,
     label: "HPS Agrícola",
     description: "Preto absoluto + verde neon — máximo contraste sob luz HPS/LED",
     icon: <Zap className="w-4 h-4 text-green-400 shrink-0" />,
   },
+  {
+    value: "aurora" as ThemeValue,
+    label: "Aurora",
+    description: "Dark atmosférico — glow verde, cards glass e textura de grão",
+    icon: <Telescope className="w-4 h-4 text-emerald-300 shrink-0" />,
+  },
 ] as const;
-
-type ThemeValue = "forest" | "hps" | "monstera" | "vision";
 
 function applyThemeToDOM(t: ThemeValue) {
   const root = document.documentElement;
-  root.classList.remove("forest", "hps", "monstera", "vision", "light", "dark");
+  root.classList.remove("forest", "hps", "monstera", "vision", "aurora", "jardim", "light", "dark");
   root.classList.add(t);
-  // Adiciona .dark para temas escuros (necessário para utilitários dark: do Tailwind)
-  if (t === "hps" || t === "vision" || t === "forest") {
+  if (t === "hps" || t === "vision" || t === "forest" || t === "aurora") {
     root.classList.add("dark");
   }
 }

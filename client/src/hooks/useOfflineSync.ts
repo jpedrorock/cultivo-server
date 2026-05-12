@@ -12,7 +12,6 @@ import {
   countPendingLogs,
   syncPendingLogs,
   isOnline,
-  onConnectionRestored,
   type PendingLog,
 } from '@/lib/offlineStorage';
 import { trpc } from '@/lib/trpc';

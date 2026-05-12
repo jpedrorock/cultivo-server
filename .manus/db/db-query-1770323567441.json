@@ -1,9 +1,0 @@
-{
-  "query": "SET FOREIGN_KEY_CHECKS = 0;\nDROP TABLE IF EXISTS alerts;\nDROP TABLE IF EXISTS cloningEvents;\nDROP TABLE IF EXISTS cycles;\nDROP TABLE IF EXISTS dailyLogs;\nDROP TABLE IF EXISTS recipeTemplates;\nDROP TABLE IF EXISTS recipes;\nDROP TABLE IF EXISTS safetyLimits;\nDROP TABLE IF EXISTS strains;\nDROP TABLE IF EXISTS taskInstances;\nDROP TABLE IF EXISTS taskTemplates;\nDROP TABLE IF EXISTS tentAState;\nDROP TABLE IF EXISTS tents;\nDROP TABLE IF EXISTS weeklyTargets;\nDROP TABLE IF EXISTS users;\nSET FOREIGN_KEY_CHECKS = 1;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute SET FOREIGN_KEY_CHECKS = 0;\nDROP TABLE IF EXISTS alerts;\nDROP TABLE IF EXISTS cloningEvents;\nDROP TABLE IF EXISTS cycles;\nDROP TABLE IF EXISTS dailyLogs;\nDROP TABLE IF EXISTS recipeTemplates;\nDROP TABLE IF EXISTS recipes;\nDROP TABLE IF EXISTS safetyLimits;\nDROP TABLE IF EXISTS strains;\nDROP TABLE IF EXISTS taskInstances;\nDROP TABLE IF EXISTS taskTemplates;\nDROP TABLE IF EXISTS tentAState;\nDROP TABLE IF EXISTS tents;\nDROP TABLE IF EXISTS weeklyTargets;\nDROP TABLE IF EXISTS users;\nSET FOREIGN_KEY_CHECKS = 1;",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 9310
-}

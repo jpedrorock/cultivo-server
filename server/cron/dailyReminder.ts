@@ -2,12 +2,19 @@ import cron from "node-cron";
 import { checkAndSendDailyReminders } from "../pushService";
 
 /**
- * Inicia o cron job de lembretes diários
- * Executa a cada minuto e verifica se algum dispositivo tem lembrete configurado para o horário atual
+ * Cron job de lembretes diários — dispara a cada MINUTO.
+ *
+ * Antes era "0 * * * *" (a cada hora no minuto :00) com checkAndSend
+ * comparando contra "HH:MM" — usuários que configuravam lembrete em
+ * 09:30, 12:15, etc. nunca recebiam (apenas :00 batia).
+ *
+ * Custo: 1 query SELECT * FROM pushSubscriptions por minuto. Para
+ * volume típico (<1000 subscriptions) é trivial. Caso cresça, mover
+ * para tabela `cron_state(name, lastRunAt)` com lock + persist nextRun
+ * por subscription.
  */
 export function startDailyReminderCron() {
-  // Executa a cada hora (no minuto zero)
-  const task = cron.schedule("0 * * * *", async () => {
+  const task = cron.schedule("* * * * *", async () => {
     try {
       await checkAndSendDailyReminders();
     } catch (error) {
@@ -15,6 +22,6 @@ export function startDailyReminderCron() {
     }
   });
 
-  console.log("[DailyReminder] Cron job iniciado: verificação de lembretes a cada hora");
+  console.log("[DailyReminder] Cron iniciado: verificação de lembretes a cada minuto");
   return task;
 }

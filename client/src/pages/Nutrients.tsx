@@ -49,6 +49,7 @@ const PRODUCT_COLORS: Record<string, { bg: string; border: string; badge: string
   "MKP (Fosfato Monopotássico)": { bg: "bg-orange-500/8",  border: "border-orange-400/25",  badge: "bg-orange-500/15 text-orange-300", dot: "bg-orange-400" },
   "Sulfato de Magnésio":         { bg: "bg-teal-500/8",    border: "border-teal-400/25",    badge: "bg-teal-500/15 text-teal-300",    dot: "bg-teal-400"   },
   "Micronutrientes":             { bg: "bg-rose-500/8",    border: "border-rose-400/25",    badge: "bg-rose-500/15 text-rose-300",    dot: "bg-rose-400"   },
+  "Óxido de Cálcio":            { bg: "bg-cyan-500/8",    border: "border-cyan-400/25",    badge: "bg-cyan-500/15 text-cyan-300",    dot: "bg-cyan-400"   },
 };
 const DEFAULT_COLOR = { bg: "bg-muted/20", border: "border-border/50", badge: "bg-muted/30 text-muted-foreground", dot: "bg-muted-foreground" };
 
@@ -70,13 +71,34 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
     ];
   }
   if (phase === "FLORA") {
-    const m = 0.8 + (Math.min(week, 8) / 8) * 0.4;
+    if (week <= 3) {
+      // Stretch — semanas 1-3: Ca alto, fósforo aumentado vs Vega
+      return [
+        { name: "Nitrato de Cálcio",           gPerLiter: 1.12, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+        { name: "Nitrato de Potássio",          gPerLiter: 0.5,  npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.5,  npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+        { name: "Sulfato de Magnésio",          gPerLiter: 0.8,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+        { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
+      ];
+    }
+    if (week <= 7) {
+      // Bulking — semanas 4-7: Ca reduz, K e P mantidos
+      return [
+        { name: "Nitrato de Cálcio",           gPerLiter: 0.7,  npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+        { name: "Nitrato de Potássio",          gPerLiter: 0.5,  npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.5,  npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+        { name: "Sulfato de Magnésio",          gPerLiter: 0.8,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+        { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
+      ];
+    }
+    // Finalização — semana 8: EC alvo ~1.0, Ca(NO3)2 reduz ao mínimo, entra Óxido de Cálcio
     return [
-      { name: "Nitrato de Cálcio",           gPerLiter: 0.6  * m, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-      { name: "Nitrato de Potássio",          gPerLiter: 0.6  * m, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.4  * m, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "Sulfato de Magnésio",          gPerLiter: 0.5  * m, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-      { name: "Micronutrientes",              gPerLiter: 0.05 * m, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
+      { name: "Nitrato de Cálcio",           gPerLiter: 0.15, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+      { name: "Óxido de Cálcio",             gPerLiter: 0.45, npk: "0-0-0",    ca: 71, mg: 0,  fe: 0, s: 0  },
+      { name: "Nitrato de Potássio",          gPerLiter: 0.55, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.55, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "Sulfato de Magnésio",          gPerLiter: 0.8,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+      { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
     ];
   }
   if (phase === "MAINTENANCE") return [
@@ -421,6 +443,12 @@ function CompareTab() {
   );
 }
 
+function getFloraSubphase(week: number): { label: string; ecTarget: string } {
+  if (week <= 3) return { label: "Stretch",      ecTarget: "~3.0 EC" };
+  if (week <= 7) return { label: "Bulking",      ecTarget: "~3.0 EC" };
+  return              { label: "Finalização",   ecTarget: "~1.0 EC" };
+}
+
 export default function Nutrients() {
   const [phase, setPhase] = useState<Phase>("VEGA");
   const [week, setWeek] = useState(1);
@@ -456,7 +484,7 @@ export default function Nutrients() {
       const weeks = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
       setWeek(weeks);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [activeCycles, effectiveTentId]);
 
   const applications = trpc.nutrients.listApplications.useQuery(
@@ -560,7 +588,7 @@ export default function Nutrients() {
 
     const win = window.open("", "_blank", "width=320,height=600");
     if (!win) { showToast.error("Permita pop-ups para imprimir"); return; }
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receita</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:11px;line-height:1.5;background:#fff;color:#000;padding:4px;width:58mm}pre{white-space:pre-wrap;word-break:break-word}@media print{body{width:58mm;padding:0}@page{margin:2mm;size:58mm auto}}</style></head><body><pre>${lines.join("\n")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}<\/script></body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receita</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:11px;line-height:1.5;background:#fff;color:#000;padding:4px;width:58mm}pre{white-space:pre-wrap;word-break:break-word}@media print{body{width:58mm;padding:0}@page{margin:2mm;size:58mm auto}}</style></head><body><pre>${lines.join("\n")}</pre><script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script></body></html>`);
     win.document.close();
   };
 
@@ -574,7 +602,7 @@ export default function Nutrients() {
       link.href = dataUrl;
       link.click();
       showToast.success("Imagem salva! Envie para a impressora.");
-    } catch (e) {
+    } catch (_e) {
       showToast.error("Erro ao gerar imagem");
     } finally {
       setIsSavingImage(false);
@@ -635,7 +663,9 @@ export default function Nutrients() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {[1,2,3,4,5,6,7,8].map(w => (
-                          <SelectItem key={w} value={w.toString()}>Semana {w}</SelectItem>
+                          <SelectItem key={w} value={w.toString()}>
+                            Semana {w}{phase === "FLORA" ? ` — ${getFloraSubphase(w).label}` : ""}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -689,10 +719,15 @@ export default function Nutrients() {
                   <div className="flex items-center gap-2">
                     <FlaskConical className="w-5 h-5 text-white shrink-0" />
                     <span className="text-base font-bold text-white leading-tight">
-                      {PHASE_ICONS[phase]} Receita — {PHASE_NAMES[phase]} Semana {week} — {volumeL}L
+                      {PHASE_ICONS[phase]} Receita — {PHASE_NAMES[phase]}{phase === "FLORA" ? ` · ${getFloraSubphase(week).label}` : ""} Sem. {week} — {volumeL}L
                     </span>
                   </div>
-                  <p className="text-sm" style={{ color: "#d1fae5" }}>Adicione os produtos na ordem listada abaixo</p>
+                  <p className="text-sm" style={{ color: "#d1fae5" }}>
+                    Adicione os produtos na ordem listada abaixo
+                    {phase === "FLORA" && (
+                      <span className="ml-2 font-semibold">· Alvo: {getFloraSubphase(week).ecTarget}</span>
+                    )}
+                  </p>
                 </div>
               </CardHeader>
               <CardContent className="pt-0 space-y-3">
@@ -717,6 +752,16 @@ export default function Nutrients() {
                     </div>
                   </div>
                 </div>
+
+                {/* Nota de Finalização */}
+                {phase === "FLORA" && week >= 8 && (
+                  <div className="rounded-xl border border-amber-400/30 bg-amber-500/8 px-3 py-2.5 flex items-start gap-2">
+                    <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-200/80 leading-snug">
+                      <span className="font-semibold text-amber-300">Finalização:</span> Esta receita é preparada em concentração total (~1.4–2.0 EC calculado), mas o alvo no reservatório/gotejador é <strong>EC 1.0</strong>. Dilua conforme necessário para atingir esse valor.
+                    </p>
+                  </div>
+                )}
 
                 {/* Lista de produtos colorida */}
                 {calculatedProducts.length === 0 ? (

@@ -1,9 +1,0 @@
-{
-  "query": "INSERT INTO taskTemplates (context, phase, weekNumber, title, description) VALUES\n('TENT_BC', 'VEGA', 3, 'Verificar altura das plantas', 'Medir altura e registrar crescimento semanal'),\n('TENT_BC', 'VEGA', 3, 'Ajustar distância da luz', 'Manter distância ideal entre luz e topo das plantas'),\n('TENT_BC', 'VEGA', 3, 'Verificar deficiências nutricionais', 'Inspecionar folhas em busca de sinais de deficiência'),\n('TENT_BC', 'FLORA', 1, 'Iniciar floração', 'Ajustar fotoperíodo para 12/12 e monitorar resposta'),\n('TENT_BC', 'FLORA', 1, 'Aumentar ventilação', 'Aumentar fluxo de ar para prevenir mofo durante floração'),\n('TENT_BC', 'FLORA', 1, 'Verificar pH e EC', 'Ajustar nutrientes para fase de floração');",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute INSERT INTO taskTemplates (context, phase, weekNumber, title, description) VALUES\n('TENT_BC', 'VEGA', 3, 'Verificar altura das plantas', 'Medir altura e registrar crescimento semanal'),\n('TENT_BC', 'VEGA', 3, 'Ajustar distância da luz', 'Manter distância ideal entre luz e topo das plantas'),\n('TENT_BC', 'VEGA', 3, 'Verificar deficiências nutricionais', 'Inspecionar folhas em busca de sinais de deficiência'),\n('TENT_BC', 'FLORA', 1, 'Iniciar floração', 'Ajustar fotoperíodo para 12/12 e monitorar resposta'),\n('TENT_BC', 'FLORA', 1, 'Aumentar ventilação', 'Aumentar fluxo de ar para prevenir mofo durante floração'),\n('TENT_BC', 'FLORA', 1, 'Verificar pH e EC', 'Ajustar nutrientes para fase de floração');",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 94
-}

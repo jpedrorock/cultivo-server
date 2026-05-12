@@ -85,9 +85,9 @@ export const LazyImage: React.FC<LazyImageProps> = ({
             ? `url(${blurDataURL})`
             : `linear-gradient(
                 90deg,
-                hsl(var(--muted)) 0%,
-                hsl(var(--muted) / 0.8) 50%,
-                hsl(var(--muted)) 100%
+                var(--muted) 0%,
+                color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                var(--muted) 100%
               )`,
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -104,7 +104,7 @@ export const LazyImage: React.FC<LazyImageProps> = ({
             background: `linear-gradient(
               90deg,
               transparent 0%,
-              hsl(var(--muted) / 0.3) 50%,
+              color-mix(in oklch, var(--muted) 30%, transparent) 50%,
               transparent 100%
             )`,
             backgroundSize: "200% 100%",

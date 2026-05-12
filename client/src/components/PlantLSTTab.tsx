@@ -15,7 +15,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Plus, Scissors, Check, Info, ChevronDown, Pencil, Waves, Leaf, Zap, Wind, Sprout, LayoutGrid } from "lucide-react";
+import { Plus, Scissors, Check, Info, Pencil, Waves, Leaf, Zap, Wind, Sprout, LayoutGrid } from "lucide-react";
 import { toast } from "sonner";
 import { LSTTabSkeleton } from "@/components/TabSkeletons";
 

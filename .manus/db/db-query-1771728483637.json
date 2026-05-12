@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE dailyLogs \nADD COLUMN wateringVolume INT NULL COMMENT 'Volume regado em ml',\nADD COLUMN runoffCollected INT NULL COMMENT 'Runoff coletado em ml',\nADD COLUMN runoffPercentage DECIMAL(5,2) NULL COMMENT 'Calculado: (runoffCollected / wateringVolume) * 100';",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute ALTER TABLE dailyLogs \nADD COLUMN wateringVolume INT NULL COMMENT 'Volume regado em ml',\nADD COLUMN runoffCollected INT NULL COMMENT 'Runoff coletado em ml',\nADD COLUMN runoffPercentage DECIMAL(5,2) NULL COMMENT 'Calculado: (runoffCollected / wateringVolume) * 100';",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 2275
-}

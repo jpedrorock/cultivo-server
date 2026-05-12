@@ -1,13 +1,14 @@
 import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch, useLocation } from "wouter";
-import { AnimatePresence } from "framer-motion";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { InstallPWA } from "./components/InstallPWA";
 import { AddToHomeScreenPrompt } from "./components/AddToHomeScreenPrompt";
 import { BottomNav } from "./components/BottomNav";
 import { Sidebar } from "./components/Sidebar";
+import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { SplashScreen } from "./components/SplashScreen";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -54,7 +55,7 @@ const DisplayMode          = lazy(() => import("./pages/DisplayMode"));
 const MorningCheck         = lazy(() => import("./pages/MorningCheck"));
 const PlantChat            = lazy(() => import("./pages/PlantChat"));
 const TuyaSettings         = lazy(() => import("./pages/TuyaSettings"));
-const Dispositivos         = lazy(() => import("./pages/Dispositivos"));
+const SmartLife            = lazy(() => import("./pages/SmartLife"));
 // QuickLog removido daqui — agora é eager (import estático acima)
 
 // Spinner minimalista usado durante carregamento lazy
@@ -66,6 +67,14 @@ function PageLoader() {
   );
 }
 
+// Componente helper de redirect — extraído porque hooks não podem ser chamados
+// dentro de render-prop callbacks de <Route>.
+function Redirect({ to }: { to: string }) {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate(to, { replace: true }); }, [navigate, to]);
+  return null;
+}
+
 function Router() {
   const [location] = useLocation();
   return (
@@ -74,7 +83,10 @@ function Router() {
         <Route path={"/"} component={Home} />
 
         <Route path={"/strains"} component={ManageStrains} />
-        <Route path={"/manage-strains"} component={ManageStrains} />
+        {/* /manage-strains: legacy URL — redireciona pro canônico /strains */}
+        <Route path={"/manage-strains"}>
+          <Redirect to="/strains" />
+        </Route>
         <Route path={"/tarefas"} component={Tarefas} />
         <Route path={"/calculators"} component={CalculatorMenu} />
         <Route path={"/calculators/:id"} component={Calculators} />
@@ -88,7 +100,7 @@ function Router() {
         <Route path={"/settings/notifications"} component={NotificationSettings} />
         <Route path={"/settings/alerts"} component={AlertSettings} />
         <Route path={"/settings/sensors"} component={TuyaSettings} />
-        <Route path={"/settings/dispositivos"} component={Dispositivos} />
+        <Route path={"/smartlife"} component={SmartLife} />
         <Route path={"/alerts/history"} component={AlertHistory} />
         <Route path={"/strains/:id/targets"} component={StrainTargets} />
 
@@ -115,9 +127,10 @@ function Router() {
   );
 }
 
-function AuthenticatedApp() {
+function AuthenticatedAppInner() {
   const { isAuthenticated, loading, user } = useAuth();
   const [location, setLocation] = useLocation();
+  const { collapsed } = useSidebar();
   const isDisplayMode = location.endsWith("/display");
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem('hasSeenSplash');
@@ -160,10 +173,10 @@ function AuthenticatedApp() {
       )}
       {!isDisplayMode && <Sidebar />}
       <div
-        className={isDisplayMode ? "" : "md:pl-64"}
-        style={isDisplayMode ? {} : {
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem)',
-        }}
+        className={cn(
+          isDisplayMode ? "" : "pb-20 md:pb-0 transition-[padding-left] duration-200 ease-in-out",
+          !isDisplayMode && (collapsed ? "lg:pl-16" : "lg:pl-64"),
+        )}
       >
         <PullToRefresh>
           <Router />
@@ -173,6 +186,14 @@ function AuthenticatedApp() {
       <InstallPWA />
       <AddToHomeScreenPrompt />
     </>
+  );
+}
+
+function AuthenticatedApp() {
+  return (
+    <SidebarProvider>
+      <AuthenticatedAppInner />
+    </SidebarProvider>
   );
 }
 

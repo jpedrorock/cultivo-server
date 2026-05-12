@@ -1,5 +1,6 @@
 import {
   int,
+  float,
   mysqlEnum,
   mysqlTable,
   text,
@@ -114,14 +115,14 @@ export const cycles = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     tentId: int("tentId")
       .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "cascade" }),
     strainId: int("strainId")
-      .references(() => strains.id), // Opcional: ciclo pode ter múltiplas strains via plantas individuais
+      .references(() => strains.id, { onDelete: "set null" }), // Opcional: ciclo pode ter múltiplas strains via plantas individuais
     startDate: timestamp("startDate").notNull(),
     cloningStartDate: timestamp("cloningStartDate"),
     floraStartDate: timestamp("floraStartDate"),
     motherPlantId: int("motherPlantId")
-      .references(() => plants.id), // Planta-mãe usada para clonagem (quando fase = CLONING)
+      .references(() => plants.id, { onDelete: "set null" }), // Planta-mãe usada para clonagem (quando fase = CLONING)
     clonesProduced: int("clonesProduced"), // Número de clones produzidos ao retornar de CLONING para MAINTENANCE
     harvestWeight: decimal("harvestWeight", { precision: 10, scale: 2 }), // Peso estimado da colheita em gramas
     harvestNotes: text("harvestNotes"), // Notas sobre a colheita
@@ -145,10 +146,10 @@ export const tentAState = mysqlTable("tentAState", {
   id: int("id").autoincrement().primaryKey(),
   tentId: int("tentId")
     .notNull()
-    .references(() => tents.id)
+    .references(() => tents.id, { onDelete: "cascade" })
     .unique(),
   mode: mysqlEnum("mode", ["MAINTENANCE", "CLONING"]).default("MAINTENANCE").notNull(),
-  activeCloningEventId: int("activeCloningEventId").references(() => cloningEvents.id),
+  activeCloningEventId: int("activeCloningEventId").references(() => cloningEvents.id, { onDelete: "set null" }),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -164,7 +165,7 @@ export const cloningEvents = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     tentId: int("tentId")
       .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "cascade" }),
     startDate: timestamp("startDate").notNull(),
     endDate: timestamp("endDate").notNull(),
     status: mysqlEnum("status", ["ACTIVE", "FINISHED"]).default("ACTIVE").notNull(),
@@ -188,7 +189,7 @@ export const weeklyTargets = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     strainId: int("strainId")
       .notNull()
-      .references(() => strains.id),
+      .references(() => strains.id, { onDelete: "cascade" }),
     phase: mysqlEnum("phase", ["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
     weekNumber: int("weekNumber").notNull(),
     tempMin: decimal("tempMin", { precision: 4, scale: 1 }),
@@ -230,7 +231,7 @@ export const dailyLogs = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     tentId: int("tentId")
       .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "cascade" }),
     logDate: timestamp("logDate").notNull(),
     turn: mysqlEnum("turn", ["AM", "PM"]).notNull(),
     tempC: decimal("tempC", { precision: 4, scale: 1 }),
@@ -265,7 +266,7 @@ export const recipes = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     tentId: int("tentId")
       .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "cascade" }),
     logDate: timestamp("logDate").notNull(),
     turn: mysqlEnum("turn", ["AM", "PM"]).notNull(),
     volumeTotalL: decimal("volumeTotalL", { precision: 6, scale: 2 }),
@@ -334,10 +335,10 @@ export const taskInstances = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     tentId: int("tentId")
       .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "cascade" }),
     taskTemplateId: int("taskTemplateId")
       .notNull()
-      .references(() => taskTemplates.id),
+      .references(() => taskTemplates.id, { onDelete: "cascade" }),
     occurrenceDate: timestamp("occurrenceDate").notNull(),
     isDone: boolean("isDone").default(false).notNull(),
     completedAt: timestamp("completedAt"),
@@ -387,7 +388,7 @@ export const alerts = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     tentId: int("tentId")
       .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "cascade" }),
     alertType: mysqlEnum("alertType", ["OUT_OF_RANGE", "SAFETY_LIMIT", "TREND"]).notNull(),
     metric: mysqlEnum("metric", ["TEMP", "RH", "PPFD", "PH"]).notNull(),
     logDate: timestamp("logDate").notNull(),
@@ -446,7 +447,7 @@ export const alertSettings = mysqlTable("alertSettings", {
   id: int("id").autoincrement().primaryKey(),
   tentId: int("tentId")
     .notNull()
-    .references(() => tents.id)
+    .references(() => tents.id, { onDelete: "cascade" })
     .unique(),
   alertsEnabled: boolean("alertsEnabled").default(true).notNull(),
   tempEnabled: boolean("tempEnabled").default(true).notNull(),
@@ -474,7 +475,7 @@ export const alertHistory = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     tentId: int("tentId")
       .notNull()
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "cascade" }),
     metric: mysqlEnum("metric", ["TEMP", "RH", "PPFD", "PH"]).notNull(),
     value: decimal("value", { precision: 10, scale: 2 }).notNull(),
     targetMin: decimal("targetMin", { precision: 10, scale: 2 }),
@@ -517,7 +518,7 @@ export const notificationHistory = mysqlTable(
   "notificationHistory",
   {
     id: int("id").autoincrement().primaryKey(),
-    type: mysqlEnum("type", ["daily_reminder", "environment_alert", "task_reminder"]).notNull(),
+    type: mysqlEnum("type", ["daily_reminder", "environment_alert", "task_reminder", "incomplete_log"]).notNull(),
     title: varchar("title", { length: 255 }).notNull(),
     message: text("message").notNull(),
     metadata: text("metadata"), // JSON string with additional data
@@ -551,9 +552,9 @@ export const plants = mysqlTable(
     code: varchar("code", { length: 50 }), // Código opcional (ex: "NL-001")
     strainId: int("strainId")
       .notNull()
-      .references(() => strains.id),
+      .references(() => strains.id, { onDelete: "restrict" }),
     currentTentId: int("currentTentId")
-      .references(() => tents.id),
+      .references(() => tents.id, { onDelete: "set null" }),
     plantStage: mysqlEnum("plantStage", ["CLONE", "SEEDLING", "PLANT"]).default("SEEDLING").notNull(),
     status: mysqlEnum("status", ["ACTIVE", "AWAITING_DRYING", "HARVESTED", "DEAD", "DISCARDED"]).default("ACTIVE").notNull(),
     harvestQueueAt: timestamp("harvestQueueAt"), // Data em que entrou na fila de secagem
@@ -589,9 +590,9 @@ export const plantTentHistory = mysqlTable(
     plantId: int("plantId")
       .notNull()
       .references(() => plants.id, { onDelete: "cascade" }),
-    fromTentId: int("fromTentId").references(() => tents.id),
+    fromTentId: int("fromTentId").references(() => tents.id, { onDelete: "set null" }),
     toTentId: int("toTentId")
-      .references(() => tents.id), // nullable: planta pode sair para fila sem estufa destino
+      .references(() => tents.id, { onDelete: "set null" }), // nullable: planta pode sair para fila sem estufa destino
     movedAt: timestamp("movedAt").defaultNow().notNull(),
     reason: text("reason"),
   },
@@ -983,6 +984,11 @@ export type InsertWateringApplication = typeof wateringApplications.$inferInsert
  */
 export const pushSubscriptions = mysqlTable("pushSubscriptions", {
   id: int("id").autoincrement().primaryKey(),
+  // Dono da subscription — para isolamento de notificações por usuário
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Grupo do usuário no momento da subscription (cache para queries rápidas)
+  // Pode ficar null se o usuário não estiver em grupo
+  groupId: int("groupId"),
   // Endpoint único da subscription (identifica o dispositivo)
   endpoint: varchar("endpoint", { length: 512 }).notNull().unique(),
   // Chaves da subscription (JSON serializado)
@@ -991,6 +997,8 @@ export const pushSubscriptions = mysqlTable("pushSubscriptions", {
   reminderTimes: text("reminderTimes"),
   // Lembrete diário ativado
   reminderEnabled: boolean("reminderEnabled").default(false).notNull(),
+  // Timezone IANA do dispositivo (ex: "America/Sao_Paulo") — usado para lembretes
+  timezone: varchar("timezone", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -1009,6 +1017,7 @@ export const plantStructures = mysqlTable("plantStructures", {
     .references(() => plants.id, { onDelete: "cascade" })
     .unique(),
   nodesJson: text("nodesJson").notNull(), // JSON serializado de PlantNode[]
+  potSizeL:  float("potSizeL").default(5).notNull(), // Tamanho do vaso em litros
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

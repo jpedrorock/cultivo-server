@@ -15,108 +15,23 @@ import {
   PlantGraphNode, LayoutNode, GraphAction,
   createInitialGraph, isLegacyFormat,
   applyTopping, applyFIM, applyLST, applySuperCrop,
-  growPlant, addLateralBranch, removeSubtree,
-  getAvailableActions, getPlantStats, computeLayout,
+  growPlant, addLateralBranch, insertNodeBefore, removeSubtree,
+  getAvailableActions, getPlantStats, computeLayout, computeRadialLayout, computeIsoLayout,
   resolveEdgeState, setEdgeRecovering, setEdgeDefoliated, setEdgeActive,
 } from "@/features/cannaprune/plantGraph";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
-  Scissors, Zap, Leaf, ArrowUp, GitBranch,
-  Trash2, Undo2, Redo2, RotateCcw, Save, Loader2, X,
-  ZoomIn, ZoomOut, Maximize2,
-} from "lucide-react";
-
-// ── Paleta ────────────────────────────────────────────────────────────────────
-
-const NODE_COLOR = {
-  root:        { ring: '#4ade80', bg: '#071209', text: '#4ade80' },
-  node:        { ring: '#22c55e', bg: '#071209', text: '#86efac' },
-  top:         { ring: '#4ade80', fill: '#0d2010' },    // triângulo ativo — verde
-  topNew:      { ring: '#fbbf24', fill: '#1a1000' },    // pós-topping — amarelo
-  topFimmed:   { ring: '#fb923c', fill: '#1a0c00' },    // pós-fim — laranja
-  topped:      { ring: '#fbbf24', bg: '#140d00', text: '#fde68a' },
-  fimmed:      { ring: '#fb923c', bg: '#140800', text: '#fed7aa' },
-  lst:         { ring: '#818cf8', bg: '#0c0b1f', text: '#c7d2fe' },
-  lstDone:     { ring: '#22c55e', bg: '#071209', text: '#86efac' }, // LST recuperado
-  sc:          { ring: '#c084fc', bg: '#100a1f', text: '#e9d5ff' },
-};
-
-const LST_RECOVERY_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
-
-function isLSTRecovered(n: PlantGraphNode): boolean {
-  if (n.state !== 'lst' || !n.lstAppliedAt) return false;
-  return Date.now() - new Date(n.lstAppliedAt).getTime() > LST_RECOVERY_MS;
-}
-
-// Tipo de renderização visual do nó
-type NodeVisual =
-  | 'top'      // top ativo nativo → bola verde com ★
-  | 'top-new'  // top ativo pós-topping → bola amarela com ★
-  | 'top-fim'  // top ativo pós-fim → bola laranja com ★
-  | 'circle';  // tudo o mais → círculo
-
-function getNodeVisual(n: PlantGraphNode, parentState?: PlantGraphNode['state']): NodeVisual {
-  if (n.type === 'top' && n.state === 'active') {
-    if (parentState === 'topped') return 'top-new';
-    if (parentState === 'fimmed') return 'top-fim';
-    return 'top';
-  }
-  return 'circle';
-}
-
-function getCircleColor(n: PlantGraphNode) {
-  if (n.state === 'topped')        return NODE_COLOR.topped;
-  if (n.state === 'fimmed')        return NODE_COLOR.fimmed;
-  if (n.state === 'lst')           return isLSTRecovered(n) ? NODE_COLOR.lstDone : NODE_COLOR.lst;
-  if (n.state === 'super-cropped') return NODE_COLOR.sc;
-  if (n.type  === 'root')          return NODE_COLOR.node; // raiz = círculo verde
-  return NODE_COLOR.node;
-}
-
-function getCircleLabel(n: PlantGraphNode): string {
-  if (n.type === 'root')           return '↑';
-  if (n.state === 'topped')        return '✂';
-  if (n.state === 'fimmed')        return '~';
-  if (n.state === 'lst')           return isLSTRecovered(n) ? String(n.nodeNumber) : '〰';
-  if (n.state === 'super-cropped') return '↑';  // seta roxa = recovery
-  return String(n.nodeNumber);
-}
-
-function getEdgeColor(n: PlantGraphNode, isSelected: boolean): string {
-  if (isSelected) return '#60a5fa';
-  const es = resolveEdgeState(n);
-  if (es === 'defoliated') return '#4b5563';   // cinza
-  if (es === 'recovering') return '#3b82f6';   // azul recuperação
-  if (n.state === 'topped')        return '#92400e';
-  if (n.state === 'fimmed')        return '#9a3412';
-  if (n.state === 'lst')           return '#3730a3';
-  if (n.state === 'super-cropped') return '#6b21a8';
-  return '#14532d';
-}
-
-function getRadius(n: PlantGraphNode, compact = false): number {
-  const base = n.type === 'root' ? 14 : n.type === 'top' ? 18 : 17;
-  return compact ? Math.round(base * 0.72) : base;
-}
-
-// ── Menu de ações ─────────────────────────────────────────────────────────────
-
-const ACTION_META: Record<GraphAction, {
-  label: string; shortDesc: string; color: string;
-  Icon: React.ElementType; destructive?: boolean; separator?: boolean;
-}> = {
-  topping:      { label: 'Topping',    shortDesc: '→ 2 topos',       color: '#fbbf24', Icon: Scissors },
-  fim:          { label: 'FIM',        shortDesc: '→ 3–4 brotos',    color: '#fb923c', Icon: Scissors },
-  grow:         { label: 'Crescer',    shortDesc: '+ nó acima',      color: '#4ade80', Icon: ArrowUp  },
-  'add-branch': { label: '+ Galho',   shortDesc: 'ramo lateral',    color: '#34d399', Icon: GitBranch },
-  'super-crop': { label: 'Super Crop',shortDesc: '→ 2 topos',       color: '#c084fc', Icon: Zap      },
-  remove:       { label: 'Remover',    shortDesc: 'nó + filhos',     color: '#f87171', Icon: Trash2,
-                  destructive: true, separator: true },
-};
-
-const ACTION_ORDER: GraphAction[] = ['super-crop','topping','grow','remove'];
+  NODE_COLOR,
+  getNodeVisual, getCircleColor, getCircleLabel, getEdgeColor, getRadius,
+} from "@/features/cannaprune/plantNodeColors";
+import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { NodeActionMenu } from "./NodeActionMenu";
+import { EdgeActionMenu } from "./EdgeActionMenu";
+import { PlantNodeMapResetSheet } from "./PlantNodeMapResetSheet";
+import { PlantNodeMapToolbar } from "./PlantNodeMapToolbar";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+
+const ACTION_ORDER: GraphAction[] = ['super-crop','topping','grow','remove'];
 
 const MAX_UNDO          = 12;
 const SVG_MIN_H         = 380;
@@ -142,121 +57,15 @@ interface Props {
   cancelSaveRef?:      React.MutableRefObject<boolean>;
   onTechniqueApplied?: (technique: string, nodeLabel: string) => void;
   onResetStructure?:   (clearHistory: boolean) => void;
-}
-
-function Chip({ value, label, color }: { value: number; label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-1">
-      <span className="text-sm font-bold tabular-nums" style={{ color }}>{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
-    </div>
-  );
-}
-
-// ── NodeActionMenu — componente de módulo (nunca recriado durante render) ─────
-// Motivo: componentes definidos dentro de outro componente/IIFE recebem um
-// tipo novo a cada render → React os desmonta imediatamente → conteúdo vazio.
-
-interface NodeActionMenuProps {
-  selectedNode:     LayoutNode;
-  availableActions: GraphAction[];
-  onClose:   () => void;
-  onAction:  (a: GraphAction) => void;
-}
-
-function NodeActionMenu({
-  selectedNode, availableActions, onClose, onAction,
-}: NodeActionMenuProps) {
-  const nodeColor = selectedNode.type === 'top' && selectedNode.state === 'active'
-    ? NODE_COLOR.top.ring : getCircleColor(selectedNode).ring;
-  const nodeLabel = selectedNode.type === 'root' ? 'Raiz' : `N${selectedNode.nodeNumber}`;
-  const nodeDesc  = selectedNode.type === 'root'    ? '↑ caule'
-    : selectedNode.type === 'top' && selectedNode.state === 'active' ? '★ top bud'
-    : selectedNode.type === 'internode' ? 'nó'
-    : selectedNode.state;
-
-  const mainActions = availableActions.filter(a => a !== 'remove');
-  const hasRemove   = availableActions.includes('remove');
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-[199]" onClick={onClose} />
-
-      {/* Card */}
-      <div
-        className="fixed z-[200] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] pointer-events-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden">
-
-          {/* Cabeçalho */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/20">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: nodeColor }} />
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-bold">{nodeLabel}</span>
-              <span className="text-xs text-muted-foreground ml-1.5">{nodeDesc}</span>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Ações flat */}
-          <div className="py-1.5">
-            {mainActions.map(action => {
-              const meta = ACTION_META[action];
-              const Icon = meta.Icon;
-              return (
-                <button
-                  key={action}
-                  onClick={() => onAction(action)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 active:bg-muted transition-colors"
-                >
-                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: meta.color + '22' }}>
-                    <Icon className="w-4 h-4" style={{ color: meta.color }} />
-                  </span>
-                  <div>
-                    <span className="text-sm font-semibold block leading-tight">{meta.label}</span>
-                    <span className="text-xs text-muted-foreground">{meta.shortDesc}</span>
-                  </div>
-                </button>
-              );
-            })}
-            {hasRemove && (
-              <>
-                <div className="h-px bg-border/30 mx-4 my-1" />
-                <button
-                  onClick={() => onAction('remove')}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
-                >
-                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-red-500/10">
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                  </span>
-                  <div>
-                    <span className="text-sm font-semibold text-red-400 block leading-tight">Remover</span>
-                    <span className="text-xs text-muted-foreground">nó + filhos</span>
-                  </div>
-                </button>
-              </>
-            )}
-          </div>
-
-        </div>
-      </div>
-    </>
-  );
+  /** 'side' = lateral (padrão), 'top' = de cima (radial), 'iso' = isométrica 30° */
+  viewMode?:           'side' | 'top' | 'iso';
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function PlantNodeMap({
   plantId, compact = false, onCompactTap, staticNodes, nodeSnapshotRef,
-  cancelSaveRef, onTechniqueApplied, onResetStructure,
+  cancelSaveRef, onTechniqueApplied, onResetStructure, viewMode = 'side',
 }: Props) {
   // Modo estático: só renderiza o snapshot, sem DB, sem interação
   const isStatic = !!staticNodes;
@@ -318,8 +127,9 @@ export default function PlantNodeMap({
 
   // ── tRPC ───────────────────────────────────────────────────────────────────
 
+  const utils = trpc.useUtils();
   const { data: saved } = trpc.plantStructure.get.useQuery(
-    { plantId },
+    { plantId: plantId! },
     { enabled: !!plantId, refetchOnWindowFocus: false },
   );
   const saveMutation = trpc.plantStructure.save.useMutation({
@@ -328,6 +138,8 @@ export default function PlantNodeMap({
       setIsSaved(true);
       if (savedTimer.current) clearTimeout(savedTimer.current);
       savedTimer.current = setTimeout(() => setIsSaved(false), 2000);
+      // Invalida o cache para que o Plant3DView (e outras views) vejam o estado atual
+      if (plantId) utils.plantStructure.get.invalidate({ plantId });
     },
     onError: () => { setIsSaving(false); toast.error('Erro ao salvar'); },
   });
@@ -363,7 +175,7 @@ export default function PlantNodeMap({
     if (compact) return;
     // Ao desmontar o modo fullscreen: salva silenciosamente
     return () => { saveFnRef.current(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [compact]);
 
   // ── Load ────────────────────────────────────────────────────────────────────
@@ -400,12 +212,17 @@ export default function PlantNodeMap({
   // ── Layout ──────────────────────────────────────────────────────────────────
 
   const { layoutNodes, svgHeight, svgActualWidth } = useMemo(
-    () => computeLayout(
-      nodes, svgWidth,
-      compact ? SVG_MIN_H_COMPACT : SVG_MIN_H,
-      compact ? 50 : undefined,
-    ),
-    [nodes, svgWidth, compact],
+    () => {
+      const minH = compact ? SVG_MIN_H_COMPACT : SVG_MIN_H;
+      if (viewMode === 'top') {
+        return computeRadialLayout(nodes, svgWidth, minH, compact ? 60 : 80);
+      }
+      if (viewMode === 'iso') {
+        return computeIsoLayout(nodes, svgWidth, minH, compact ? 55 : 70, compact ? 50 : 65);
+      }
+      return computeLayout(nodes, svgWidth, minH, compact ? 50 : undefined);
+    },
+    [nodes, svgWidth, compact, viewMode],
   );
 
   const nodeMap = useMemo(() => {
@@ -512,6 +329,8 @@ export default function PlantNodeMap({
             origDx: handleNum === 1 ? ctrl.dx1 : ctrl.dx2,
             origDy: handleNum === 1 ? ctrl.dy1 : ctrl.dy2,
           };
+          // Captura o ponteiro para receber eventos mesmo fora do elemento
+          el!.setPointerCapture(e.pointerId);
         }
         return;
       }
@@ -528,6 +347,8 @@ export default function PlantNodeMap({
             origX: ln.x, origY: ln.y,
             moved: false,
           };
+          // Captura o ponteiro para receber eventos mesmo fora do elemento
+          el!.setPointerCapture(e.pointerId);
           return;
         }
       }
@@ -553,6 +374,7 @@ export default function PlantNodeMap({
       setEdgeMenuOpen(false);
       gestureRef.current.ptrs.push({ id: e.pointerId, x: e.clientX, y: e.clientY });
       if (gestureRef.current.ptrs.length === 1) gestureRef.current.moved = false;
+      el!.setPointerCapture(e.pointerId);
     }
 
     function onPointerMove(e: PointerEvent) {
@@ -628,7 +450,7 @@ export default function PlantNodeMap({
         const newDist  = Math.hypot(g.ptrs[idx].x - other.x, g.ptrs[idx].y - other.y);
         if (oldDist < 1) return;
         const ratio = newDist / oldDist;
-        const rect  = el.getBoundingClientRect();
+        const rect  = el!.getBoundingClientRect();
         const cx    = (g.ptrs[0].x + g.ptrs[1].x) / 2 - rect.left;
         const cy    = (g.ptrs[0].y + g.ptrs[1].y) / 2 - rect.top;
         setVP(v => {
@@ -651,6 +473,9 @@ export default function PlantNodeMap({
         if (nd.moved) {
           // Marca a aresta do nó movido como recovering (linha azul por 5 dias)
           setNodes(ns => setEdgeRecovering(ns, nd.nodeId));
+          // Persiste posição arrastada com debounce de 1 s (sem spammar o DB durante drag rápido)
+          if (saveTimer.current) clearTimeout(saveTimer.current);
+          saveTimer.current = setTimeout(() => { saveFnRef.current(); }, 1000);
         } else {
           // Tap sem arrastar → abre menu de ações do nó
           setSelectedId(nd.nodeId);
@@ -663,7 +488,7 @@ export default function PlantNodeMap({
 
     function onWheel(e: WheelEvent) {
       e.preventDefault();
-      const rect   = el.getBoundingClientRect();
+      const rect   = el!.getBoundingClientRect();
       const cx     = e.clientX - rect.left;
       const cy     = e.clientY - rect.top;
       const factor = e.deltaY < 0 ? 1.13 : 1 / 1.13;
@@ -692,6 +517,7 @@ export default function PlantNodeMap({
       el.removeEventListener('pointercancel',onPointerCancel);
       el.removeEventListener('wheel',        onWheel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compact]);
 
   // ── Undo / Redo / Reset ──────────────────────────────────────────────────────
@@ -776,6 +602,7 @@ export default function PlantNodeMap({
         return;
       }
       setNodes(res.nodes);
+      saveNow(res.nodes);
       toast.success('Nó removido');
       return;
     }
@@ -790,6 +617,7 @@ export default function PlantNodeMap({
       case 'super-crop': res = applySuperCrop(nodes, nodeId);   break;
       case 'grow':       res = growPlant(nodes, nodeId);        break;
       case 'add-branch': res = addLateralBranch(nodes, nodeId); break;
+      case 'add-before': res = insertNodeBefore(nodes, nodeId); break;
       default: return;
     }
 
@@ -798,10 +626,12 @@ export default function PlantNodeMap({
     pushHistory(nodes);
     const selNode = nodes.find(n => n.id === nodeId);
     setNodes(res.nodes);
+    saveNow(res.nodes);
 
     const techLabels: Partial<Record<GraphAction, string>> = {
       topping: 'Topping', fim: 'FIM', lst: 'LST',
-      'super-crop': 'Super Cropping', grow: 'Crescimento', 'add-branch': 'Galho lateral',
+      'super-crop': 'Super Cropping', grow: 'Crescimento',
+      'add-branch': 'Galho lateral', 'add-before': 'Nó inserido',
     };
     if (techLabels[action]) onTechniqueApplied?.(techLabels[action]!, selNode ? `N${selNode.nodeNumber}` : '');
 
@@ -812,8 +642,44 @@ export default function PlantNodeMap({
       'super-crop': '⚡ Super Cropping — estrutura acima removida, 2 novos topos',
       grow:         '🌱 Crescimento aplicado',
       'add-branch': '🌿 Galho lateral adicionado',
+      'add-before': '➕ Nó inserido entre o pai e este',
     };
     if (msgs[action]) toast.success(msgs[action]!);
+  }
+
+  // ── Edge action callbacks ─────────────────────────────────────────────────────
+
+  function handleEdgeDefoliate() {
+    if (!selectedEdgeId) return;
+    pushHistory(nodes);
+    const ns = setEdgeDefoliated(nodes, selectedEdgeId);
+    setNodes(ns);
+    setEdgeMenuOpen(false);
+    toast.success('🍂 Desfolha aplicada — caule cinza');
+  }
+
+  function handleEdgeRestore() {
+    if (!selectedEdgeId) return;
+    pushHistory(nodes);
+    const ns = setEdgeActive(nodes, selectedEdgeId);
+    setNodes(ns);
+    setEdgeMenuOpen(false);
+    toast.success('✅ Caule restaurado');
+  }
+
+  function handleEdgeCurve() {
+    setEdgeMenuOpen(false);
+    // mantém selectedEdgeId para mostrar os handles
+  }
+
+  function handleEdgeResetCurve() {
+    if (!selectedEdgeId) return;
+    pushHistory(nodes);
+    const ns = nodes.map(n => n.id === selectedEdgeId ? { ...n, edgeCtrl: undefined } : n);
+    setNodes(ns);
+    setSelectedEdgeId(null);
+    setEdgeMenuOpen(false);
+    toast.success('↺ Curva resetada');
   }
 
   // ── Edges ────────────────────────────────────────────────────────────────────
@@ -832,6 +698,7 @@ export default function PlantNodeMap({
         edgeState: resolveEdgeState(n),
       };
     }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   [layoutNodes, nodeMap]);
 
   // ── Selected node ─────────────────────────────────────────────────────────────
@@ -1059,50 +926,16 @@ export default function PlantNodeMap({
 
       {/* ── Stats + controles ─────────────────────────────────────────────── */}
       {!compact && (
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/30 shrink-0">
-          <Chip value={stats.tops}       label="tops" color="#4ade80" />
-          <div className="w-px h-3 bg-border/40" />
-          <Chip value={stats.internodes} label="nós"  color="#86efac" />
-          {stats.lst > 0 && (
-            <><div className="w-px h-3 bg-border/40" /><Chip value={stats.lst} label="LST" color="#818cf8" /></>
-          )}
-          {stats.superCropped > 0 && (
-            <><div className="w-px h-3 bg-border/40" /><Chip value={stats.superCropped} label="SC" color="#c084fc" /></>
-          )}
-          <div className="ml-auto flex items-center gap-1.5">
-            {/* Indicador de save discreto */}
-            <div className="w-6 h-6 flex items-center justify-center" title={isSaving ? 'Salvando…' : isSaved ? 'Salvo' : ''}>
-              {isSaving ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground/50" />
-              ) : isSaved ? (
-                <svg className="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : null}
-            </div>
-            {(canUndo || canRedo) && (
-              <div className="flex items-center gap-0.5">
-                <button
-                  onClick={handleUndo} disabled={!canUndo}
-                  title="Desfazer (Ctrl+Z)"
-                  className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Undo2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={handleRedo} disabled={!canRedo}
-                  title="Refazer (Ctrl+Y)"
-                  className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Redo2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-            <button onClick={() => setResetOpen(true)} title="Reiniciar" className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:bg-red-500/20 hover:text-red-500 transition-colors">
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+        <PlantNodeMapToolbar
+          stats={stats}
+          isSaving={isSaving}
+          isSaved={isSaved}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onReset={() => setResetOpen(true)}
+        />
       )}
 
       {/* ── Canvas ────────────────────────────────────────────────────────── */}
@@ -1227,185 +1060,35 @@ export default function PlantNodeMap({
       {selectedEdgeId && edgeMenuOpen && !compact && (() => {
         const edgeNode = nodeMap.get(selectedEdgeId);
         if (!edgeNode) return null;
-        const es = resolveEdgeState(edgeNode);
         return (
-          <>
-            <div className="fixed inset-0 z-[199]"
-              onClick={() => setEdgeMenuOpen(false)} />
-            <div
-              className="fixed z-[200] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px] pointer-events-auto"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden">
-                {/* Header */}
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/20">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: es === 'defoliated' ? '#6b7280' : es === 'recovering' ? '#3b82f6' : '#22c55e' }} />
-                  <div className="flex-1">
-                    <span className="text-sm font-bold">Caule</span>
-                    <span className="text-xs text-muted-foreground ml-1.5">
-                      {es === 'defoliated' ? '🍂 desfolhado'
-                        : es === 'recovering' ? '💧 recuperando'
-                        : '✅ ativo'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setEdgeMenuOpen(false)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {/* Ações */}
-                <div className="py-1.5">
-                  {/* Desfolha */}
-                  {es !== 'defoliated' ? (
-                    <button
-                      onClick={() => {
-                        pushHistory(nodes);
-                        const ns = setEdgeDefoliated(nodes, selectedEdgeId);
-                        setNodes(ns);
-                        setEdgeMenuOpen(false);
-                        toast.success('🍂 Desfolha aplicada — caule cinza');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 transition-colors"
-                    >
-                      <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-zinc-500/15">
-                        <Leaf className="w-4 h-4 text-zinc-400" />
-                      </span>
-                      <div>
-                        <span className="text-sm font-semibold block">Desfolha</span>
-                        <span className="text-xs text-muted-foreground">Caule fica cinza</span>
-                      </div>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        pushHistory(nodes);
-                        const ns = setEdgeActive(nodes, selectedEdgeId);
-                        setNodes(ns);
-                        setEdgeMenuOpen(false);
-                        toast.success('✅ Caule restaurado');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 transition-colors"
-                    >
-                      <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/15">
-                        <Leaf className="w-4 h-4 text-emerald-400" />
-                      </span>
-                      <div>
-                        <span className="text-sm font-semibold block">Restaurar</span>
-                        <span className="text-xs text-muted-foreground">Remove desfolha</span>
-                      </div>
-                    </button>
-                  )}
-
-                  {/* Curvatura bezier */}
-                  <button
-                    onClick={() => {
-                      setEdgeMenuOpen(false);
-                      // mantém selectedEdgeId para mostrar os handles
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 transition-colors"
-                  >
-                    <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-blue-500/15">
-                      <GitBranch className="w-4 h-4 text-blue-400" />
-                    </span>
-                    <div>
-                      <span className="text-sm font-semibold block">Curvar linha</span>
-                      <span className="text-xs text-muted-foreground">Arraste os handles</span>
-                    </div>
-                  </button>
-
-                  {/* Resetar curva */}
-                  {edgeNode.edgeCtrl && (
-                    <>
-                      <div className="h-px bg-border/30 mx-4 my-1" />
-                      <button
-                        onClick={() => {
-                          pushHistory(nodes);
-                          const ns = nodes.map(n => n.id === selectedEdgeId ? { ...n, edgeCtrl: undefined } : n);
-                          setNodes(ns);
-                          setSelectedEdgeId(null); setEdgeMenuOpen(false);
-                          toast.success('↺ Curva resetada');
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/60 transition-colors text-muted-foreground"
-                      >
-                        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-muted">
-                          <RotateCcw className="w-4 h-4" />
-                        </span>
-                        <div>
-                          <span className="text-sm font-semibold block">Resetar curva</span>
-                          <span className="text-xs text-muted-foreground">Volta ao padrão</span>
-                        </div>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
+          <EdgeActionMenu
+            edgeNode={edgeNode}
+            onDefoliate={handleEdgeDefoliate}
+            onRestore={handleEdgeRestore}
+            onCurve={handleEdgeCurve}
+            onResetCurve={edgeNode.edgeCtrl ? handleEdgeResetCurve : undefined}
+            onClose={() => setEdgeMenuOpen(false)}
+          />
         );
       })()}
 
       {/* ── Sheet de reset ─────────────────────────────────────────────────── */}
-      <Sheet open={resetOpen} onOpenChange={setResetOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl pb-8">
-          <SheetHeader className="mb-3">
-            <SheetTitle className="text-sm flex items-center gap-2">
-              <RotateCcw className="w-4 h-4 text-red-500" /> Reiniciar planta
-            </SheetTitle>
-          </SheetHeader>
-          <p className="text-sm text-muted-foreground mb-4">
-            A estrutura será apagada e a planta volta ao estado inicial.
-          </p>
-          <div className="space-y-2">
-            {/* Restaurar ao último salvamento (master snapshot) */}
-            <button onClick={handleRestoreSnapshot} className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-border bg-card text-left active:scale-[0.98] transition-all">
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500/10">
-                <Leaf className="w-4 h-4 text-emerald-500" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold">Manter histórico</p>
-                <p className="text-xs text-muted-foreground">Volta ao último salvamento, mantém os logs</p>
-              </div>
-            </button>
-            {/* Apagar tudo: volta à planta inicial + apaga logs */}
-            <button onClick={() => handleClearAll(true)} className="w-full flex items-center gap-3 p-3 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-card text-left active:scale-[0.98] transition-all">
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-red-500/10">
-                <RotateCcw className="w-4 h-4 text-red-500" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-red-500">Apagar tudo</p>
-                <p className="text-xs text-muted-foreground">Recomeça da raiz e apaga o histórico</p>
-              </div>
-            </button>
-            <button
-              onClick={() => {
-                skipRemote.current = true;
-                setResetOpen(false);
-                // Remove posições customizadas — volta ao layout automático
-                const ns = nodes.map(({ posX: _px, posY: _py, ...n }) => n);
-                setNodes(ns);
-                saveNow(ns);
-                requestAnimationFrame(fitToView);
-                toast.success('Layout automático restaurado');
-              }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-border bg-card text-left active:scale-[0.98] transition-all"
-            >
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-muted">
-                <Maximize2 className="w-4 h-4 text-muted-foreground" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold">Auto-layout</p>
-                <p className="text-xs text-muted-foreground">Remove posições manuais dos nós</p>
-              </div>
-            </button>
-            <button onClick={() => setResetOpen(false)} className="w-full p-3 rounded-xl border border-border/40 text-sm text-muted-foreground transition-all hover:border-border">
-              Cancelar
-            </button>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <PlantNodeMapResetSheet
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        onRestoreSnapshot={handleRestoreSnapshot}
+        onClearAll={() => handleClearAll(true)}
+        onAutoLayout={() => {
+          skipRemote.current = true;
+          setResetOpen(false);
+          // Remove posições customizadas — volta ao layout automático
+          const ns = nodes.map(({ posX: _px, posY: _py, ...n }) => n);
+          setNodes(ns);
+          saveNow(ns);
+          requestAnimationFrame(fitToView);
+          toast.success('Layout automático restaurado');
+        }}
+      />
     </div>
   );
 }

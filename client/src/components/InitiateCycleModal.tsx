@@ -170,15 +170,15 @@ export function InitiateCycleModal({
                       className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all duration-150"
                       style={{
                         background: isActive ? p.bg : "transparent",
-                        borderColor: isActive ? p.border : "hsl(var(--border) / 0.5)",
+                        borderColor: isActive ? p.border : "color-mix(in oklch, var(--border) 50%, transparent)",
                         boxShadow: isActive ? `0 0 10px ${p.color}20` : "none",
                       }}
                     >
                       <div
                         className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: isActive ? p.bg : "hsl(var(--muted) / 0.5)" }}
+                        style={{ background: isActive ? p.bg : "color-mix(in oklch, var(--muted) 50%, transparent)" }}
                       >
-                        <Icon className="w-3.5 h-3.5" style={{ color: isActive ? p.color : "hsl(var(--muted-foreground))" }} />
+                        <Icon className="w-3.5 h-3.5" style={{ color: isActive ? p.color : "var(--muted-foreground)" }} />
                       </div>
                       <span className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
                         {p.label}

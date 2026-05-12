@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
 import { PageTransition } from "@/components/PageTransition";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -11,16 +10,13 @@ import {
   Leaf,
   BarChart3,
   Settings,
-  ChevronDown,
   ChevronRight,
   Droplets,
   Thermometer,
   FlaskConical,
-  Camera,
   Activity,
   Scissors,
   Archive,
-  AlertTriangle,
   BookOpen,
   Zap,
   ClipboardList,
@@ -43,6 +39,7 @@ interface Section {
   glow: string;
   border: string;
   badge?: string;
+  searchText: string; // plain-text for full-content search
   content: React.ReactNode;
 }
 
@@ -85,20 +82,27 @@ function SectionBody({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AccordionSection({ section }: { section: Section }) {
-  const [open, setOpen] = useState(false);
+function AccordionSection({
+  section,
+  open,
+  onToggle,
+}: {
+  section: Section;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const Icon = section.icon;
 
   return (
     <div
       id={`section-${section.id}`}
       className={`rounded-2xl border ${section.border} overflow-hidden`}
-      style={{ background: `linear-gradient(145deg, ${section.glow} 0%, hsl(var(--card)) 60%)` }}
+      style={{ background: `linear-gradient(145deg, ${section.glow} 0%, var(--card) 60%)` }}
     >
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         aria-expanded={open}
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:scale-[0.99] transition-transform duration-100"
       >
         <div className={`w-8 h-8 rounded-xl ${section.gradient} flex items-center justify-center shadow-sm shrink-0`}>
           <Icon className="w-4 h-4 text-white" />
@@ -111,12 +115,21 @@ function AccordionSection({ section }: { section: Section }) {
             </span>
           )}
         </div>
-        {open
-          ? <ChevronDown className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-          : <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-        }
+        <div className={`transition-transform duration-200 ${open ? "rotate-90" : "rotate-0"}`}>
+          <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+        </div>
       </button>
-      {open && <SectionBody>{section.content}</SectionBody>}
+
+      {/* Animated collapse via grid-template-rows */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <SectionBody>{section.content}</SectionBody>
+        </div>
+      </div>
     </div>
   );
 }
@@ -132,6 +145,8 @@ const sections: Section[] = [
     glow: "rgba(77,184,77,0.10)",
     border: "border-primary/25",
     badge: "Começar aqui",
+    searchText:
+      "fluxo início começar zero configurar strains estufas ciclo fase vegetativa floração secagem tarefas registro rápido saúde tricomas colheita arquivo manutenção log diário gráficos alertas targets semanais",
     content: (
       <div className="space-y-4">
         <p>Se você está começando do zero, siga este fluxo para configurar o sistema e tirar o máximo proveito de todas as funcionalidades.</p>
@@ -159,6 +174,8 @@ const sections: Section[] = [
     glow: "rgba(234,179,8,0.09)",
     border: "border-yellow-500/25",
     badge: "Principal",
+    searchText:
+      "registro rápido quicklog botão mais menu temperatura umidade PPFD pH EC rega runoff status estufa saúde de planta sintomas anotação foto tricomas floração mini menu",
     content: (
       <div className="space-y-4">
         <p>O <strong>Registro Rápido</strong> é o coração do app — acessível pelo botão <strong>+</strong> na navegação. Toque uma vez para abrir o mini menu com as 3 opções:</p>
@@ -187,6 +204,8 @@ const sections: Section[] = [
     gradient: "bg-emerald-500",
     glow: "rgba(16,185,129,0.09)",
     border: "border-emerald-500/25",
+    searchText:
+      "painel home card estufa temperatura umidade PPFD plantas ativas strain progresso tarefas última atualização verde âmbar vermelho badge",
     content: (
       <div className="space-y-4">
         <p>O painel exibe um <strong>card para cada estufa ativa</strong> com as informações mais recentes do último registro diário.</p>
@@ -209,6 +228,8 @@ const sections: Section[] = [
     gradient: "bg-teal-500",
     glow: "rgba(20,184,166,0.09)",
     border: "border-teal-500/25",
+    searchText:
+      "estufa ciclo fase transição manutenção vegetativa floração colheita secagem logs diários histórico exportar dimensões categoria editar excluir log grade",
     content: (
       <div className="space-y-4">
         <p>Cada estufa pode ter um <strong>ciclo ativo</strong> com fase, strain(s) e semana atual. A página da estufa exibe os dados ambientais mais recentes e o histórico de logs.</p>
@@ -237,6 +258,8 @@ const sections: Section[] = [
     glow: "rgba(34,197,94,0.09)",
     border: "border-green-500/25",
     badge: "Central do cultivo",
+    searchText:
+      "planta perfil hero card foto saúde ambiente cultivo arquivo aba mover clonar colher descartar arquivar LST tricomas observações histórico transferência dias cultivo",
     content: (
       <div className="space-y-4">
         <p>Cada planta tem um <strong>perfil completo</strong> com hero card (foto mais recente + dias de cultivo + fase), e 4 abas de conteúdo.</p>
@@ -267,6 +290,8 @@ const sections: Section[] = [
     gradient: "bg-rose-500",
     glow: "rgba(244,63,94,0.09)",
     border: "border-rose-500/25",
+    searchText:
+      "saúde planta saudável estressada doente recuperando sintomas tratamento foto registro status status verde amarelo vermelho azul intervenção monitorar",
     content: (
       <div className="space-y-4">
         <p>O registro de saúde documenta o estado de cada planta ao longo do ciclo, com data, status, sintomas, tratamento e foto opcional.</p>
@@ -295,6 +320,8 @@ const sections: Section[] = [
     gradient: "bg-violet-500",
     glow: "rgba(139,92,246,0.09)",
     border: "border-violet-500/25",
+    searchText:
+      "tricomas translúcidos opacos âmbar misturado colheita floração maturação clear cloudy amber percentual ponto de colheita THC efeito cerebral corporal",
     content: (
       <div className="space-y-4">
         <p>O registro de tricomas determina o <strong>ponto ideal de colheita</strong>. Disponível apenas em estufas de floração — acesse via Registro Rápido → Tricomas ou pela aba Cultivo de cada planta.</p>
@@ -316,6 +343,8 @@ const sections: Section[] = [
     gradient: "bg-orange-500",
     glow: "rgba(249,115,22,0.09)",
     border: "border-orange-500/25",
+    searchText:
+      "LST treinamento topping FIM super cropping lollipopping defoliação mainlining ScrOG dobramento amarrilho tela ápice galho folha planta resposta técnica",
     content: (
       <div className="space-y-4">
         <p>A aba <strong>Cultivo → LST</strong> registra quais técnicas de treinamento foram aplicadas em cada planta, com campo para descrever a resposta da planta.</p>
@@ -347,6 +376,8 @@ const sections: Section[] = [
     glow: "rgba(14,165,233,0.09)",
     border: "border-sky-500/25",
     badge: "Novo",
+    searchText:
+      "ambiente planta histórico ambiental transferência estufa período temperatura umidade PPFD pH EC saúde exportar dados ambientais registro diário",
     content: (
       <div className="space-y-4">
         <p>A aba <strong>Ambiente</strong> no perfil de cada planta mostra o histórico ambiental completo da estufa durante o período em que a planta esteve lá — mesmo que ela tenha sido transferida entre estufas.</p>
@@ -367,6 +398,8 @@ const sections: Section[] = [
     gradient: "bg-pink-500",
     glow: "rgba(236,72,153,0.09)",
     border: "border-pink-500/25",
+    searchText:
+      "fotos galeria lightbox zoom navegação download HEIC JPEG iPhone câmera registro saúde hero card planta arquivo histórico contador",
     content: (
       <div className="space-y-4">
         <p>A galeria completa de cada planta fica na aba <strong>Arquivo → Fotos</strong>. A foto mais recente é exibida no hero card do perfil da planta.</p>
@@ -388,6 +421,8 @@ const sections: Section[] = [
     glow: "rgba(59,130,246,0.09)",
     border: "border-blue-500/25",
     badge: "Automático",
+    searchText:
+      "tarefas semanais automático fase vegetativa floração manutenção secagem progresso marcar concluído badge ações em lote filtrar estufa",
     content: (
       <div className="space-y-4">
         <p>As tarefas são geradas <strong>automaticamente</strong> com base na fase e semana do ciclo ativo de cada estufa.</p>
@@ -413,6 +448,8 @@ const sections: Section[] = [
     gradient: "bg-indigo-500",
     glow: "rgba(99,102,241,0.09)",
     border: "border-indigo-500/25",
+    searchText:
+      "calculadora rega automática runoff fertilização nutrição EC PPM lux PPFD VPD pH conversor bomba cronograma vaso predefinições sais minerais NPK",
     content: (
       <div className="space-y-3">
         <p>Ferramentas de cálculo acessíveis pelo ícone de calculadora na navegação.</p>
@@ -443,6 +480,8 @@ const sections: Section[] = [
     gradient: "bg-amber-500",
     glow: "rgba(245,158,11,0.09)",
     border: "border-amber-500/25",
+    searchText:
+      "alertas notificação temperatura umidade PPFD limite mínimo máximo badge vermelho atenção crítico configurar fase estufa marcar visto 10 dias desvio",
     content: (
       <div className="space-y-4">
         <p>O sistema monitora os parâmetros de cada estufa e gera notificações quando os valores saem dos limites configurados. O badge vermelho na navegação indica alertas não lidos.</p>
@@ -467,6 +506,8 @@ const sections: Section[] = [
     gradient: "bg-lime-500",
     glow: "rgba(132,204,22,0.09)",
     border: "border-lime-500/25",
+    searchText:
+      "strain variedade target semanal temperatura umidade PPFD pH EC clonagem vegetativa floração alertas automáticos pré-cadastradas Orange Punch Gorilla Glue White Widow Northern Lights",
     content: (
       <div className="space-y-4">
         <p>As strains definem os <strong>targets semanais</strong> de temperatura, umidade, PPFD, pH e EC para cada fase do ciclo. O sistema compara os logs diários com esses targets e gera alertas automáticos.</p>
@@ -487,6 +528,8 @@ const sections: Section[] = [
     gradient: "bg-cyan-500",
     glow: "rgba(6,182,212,0.09)",
     border: "border-cyan-500/25",
+    searchText:
+      "histórico gráfico linha tabela logs estufa período data temperatura RH umidade PPFD target comparação 7 dias ponto valor exato",
     content: (
       <div className="space-y-4">
         <p>A página de Histórico exibe todos os logs diários em tabela e gráficos de linha interativos por estufa.</p>
@@ -507,6 +550,8 @@ const sections: Section[] = [
     gradient: "bg-stone-500",
     glow: "rgba(120,113,108,0.09)",
     border: "border-stone-500/25",
+    searchText:
+      "arquivo planta colhida arquivada histórico peso gramas data finalização estufa origem saúde tricomas LST fotos status filtrar",
     content: (
       <div className="space-y-4">
         <p>Quando uma planta é colhida ou arquivada, todo o seu histórico é preservado no <strong>Arquivo de Plantas</strong> — saúde, tricomas, LST, fotos e dados de colheita.</p>
@@ -530,6 +575,8 @@ const sections: Section[] = [
     gradient: "bg-slate-500",
     glow: "rgba(100,116,139,0.09)",
     border: "border-slate-500/25",
+    searchText:
+      "configurações tema claro escuro floresta HPS alto contraste notificações push alertas backup exportar importar JSON conta perfil membros grupo manutenção",
     content: (
       <div className="space-y-4">
         <p>A página de Configurações centraliza preferências do sistema, notificações e manutenção do app.</p>
@@ -552,6 +599,8 @@ const sections: Section[] = [
     glow: "rgba(6,182,212,0.09)",
     border: "border-cyan-500/25",
     badge: "Novo",
+    searchText:
+      "sensor SmartLife Tuya temperatura umidade automático Device ID Access ID Secret região QR code leitura cron intervalo ao vivo badge verde registro rápido offline",
     content: (
       <div className="space-y-4">
         <p>Conecte sensores físicos de temperatura e umidade do SmartLife/Tuya para que o app preencha esses campos automaticamente no Registro Rápido.</p>
@@ -600,6 +649,8 @@ const sections: Section[] = [
     glow: "rgba(56,189,248,0.09)",
     border: "border-sky-400/25",
     badge: "Mobile",
+    searchText:
+      "iPhone mobile PWA instalar tela de início câmera fotos HEIC vibração haptic feedback offline sincronizar teclado numérico abas deslizáveis gráfico ações em lote",
     content: (
       <div className="space-y-3">
         {[
@@ -626,14 +677,50 @@ const sections: Section[] = [
 
 export default function Help() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
-  const filtered = searchQuery.trim()
+  const isSearching = searchQuery.trim().length > 0;
+
+  const filtered = isSearching
     ? sections.filter(
         (s) =>
           s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.id.includes(searchQuery.toLowerCase())
+          s.id.includes(searchQuery.toLowerCase()) ||
+          s.searchText.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : sections;
+
+  // Auto-expand matching sections while searching
+  useEffect(() => {
+    if (isSearching) {
+      setOpenSections(new Set(filtered.map((s) => s.id)));
+    }
+  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleSection = (id: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleChipClick = (id: string) => {
+    // Ensure the section is open
+    setOpenSections((prev) => { const next = new Set(prev); next.add(id); return next; });
+    // Scroll after a tick so the DOM has the section rendered
+    setTimeout(() => {
+      document.getElementById(`section-${id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+  };
+
+  const subtitle = isSearching
+    ? `${filtered.length} de ${sections.length} tópico${filtered.length !== 1 ? "s" : ""} encontrado${filtered.length !== 1 ? "s" : ""}`
+    : `${sections.length} tópicos · App Cultivo`;
 
   return (
     <PageTransition>
@@ -647,39 +734,44 @@ export default function Help() {
               <span className="truncate">Guia do Usuário</span>
             </>
           }
-          subtitle={`${sections.length} tópicos · App Cultivo`}
+          subtitle={subtitle}
         />
 
-        <div className="px-4 py-4 max-w-2xl mx-auto space-y-4">
+        <div className="px-4 py-4 max-w-2xl md:max-w-4xl mx-auto space-y-4">
 
-          {/* Intro banner */}
-          <div className="rounded-2xl border border-primary/25 px-4 py-3.5 flex items-center gap-3"
-            style={{ background: "linear-gradient(135deg, rgba(77,184,77,0.10) 0%, hsl(var(--card)) 60%)" }}>
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-md shrink-0">
-              <ClipboardList className="w-5 h-5 text-white" />
+          {/* Intro banner — hidden while searching */}
+          {!isSearching && (
+            <div
+              className="rounded-2xl border border-primary/25 px-4 py-3.5 flex items-center gap-3"
+              style={{ background: "linear-gradient(135deg, rgba(77,184,77,0.10) 0%, var(--card) 60%)" }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-md shrink-0">
+                <ClipboardList className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Bem-vindo ao App Cultivo</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-0.5 leading-relaxed">
+                  Toque em qualquer tópico para expandir as instruções detalhadas.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Bem-vindo ao App Cultivo</p>
-              <p className="text-[11px] text-muted-foreground/60 mt-0.5 leading-relaxed">
-                Toque em qualquer tópico para expandir as instruções detalhadas.
-              </p>
-            </div>
-          </div>
+          )}
 
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/40 pointer-events-none" />
             <input
               type="search"
-              placeholder="Buscar tópico..."
+              aria-label="Buscar tópico"
+              placeholder="Buscar tópico…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-10 pl-9 pr-4 rounded-xl border border-border/40 bg-card/80 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40"
             />
           </div>
 
-          {/* Quick nav chips */}
-          {!searchQuery && (
+          {/* Quick nav chips — hidden while searching */}
+          {!isSearching && (
             <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {[
                 { label: "Início Rápido", id: "fluxo" },
@@ -693,11 +785,8 @@ export default function Help() {
               ].map((chip) => (
                 <button
                   key={chip.id}
-                  onClick={() => {
-                    const el = document.getElementById(`section-${chip.id}`);
-                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  className="shrink-0 px-3 py-1.5 rounded-full border border-border/40 bg-card text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-colors"
+                  onClick={() => handleChipClick(chip.id)}
+                  className="shrink-0 px-3 py-1.5 rounded-full border border-border/40 bg-card text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:border-primary/30 hover:text-primary active:scale-95 transition-[color,background-color,border-color,transform] duration-150"
                 >
                   {chip.label}
                 </button>
@@ -709,15 +798,22 @@ export default function Help() {
           <div className="space-y-2">
             {filtered.length === 0 ? (
               <div className="rounded-2xl border border-border/40 bg-card py-12 flex flex-col items-center gap-3 text-center">
-                <AlertTriangle className="w-8 h-8 text-muted-foreground/30" />
+                <Search className="w-8 h-8 text-muted-foreground/30" />
                 <div>
                   <p className="text-sm font-medium text-foreground">Nenhum tópico encontrado</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Tente outro termo de busca</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">
+                    Tente outro termo — ex: "tricomas", "sensor" ou "backup"
+                  </p>
                 </div>
               </div>
             ) : (
               filtered.map((section) => (
-                <AccordionSection key={section.id} section={section} />
+                <AccordionSection
+                  key={section.id}
+                  section={section}
+                  open={openSections.has(section.id)}
+                  onToggle={() => toggleSection(section.id)}
+                />
               ))
             )}
           </div>

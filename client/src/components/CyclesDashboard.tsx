@@ -1,10 +1,8 @@
-import { useState } from "react";
 import type React from "react";
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { Calendar, Leaf, Sprout, ArrowRight, Scissors } from "lucide-react";
+import { Calendar, Leaf, Sprout, Scissors } from "lucide-react";
 // PhaseTransitionDialog moved to tent cards
 
 export function CyclesDashboard() {
@@ -50,9 +48,7 @@ export function CyclesDashboard() {
           let PhaseIcon = Sprout;
           let phaseColor = 'text-green-600 dark:text-green-400';
           let phaseBg = 'bg-green-500/10';
-          let phaseBorder = 'border-green-500/30';
           let phaseProgressBg = 'bg-green-500/20';
-          let phaseProgressBar = '';
           let phaseProgressStyle: React.CSSProperties = {
             background: 'linear-gradient(90deg, #34d399, #22c55e, #16a34a)',
             boxShadow: '0 0 8px rgba(34,197,94,0.7), 0 0 18px rgba(34,197,94,0.3)',
@@ -63,7 +59,6 @@ export function CyclesDashboard() {
             PhaseIcon = Leaf;
             phaseColor = 'text-blue-600 dark:text-blue-400';
             phaseBg = 'bg-blue-500/10';
-            phaseBorder = 'border-blue-500/30';
             phaseProgressBg = 'bg-blue-500/20';
             phaseProgressStyle = {
               background: 'linear-gradient(90deg, #60a5fa, #3b82f6, #2563eb)',
@@ -74,7 +69,6 @@ export function CyclesDashboard() {
             PhaseIcon = Scissors;
             phaseColor = 'text-cyan-600 dark:text-cyan-400';
             phaseBg = 'bg-cyan-500/10';
-            phaseBorder = 'border-cyan-500/30';
             phaseProgressBg = 'bg-cyan-500/20';
             phaseProgressStyle = {
               background: 'linear-gradient(90deg, #2dd4bf, #06b6d4, #0891b2)',
@@ -85,16 +79,12 @@ export function CyclesDashboard() {
             PhaseIcon = Leaf;
             phaseColor = 'text-purple-600 dark:text-purple-400';
             phaseBg = 'bg-purple-500/10';
-            phaseBorder = 'border-purple-500/30';
             phaseProgressBg = 'bg-purple-500/20';
             phaseProgressStyle = {
               background: 'linear-gradient(90deg, #818cf8, #a78bfa, #c084fc, #a855f7)',
               boxShadow: '0 0 8px rgba(168,85,247,0.8), 0 0 20px rgba(139,92,246,0.4)',
             };
             phaseLabel = 'Floração';
-          } else {
-            // VEGA (padrão)
-            phaseLabel = 'Vegetativa';
           }
 
           const gradientBorder =

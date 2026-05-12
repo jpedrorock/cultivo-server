@@ -8,8 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Loader2, Sprout } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,7 +23,7 @@ export function SelectMotherPlantDialog({
   open,
   onOpenChange,
   tentId,
-  cycleId,
+  cycleId: _cycleId,
   onMotherSelected,
 }: SelectMotherPlantDialogProps) {
   const [selectedMotherId, setSelectedMotherId] = useState<number | null>(null);

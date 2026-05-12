@@ -1,51 +1,60 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useRef } from "react";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { cn } from "@/lib/utils";
 import { useHomeModals } from "@/hooks/useHomeModals";
-import { WeatherWidget } from "@/components/WeatherWidget";
 import StartCycleModal from "@/components/StartCycleModal";
 import { InitiateCycleModal } from "@/components/InitiateCycleModal";
 import { EditCycleModal } from "@/components/EditCycleModal";
 import { CreateTentModal } from "@/components/CreateTentModal";
 import { EditTentDialog } from "@/components/EditTentDialog";
-
-import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
-import { FinishCloningDialog } from "@/components/FinishCloningDialog";
-import { PromotePhaseDialog } from "@/components/PromotePhaseDialog";
-import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
-import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AnimatedButton } from "@/components/AnimatedButton";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Loader2, Sprout, Droplets, Sun, ThermometerSun, Wind, BookOpen, CheckCircle2, CheckCircle, Calculator, Bell, Trash2, EyeOff, Eye, Wrench, Scissors, Flower2, Check, AlertTriangle, X, Zap, Clock, ArrowRight, PauseCircle, PlayCircle, MoreVertical, Monitor, ChevronRight, BarChart2, Leaf, RefreshCw, Wifi, Bot } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+  Loader2,
+  Sprout,
+  Wind,
+  CheckCircle,
+  Bell,
+  Wrench,
+  Flower2,
+  Zap,
+  ArrowRight,
+  PauseCircle,
+  Menu,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { startMissingReadingsMonitor, getNotificationPermission } from "@/lib/notifications";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import { countPendingLogs, syncPendingLogs, onConnectionRestored } from "@/lib/offlineStorage";
-import { PageTransition, StaggerList, ListItemAnimation, CardAnimation, AnimatedCounter } from "@/components/PageTransition";
-import { SkeletonLoader } from "@/components/SkeletonLoader";
-import { TentCardSkeleton } from "@/components/TentCardSkeleton";
+import { PageTransition, StaggerList } from "@/components/PageTransition";
 import { ErrorState } from "@/components/ErrorState";
+import { TentCardSkeleton } from "@/components/TentCardSkeleton";
+import { EmptyOnboarding } from "@/components/EmptyOnboarding";
+import { TodayMissionWidget } from "@/components/TodayMissionWidget";
+import { HomeLoadingState } from "@/components/HomeLoadingState";
+import { DeleteTentDialog } from "@/components/DeleteTentDialog";
+import { TentCard } from "@/components/TentCard";
 
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const { collapsed, openSidebar } = useSidebar();
+  const headerCls = cn(
+    "bg-card border-b border-border fixed top-0 left-0 right-0 z-20 pt-safe transition-[left] duration-200 ease-in-out",
+    // iPad (md < lg): sem deslocamento — sidebar é overlay
+    // Desktop (lg+): desloca conforme estado collapsed
+    collapsed ? "lg:left-16" : "lg:left-64",
+  );
   const [pendingLogsCount, setPendingLogsCount] = useState(0);
 
   // utils DEVE ser declarado antes de qualquer mutation que o usa em callbacks
@@ -62,8 +71,6 @@ export default function Home() {
     tentToDelete, setTentToDelete,
     editTentDialogOpen, setEditTentDialogOpen,
     tentToEdit, setTentToEdit,
-    showMoveAllPlants, setShowMoveAllPlants,
-    targetTentId, setTargetTentId,
     deletePreviewTentId, setDeletePreviewTentId,
     finalizeCycleConfirm, setFinalizeCycleConfirm,
   } = useHomeModals();
@@ -166,8 +173,8 @@ export default function Home() {
         const cleanup = startMissingReadingsMonitor(getTentsData);
         return cleanup; // Cleanup on unmount
       }
-    } catch (e) {
-      console.error('Error starting missing readings monitor:', e);
+    } catch {
+      // silent — monitor not critical
     }
   }, [tents]);
 
@@ -181,8 +188,6 @@ export default function Home() {
       toast.success(`${data.movedCount} planta(s) movida(s) com sucesso!`);
       utils.plants.list.invalidate();
       utils.tents.list.invalidate();
-      setShowMoveAllPlants(false);
-      setTargetTentId("");
     },
     onError: (error) => {
       toast.error(`Erro ao mover plantas: ${error.message}`);
@@ -206,27 +211,13 @@ export default function Home() {
     setDeleteDialogOpen(true);
   };
 
-  const handleMoveAllPlants = () => {
-    if (!tentToDelete || !targetTentId) {
-      toast.error("Selecione uma estufa de destino");
-      return;
-    }
-    
-    moveAllPlants.mutate({
-      fromTentId: tentToDelete.id,
-      toTentId: parseInt(targetTentId),
-      reason: "Movimentação antes de excluir estufa",
-    });
-  };
-
   const confirmDeleteTent = () => {
     if (tentToDelete) {
       const tent = tentToDelete;
       setDeleteDialogOpen(false);
       setTentToDelete(null);
-      setShowMoveAllPlants(false);
-      setTargetTentId("");
-      
+
+
       let timeoutId: NodeJS.Timeout | null = null;
       
       // Show toast with undo button
@@ -354,35 +345,7 @@ export default function Home() {
   ]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-          <div className="container py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
-                  <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
-                </div>
-                <h1 className="text-base sm:text-xl font-bold text-foreground leading-tight">Cultivo</h1>
-              </div>
-            </div>
-          </div>
-        </header>
-        {/* Spacer = header height (py-4 = 16px × 2 + h-9 = 36px = 68px) + safe area */}
-        <div style={{ height: 'calc(68px + env(safe-area-inset-top, 0px))' }} />
-        <main className="container py-8">
-          <div className="mb-6 flex items-center justify-between">
-            <div className="h-8 w-24 bg-muted rounded animate-pulse" />
-            <div className="h-9 w-36 bg-muted rounded animate-pulse" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <TentCardSkeleton key={i} />
-            ))}
-          </div>
-        </main>
-      </div>
-    );
+    return <HomeLoadingState headerCls={headerCls} />;
   }
 
   if (isError) {
@@ -390,7 +353,7 @@ export default function Home() {
   }
 
   const getTentCycle = (tentId: number) => {
-    return activeCycles?.find((c) => c.tentId === tentId);
+    return activeCycles?.find((c: any) => c.tentId === tentId);
   };
 
   const getPhaseInfo = (category: string, cycle: any) => {
@@ -435,10 +398,18 @@ export default function Home() {
     <PageTransition>
       <div className="min-h-screen bg-background">
         {/* Header — fixed para funcionar independente do PullToRefresh */}
-        <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <header className={headerCls}>
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
+              {/* Hamburguer — só no iPad (md < lg) */}
+              <button
+                className="sidebar-hamburger items-center justify-center w-9 h-9 rounded-xl hover:bg-primary/10 text-foreground/70 hover:text-primary transition-colors"
+                onClick={openSidebar}
+                aria-label="Abrir menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
               <div className="w-9 h-9 bg-primary/15 rounded-xl flex items-center justify-center ring-1 ring-primary/20 shadow-sm flex-shrink-0">
                 <Sprout className="w-4.5 h-4.5 text-primary" strokeWidth={2} />
               </div>
@@ -479,7 +450,7 @@ export default function Home() {
       </header>
 
       {/* Spacer = header height (py-4 = 32px + h-9 = 36px = 68px) + safe area */}
-      <div style={{ height: 'calc(68px + env(safe-area-inset-top, 0px))' }} />
+      <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '68px' }} />
 
       <PullToRefresh onRefresh={handleRefresh}>
         <div>
@@ -513,128 +484,26 @@ export default function Home() {
       )}
 
       {/* Main Content */}
-      <main className="container py-4">
+      <main className="container mx-auto max-w-7xl py-4">
 
-        {/* ── Widget "Missão de hoje" ── */}
-        {!isLoading && tents && tents.length > 0 && (() => {
-          const activeTents = tents.filter((t: any) => getTentCycle(t.id));
-          const registeredToday = activeTents.filter((t: any) => {
-            if (!t.lastReadingAt) return false;
-            const diff = Date.now() - t.lastReadingAt;
-            return diff < 24 * 60 * 60 * 1000;
-          });
-          const pendingRegistrations = activeTents.length - registeredToday.length;
-          const allDone = pendingRegistrations === 0 && totalNewAlerts === 0;
-
-          return (
-            <div className={`mb-4 rounded-2xl border px-4 py-3 flex items-center gap-4 ${
-              allDone
-                ? 'border-emerald-500/25 bg-emerald-500/[0.06]'
-                : 'border-border/50 bg-card'
-            }`}>
-              {/* Status icon */}
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                allDone ? 'bg-emerald-500/20' : 'bg-muted/60'
-              }`}>
-                {allDone
-                  ? <CheckCircle className="w-5 h-5 text-emerald-500" />
-                  : <CheckCircle2 className="w-5 h-5 text-muted-foreground" />}
-              </div>
-
-              {/* Metrics */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">
-                  {allDone ? 'Tudo certo hoje! 🌿' : 'Missão de hoje'}
-                </p>
-                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                  <span className={`text-xs flex items-center gap-1 ${pendingRegistrations > 0 ? 'text-amber-500 font-medium' : 'text-muted-foreground line-through'}`}>
-                    <Zap className="w-3 h-3" />
-                    {pendingRegistrations > 0 ? `${pendingRegistrations} registro${pendingRegistrations > 1 ? 's' : ''} pendente${pendingRegistrations > 1 ? 's' : ''}` : 'Registros OK'}
-                  </span>
-                  <span className={`text-xs flex items-center gap-1 ${totalNewAlerts > 0 ? 'text-red-500 font-medium' : 'text-muted-foreground line-through'}`}>
-                    <Bell className="w-3 h-3" />
-                    {totalNewAlerts > 0 ? `${totalNewAlerts} alerta${totalNewAlerts > 1 ? 's' : ''} novo${totalNewAlerts > 1 ? 's' : ''}` : 'Sem alertas'}
-                  </span>
-                </div>
-              </div>
-
-              {/* CTA */}
-              {!allDone && (
-                <Link href={pendingRegistrations > 0 ? '/quick-log' : '/alerts'} onClick={e => e.stopPropagation()}>
-                  <button className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                    {pendingRegistrations > 0 ? 'Registrar' : 'Ver alertas'}
-                  </button>
-                </Link>
-              )}
-            </div>
-          );
-        })()}
+        {/* Widget "Missão de hoje" — só renderiza se houver estufas */}
+        {!isLoading && tents && tents.length > 0 && (
+          <TodayMissionWidget
+            tents={tents}
+            totalNewAlerts={totalNewAlerts}
+            hasActiveCycle={(tentId) => Boolean(getTentCycle(tentId))}
+          />
+        )}
 
         {/* Tents Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
-              <TentCardSkeleton key={i} />
+              <TentCardSkeleton key={`skeleton-tent-${i}`} />
             ))}
           </div>
         ) : tents && tents.length === 0 ? (
-          /* ── Onboarding Empty State ── */
-          <div className="flex flex-col items-center py-10 px-4 max-w-md mx-auto">
-            {/* Ícone central */}
-            <div className="w-20 h-20 rounded-3xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center mb-6">
-              <Sprout className="w-10 h-10 text-primary" />
-            </div>
-
-            <h2 className="text-xl font-bold text-foreground mb-1 text-center">Bem-vindo ao Cultivo</h2>
-            <p className="text-sm text-muted-foreground text-center mb-8">
-              Siga os passos abaixo para começar a monitorar seu cultivo.
-            </p>
-
-            {/* Passos */}
-            <div className="w-full space-y-3 mb-8">
-              {/* Passo 1 */}
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-xs font-bold text-primary-foreground">1</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">Crie sua primeira estufa</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Defina nome, tamanho e categoria (Vega, Flora, Manutenção…)</p>
-                </div>
-              </div>
-
-              {/* Passo 2 */}
-              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-muted-foreground/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-xs font-bold text-muted-foreground">2</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-muted-foreground">Adicione suas plantas</p>
-                  <p className="text-xs text-muted-foreground/70 mt-0.5">Cadastre mudas, clones ou plantas com strain e semana</p>
-                </div>
-              </div>
-
-              {/* Passo 3 */}
-              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-muted-foreground/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-xs font-bold text-muted-foreground">3</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-muted-foreground">Registre os parâmetros diários</p>
-                  <p className="text-xs text-muted-foreground/70 mt-0.5">Temperatura, umidade, PPFD, pH, EC e rega — tudo num só lugar</p>
-                </div>
-              </div>
-            </div>
-
-            {/* CTA */}
-            <button
-              onClick={() => setCreateTentModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-semibold py-4 text-sm active:scale-[0.98] transition-transform shadow-lg shadow-primary/20"
-            >
-              <Sprout className="w-5 h-5" />
-              Criar primeira estufa
-            </button>
-          </div>
+          <EmptyOnboarding onCreateTent={() => setCreateTentModalOpen(true)} />
         ) : (
           <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tents?.map((tent) => {
@@ -674,10 +543,6 @@ export default function Home() {
           </button>
         )}
 
-        {/* Weather Widget */}
-        <div className="mt-8">
-          <WeatherWidget />
-        </div>
 
 
 
@@ -736,161 +601,28 @@ export default function Home() {
       />
 
       {/* Delete Tent Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
-        setDeleteDialogOpen(open);
-        if (!open) {
-          setShowMoveAllPlants(false);
-          setTargetTentId("");
-          setDeletePreviewTentId(null);
-        }
-      }}>
-        <AlertDialogContent className="max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir a estufa "{tentToDelete?.name}"?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          {/* Delete Preview Section */}
-          {deletePreviewLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">Verificando dados...</span>
-            </div>
-          ) : deletePreview ? (
-            <div className="space-y-3 py-3">
-              {/* Blockers */}
-              {!deletePreview.canDelete && (
-                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                  <p className="text-sm font-medium text-destructive mb-2 flex items-center gap-1"><AlertTriangle className="w-4 h-4"/>Não é possível excluir:
-                  </p>
-                  <ul className="text-sm space-y-1 text-destructive/90">
-                    {deletePreview.blockers.activeCycles > 0 && (
-                      <li>• {deletePreview.blockers.activeCycles} ciclo(s) ativo(s) - finalize primeiro</li>
-                    )}
-                    {deletePreview.blockers.plants > 0 && (
-                      <li>• {deletePreview.blockers.plants} planta(s) na estufa - mova ou finalize primeiro</li>
-                    )}
-                  </ul>
-                </div>
-              )}
-              
-              {/* Preview of what will be deleted */}
-              {deletePreview.totalRecords > 0 && (
-                <div className="p-3 bg-muted/50 rounded-md">
-                  <p className="text-sm font-medium mb-2">Serão excluídos permanentemente:</p>
-                  <ul className="text-sm space-y-1 text-muted-foreground">
-                    {deletePreview.willDelete.cycles > 0 && (
-                      <li>• {deletePreview.willDelete.cycles} ciclo(s) finalizado(s)</li>
-                    )}
-                    {deletePreview.willDelete.recipes > 0 && (
-                      <li>• {deletePreview.willDelete.recipes} receita(s) nutricional(is)</li>
-                    )}
-                    {deletePreview.willDelete.dailyLogs > 0 && (
-                      <li>• {deletePreview.willDelete.dailyLogs} registro(s) diário(s)</li>
-                    )}
-                    {deletePreview.willDelete.alerts > 0 && (
-                      <li>• {deletePreview.willDelete.alerts} alerta(s)</li>
-                    )}
-                    {deletePreview.willDelete.taskInstances > 0 && (
-                      <li>• {deletePreview.willDelete.taskInstances} tarefa(s)</li>
-                    )}
-                    {deletePreview.willDelete.plantHistory > 0 && (
-                      <li>• {deletePreview.willDelete.plantHistory} registro(s) de movimentação</li>
-                    )}
-                  </ul>
-                  <p className="text-xs text-muted-foreground mt-2 font-medium">
-                    Total: {deletePreview.totalRecords} registro(s)
-                    {deletePreview.totalRecords > 100 && <span className="inline-flex items-center gap-1 ml-1"><AlertTriangle className="w-3 h-3 text-amber-400"/>Grande quantidade de dados!</span>}
-                  </p>
-                </div>
-              )}
-              
-              {deletePreview.totalRecords === 0 && deletePreview.canDelete && (
-                <div className="p-3 bg-muted/30 rounded-md">
-                  <p className="text-sm text-muted-foreground flex items-center gap-1"><CheckCircle2 className="w-4 h-4 text-green-500"/>Estufa vazia, sem dados relacionados.</p>
-                </div>
-              )}
-            </div>
-          ) : null}
-          
-          {/* Move All Plants Section */}
-          {!showMoveAllPlants ? (
-            <div className="py-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowMoveAllPlants(true)}
-                className="w-full"
-                disabled={deleteTent.isPending || moveAllPlants.isPending}
-              >
-                <span className="flex items-center gap-2"><ArrowRight className="w-4 h-4"/>Mover Todas as Plantas Primeiro</span>
-              </Button>
-            </div>
-          ) : (
-            <div className="py-3 space-y-3 border-t border-b">
-              <p className="text-sm font-medium">Mover plantas para:</p>
-              <Select value={targetTentId} onValueChange={setTargetTentId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a estufa de destino" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tents?.filter(t => t.id !== tentToDelete?.id).map(tent => (
-                    <SelectItem key={tent.id} value={tent.id.toString()}>
-                      {tent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowMoveAllPlants(false);
-                    setTargetTentId("");
-                  }}
-                  disabled={moveAllPlants.isPending}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleMoveAllPlants}
-                  disabled={!targetTentId || moveAllPlants.isPending}
-                  className="flex-1"
-                >
-                  {moveAllPlants.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Movendo...
-                    </>
-                  ) : (
-                    "Mover Agora"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteTent.isPending || moveAllPlants.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteTent}
-              disabled={deleteTent.isPending || moveAllPlants.isPending || (deletePreview && !deletePreview.canDelete)}
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-            >
-              {deleteTent.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                "Excluir Estufa"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteTentDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setDeletePreviewTentId(null);
+        }}
+        tentToDelete={tentToDelete}
+        tents={tents}
+        deletePreview={deletePreview}
+        deletePreviewLoading={deletePreviewLoading}
+        isDeleting={deleteTent.isPending}
+        isMovingPlants={moveAllPlants.isPending}
+        onConfirmDelete={confirmDeleteTent}
+        onMoveAllPlants={(toTentId) => {
+          if (!tentToDelete) return;
+          moveAllPlants.mutate({
+            fromTentId: tentToDelete.id,
+            toTentId,
+            reason: "Movimentação antes de excluir estufa",
+          });
+        }}
+      />
 
       {/* Finalizar Ciclo Confirm Dialog */}
       <Dialog open={finalizeCycleConfirm.open} onOpenChange={(open) => !open && setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" })}>
@@ -932,598 +664,3 @@ export default function Home() {
   );
 }
 
-
-// Mini-sparkline ECG animado — mostra tendência dos últimos 7 dias
-function MiniSparkline({ values, color, w = 60, h = 20 }: { values: number[]; color: string; w?: number; h?: number }) {
-  if (values.length < 2) return null;
-  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
-  const pts = values.map((v, i) =>
-    `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h * 0.8 - h * 0.1).toFixed(1)}`
-  );
-  const pathD = pts.reduce((acc, pt, i) => (i === 0 ? `M ${pt}` : `${acc} L ${pt}`), "");
-  const uid = `ecg-${color.replace(/[^a-z0-9]/gi, "")}`;
-  const dur = "3.5s";
-
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: "visible", opacity: 0.85 }}>
-      <defs>
-        <filter id={`${uid}-glow`} x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-      {/* Traço de fundo apagado */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1"
-        strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.10" />
-      {/* Rastro longo e tênue */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.18"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.35 0.65">
-        <animate attributeName="stroke-dashoffset" values="0.35;-0.65" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-      {/* Rastro médio */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.45"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.18 0.82">
-        <animate attributeName="stroke-dashoffset" values="0.18;-0.82" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-      {/* Rastro curto */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.80"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.07 0.93">
-        <animate attributeName="stroke-dashoffset" values="0.07;-0.93" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-      {/* Ponta brilhante com glow */}
-      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeOpacity="1"
-        strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="0.02 0.98"
-        filter={`url(#${uid}-glow)`}>
-        <animate attributeName="stroke-dashoffset" values="0.02;-0.98" dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </path>
-      {/* Ponto de luz na frente */}
-      <circle r="2.2" fill={color} filter={`url(#${uid}-glow)`} opacity="0.95">
-        <animateMotion path={pathD} dur={dur} repeatCount="indefinite" calcMode="linear" />
-      </circle>
-    </svg>
-  );
-}
-
-// Separate component for Tent Card
-function TentCard({ tent, cycle, phaseInfo, PhaseIcon, onStartCycle, onStartFlora, onInitiateCycle, onEditCycle, onFinalizeCycle, onEditTent, onDeleteTent }: any) {
-  const [, navigate] = useLocation();
-
-  const [selectMotherOpen, setSelectMotherOpen] = useState(false);
-  const [selectedMotherId, setSelectedMotherId] = useState<number | null>(null);
-  const [selectedMotherName, setSelectedMotherName] = useState<string>("");
-  const [selectedClonesCount, setSelectedClonesCount] = useState<number>(10);
-  const [finishCloningOpen, setFinishCloningOpen] = useState(false);
-  const [promotePhaseOpen, setPromotePhaseOpen] = useState(false);
-  const [harvestQueueOpen, setHarvestQueueOpen] = useState(false);
-
-  // Mini-modal de confirmação de fase
-  const [phaseConfirmOpen, setPhaseConfirmOpen] = useState(false);
-  const [phaseConfirmType, setPhaseConfirmType] = useState<PhaseConfirmType>("FLORA");
-
-  const openPhaseConfirm = (type: PhaseConfirmType) => {
-    setPhaseConfirmType(type);
-    setPhaseConfirmOpen(true);
-  };
-
-  const handlePhaseConfirmed = () => {
-    setPhaseConfirmOpen(false);
-    if (phaseConfirmType === "CLONING") {
-      setSelectMotherOpen(true);
-    } else {
-      setPromotePhaseOpen(true);
-    }
-  };
-  
-  const { data: latestLog } = trpc.dailyLogs.getLatestByTent.useQuery(
-    { tentId: tent.id }
-  );
-
-  const { data: recentLogs } = trpc.dailyLogs.list.useQuery(
-    { tentId: tent.id, limit: 7 },
-    { staleTime: 5 * 60 * 1000 }
-  );
-  const sparkTemps = [...(recentLogs ?? [])].reverse().map(l => l.tempC ? parseFloat(String(l.tempC)) : null).filter((v): v is number => v !== null);
-  const sparkRh    = [...(recentLogs ?? [])].reverse().map(l => l.rhPct  ? parseFloat(String(l.rhPct))  : null).filter((v): v is number => v !== null);
-
-  // Buscar targets ideais - usa média das strains das plantas na estufa
-  const currentWeek = cycle ? (() => {
-    const now = new Date();
-    const start = new Date(cycle.startDate);
-    if (isNaN(start.getTime())) return null;
-    const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-    if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
-      return Math.max(1, Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-    }
-    return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-  })() : null;
-  
-  const currentPhase = cycle ? (cycle.floraStartDate ? "FLORA" : "VEGA") : null;
-  
-  const { data: targets } = trpc.weeklyTargets.getTargetsByTent.useQuery(
-    { tentId: tent.id, phase: currentPhase! as any, weekNumber: currentWeek! },
-    { enabled: !!cycle && !!currentPhase && !!currentWeek }
-  );
-
-  const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
-    { tentId: tent.id },
-    { staleTime: 2 * 60 * 1000 }
-  );
-  const markAllSeen = trpc.alerts.markAllAsSeen.useMutation();
-  const newAlerts = alertCount != null ? Number(alertCount) : 0;
-
-  const { data: streak } = trpc.dailyLogs.streak.useQuery(
-    { tentId: tent.id },
-    { staleTime: 5 * 60 * 1000 }
-  );
-
-  // Leitura do sensor SmartLife para badge automático
-  const { data: sensorReading, refetch: refetchSensor } = trpc.tuya.getLatestReadingForTent.useQuery(
-    { tentId: tent.id },
-    { staleTime: 5 * 60 * 1000, retry: false }
-  );
-  // Badge "A" aparece sempre que o sensor estiver mapeado (hasSensor), independente de ter leitura
-  const isSensorAuto = !!(sensorReading?.hasSensor);
-
-  // Função para determinar cor baseada no valor e target
-  const getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
-    if (!value || !min || !max) return "text-foreground";
-    
-    // Converter strings para números
-    const minNum = typeof min === 'string' ? parseFloat(min) : min;
-    const maxNum = typeof max === 'string' ? parseFloat(max) : max;
-    
-    if (isNaN(minNum) || isNaN(maxNum)) return "text-foreground";
-    
-    // Verde: dentro da faixa ideal
-    if (value >= minNum && value <= maxNum) {
-      return "text-green-600 font-bold";
-    }
-    
-    // Amarelo: próximo (±10% de tolerância)
-    const tolerance = 0.1;
-    const lowerBound = minNum * (1 - tolerance);
-    const upperBound = maxNum * (1 + tolerance);
-    
-    if (value >= lowerBound && value <= upperBound) {
-      return "text-yellow-600 font-bold";
-    }
-    
-    // Vermelho: fora da faixa
-    return "text-red-600 font-bold";
-  };
-
-  // Função para determinar ícone de status
-  const getStatusIcon = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
-    if (!value || !min || !max) return null;
-    
-    const minNum = typeof min === 'string' ? parseFloat(min) : min;
-    const maxNum = typeof max === 'string' ? parseFloat(max) : max;
-    
-    if (isNaN(minNum) || isNaN(maxNum)) return null;
-    
-    // Verde: dentro da faixa ideal
-    if (value >= minNum && value <= maxNum) {
-      return <Check className="w-3 h-3 text-green-600 dark:text-green-400" />;
-    }
-    
-    // Amarelo: próximo (±10% de tolerância)
-    const tolerance = 0.1;
-    const lowerBound = minNum * (1 - tolerance);
-    const upperBound = maxNum * (1 + tolerance);
-    
-    if (value >= lowerBound && value <= upperBound) {
-      return <AlertTriangle className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />;
-    }
-    
-    // Vermelho: fora da faixa
-    return <X className="w-3 h-3 text-red-600 dark:text-red-400" />;
-  };
-
-  const utils = trpc.useUtils();
-
-  const readNow = trpc.tuya.readNow.useMutation({
-    onSuccess: (data) => {
-      // Atualiza o cache do sensor com os valores retornados direto (sem esperar refetch)
-      utils.tuya.getLatestReadingForTent.setData(
-        { tentId: tent.id },
-        { hasSensor: true, isFresh: true, tempC: data.tempC, rhPct: data.rhPct, readAt: data.readAt }
-      );
-      utils.dailyLogs.getLatestByTent.invalidate({ tentId: tent.id });
-      utils.dailyLogs.list.invalidate({ tentId: tent.id });
-      toast.success(`Leitura: ${data.tempC?.toFixed(1)}°C · ${data.rhPct?.toFixed(0)}%`);
-    },
-    onError: (e) => toast.error(`Sensor: ${e.message}`),
-  });
-
-  const phaseAccentColor = !cycle ? '#6b7280' :
-    tent.category === 'VEGA'   ? '#4ade80' :
-    tent.category === 'FLORA'  ? '#a78bfa' :
-    tent.category === 'DRYING' ? '#fbbf24' :
-    '#60a5fa';
-
-  // Fundo da fase — só no dark mode via data-theme check; no light ficamos flat
-  const phaseBg = 'none';
-
-  return (
-    <ListItemAnimation>
-      <div className="relative">
-      {/* Badge de alertas — canto superior direito do card */}
-      {newAlerts > 0 && (
-        <Link href="/alerts" onClick={e => e.stopPropagation()}>
-          <div
-            title={`${newAlerts} alerta${newAlerts > 1 ? 's' : ''}`}
-            className="absolute -top-3 right-2 z-30 min-w-[32px] h-[32px] px-2 rounded-full bg-red-500 text-white text-sm font-bold flex items-center justify-center shadow-lg shadow-red-900/50 animate-pulse"
-          >
-            {newAlerts > 9 ? '9+' : newAlerts}
-          </div>
-        </Link>
-      )}
-      <Card className="relative z-10 py-0 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'hsl(var(--card))' }}>
-        {/* Fundo gradiente da fase */}
-        {phaseBg !== 'none' && (
-          <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
-        )}
-        {/* Linha de acento no topo */}
-        <div className="pointer-events-none absolute top-0 left-0 right-0 h-[2px] z-20" style={{ background: `linear-gradient(90deg, ${phaseAccentColor}99 0%, ${phaseAccentColor}33 100%)` }} />
-      <CardHeader className="relative z-10 px-5 pt-5 pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            {/* Linha 1: nome + freshness badge */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-xl font-bold tracking-tight">{tent.name}</CardTitle>
-              {(() => {
-                if (!tent.lastReadingAt) return (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground">
-                    <Clock className="w-3 h-3" /> Sem registros
-                  </span>
-                );
-                const diffMs = Date.now() - tent.lastReadingAt;
-                const diffH = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMin = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                const timeText = diffH === 0 ? `há ${diffMin}min` : `há ${diffH}h`;
-                const pill = diffH < 24 ? "pill-fresh" : diffH < 48 ? "pill-warning" : "pill-danger";
-                return (
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${pill}`}>
-                    <Clock className="w-3 h-3" />{timeText}
-                  </span>
-                );
-              })()}
-              {/* Streak badge */}
-              {streak && streak.current > 0 && (
-                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'pill-streak-done' : 'pill-streak-pending'}`}>
-                  <Leaf className="w-2.5 h-2.5" />{streak.current}d
-                </span>
-              )}
-            </div>
-            {/* Linha 2: dimensões */}
-            <p className="text-xs text-muted-foreground mt-0.5">{tent.width}×{tent.depth}×{tent.height}cm</p>
-          </div>
-
-          {/* Monitor — acesso rápido ao display da estufa */}
-          <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
-            <button
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              title="Modo Display"
-            >
-              <Monitor className="w-4 h-4" />
-            </button>
-          </Link>
-
-          {/* ··· dropdown menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                <MoreVertical className="w-4 h-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              {!cycle ? (
-                <>
-                  <DropdownMenuItem onClick={() => onInitiateCycle(tent.id, tent.name)}>
-                    <Sprout className="w-4 h-4 mr-2" />
-                    Novo Ciclo
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate(`/tent/${tent.id}`)}>
-                    <ArrowRight className="w-4 h-4 mr-2" />
-                    Ver Detalhes
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEditTent(tent)}>
-                    <Wrench className="w-4 h-4 mr-2" />
-                    Editar Estufa
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onDeleteTent(tent.id, tent.name)} className="text-red-600 focus:text-red-600">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir Estufa
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem onClick={() => navigate(`/quick-log?tentId=${tent.id}`)}>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Registrar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate(`/tent/${tent.id}`)}>
-                    <ArrowRight className="w-4 h-4 mr-2" />
-                    Ver Detalhes
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onEditCycle(cycle, tent)}>
-                    <Wrench className="w-4 h-4 mr-2" />
-                    Editar Ciclo
-                  </DropdownMenuItem>
-                  {tent.category === "MAINTENANCE" && (
-                    <DropdownMenuItem onClick={() => openPhaseConfirm("CLONING")}>
-                      <Sprout className="w-4 h-4 mr-2 text-blue-500" />
-                      Tirar Clones
-                    </DropdownMenuItem>
-                  )}
-                  {tent.category === "VEGA" && (
-                    <DropdownMenuItem onClick={() => openPhaseConfirm("FLORA")}>
-                      <Flower2 className="w-4 h-4 mr-2 text-green-500" />
-                      Avançar para Floração
-                    </DropdownMenuItem>
-                  )}
-                  {tent.category === "FLORA" && (
-                    <>
-                      <DropdownMenuItem onClick={() => setHarvestQueueOpen(true)}>
-                        <Wind className="w-4 h-4 mr-2 text-orange-500" />
-                        Colher → Aguardando Secagem
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openPhaseConfirm("DRYING")}>
-                        <Wind className="w-4 h-4 mr-2 text-amber-500" />
-                        Ir direto para Secagem
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {cycle.cloningStartDate && tent.category === "CLONING" && (
-                    <DropdownMenuItem onClick={() => setFinishCloningOpen(true)}>
-                      <ArrowRight className="w-4 h-4 mr-2 text-blue-500" />
-                      Finalizar Clonagem
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onFinalizeCycle(cycle.id, tent.name)} className="text-red-600 focus:text-red-600">
-                    <X className="w-4 h-4 mr-2" />
-                    Finalizar Ciclo
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Plant count chips — abaixo do header */}
-        {(tent.plantCount > 0 || tent.seedlingCount > 0) && (
-          <Link href={`/plants?tent=${tent.id}`}>
-            <div className="flex items-center gap-2 mt-3">
-              {tent.plantCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors">
-                  <Sprout className="w-3.5 h-3.5 text-primary" />
-                  {tent.plantCount} {tent.plantCount === 1 ? 'planta' : 'plantas'}
-                </span>
-              )}
-              {tent.seedlingCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors">
-                  <Scissors className="w-3.5 h-3.5 text-cyan-500" />
-                  {tent.seedlingCount} {tent.seedlingCount === 1 ? 'muda' : 'mudas'}
-                </span>
-              )}
-            </div>
-          </Link>
-        )}
-      </CardHeader>
-
-      <CardContent className="relative z-10 px-5 pb-5 pt-0">
-        <div className="space-y-3">
-          {/* Cycle Info — compacto, sem barra de progresso */}
-          {cycle ? (
-            <div
-              onClick={() => navigate(`/tent/${tent.id}`)}
-              className={`rounded-xl p-3.5 border cursor-pointer active:scale-[0.99] transition-all duration-150 ${
-                tent.category === 'VEGA'        ? 'phase-card-vega'
-                : tent.category === 'FLORA'     ? 'phase-card-flora'
-                : tent.category === 'DRYING'    ? 'phase-card-drying'
-                : 'phase-card-maintenance'
-              }`}
-            >
-              {/* Linha 1: fase | semana / clonagem */}
-              <div className="flex justify-between items-center">
-                <span className={`text-sm font-semibold flex items-center gap-1.5 text-white dark:${
-                  tent.category === 'VEGA'    ? 'text-green-400'
-                  : tent.category === 'FLORA' ? 'text-purple-400'
-                  : tent.category === 'DRYING'? 'text-amber-400'
-                  : 'text-blue-400'
-                }`}>
-                  <PhaseIcon className="w-3.5 h-3.5" />
-                  {tent.category === 'MAINTENANCE' ? 'Manutenção Perpétua' : 'Ciclo Ativo'}
-                </span>
-                <span className={`text-sm font-bold text-white dark:${
-                  tent.category === 'VEGA'    ? 'text-green-400'
-                  : tent.category === 'FLORA' ? 'text-purple-400'
-                  : tent.category === 'DRYING'? 'text-amber-400'
-                  : 'text-blue-400'
-                }`}>
-                  {tent.category === 'MAINTENANCE'
-                    ? (tent.lastCloningAt
-                        ? (() => { const d = Math.floor((Date.now() - tent.lastCloningAt) / 86400000); return d === 0 ? 'Hoje' : d === 1 ? 'Ontem' : `Há ${d}d`; })()
-                        : 'Sem clonagem')
-                    : `Semana ${(() => {
-                        const now = new Date(); const start = new Date(cycle.startDate);
-                        if (isNaN(start.getTime())) return '?';
-                        const fs = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                        if (fs && !isNaN(fs.getTime()) && now >= fs) return Math.max(1, Math.floor((now.getTime() - fs.getTime()) / 604800000) + 1);
-                        return Math.max(1, Math.floor((now.getTime() - start.getTime()) / 604800000) + 1);
-                      })()}`
-                  }
-                </span>
-              </div>
-              {/* Linha 2: label | data */}
-              <div className="flex justify-between items-center mt-1.5">
-                <span className="text-xs text-white/70 dark:text-muted-foreground">
-                  {tent.category === 'MAINTENANCE' ? 'Última Clonagem' : 'Iniciado em'}
-                </span>
-                <span className="text-xs font-medium text-white/90 dark:text-foreground/70">
-                  {tent.category === 'MAINTENANCE'
-                    ? (tent.lastCloningAt ? new Date(tent.lastCloningAt).toLocaleDateString('pt-BR') : '—')
-                    : new Date(cycle.startDate).toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-border/40 bg-muted/20 p-3.5 text-center">
-              <p className="text-sm text-muted-foreground">Nenhum ciclo ativo</p>
-            </div>
-          )}
-
-          {/* KPI Metrics — 3 colunas: Temp · RH · PPFD */}
-          <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border/60">
-            {/* Temperature */}
-            <button
-              type="button"
-              disabled={!isSensorAuto || readNow.isPending}
-              className={`kpi-temp flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-orange-500/20 dark:border-orange-500/15 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
-              onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
-            >
-              <ThermometerSun className="w-4 h-4 text-orange-500 dark:text-orange-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Temp</p>
-              <div className="flex items-center gap-0.5">
-                <p className="text-base font-bold tracking-tight leading-none text-foreground">
-                  {readNow.isPending
-                    ? <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
-                    : (() => {
-                        const val = sensorReading?.isFresh && sensorReading.tempC != null ? sensorReading.tempC : latestLog?.tempC ? parseFloat(latestLog.tempC) : null;
-                        return val != null ? <AnimatedCounter value={val} decimals={1} suffix="°" /> : <span className="text-muted-foreground/40">--</span>;
-                      })()
-                  }
-                </p>
-              </div>
-              <MiniSparkline values={sparkTemps} color="#f97316" />
-              {isSensorAuto && (
-                <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-cyan-400 opacity-80"><Wifi className="w-3 h-3" /></span>
-              )}
-            </button>
-            {/* Humidity */}
-            <button
-              type="button"
-              disabled={!isSensorAuto || readNow.isPending}
-              className={`kpi-rh flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-cyan-500/20 dark:border-cyan-500/20 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
-              onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
-            >
-              <Droplets className="w-4 h-4 text-cyan-500 dark:text-cyan-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">RH</p>
-              <div className="flex items-center gap-0.5">
-                <p className="text-base font-bold tracking-tight leading-none text-foreground">
-                  {readNow.isPending
-                    ? <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
-                    : (() => {
-                        const val = sensorReading?.isFresh && sensorReading.rhPct != null ? sensorReading.rhPct : latestLog?.rhPct ? parseFloat(latestLog.rhPct) : null;
-                        return val != null ? <AnimatedCounter value={val} decimals={0} suffix="%" /> : <span className="text-muted-foreground/40">--</span>;
-                      })()
-                  }
-                </p>
-              </div>
-              <MiniSparkline values={sparkRh} color="#0891b2" />
-              {isSensorAuto && (
-                <span className="absolute top-1 right-1 text-muted-foreground/60 dark:text-cyan-400 opacity-80"><Wifi className="w-3 h-3" /></span>
-              )}
-            </button>
-            {/* PPFD */}
-            <div className="kpi-ppfd flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-amber-500/20 dark:border-yellow-500/15">
-              <Sun className="w-4 h-4 text-amber-500 dark:text-yellow-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PPFD</p>
-              <div className="flex items-center gap-0.5">
-                <p className="text-base font-bold tracking-tight leading-none text-foreground">
-                  {latestLog?.ppfd ? <AnimatedCounter value={latestLog.ppfd} /> : <span className="text-muted-foreground/40">--</span>}
-                </p>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </CardContent>
-      
-
-      {/* Mini-modal de confirmação de fase */}
-      <PhaseConfirmDialog
-        open={phaseConfirmOpen}
-        onOpenChange={setPhaseConfirmOpen}
-        phase={phaseConfirmType}
-        tentName={tent.name}
-        onConfirm={handlePhaseConfirmed}
-      />
-
-      {/* Select Mother Plant Dialog */}
-      <SelectMotherPlantDialog
-        open={selectMotherOpen}
-        onOpenChange={setSelectMotherOpen}
-        tentId={tent.id}
-        onMotherSelected={(plantId: number, plantName: string) => {
-          // Salvar dados temporários
-          setSelectedMotherId(plantId);
-          setSelectedMotherName(plantName);
-          setSelectMotherOpen(false);
-          // Abrir FinishCloningDialog
-          setFinishCloningOpen(true);
-        }}
-      />
-      
-      {/* Finish Cloning Dialog */}
-      {cycle && (
-        <FinishCloningDialog
-          open={finishCloningOpen}
-          onOpenChange={setFinishCloningOpen}
-          cycleId={cycle.id}
-          motherPlantId={selectedMotherId || 0}
-          motherPlantName={selectedMotherName || "Planta Mãe"}
-          clonesCount={selectedClonesCount}
-        />
-      )}
-      
-      {/* Promote Phase Dialog */}
-      {cycle && (
-        <PromotePhaseDialog
-          open={promotePhaseOpen}
-          onOpenChange={setPromotePhaseOpen}
-          cycleId={cycle.id}
-          tentId={cycle.tentId}
-          currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
-          currentTentName={tent.name}
-        />
-      )}
-
-      {/* Harvest Queue Dialog */}
-      {cycle && (
-        <MoveToHarvestQueueDialog
-          open={harvestQueueOpen}
-          onOpenChange={setHarvestQueueOpen}
-          cycleId={cycle.id}
-          tentId={tent.id}
-          tentName={tent.name}
-        />
-      )}
-    </Card>
-
-    {/* ── Acesso rápido à estufa ── */}
-    {cycle && (
-      <Link href={`/tent/${tent.id}`}>
-        <div className="mx-1 mt-1">
-          <div className="w-full flex items-center justify-between px-5 py-2.5 rounded-b-xl bg-muted/20 border border-t-0 border-border/30 hover:bg-muted/40 active:scale-[0.99] transition-all duration-150">
-            <span className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Ver tarefas e detalhes da estufa
-            </span>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
-          </div>
-        </div>
-      </Link>
-    )}
-
-      </div>
-    </ListItemAnimation>
-  );
-}

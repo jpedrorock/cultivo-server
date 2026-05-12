@@ -198,19 +198,19 @@ export async function checkAndNotifyAlerts(tentId: number, values: {
     }
   }
 
-  // 7. Salvar alertas no histórico — com deduplicação de 4h por métrica+direção
-  //    Evita flood de alertas idênticos, mas permite HIGH e LOW da mesma métrica
-  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  // 7. Salvar alertas no histórico — com deduplicação de 24h por métrica+direção
+  //    Usuário registra ~2x/dia; cron roda horário mas não deve repetir alerta no mesmo dia
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  // Buscar alertas recentes (últimas 4h) para este tent de uma vez
+  // Buscar alertas recentes (últimas 24h) para este tent de uma vez
   const recentAlerts = await database
     .select({ metric: alertHistory.metric, value: alertHistory.value, targetMax: alertHistory.targetMax })
     .from(alertHistory)
-    .where(and(eq(alertHistory.tentId, tentId), gte(alertHistory.createdAt, fourHoursAgo)));
+    .where(and(eq(alertHistory.tentId, tentId), gte(alertHistory.createdAt, oneDayAgo)));
 
   // Chave = "METRIC_HIGH" ou "METRIC_LOW" — deriva direção do valor vs targetMax
   const recentMetrics = new Set(
-    recentAlerts.map(a => {
+    recentAlerts.map((a: any) => {
       const v = parseFloat(a.value);
       const tMax = a.targetMax ? parseFloat(a.targetMax) : null;
       const dir = tMax !== null && v > tMax ? "HIGH" : "LOW";
@@ -308,12 +308,12 @@ async function detectTrends(tentId: number, tentName: string) {
 
   if (trendAlerts.length === 0) return;
 
-  // Deduplicação: não repetir o mesmo TREND nas últimas 12h
-  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+  // Deduplicação: não repetir o mesmo TREND nas últimas 24h
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const recentTrends = await database
     .select({ metric: alertHistory.metric, message: alertHistory.message })
     .from(alertHistory)
-    .where(and(eq(alertHistory.tentId, tentId), gte(alertHistory.createdAt, twelveHoursAgo)));
+    .where(and(eq(alertHistory.tentId, tentId), gte(alertHistory.createdAt, oneDayAgo)));
 
   for (const ta of trendAlerts) {
     const alreadySent = recentTrends.some(

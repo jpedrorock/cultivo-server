@@ -93,7 +93,7 @@ const parameterConfig = {
   },
 };
 
-export function TentChartWidget({ tentId, tentName, data }: TentChartWidgetProps) {
+export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWidgetProps) {
   const [selectedParam, setSelectedParam] = useState<Parameter>("all");
 
   // Normalize data for better visualization
@@ -112,6 +112,7 @@ export function TentChartWidget({ tentId, tentName, data }: TentChartWidgetProps
     ecRaw: point.ec,
   }));
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const visibleParams =
     selectedParam === "all"
       ? (["temp", "rh", "ppfd", "ph", "ec"] as const)
@@ -227,12 +228,12 @@ export function TentChartWidget({ tentId, tentName, data }: TentChartWidgetProps
           {selectedParam !== "all" && (
             <Tooltip
               contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
+                backgroundColor: "var(--card)",
+                border: "1px solid var(--border)",
                 borderRadius: "6px",
                 fontSize: "11px",
               }}
-              labelStyle={{ color: "hsl(var(--foreground))", fontSize: "10px" }}
+              labelStyle={{ color: "var(--foreground)", fontSize: "10px" }}
               formatter={(value: number | undefined, name: string | undefined, payload: any) => {
                 if (value === undefined || !name) return ['--', name || ''];
                 const param = name as keyof typeof parameterConfig;

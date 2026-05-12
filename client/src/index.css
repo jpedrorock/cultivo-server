@@ -102,6 +102,21 @@
   --sidebar-accent-foreground: oklch(0.22 0.010 148);
   --sidebar-border: oklch(0.878 0.007 140);
   --sidebar-ring: oklch(0.35 0.11 148);
+
+  /* ── Tokens das calculadoras (light) ── */
+  --color-primary-fg: var(--primary-foreground);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-fg-dim: oklch(0.58 0.010 148);
+  --color-bg-elevated: oklch(0.918 0.006 140);
+  --color-border-strong: oklch(0.78 0.008 140);
+  --color-kpi-temp: oklch(0.58 0.18 45);
+  --color-kpi-rh: oklch(0.50 0.14 220);
+  --color-kpi-ppfd: oklch(0.60 0.18 85);
+  --color-phase-maint: oklch(0.48 0.17 245);
+  --color-phase-vega: oklch(0.46 0.17 145);
+  --color-phase-flora: oklch(0.48 0.20 305);
+  --color-phase-dry: oklch(0.55 0.16 75);
 }
 
 .dark {
@@ -118,19 +133,19 @@
   --foreground: oklch(0.97 0 0);          /* branco puro — max contraste */
 
   /* Cards: step claro de elevação sobre o fundo */
-  --card: oklch(0.14 0.010 240);
+  --card: oklch(0.16 0.010 240);
   --card-foreground: oklch(0.97 0 0);
 
   /* Popover */
-  --popover: oklch(0.14 0.010 240);
+  --popover: oklch(0.16 0.010 240);
   --popover-foreground: oklch(0.97 0 0);
 
   /* Secondary */
-  --secondary: oklch(0.18 0.010 240);
+  --secondary: oklch(0.20 0.010 240);
   --secondary-foreground: oklch(0.97 0 0);
 
-  /* Muted — claramente diferente do foreground para hierarquia */
-  --muted: oklch(0.14 0.008 240);
+  /* Muted — claramente diferente do card para hierarquia visual */
+  --muted: oklch(0.12 0.008 240);
   --muted-foreground: oklch(0.46 0.008 240);
 
   /* Accent: leve tint verde */
@@ -160,6 +175,170 @@
   --sidebar-accent-foreground: oklch(0.97 0 0);
   --sidebar-border: oklch(0.18 0.008 240);
   --sidebar-ring: oklch(0.62 0.17 145);
+
+  /* ── Tokens das calculadoras (aliases + semânticos) ── */
+  --color-primary-fg: var(--primary-foreground);
+  --color-fg: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+  --color-fg-dim: oklch(0.36 0.008 240);
+  --color-bg-elevated: oklch(0.12 0.008 240);
+  --color-border-strong: oklch(0.32 0.012 240);
+  --color-kpi-temp: oklch(0.72 0.18 45);
+  --color-kpi-rh: oklch(0.70 0.13 220);
+  --color-kpi-ppfd: oklch(0.85 0.16 95);
+  --color-phase-maint: oklch(0.62 0.17 245);
+  --color-phase-vega: oklch(0.70 0.20 145);
+  --color-phase-flora: oklch(0.65 0.22 305);
+  --color-phase-dry: oklch(0.74 0.17 75);
+}
+
+/* ─── AURORA — Dark 2: atmospheric glow + glass cards + grain ─────────────────
+   Inspirado no cultivo-site: radial gradient verde no topo, cards translúcidos
+   com backdrop-blur, textura de grão sutil. Herda todos os valores do .dark.   */
+.aurora {
+  /* Primary: azul-teal harmônico com o gradient do fundo */
+  --primary: oklch(0.65 0.20 245);
+  --primary-foreground: oklch(0.97 0.01 245);
+  --sidebar-primary: oklch(0.65 0.20 245);
+  --sidebar-primary-foreground: oklch(0.97 0.01 245);
+
+  /* Background: um toque mais fundo para o glow contrastar */
+  --background: oklch(0.07 0.010 240);
+  --foreground: oklch(0.97 0 0);
+
+  /* Cards: semi-transparentes para o glass funcionar */
+  --card: oklch(0.15 0.012 240 / 0.72);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.13 0.010 240 / 0.88);
+  --popover-foreground: oklch(0.97 0 0);
+
+  /* Secondary e muted */
+  --secondary: oklch(0.18 0.010 240 / 0.80);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.11 0.008 240);
+  --muted-foreground: oklch(0.50 0.010 240);
+
+  /* Accent: tint verde mais visível */
+  --accent: oklch(0.22 0.028 155 / 0.80);
+  --accent-foreground: oklch(0.97 0 0);
+
+  /* Borders: mais vivas para se destacar sobre o glass */
+  --border: oklch(0.30 0.015 240 / 0.60);
+  --input: oklch(0.18 0.010 240 / 0.80);
+  --ring: oklch(0.65 0.20 245);
+
+  /* Destructive */
+  --destructive: oklch(0.68 0.14 15);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  /* Charts — iguais ao dark */
+  --chart-1: oklch(0.65 0.17 145);
+  --chart-2: oklch(0.65 0.14 200);
+  --chart-3: oklch(0.70 0.18 55);
+  --chart-4: oklch(0.65 0.18 280);
+  --chart-5: oklch(0.68 0.20 25);
+
+  /* Sidebar: mais fundo */
+  --sidebar: oklch(0.06 0.008 240 / 0.90);
+  --sidebar-foreground: oklch(0.97 0 0);
+  --sidebar-accent: oklch(0.20 0.024 155 / 0.70);
+  --sidebar-accent-foreground: oklch(0.97 0 0);
+  --sidebar-border: oklch(0.22 0.010 240 / 0.50);
+  --sidebar-ring: oklch(0.68 0.20 145);
+
+  /* Tokens das calculadoras */
+  --color-primary-fg: oklch(0.08 0.02 145);
+  --color-fg: oklch(0.97 0 0);
+  --color-fg-muted: oklch(0.50 0.010 240);
+  --color-fg-dim: oklch(0.36 0.008 240);
+  --color-bg-elevated: oklch(0.14 0.010 240 / 0.70);
+  --color-border-strong: oklch(0.38 0.018 240 / 0.70);
+  --color-kpi-temp: oklch(0.72 0.18 45);
+  --color-kpi-rh: oklch(0.70 0.13 220);
+  --color-kpi-ppfd: oklch(0.85 0.16 95);
+  --color-phase-maint: oklch(0.62 0.17 245);
+  --color-phase-vega: oklch(0.70 0.20 145);
+  --color-phase-flora: oklch(0.65 0.22 305);
+  --color-phase-dry: oklch(0.74 0.17 75);
+}
+
+/* Gradient fixo no html — não é sobrescrito pelo bg-background do Tailwind */
+html.aurora {
+  background:
+    radial-gradient(
+      ellipse 90% 70% at 5% -10%,
+      color-mix(in oklch, oklch(0.62 0.17 245) 65%, transparent) 0%,
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 92% 3%,
+      color-mix(in oklch, oklch(0.68 0.20 145) 30%, transparent) 0%,
+      transparent 60%
+    ),
+    oklch(0.07 0.014 230);
+  min-height: 100dvh;
+}
+
+/* Body e wrappers bg-background transparentes — o gradient do html aparece */
+html.aurora body,
+html.aurora .bg-background {
+  background-color: transparent !important;
+}
+
+/* Grain texture sutil sobre tudo */
+html.aurora::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.038;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  z-index: 9999;
+}
+
+/* ── Cards no estilo do site: gradient tint + border colorida ── */
+
+/* Todos os cards: glass + ring azul-teal sutil */
+html.aurora .bg-card {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklch, oklch(0.62 0.17 245) 7%, oklch(0.15 0.012 240 / 0.72)),
+    oklch(0.15 0.012 240 / 0.72)
+  ) !important;
+  border-color: color-mix(in oklch, oklch(0.62 0.17 245) 22%, oklch(0.30 0.015 240 / 0.60)) !important;
+}
+
+/* KPI temp — gradiente laranja mais forte no Aurora */
+html.aurora .kpi-temp {
+  background: linear-gradient(135deg,
+    oklch(0.72 0.18 45 / 0.28) 0%,
+    oklch(0.72 0.18 45 / 0.10) 50%,
+    transparent 100%
+  ) !important;
+  border: 1px solid oklch(0.72 0.18 45 / 0.35) !important;
+}
+
+/* KPI rh — gradiente ciano */
+html.aurora .kpi-rh {
+  background: linear-gradient(135deg,
+    oklch(0.70 0.13 220 / 0.26) 0%,
+    oklch(0.70 0.13 220 / 0.09) 50%,
+    transparent 100%
+  ) !important;
+  border: 1px solid oklch(0.70 0.13 220 / 0.35) !important;
+}
+
+/* KPI ppfd — gradiente âmbar */
+html.aurora .kpi-ppfd {
+  background: linear-gradient(135deg,
+    oklch(0.85 0.16 95 / 0.24) 0%,
+    oklch(0.85 0.16 95 / 0.08) 50%,
+    transparent 100%
+  ) !important;
+  border: 1px solid oklch(0.85 0.16 95 / 0.32) !important;
 }
 
 /* ─── Phase palette — cores semânticas por fase do ciclo ──────────────────────
@@ -202,7 +381,7 @@
 }
 
 /* Light: card branco neutro — sem cor de fundo */
-.kpi-temp, .kpi-rh, .kpi-ppfd { background: hsl(var(--card)); }
+.kpi-temp, .kpi-rh, .kpi-ppfd { background: var(--card); }
 
 /* Dark: gradiente tintado como antes */
 .dark .kpi-temp  { background: linear-gradient(135deg, rgba(249,115,22,0.18) 0%, rgba(234,88,12,0.08) 60%, rgba(249,115,22,0.02) 100%); }
@@ -602,6 +781,14 @@
     0 2px 8px oklch(0.44 0.115 145 / 0.06),
     0 1px 3px oklch(0.44 0.115 145 / 0.04);
 }
+
+
+/* ── Hamburguer sidebar: só no tablet (768px–1023px) ────────────────────────
+   CSS puro fora do @layer para garantir precedência sobre utilities Tailwind.
+   Esconde no mobile (BottomNav activo) e no desktop (sidebar dockado).       */
+.sidebar-hamburger { display: none !important; }
+@media (min-width: 768px)  { .sidebar-hamburger { display: flex !important; } }
+@media (min-width: 1024px) { .sidebar-hamburger { display: none !important; } }
 
 /* ============================================================
    VISION UI THEME — Dark glassmorphism, paleta verde/âmbar Cultivo
@@ -1675,6 +1862,22 @@ input[type="range"]::-moz-range-track {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* Ícone PPFD — respiração suave, como luz pulsando devagar */
+@keyframes ppfd-breathe {
+  0%, 100% { opacity: 0.55; filter: drop-shadow(0 0 0px transparent); }
+  50%       { opacity: 1;    filter: drop-shadow(0 0 5px currentColor); }
+}
+
+/* Hero com altura que considera a safe area do topo (PlantDetail) */
+.h-hero-safe {
+  height: calc(300px + env(safe-area-inset-top, 0px));
+}
+
+/* Posicionamento de botões flutuantes abaixo do notch (PlantDetail) */
+.top-safe-1rem {
+  top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
 /* ============================================================
    FIX: position:fixed + backdrop-filter no iOS Safari / WebKit
    
@@ -1717,6 +1920,20 @@ header[class*="sticky"],
 div[class*="sticky"][class*="bg-card"],
 div[class*="sticky"][class*="bg-background"] {
   background-color: var(--card);
+}
+
+/* ── Utilitários das calculadoras ─────────────────────────────────────────── */
+.mono {
+  font-family: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  font-feature-settings: "ss01", "tnum";
+}
+
+@keyframes pulse-num {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+.pulse-dot {
+  animation: pulse-num 2.4s ease-in-out infinite;
 }
 
 /* No iOS Safari, backdrop-blur em sticky headers quebra position:fixed.

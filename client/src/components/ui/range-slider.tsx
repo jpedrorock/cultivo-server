@@ -40,7 +40,7 @@ export function RangeSlider({
   size = "md",
 }: RangeSliderProps) {
   const isLg = size === "lg";
-  const progress = ((value - min) / (max - min)) * 100;
+  const _progress = ((value - min) / (max - min)) * 100;
   const tooltipLabel = formatTooltip ? formatTooltip(value) : String(value);
 
   const trackH = isLg ? "h-[20px]" : "h-[6px]";

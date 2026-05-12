@@ -20,10 +20,19 @@ export default function Login() {
   // Mostrar erro vindo do callback do Google
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('error') === 'google_cancelled') {
+    const err = params.get('error');
+    if (err === 'google_cancelled') {
       setError('Login com Google cancelado.');
-    } else if (params.get('error') === 'google_failed') {
+    } else if (err === 'google_failed') {
       setError('Erro ao autenticar com Google. Tente novamente.');
+    } else if (err === 'google_state_invalid') {
+      setError('Sessão expirou ou link inválido. Tente entrar com Google novamente.');
+    } else if (err === 'google_email_not_verified') {
+      setError('Este email Google ainda não foi verificado. Confirme no Gmail antes de entrar.');
+    } else if (err === 'google_email_exists') {
+      setError('Já existe uma conta com este email. Entre com email/senha e vincule o Google nas configurações.');
+    } else if (err === 'google_account_conflict') {
+      setError('Este email já está vinculado a outra conta Google. Entre em contato com o suporte.');
     }
   }, []);
 
@@ -100,9 +109,12 @@ export default function Login() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+            <label htmlFor="login-email" className="block text-sm font-medium text-foreground mb-1.5">Email</label>
             <input
+              id="login-email"
               type="email"
+              autoComplete="username"
+              inputMode="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="seu@email.com"
@@ -112,9 +124,19 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Senha</label>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <label htmlFor="login-password" className="block text-sm font-medium text-foreground">Senha</label>
+              <a
+                href="mailto:suporte@cultivo.app?subject=Reset%20de%20senha&body=Olá%2C%20esqueci%20minha%20senha%20do%20App%20Cultivo.%20Meu%20email%20cadastrado%20é%3A%20"
+                className="text-xs text-muted-foreground hover:text-emerald-600 transition-colors"
+              >
+                Esqueci minha senha
+              </a>
+            </div>
             <input
+              id="login-password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"

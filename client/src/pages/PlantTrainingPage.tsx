@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
@@ -11,11 +11,21 @@ import {
   Pause,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
+  Boxes,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import PlantNodeMap from "@/components/PlantNodeMap";
+// Lazy: Three.js (~600KB) só carrega quando user abre a vista 3D
+const Plant3DView = lazy(() => import("@/components/Plant3DView"));
+
+const View3DFallback = () => (
+  <div className="flex items-center justify-center text-xs text-muted-foreground" style={{ height: "100%", minHeight: 200 }}>
+    Carregando 3D…
+  </div>
+);
 import type { PlantGraphNode } from "@/features/cannaprune/plantGraph";
 import {
   TECHNIQUE_CONFIGS,
@@ -26,7 +36,7 @@ import {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PlantTrainingPage() {
   const [, params]  = useRoute("/plants/:id/training");
-  const [, navigate] = useLocation();
+  const [, _navigate] = useLocation();
   const plantId = params?.id ? parseInt(params.id, 10) : null;
 
   // Data
@@ -45,7 +55,7 @@ export default function PlantTrainingPage() {
 
   // Mutations
   const utils = trpc.useUtils();
-  const createMutation = trpc.plantLST.create.useMutation({
+  const createBatchMutation = trpc.plantLST.createBatch.useMutation({
     onSuccess: () => {
       refetch();
       utils.plantLST.stats.invalidate({ plantId: plantId! });
@@ -61,8 +71,35 @@ export default function PlantTrainingPage() {
     onError: (e) => toast.error(`Erro ao apagar histórico: ${e.message}`),
   });
   // Auto-abre o sandbox se navegou com ?sandbox=1 (ex: via quick log)
-  const autoSandbox = new URLSearchParams(window.location.search).get('sandbox') === '1';
+  // ?view=3d ou ?view=2d (top) define a vista inicial
+  const _qs = new URLSearchParams(window.location.search);
+  const autoSandbox = _qs.get('sandbox') === '1';
+  const initialView: 'top' | '3d' = _qs.get('view') === '3d' ? '3d' : 'top';
   const [mapFullscreen,    setMapFullscreen]    = useState(autoSandbox);
+  const [viewMode,         setViewMode]         = useState<'top' | '3d'>(initialView);
+
+  // ── Tamanho do vaso — agora persistido no banco (antes: localStorage) ───────
+  const { data: plantStructure } = trpc.plantStructure.get.useQuery(
+    { plantId: plantId! },
+    { enabled: !!plantId, refetchOnWindowFocus: false },
+  );
+  const savePotSizeMutation = trpc.plantStructure.savePotSize.useMutation();
+  const potSizeSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [potSizeL, setPotSizeL] = useState<number>(5);
+  // Sincroniza com valor do banco quando a query retorna
+  useEffect(() => {
+    if (plantStructure !== undefined) {
+      setPotSizeL(plantStructure?.potSizeL ?? 5);
+    }
+  }, [plantStructure]);
+  // Persiste no banco com debounce ao alterar
+  function handlePotSizeChange(newVal: number) {
+    setPotSizeL(newVal);
+    if (potSizeSaveTimer.current) clearTimeout(potSizeSaveTimer.current);
+    potSizeSaveTimer.current = setTimeout(() => {
+      if (plantId) savePotSizeMutation.mutate({ plantId, potSizeL: newVal });
+    }, 800);
+  }
   const [exitConfirmOpen,  setExitConfirmOpen]  = useState(false);
   // Técnicas aplicadas nesta sessão do sandbox
   const [sessionTechniques, setSessionTechniques] = useState<{ technique: string; nodeLabel: string }[]>([]);
@@ -106,7 +143,7 @@ export default function PlantTrainingPage() {
     }
   }
 
-  // ── Salvar sessão: cria os logs (com snapshot) e fecha ───────────────────
+  // ── Salvar sessão: cria os logs em lote (1 request) e fecha ──────────────
   function handleSaveSession() {
     if (!plantId) return;
     setExitConfirmOpen(false);
@@ -114,20 +151,20 @@ export default function PlantTrainingPage() {
     const snapshot = nodeSnapshotRef.current.length > 0
       ? JSON.stringify(nodeSnapshotRef.current)
       : undefined;
-    // Cria um log por técnica aplicada, todos com o mesmo snapshot da sessão
-    sessionTechniques.forEach(({ technique, nodeLabel }) => {
-      const techId = normalizeTechniqueName(technique) as TechniqueId | null;
-      const cfg    = techId ? TECHNIQUE_CONFIGS[techId] : null;
-      createMutation.mutate({
-        plantId,
-        technique,
-        nodePosition: nodeLabel,
-        techniqueConfig: cfg
-          ? { expectedTops: cfg.expectedTops, recoveryDays: cfg.recoveryDays }
-          : undefined,
-        snapshotJson: snapshot,
+    if (sessionTechniques.length > 0) {
+      const techniques = sessionTechniques.map(({ technique, nodeLabel }) => {
+        const techId = normalizeTechniqueName(technique) as TechniqueId | null;
+        const cfg    = techId ? TECHNIQUE_CONFIGS[techId] : null;
+        return {
+          technique,
+          nodePosition: nodeLabel,
+          techniqueConfig: cfg
+            ? { expectedTops: cfg.expectedTops, recoveryDays: cfg.recoveryDays }
+            : undefined,
+        };
       });
-    });
+      createBatchMutation.mutate({ plantId, techniques, snapshotJson: snapshot });
+    }
     setMapFullscreen(false); // PlantNodeMap salva estrutura no unmount
   }
 
@@ -200,24 +237,74 @@ export default function PlantTrainingPage() {
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Mapa da planta
             </p>
-            <button
-              onClick={openSandbox}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              title="Abrir em tela cheia"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Toggle único que cicla entre vistas (futuro: 3D, isométrica…) */}
+              {(() => {
+                const VIEWS = [
+                  { id: 'top' as const, label: '2D',  icon: LayoutGrid },
+                  { id: '3d'  as const, label: '3D',  icon: Boxes },
+                ];
+                const current = VIEWS.find(v => v.id === viewMode) ?? VIEWS[0];
+                const next    = VIEWS[(VIEWS.indexOf(current) + 1) % VIEWS.length];
+                const Icon    = current.icon;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode(next.id)}
+                    className="h-7 px-2 rounded-lg flex items-center gap-1.5 text-[11px] font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+                    title={`Trocar para ${next.label}`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{current.label}</span>
+                  </button>
+                );
+              })()}
+              {viewMode === '3d' && (
+                <div className="flex items-center gap-1 ml-1">
+                  <input
+                    type="number"
+                    min="0.5" step="0.5" max="100"
+                    value={potSizeL}
+                    onChange={(e) => handlePotSizeChange(Math.max(0.5, parseFloat(e.target.value) || 5))}
+                    className="w-12 h-7 px-1.5 text-[11px] font-medium bg-muted/50 border border-border/40 rounded-md text-center focus:outline-none focus:border-primary"
+                    title="Tamanho do vaso (litros)"
+                  />
+                  <span className="text-[10px] text-muted-foreground">L</span>
+                </div>
+              )}
+              <button
+                onClick={openSandbox}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Abrir em tela cheia"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
           {/* Preview compacto (desmontado quando fullscreen estiver aberto) */}
           {!mapFullscreen && (
             <>
-              <PlantNodeMap
-                plantId={plantId}
-                compact
-                onCompactTap={openSandbox}
-                onTechniqueApplied={handleTechniqueApplied}
-                onResetStructure={handleResetStructure}
-              />
+              {viewMode === 'top' && (
+                <PlantNodeMap
+                  plantId={plantId}
+                  compact
+                  viewMode="top"
+                  onCompactTap={openSandbox}
+                  onTechniqueApplied={handleTechniqueApplied}
+                  onResetStructure={handleResetStructure}
+                  nodeSnapshotRef={nodeSnapshotRef}
+                />
+              )}
+              {viewMode === '3d' && (
+                <Suspense fallback={<View3DFallback />}>
+                  <Plant3DView
+                    plantId={plantId}
+                    height={360}
+                    potSizeL={potSizeL}
+                    onTechniqueApplied={handleTechniqueApplied}
+                  />
+                </Suspense>
+              )}
               <button
                 onClick={openSandbox}
                 className="w-full py-2 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors flex items-center justify-center gap-1.5 border-t border-border/20"
@@ -259,6 +346,15 @@ export default function PlantTrainingPage() {
                   <p className="text-xs text-muted-foreground truncate">{plant.name}</p>
                 )}
               </div>
+              {/* Toggle 2D/3D dentro do fullscreen */}
+              <button
+                onClick={() => setViewMode(viewMode === '3d' ? 'top' : '3d')}
+                className="h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors shrink-0"
+                title={`Trocar para ${viewMode === '3d' ? '2D' : '3D'}`}
+              >
+                {viewMode === '3d' ? <Boxes className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
+                <span>{viewMode === '3d' ? '3D' : '2D'}</span>
+              </button>
               {/* Badge de técnicas aplicadas na sessão */}
               {sessionTechniques.length > 0 && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
@@ -268,13 +364,24 @@ export default function PlantTrainingPage() {
             </div>
             {/* Canvas com pan/zoom — overflow:hidden é intencional */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              <PlantNodeMap
-                plantId={plantId}
-                cancelSaveRef={sandboxCancelRef}
-                nodeSnapshotRef={nodeSnapshotRef}
-                onTechniqueApplied={handleTechniqueApplied}
-                onResetStructure={handleResetStructure}
-              />
+              {viewMode === '3d' ? (
+                <Suspense fallback={<View3DFallback />}>
+                  <Plant3DView
+                    plantId={plantId}
+                    potSizeL={potSizeL}
+                    onTechniqueApplied={handleTechniqueApplied}
+                  />
+                </Suspense>
+              ) : (
+                <PlantNodeMap
+                  plantId={plantId}
+                  viewMode="top"
+                  cancelSaveRef={sandboxCancelRef}
+                  nodeSnapshotRef={nodeSnapshotRef}
+                  onTechniqueApplied={handleTechniqueApplied}
+                  onResetStructure={handleResetStructure}
+                />
+              )}
             </div>
           </div>
         )}
@@ -317,6 +424,7 @@ export default function PlantTrainingPage() {
                 key={safeTimelineIndex}
                 staticNodes={snapshots[safeTimelineIndex].nodes}
                 compact={false}
+                viewMode="top"
               />
             </div>
 

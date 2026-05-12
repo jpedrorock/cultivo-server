@@ -1,11 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -15,16 +14,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Flower2, Wrench, Check } from "lucide-react";
+import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Check } from "lucide-react";
+import { useSidebar } from "@/contexts/SidebarContext";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
 import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
 import { useLocation } from "wouter";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
-import { LazyImage } from "@/components/LazyImage";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 type DialogState =
@@ -37,18 +36,8 @@ type DialogState =
   | { type: 'bulkHarvest' }
   | { type: 'bulkDiscard' };
 
-const getFitnessScore = (status: string | null | undefined) => {
-  if (!status) return null;
-  const map: Record<string, { score: number; color: string }> = {
-    HEALTHY:    { score: 95, color: "#4ade80" },
-    RECOVERING: { score: 62, color: "#60a5fa" },
-    STRESSED:   { score: 38, color: "#fbbf24" },
-    SICK:       { score: 12, color: "#f87171" },
-  };
-  return map[status] ?? null;
-};
-
 export default function PlantsList() {
+  const { collapsed } = useSidebar();
   const [, navigate] = useLocation();
   const haptic = useTactileFeedback();
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,6 +59,28 @@ export default function PlantsList() {
 
   const { data: tents } = trpc.tents.list.useQuery();
   const { data: strains } = trpc.strains.list.useQuery();
+
+  // Expande todos os grupos na primeira carga — deve vir APÓS declaração de tents
+  const expandedInitRef = useRef(false);
+  useEffect(() => {
+    if (expandedInitRef.current || !tents?.length) return;
+    expandedInitRef.current = true;
+    if (!tentParam) setExpandedTents(new Set(tents.map(t => t.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tents]);
+
+  // Hold-to-select: pressionar e segurar 400ms ativa seleção
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startHold = (plantId: number) => {
+    holdTimerRef.current = setTimeout(() => {
+      togglePlantSelection(plantId);
+      (navigator as any).vibrate?.(40);
+      holdTimerRef.current = null;
+    }, 400);
+  };
+  const cancelHold = () => {
+    if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }
+  };
 
   const utils = trpc.useUtils();
   const moveMultiplePlants = trpc.plants.moveSelectedPlants.useMutation({
@@ -191,7 +202,7 @@ export default function PlantsList() {
   const phaseOrder: Record<string, number> = { FLORA: 0, VEGA: 1, CLONING: 2, SEEDLING: 3, MAINTENANCE: 4 };
 
   const filteredPlants = useMemo(() => {
-    const filtered = plants?.filter((plant) =>
+    const filtered = plants?.filter((plant: any) =>
       plant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       plant.code?.toLowerCase().includes(searchTerm.toLowerCase())
     ) ?? [];
@@ -202,6 +213,7 @@ export default function PlantsList() {
       if (sortBy === "health") return (healthOrder[a.lastHealthStatus ?? ""] ?? 99) - (healthOrder[b.lastHealthStatus ?? ""] ?? 99);
       return 0;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plants, searchTerm, sortBy]);
 
   // Agrupar plantas por estufa
@@ -297,7 +309,7 @@ export default function PlantsList() {
     <PageTransition>
       <div className="min-h-screen bg-background">
       {/* Header — fixed para funcionar dentro do scroll do iOS */}
-      <header className="bg-card border-b border-border fixed top-0 left-0 right-0 z-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+      <header className={cn("bg-card border-b border-border fixed top-0 left-0 right-0 z-40 pt-safe transition-[left] duration-200 ease-in-out", collapsed ? "lg:left-16" : "lg:left-64")}>
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -339,7 +351,7 @@ export default function PlantsList() {
       </header>
 
       {/* Spacer = header height (py-4=32px + h-12=48px = 80px) + safe area */}
-      <div style={{ height: 'calc(80px + env(safe-area-inset-top, 0px))' }} />
+      <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '80px' }} />
 
       {/* Main Content */}
       <main className="container py-4">
@@ -393,7 +405,7 @@ export default function PlantsList() {
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <PlantCardSkeleton key={i} />
+              <PlantCardSkeleton key={`skeleton-plant-${i}`} />
             ))}
           </div>
         ) : filteredPlants && filteredPlants.length > 0 ? (
@@ -460,7 +472,7 @@ export default function PlantsList() {
                         const letter = (p.name ?? '?')[0].toUpperCase();
                         const thumbUrl = p.lastHealthPhotoUrl
                           ? (p.lastHealthPhotoUrl.startsWith('/uploads/')
-                              ? `/api/upload/thumbnail?url=${encodeURIComponent(p.lastHealthPhotoUrl)}&w=120&h=120&q=70`
+                              ? `/api/upload/thumbnail?url=${encodeURIComponent(p.lastHealthPhotoUrl)}&w=96&h=96&q=45`
                               : p.lastHealthPhotoUrl)
                           : null;
                         return (
@@ -493,7 +505,7 @@ export default function PlantsList() {
 
                   {isExpanded && (
                     <div>
-                      <StaggerList className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+                      <StaggerList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                         {tentPlants.map((plant: any) => {
                           const isSelected = selectedPlants.has(plant.id);
 
@@ -521,27 +533,31 @@ export default function PlantsList() {
 
                           const thumbUrl = plant.lastHealthPhotoUrl
                             ? (plant.lastHealthPhotoUrl.startsWith('/uploads/')
-                                ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=300&h=400&q=75`
+                                ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=220&h=300&q=55`
                                 : plant.lastHealthPhotoUrl)
                             : null;
 
                           return (
                           <ListItemAnimation key={plant.id}>
                             <div
-                              className={`rounded-2xl overflow-hidden relative transition-all duration-200 ${
+                              className={`rounded-2xl overflow-hidden relative aspect-[3/4] transition-all duration-200 ${
                                 isSelected ? 'ring-2 ring-white/50 ring-offset-2 ring-offset-background scale-[0.96]' : ''
                               }`}
                               style={{ background: cardBg }}
+                              onPointerDown={() => startHold(plant.id)}
+                              onPointerUp={cancelHold}
+                              onPointerLeave={cancelHold}
+                              onContextMenu={e => e.preventDefault()}
                             >
                               {/* Badge saúde / toggle seleção — canto superior esquerdo */}
                               <button
                                 onClick={e => { e.preventDefault(); e.stopPropagation(); togglePlantSelection(plant.id); }}
-                                className="absolute top-2 left-2 z-20 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 shadow-sm"
+                                className="absolute top-2 left-2 z-30 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all active:scale-90 shadow-sm"
                                 style={isSelected
-                                  ? { background: 'hsl(var(--primary))', color: '#fff' }
+                                  ? { background: 'var(--primary)', color: '#fff' }
                                   : healthBadge
                                   ? { background: healthBadge.bg, color: healthBadge.color }
-                                  : { background: 'rgba(0,0,0,0.25)', color: 'rgba(255,255,255,0.45)' }
+                                  : { background: 'rgba(0,0,0,0.30)', color: 'rgba(255,255,255,0.55)' }
                                 }
                               >
                                 {isSelected
@@ -557,7 +573,7 @@ export default function PlantsList() {
                                 <DropdownMenuTrigger asChild>
                                   <button
                                     onClick={e => { e.preventDefault(); e.stopPropagation(); }}
-                                    className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/25 flex items-center justify-center text-white/65 hover:bg-black/40 hover:text-white transition-colors"
+                                    className="absolute top-2 right-2 z-30 w-7 h-7 rounded-full bg-black/30 flex items-center justify-center text-white/70 hover:bg-black/50 hover:text-white transition-colors"
                                   >
                                     <MoreHorizontal className="w-3.5 h-3.5" />
                                   </button>
@@ -578,34 +594,39 @@ export default function PlantsList() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
 
-                              {/* Foto — aspect 3:4, object-cover para preencher o card */}
-                              <Link href={`/plants/${plant.id}`} className="block">
-                                <div className="w-full aspect-[3/4] relative">
-                                  {thumbUrl ? (
-                                    <img
-                                      src={thumbUrl}
-                                      alt={plant.name}
-                                      className="absolute inset-0 w-full h-full object-cover"
-                                      loading="lazy"
-                                      decoding="async"
-                                    />
-                                  ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <Sprout className="w-14 h-14 text-white/12" />
-                                    </div>
-                                  )}
-                                </div>
-                              </Link>
+                              {/* Link cobre todo o card — foto + gradient + info */}
+                              <Link href={`/plants/${plant.id}`} className="absolute inset-0 z-10">
+                                {/* Foto full-card */}
+                                {thumbUrl ? (
+                                  <img
+                                    src={thumbUrl}
+                                    alt={plant.name}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Sprout className="w-14 h-14 text-white/15" />
+                                  </div>
+                                )}
 
-                              {/* Info — nome + fase */}
-                              <Link href={`/plants/${plant.id}`} className="block px-3 pt-1 pb-3">
-                                <p className="text-white font-bold text-sm leading-tight truncate">{plant.name}</p>
-                                <p className="text-white/55 text-[11px] mt-0.5 uppercase tracking-wider truncate">{phaseLabel}</p>
+                                {/* Gradient fade no bottom para legibilidade do texto */}
+                                <div
+                                  className="absolute inset-x-0 bottom-0 pointer-events-none"
+                                  style={{ height: '55%', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.25) 55%, transparent 100%)' }}
+                                />
+
+                                {/* Nome + fase sobrepostos */}
+                                <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+                                  <p className="text-white font-bold text-sm leading-tight truncate drop-shadow">{plant.name}</p>
+                                  <p className="text-white/70 text-[11px] mt-0.5 uppercase tracking-wider truncate drop-shadow">{phaseLabel}</p>
+                                </div>
                               </Link>
 
                               {/* Overlay de seleção */}
                               {isSelected && (
-                                <div className="absolute inset-0 bg-primary/20 pointer-events-none rounded-2xl" />
+                                <div className="absolute inset-0 bg-primary/20 pointer-events-none rounded-2xl z-20" />
                               )}
                             </div>
                           </ListItemAnimation>
@@ -712,7 +733,15 @@ export default function PlantsList() {
                         <div className="flex items-center gap-3 px-3 pt-3 pb-2.5">
                           <div className="w-10 h-10 rounded-lg border border-border/20 overflow-hidden bg-white/3 shrink-0 grayscale opacity-50 flex items-center justify-center">
                             {plant.photoUrl
-                              ? <img src={plant.photoUrl} alt={plant.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                              ? <img
+                                  src={plant.photoUrl.startsWith('/uploads/')
+                                    ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.photoUrl)}&w=80&h=80&q=60`
+                                    : plant.photoUrl}
+                                  alt={plant.name}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
                               : <Sprout className="w-5 h-5 text-muted-foreground" />
                             }
                           </div>
@@ -979,7 +1008,7 @@ export default function PlantsList() {
             </div>
 
             {/* Actions — grid of cells with dividers */}
-            <div className="flex" style={{ divideColor: 'rgba(255,255,255,0.05)' }}>
+            <div className="flex">
               {/* Promover (condicional) */}
               {filteredPlants?.filter(p => selectedPlants.has(p.id)).every(p => p.plantStage === "SEEDLING") && (
                 <button

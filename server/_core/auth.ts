@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import argon2 from 'argon2';
 import type { Request, Response } from 'express';
 import { getUserById } from '../db-auth';
 import { ENV } from './env';
@@ -12,17 +13,53 @@ export interface AuthPayload {
 }
 
 /**
- * Gera um hash seguro da senha usando bcrypt
+ * Hashes de senha:
+ *   - Novos hashes: argon2id (estado da arte, recomendado pela OWASP)
+ *   - Hashes legados: bcryptjs (`$2a$`/`$2b$`) — comparados em modo legacy
+ *
+ * Migração transparente: ao fazer login com senha bcrypt, a senha é
+ * re-hasheada para argon2 e atualizada no banco (ver `comparePassword`).
+ */
+
+// Parâmetros argon2id seguidos pelo OWASP Password Storage Cheat Sheet (2024):
+// memoryCost 19MiB, timeCost 2, parallelism 1
+const ARGON2_OPTS: argon2.Options = {
+  type: argon2.argon2id,
+  memoryCost: 19456,   // 19 MiB
+  timeCost: 2,
+  parallelism: 1,
+};
+
+/**
+ * Gera hash seguro da senha (sempre argon2id para hashes novos)
  */
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  return argon2.hash(password, ARGON2_OPTS);
 }
 
 /**
- * Compara uma senha com seu hash
+ * Compara uma senha com seu hash, detectando o algoritmo automaticamente.
+ * Retorna `{ ok, needsRehash }` — se `needsRehash`, o caller deve gerar
+ * um novo hash com argon2 e atualizar no banco.
  */
-export async function comparePassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+export async function comparePassword(
+  password: string,
+  hash: string,
+): Promise<{ ok: boolean; needsRehash: boolean }> {
+  // Hashes argon2 começam com `$argon2`
+  if (hash.startsWith('$argon2')) {
+    const ok = await argon2.verify(hash, password);
+    // Se os parâmetros mudarem no futuro, argon2 também sinaliza rehash
+    const needsRehash = ok && argon2.needsRehash(hash, ARGON2_OPTS);
+    return { ok, needsRehash };
+  }
+  // Legacy bcrypt (`$2a$`, `$2b$`, `$2y$`)
+  if (hash.startsWith('$2')) {
+    const ok = await bcrypt.compare(password, hash);
+    // Se a senha bcrypt está correta, sinaliza rehash para migrar para argon2
+    return { ok, needsRehash: ok };
+  }
+  return { ok: false, needsRehash: false };
 }
 
 /**

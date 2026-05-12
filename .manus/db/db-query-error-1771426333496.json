@@ -1,8 +1,0 @@
-{
-  "query": "ALTER TABLE plantHealthLogs ADD COLUMN photoUrl TEXT AFTER notes;\nALTER TABLE plantTrichomeLogs ADD COLUMN photoUrl TEXT AFTER notes;\nALTER TABLE plantTrichomeLogs ADD COLUMN weekNumber INT AFTER plantId;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute ALTER TABLE plantHealthLogs ADD COLUMN photoUrl TEXT AFTER notes;\nALTER TABLE plantTrichomeLogs ADD COLUMN photoUrl TEXT AFTER notes;\nALTER TABLE plantTrichomeLogs ADD COLUMN weekNumber INT AFTER plantId;",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1060 (42S21) at line 2: Duplicate column name 'photoUrl'"
-  ]
-}

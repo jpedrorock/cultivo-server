@@ -7,8 +7,9 @@ import { eq, and, desc } from "drizzle-orm";
  */
 export async function saveWateringApplication(data: InsertWateringApplication) {
   const db = await getDb();
+  if (!db) throw new Error("Database not available");
   const [result] = await db.insert(wateringApplications).values(data);
-  return result.insertId;
+  return (result as { insertId: number }).insertId;
 }
 
 /**
@@ -21,20 +22,16 @@ export async function listWateringApplications(params: {
 }) {
   const { tentId, cycleId, limit = 50 } = params;
   const db = await getDb();
-  
-  let query = db.select().from(wateringApplications);
-  
+  if (!db) return [];
+
   const conditions = [];
   if (tentId) conditions.push(eq(wateringApplications.tentId, tentId));
   if (cycleId) conditions.push(eq(wateringApplications.cycleId, cycleId));
-  
-  if (conditions.length > 0) {
-    query = query.where(and(...conditions)) as any;
-  }
-  
-  const results = await query
+
+  const base = db.select().from(wateringApplications);
+  const filtered = conditions.length > 0 ? base.where(and(...conditions)) : base;
+
+  return filtered
     .orderBy(desc(wateringApplications.applicationDate))
     .limit(limit);
-  
-  return results;
 }

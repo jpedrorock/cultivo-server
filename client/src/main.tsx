@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+import { toast } from "sonner";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
@@ -70,6 +71,43 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+// ─── Lazy-chunk fail-safe ──────────────────────────────────────────────────
+// Quando um deploy roda e o user tem a app aberta, navegar pra outra rota
+// pede chunks com hashes antigos (ex: TentDetails-OLD_HASH.js). Server agora
+// devolve 404 nesses casos (em vez de index.html, que causava o famoso
+// "Failed to load module script: ... text/html"). Aqui captamos o erro e
+// fazemos reload — user pega a build nova de forma transparente.
+//
+// 1) Vite emite `vite:preloadError` quando o preload de chunk falha.
+// 2) Catch genérico de unhandledrejection com mensagem padrão de
+//    "Failed to fetch dynamically imported module" cobre o resto.
+//
+// Guard `reloadingForChunkError` evita loop se o reload por algum motivo
+// também falhar.
+let reloadingForChunkError = false;
+function reloadOnChunkError(reason: string) {
+  if (reloadingForChunkError) return;
+  reloadingForChunkError = true;
+  console.warn('[chunk] reload pra pegar build nova:', reason);
+  // Pequeno delay pra que o aviso chegue no console antes do reload
+  setTimeout(() => window.location.reload(), 100);
+}
+
+window.addEventListener('vite:preloadError', (event) => {
+  reloadOnChunkError(`vite:preloadError ${(event as any).payload?.message ?? ''}`);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = String(event.reason?.message ?? event.reason ?? '');
+  if (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes("Importing a module script failed") ||
+    msg.includes('Failed to load module script')
+  ) {
+    reloadOnChunkError(`unhandledrejection: ${msg.slice(0, 100)}`);
+  }
+});
+
 // Registrar Service Worker para PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -77,6 +115,46 @@ if ('serviceWorker' in navigator) {
       .register('/sw.js')
       .then((registration) => {
         if (import.meta.env.DEV) console.log('[PWA] Service Worker registered:', registration.scope);
+
+        // ─── Update prompt (substitui o auto-skipWaiting silencioso) ──────
+        // Antes, o sw.js fazia self.skipWaiting() no install — versão nova
+        // virava ativa no próximo refresh sem aviso (formulário recarregando
+        // no meio, comportamento mudando, etc.).
+        //
+        // Agora: detecta quando um novo SW termina de instalar e está
+        // "waiting" pra assumir. Mostra toast persistente "Atualizar".
+        // Click → posta SKIP_WAITING → SW novo assume → controllerchange
+        // dispara → recarrega a página de forma controlada.
+        const showUpdatePrompt = (waitingSW: ServiceWorker) => {
+          toast("Nova versão disponível", {
+            description: "Atualize para ver as últimas melhorias.",
+            duration: Infinity,                        // não some sozinho
+            action: {
+              label: "Atualizar",
+              onClick: () => {
+                waitingSW.postMessage({ type: 'SKIP_WAITING' });
+                // O reload será disparado pelo controllerchange listener abaixo
+              },
+            },
+          });
+        };
+
+        // Caso 1: já existe um SW novo aguardando ativação no momento do load
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          showUpdatePrompt(registration.waiting);
+        }
+
+        // Caso 2: SW novo é detectado durante a sessão (via update() periódico)
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            // installed + tem controller existente = é update, não primeiro install
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdatePrompt(newWorker);
+            }
+          });
+        });
 
         // Verificar atualizações a cada 60 segundos
         setInterval(() => {
@@ -86,6 +164,15 @@ if ('serviceWorker' in navigator) {
       .catch((error) => {
         if (import.meta.env.DEV) console.error('[PWA] Service Worker registration failed:', error);
       });
+
+    // Reload quando o SW novo assumir o controle (após user clicar "Atualizar")
+    // Guard pra não recarregar em loop em DEV / Chrome devtools "Update on reload"
+    let reloadingForUpdate = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloadingForUpdate) return;
+      reloadingForUpdate = true;
+      window.location.reload();
+    });
 
     // Ouvir mensagem do SW para sincronizar logs offline
     // O SW não tem cookies, então delega o sync para a página via postMessage

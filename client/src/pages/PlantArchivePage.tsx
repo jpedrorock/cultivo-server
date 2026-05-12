@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,7 +102,7 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
             {/* Linha vertical da timeline */}
             <div className="absolute left-1.5 top-0 bottom-0 w-px bg-border" />
             <div className="space-y-3">
-              {tentHistory.map((entry: any, idx: number) => (
+              {tentHistory.map((entry: any, _idx: number) => (
                 <div key={entry.id} className="relative flex items-start gap-3">
                   {/* Dot da timeline */}
                   <div className="absolute -left-2.5 mt-1 w-2 h-2 rounded-full bg-primary border-2 border-background" />
@@ -201,9 +200,13 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
                 )}
                 {log.photoUrl && (
                   <img
-                    src={log.photoUrl}
+                    src={log.photoUrl.startsWith('/uploads/')
+                      ? `/api/upload/thumbnail?url=${encodeURIComponent(log.photoUrl)}&w=400&h=100&q=70`
+                      : log.photoUrl}
                     alt="Foto de saúde"
                     className="w-full h-24 object-cover rounded mt-2"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )}
               </div>
@@ -315,9 +318,9 @@ export default function PlantArchivePage() {
 
   const stats = {
     total: archivedPlants?.length || 0,
-    harvested: archivedPlants?.filter((p) => p.status === "HARVESTED").length || 0,
-    discarded: archivedPlants?.filter((p) => p.status === "DISCARDED").length || 0,
-    dead: archivedPlants?.filter((p) => p.status === "DEAD").length || 0,
+    harvested: archivedPlants?.filter((p: any) => p.status === "HARVESTED").length || 0,
+    discarded: archivedPlants?.filter((p: any) => p.status === "DISCARDED").length || 0,
+    dead: archivedPlants?.filter((p: any) => p.status === "DEAD").length || 0,
   };
 
   return (
@@ -400,7 +403,7 @@ export default function PlantArchivePage() {
             </div>
           ) : archivedPlants && archivedPlants.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {archivedPlants.map((plant) => (
+              {archivedPlants.map((plant: any) => (
                 <Card key={plant.id} className="overflow-hidden">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -482,9 +485,13 @@ export default function PlantArchivePage() {
                     {plant.lastHealthPhotoUrl && (
                       <div className="mt-3">
                         <img
-                          src={plant.lastHealthPhotoUrl}
+                          src={plant.lastHealthPhotoUrl.startsWith('/uploads/')
+                            ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=400&h=135&q=75`
+                            : plant.lastHealthPhotoUrl}
                           alt={plant.name}
                           className="w-full h-32 object-cover rounded-md"
+                          loading="lazy"
+                          decoding="async"
                         />
                       </div>
                     )}

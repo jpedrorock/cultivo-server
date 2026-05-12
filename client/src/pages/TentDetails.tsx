@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react";
-import { getStatusColor, getStatusLabel } from "@/lib/plantUtils";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Leaf, Heart, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, Printer, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, Percent, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronDown, RefreshCw, Settings } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud, Camera, Maximize2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -43,7 +42,6 @@ function timeAgo(date: Date): string {
 }
 
 function TentSensorCard({ tentId }: { tentId: number }) {
-  const utils = trpc.useUtils();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const { data: tuyaConfig } = trpc.tuya.getConfig.useQuery();
@@ -244,6 +242,1155 @@ function TentSensorCard({ tentId }: { tentId: number }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ─── Cenas + Devices vinculados a estufa (mostra no display ESP32) ──────────
+
+const ICON_HINT_LABELS: Record<string, string> = {
+  light: 'Luz',
+  fan: 'Ventilador / Exaustor',
+  pump: 'Bomba / Rega',
+  heater: 'Aquecedor',
+  ac: 'Ar-condicionado',
+  humidifier: 'Umidificador',
+  dehumidifier: 'Desumidificador',
+  co2: 'CO₂',
+  schedule: 'Agendado / Timer',
+  refresh: 'Sensor / Atualizar',
+  camera: 'Câmera',
+  other: 'Outro',
+};
+
+const ICON_HINT_COMPONENTS: Record<string, React.ComponentType<{ className?: string }>> = {
+  light: Lightbulb,
+  fan: Fan,
+  pump: Droplet,
+  heater: Flame,
+  ac: Snowflake,
+  humidifier: Cloud,
+  dehumidifier: Wind,
+  co2: Cloud,
+  schedule: Clock,        // cena programada (rega automática etc)
+  refresh: RefreshCw,     // sensor / ação que atualiza dados
+  camera: Camera,         // câmera IP SmartLife / Tuya (Fase 1: só identifica, sem stream)
+  other: Zap,
+};
+
+/**
+ * Botão de toggle pra um device Tuya vinculado à estufa.
+ *
+ * Usa o MESMO caminho do app web /smartlife (tuya.getDeviceCurrentStatus +
+ * tuya.sendDeviceCommand) — autenticado via JWT do user logado, usa
+ * getTuyaConfig(ctx.user.id). Diferente do REST /api/device/device-toggle
+ * que o ESP usa.
+ *
+ * Vale como teste isolado: se este botão funciona mas o ESP não, sabemos
+ * que o problema está no caminho REST especificamente (provavelmente cfg
+ * Tuya errada selecionada, ver fix em commit 2332d5c).
+ *
+ * Refetch automático a cada 30s pra refletir mudanças feitas pelo SmartLife
+ * ou pelo display ESP.
+ */
+function DeviceToggleButton({
+  deviceId,
+  savedSwitchCode,
+}: {
+  deviceId: string;
+  savedSwitchCode: string | null;
+}) {
+  const utils = trpc.useUtils();
+
+  // refetchOnWindowFocus garante que ao voltar pra tab a app capta mudancas
+  // feitas pelo display ESP / pelo SmartLife app sem esperar o intervalo.
+  // refetchInterval cobre o caso da tab ficar aberta sem foco.
+  const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId },
+    {
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      retry: false,
+      staleTime: 5_000,
+    }
+  );
+
+  const cmd = trpc.tuya.sendDeviceCommand.useMutation({
+    onSuccess: () => {
+      // Tuya as vezes leva ate ~1s pra propagar o comando. Espera, depois
+      // invalida o cache da query — re-fetch global (qualquer outro componente
+      // observando o mesmo deviceId tambem atualiza).
+      setTimeout(() => utils.tuya.getDeviceCurrentStatus.invalidate({ deviceId }), 600);
+    },
+    onError: (e) => toast.error(`Toggle: ${e.message}`),
+  });
+
+  const isOn = status?.switchOn ?? false;
+  const isOnline = status?.online ?? false;
+  const pending = cmd.isPending;
+
+  const handleToggle = () => {
+    // Prefere switchCode descoberto live; fallback pro salvo no add()
+    const code = status?.switchCode ?? savedSwitchCode ?? 'switch_1';
+    cmd.mutate({ deviceId, switchCode: code, value: !isOn });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="shrink-0 w-10 h-7 flex items-center justify-center">
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isOnline) {
+    return (
+      <span
+        title="Dispositivo offline"
+        className="shrink-0 w-10 h-7 flex items-center justify-center rounded-lg bg-muted text-muted-foreground"
+      >
+        <WifiOff className="w-3.5 h-3.5" />
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleToggle}
+      disabled={pending}
+      title={isOn ? 'Desligar' : 'Ligar'}
+      className={`shrink-0 w-10 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${
+        isOn
+          ? 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
+          : 'bg-muted text-muted-foreground hover:bg-muted-foreground/10'
+      }`}
+    >
+      {pending
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : (isOn ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />)}
+    </button>
+  );
+}
+
+/**
+ * Botão "▶ Disparar" pra cenas Tuya vinculadas à estufa.
+ *
+ * Cenas são one-shot (Tap-to-Run no Tuya) — não têm estado on/off como
+ * devices. Só dispara o conjunto de ações que o user configurou no app
+ * SmartLife (ex: "Modo noite": apaga luz + liga exaustor + ajusta umid).
+ *
+ * Mesmo path do app web (tuya.triggerScene). Feedback visual:
+ * - Hover: highlight
+ * - Click: spinner curto
+ * - Sucesso: toast "Cena disparada"
+ */
+/**
+ * Botão de câmera — click abre modal com player HLS ao vivo.
+ *
+ * Tuya entrega URLs HLS (.m3u8) temporárias (~10min). Player usa hls.js,
+ * que funciona em Chrome/Firefox/Edge (Safari já tem HLS nativo mas hls.js
+ * cobre os 2 cenários).
+ *
+ * Renew automático: a cada 8 min re-aloca URL (margem de 2min antes da
+ * expiração default da Tuya). Se renew falhar, player segue rodando até
+ * Tuya cortar; user vê erro inline + botão "Tentar de novo".
+ */
+function CameraStreamDialog({
+  deviceId,
+  deviceName,
+  open,
+  onOpenChange,
+}: {
+  deviceId: string;
+  deviceName: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<any>(null);
+  const renewTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const allocate = trpc.tuya.getCameraStream.useMutation();
+
+  // Carrega ou renova a URL
+  const loadStream = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { url } = await allocate.mutateAsync({ deviceId, type: 'hls' });
+      setStreamUrl(url);
+    } catch (e: any) {
+      setError(e?.message ?? 'Falha ao alocar stream');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Ao abrir o dialog: aloca primeira URL
+  useEffect(() => {
+    if (!open) return;
+    loadStream();
+    // Renova a cada 8 min (Tuya expira ~10min)
+    renewTimerRef.current = setInterval(loadStream, 8 * 60 * 1000);
+    return () => {
+      if (renewTimerRef.current) clearInterval(renewTimerRef.current);
+      renewTimerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, deviceId]);
+
+  // Plug hls.js no <video> quando streamUrl mudar
+  useEffect(() => {
+    if (!streamUrl || !videoRef.current) return;
+    const video = videoRef.current;
+
+    // Cleanup do hls anterior
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    // Safari tem HLS nativo — só atribui o src
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = streamUrl;
+      video.play().catch(() => {/* user precisa tocar pra autoplay com som */});
+      return;
+    }
+
+    // Resto dos browsers: usa hls.js (carregamento dinâmico — só importa quando
+    // user abre o dialog, não vai no bundle inicial)
+    import('hls.js').then(({ default: Hls }) => {
+      if (!Hls.isSupported()) {
+        setError('Browser não suporta HLS');
+        return;
+      }
+      const hls = new Hls({ maxBufferLength: 5 });  // baixa latência
+      hls.loadSource(streamUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {/* autoplay sem som ok */});
+      });
+      hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
+        if (data.fatal) {
+          console.warn('[CameraStream] HLS fatal:', data.type, data.details);
+          // Não set error visível — re-allocate vai tentar resolver
+        }
+      });
+      hlsRef.current = hls;
+    });
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [streamUrl]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <DialogTitle className="text-base flex items-center gap-2">
+            <Camera className="w-4 h-4" />
+            {deviceName}
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Stream ao vivo (HLS) — Tuya/SmartLife
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="relative bg-black aspect-video">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center text-white/70">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          )}
+          {error && !loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70 p-4">
+              <AlertTriangle className="w-6 h-6 text-amber-400" />
+              <p className="text-xs text-center">{error}</p>
+              <Button size="sm" variant="outline" onClick={loadStream}>
+                <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                Tentar de novo
+              </Button>
+            </div>
+          )}
+          <video
+            ref={videoRef}
+            controls
+            playsInline
+            muted
+            className="w-full h-full object-contain"
+          />
+        </div>
+
+        <div className="px-4 py-2 flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>URL renova a cada 8min</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const v = videoRef.current;
+                if (!v) return;
+                // requestFullscreen disponível em desktop + iOS Safari (com webkit prefix).
+                // Fallback pro webkitEnterFullscreen do iOS (só funciona em <video>).
+                if (v.requestFullscreen) {
+                  v.requestFullscreen().catch(() => {/* user cancelou ou bloqueio do browser */});
+                } else if ((v as any).webkitEnterFullscreen) {
+                  (v as any).webkitEnterFullscreen();
+                }
+              }}
+              className="flex items-center gap-1 hover:text-foreground"
+              title="Tela cheia"
+            >
+              <Maximize2 className="w-3 h-3" />
+              Tela cheia
+            </button>
+            <button
+              onClick={loadStream}
+              disabled={loading}
+              className="flex items-center gap-1 hover:text-foreground disabled:opacity-50"
+              title="Renovar stream agora"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              Renovar
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Botão "câmera" — substitui o toggle pra devices com iconHint='camera'.
+ * Click abre <CameraStreamDialog>. Compartilha o style do DeviceToggleButton
+ * pra encaixar visualmente na row.
+ */
+function CameraButton({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
+  const [open, setOpen] = useState(false);
+  // Polling do status — câmera offline não vai conseguir alocar stream, então
+  // dar feedback ANTES de o user clicar (em vez de erro depois do dialog abrir).
+  const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+  const isOnline = status?.online ?? true;  // default true enquanto loading (não bloqueia)
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          if (!isOnline) {
+            toast.error(`${deviceName} está offline. Reabra no SmartLife e tente de novo.`);
+            return;
+          }
+          setOpen(true);
+        }}
+        title={isOnline ? `Ver câmera: ${deviceName}` : `${deviceName} (offline)`}
+        className={`shrink-0 w-10 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 ${
+          isOnline
+            ? 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
+            : 'bg-muted text-muted-foreground/50 cursor-not-allowed'
+        }`}
+      >
+        <Camera className="w-3.5 h-3.5" />
+      </button>
+      <CameraStreamDialog
+        deviceId={deviceId}
+        deviceName={deviceName}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
+
+function ScenePlayButton({ sceneId, sceneName }: { sceneId: string; sceneName: string }) {
+  const trigger = trpc.tuya.triggerScene.useMutation({
+    onSuccess: () => toast.success(`▶ ${sceneName}`),
+    onError: (e) => toast.error(`Falha ao disparar: ${e.message}`),
+  });
+
+  return (
+    <button
+      onClick={() => trigger.mutate({ sceneId })}
+      disabled={trigger.isPending}
+      title={`Disparar cena: ${sceneName}`}
+      className="shrink-0 w-10 h-7 rounded-lg flex items-center justify-center bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 transition-all active:scale-95 disabled:opacity-50"
+    >
+      {trigger.isPending
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : <Play className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
+/**
+ * Botão de toggle pra AUTOMATIONS (cenas programadas — diferente de Tap-to-Run).
+ *
+ * Automations rodam por gatilho (horário, sensor, etc) — não faz sentido
+ * "disparar" elas pelo botão. Faz sentido HABILITAR/DESABILITAR a regra
+ * inteira (ex: "rega automática" desabilitada quando você vai viajar).
+ *
+ * Exibe ícone Clock (representa schedule) com cor por estado:
+ * - Ativa: blue (azul como ⏰ ativo)
+ * - Inativa: cinza
+ * - Desconhecido (Tuya não retornou estado): outline cinza com "?"
+ */
+function AutomationToggleButton({ automationId, automationName }: { automationId: string; automationName: string }) {
+  const utils = trpc.useUtils();
+
+  const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
+    { automationId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+
+  const toggle = trpc.tuya.toggleAutomation.useMutation({
+    onSuccess: ({ enabled }) => {
+      toast.success(`⏰ ${automationName} ${enabled ? 'ativada' : 'pausada'}`);
+      setTimeout(() => utils.tuya.getAutomationEnabled.invalidate({ automationId }), 600);
+    },
+    onError: (e) => toast.error(`Falha: ${e.message}`),
+  });
+
+  const isEnabled = data?.enabled;
+  const pending = toggle.isPending;
+
+  if (isLoading) {
+    return (
+      <div className="shrink-0 w-10 h-7 flex items-center justify-center">
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Tuya não retornou estado — mostra botão neutral, click tenta habilitar
+  if (isEnabled === null || isEnabled === undefined) {
+    return (
+      <button
+        onClick={() => toggle.mutate({ automationId, enabled: true })}
+        disabled={pending}
+        title="Estado desconhecido — clicar tenta ativar"
+        className="shrink-0 w-10 h-7 rounded-lg flex items-center justify-center bg-muted text-muted-foreground hover:bg-muted-foreground/10 transition-all disabled:opacity-50"
+      >
+        {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => toggle.mutate({ automationId, enabled: !isEnabled })}
+      disabled={pending}
+      title={isEnabled ? 'Pausar automação' : 'Ativar automação'}
+      className={`shrink-0 w-10 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 disabled:opacity-50 ${
+        isEnabled
+          ? 'bg-blue-500/20 text-blue-500 hover:bg-blue-500/30'
+          : 'bg-muted text-muted-foreground hover:bg-muted-foreground/10'
+      }`}
+    >
+      {pending
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : (isEnabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />)}
+    </button>
+  );
+}
+
+// ─── Functional preview slots ────────────────────────────────────────────────
+//
+// Os 3 sub-componentes abaixo renderizam o slot do grid 2x3 de preview como
+// um BOTÃO funcional (não mais decorativo). Click dispara a mesma ação do
+// display ESP físico. Reusam exatamente os hooks tRPC dos botões da row
+// (DeviceToggleButton/ScenePlayButton/AutomationToggleButton) — então
+// quando uma luz é alterada num card, o outro reflete via React Query
+// cache (eles compartilham a mesma query key).
+
+interface PreviewSlotProps {
+  slot: any;     // item do listItems (type:'device'|'scene', refId, name, iconHint, sceneType, switchCode)
+  Icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  iconColorClass: string;  // 'text-amber-500' / 'text-blue-500'
+  ringColorClass: string;  // 'ring-amber-500/30' / 'ring-blue-500/30'
+}
+
+const SLOT_BASE = 'relative aspect-square rounded-lg ring-1 flex flex-col items-center justify-center gap-1 p-1 transition-all active:scale-95 disabled:cursor-not-allowed';
+
+/** Slot funcional pra DEVICE — toggle on/off com state ao vivo. */
+function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const utils = trpc.useUtils();
+  const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId: slot.refId },
+    { refetchInterval: 30_000, refetchOnWindowFocus: true, retry: false, staleTime: 5_000 }
+  );
+  const cmd = trpc.tuya.sendDeviceCommand.useMutation({
+    onSuccess: () => setTimeout(() => utils.tuya.getDeviceCurrentStatus.invalidate({ deviceId: slot.refId }), 600),
+    onError: (e) => toast.error(`${slot.name}: ${e.message}`),
+  });
+
+  const isOn = status?.switchOn ?? false;
+  const isOnline = status?.online ?? false;
+  const pending = cmd.isPending;
+
+  const handleClick = () => {
+    if (!isOnline || pending) return;
+    const code = status?.switchCode ?? slot.switchCode ?? 'switch_1';
+    cmd.mutate({ deviceId: slot.refId, switchCode: code, value: !isOn });
+  };
+
+  // Visual: opacity reduz quando offline; ring/icon mais brilhante quando ON.
+  const stateClass = !isOnline
+    ? 'opacity-40 bg-muted/40'
+    : isOn
+      ? 'bg-blue-500/15 ring-blue-500/60'
+      : 'bg-muted/40';
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={!isOnline || pending || isLoading}
+      title={!isOnline ? `${slot.name} (offline)` : isOn ? `${slot.name} ligado — clique pra desligar` : `${slot.name} desligado — clique pra ligar`}
+      className={`${SLOT_BASE} ${ringColorClass} ${stateClass}`}
+    >
+      {pending || isLoading ? (
+        <Loader2 className={`w-4 h-4 animate-spin ${iconColorClass}`} />
+      ) : (
+        <Icon className={`w-4 h-4 ${isOn ? 'text-blue-400' : iconColorClass}`} />
+      )}
+      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+    </button>
+  );
+}
+
+/** Slot funcional pra CÂMERA — click abre dialog com stream HLS ao vivo. */
+function PreviewCameraSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const [open, setOpen] = useState(false);
+  // Poll de status pra mostrar offline antes de o user clicar e tomar erro
+  const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
+    { deviceId: slot.refId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+  const isOnline = status?.online ?? true;
+
+  return (
+    <>
+      <button
+        onClick={() => {
+          if (!isOnline) {
+            toast.error(`${slot.name} está offline.`);
+            return;
+          }
+          setOpen(true);
+        }}
+        title={isOnline ? `Ver câmera: ${slot.name}` : `${slot.name} (offline)`}
+        className={`${SLOT_BASE} ${ringColorClass} ${
+          isOnline
+            ? 'bg-muted/40 hover:bg-indigo-500/10'
+            : 'bg-muted/20 opacity-50 cursor-not-allowed'
+        }`}
+      >
+        <Icon className={`w-4 h-4 ${iconColorClass}`} />
+        <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+        {/* Badge offline no canto */}
+        {!isOnline && (
+          <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded text-[8px] font-semibold bg-muted-foreground/60 text-card uppercase">
+            off
+          </span>
+        )}
+      </button>
+      <CameraStreamDialog
+        deviceId={slot.refId}
+        deviceName={slot.name}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
+
+/** Slot funcional pra SCENE one-shot — click dispara, animação curta de feedback. */
+function PreviewSceneSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const trigger = trpc.tuya.triggerScene.useMutation({
+    onSuccess: () => toast.success(`▶ ${slot.name}`),
+    onError: (e) => toast.error(`Falha: ${e.message}`),
+  });
+
+  const handleClick = () => {
+    if (trigger.isPending) return;
+    trigger.mutate({ sceneId: slot.refId });
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={trigger.isPending}
+      title={`Disparar: ${slot.name}`}
+      className={`${SLOT_BASE} ${ringColorClass} bg-muted/40 hover:bg-amber-500/10`}
+    >
+      {trigger.isPending
+        ? <Loader2 className={`w-4 h-4 animate-spin ${iconColorClass}`} />
+        : <Icon className={`w-4 h-4 ${iconColorClass}`} />}
+      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+    </button>
+  );
+}
+
+/** Slot funcional pra AUTOMATION — toggle ativa/pausa schedule. */
+function PreviewAutomationSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
+  const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
+    { automationId: slot.refId },
+    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+  );
+  const toggle = trpc.tuya.toggleAutomation.useMutation({
+    onSuccess: ({ enabled }) => {
+      toast.success(`⏰ ${slot.name} ${enabled ? 'ativada' : 'pausada'}`);
+      setTimeout(() => utils.tuya.getAutomationEnabled.invalidate({ automationId: slot.refId }), 600);
+    },
+    onError: (e) => toast.error(`${slot.name}: ${e.message}`),
+  });
+
+  const isEnabled = data?.enabled;
+  const pending = toggle.isPending;
+
+  const handleClick = () => {
+    if (pending) return;
+    // null/undefined → tenta habilitar; senão inverte
+    toggle.mutate({ automationId: slot.refId, enabled: !isEnabled });
+  };
+
+  const stateClass = isEnabled === true
+    ? 'bg-blue-500/15 ring-blue-500/60'
+    : 'bg-muted/40 opacity-70';
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={pending || isLoading}
+      title={isEnabled ? `${slot.name} ativa — clique pra pausar` : `${slot.name} pausada — clique pra ativar`}
+      className={`${SLOT_BASE} ${ringColorClass} ${stateClass}`}
+    >
+      {pending || isLoading ? (
+        <Loader2 className={`w-4 h-4 animate-spin ${iconColorClass}`} />
+      ) : (
+        <Icon className={`w-4 h-4 ${iconColorClass}`} />
+      )}
+      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+      {/* Badge ⏰ se iconHint não for já 'schedule' */}
+      {slot.iconHint !== 'schedule' && (
+        <span className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-blue-500/90 ring-1 ring-card flex items-center justify-center">
+          <Clock className="w-2 h-2 text-white" strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  );
+}
+
+function TentDisplayItemsCard({ tentId }: { tentId: number }) {
+  const utils = trpc.useUtils();
+  const [showSceneAdd, setShowSceneAdd] = useState(false);
+  const [showDeviceAdd, setShowDeviceAdd] = useState(false);
+  const [selectedSceneId, setSelectedSceneId] = useState<string>('');
+  const [selectedSceneIconHint, setSelectedSceneIconHint] = useState<string>('pump'); // default droplet (rega)
+  const [selectedSceneExecSec, setSelectedSceneExecSec] = useState<number>(5);  // duração padrão 5s
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [selectedIconHint, setSelectedIconHint] = useState<string>('other');
+
+  // Lista combinada (já merged + ordenada por position)
+  const { data: items = [] } = trpc.tentDisplay.listItems.useQuery({ tentId });
+
+  // Listas globais Tuya (só busca quando user abre os dropdowns)
+  const { data: allScenes = [], isLoading: scenesLoading } = trpc.tuya.listScenes.useQuery(
+    undefined,
+    { enabled: showSceneAdd, retry: false }
+  );
+  const { data: allDevices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
+    undefined,
+    { enabled: showDeviceAdd, retry: false }
+  );
+
+  const linkedSceneRefIds = new Set((items as any[]).filter((i: any) => i.type === 'scene').map((i: any) => i.refId));
+  const linkedDeviceRefIds = new Set((items as any[]).filter((i: any) => i.type === 'device').map((i: any) => i.refId));
+
+  const totalCount = items.length;
+  const atLimit = totalCount >= 6;
+
+  const invalidateAll = () => {
+    utils.tentDisplay.listItems.invalidate({ tentId });
+    utils.tentScenes.list.invalidate({ tentId });
+    utils.tentDevices.list.invalidate({ tentId });
+  };
+
+  const addScene = trpc.tentScenes.add.useMutation({
+    onSuccess: () => { toast.success('Cena adicionada'); invalidateAll(); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); setSelectedSceneExecSec(5); setShowSceneAdd(false); },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeScene = trpc.tentScenes.remove.useMutation({
+    onSuccess: () => { invalidateAll(); toast.success('Removida'); },
+    onError: (e) => toast.error(e.message),
+  });
+  const addDevice = trpc.tentDevices.add.useMutation({
+    onSuccess: () => { toast.success('Dispositivo adicionado'); invalidateAll(); setSelectedDeviceId(''); setSelectedIconHint('other'); setShowDeviceAdd(false); },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeDevice = trpc.tentDevices.remove.useMutation({
+    onSuccess: () => { invalidateAll(); toast.success('Removido'); },
+    onError: (e) => toast.error(e.message),
+  });
+  const reorder = trpc.tentDisplay.reorder.useMutation({
+    onSuccess: () => invalidateAll(),
+    onError: (e) => { toast.error(`Reorder: ${e.message}`); invalidateAll(); },
+  });
+
+  const handleAddScene = () => {
+    if (!selectedSceneId) return;
+    const scene = (allScenes as any[]).find((s: any) => s.sceneId === selectedSceneId);
+    if (!scene) return;
+    // Salva o type vindo da API Tuya (homeName === 'Automações' = automation,
+    // senão = scene one-shot). UI usa pra escolher botão certo: ▶ play ou ⏰ toggle.
+    const type = scene.homeName === 'Automações' ? 'automation' : 'scene';
+    addScene.mutate({
+      tentId,
+      sceneId: scene.sceneId,
+      name: scene.name,
+      type,
+      iconHint: selectedSceneIconHint as any,
+      // Duração só faz sentido pra cenas one-shot. Pra automation, manda o
+      // default 5 (campo é NOT NULL no DB) — UI nem mostra o input.
+      executionSec: type === 'scene' ? selectedSceneExecSec : 5,
+    });
+  };
+  const handleAddDevice = () => {
+    if (!selectedDeviceId) return;
+    const dev = (allDevices as any[]).find((d: any) => d.id === selectedDeviceId);
+    if (!dev) return;
+    addDevice.mutate({ tentId, deviceId: dev.id, name: dev.name, iconHint: selectedIconHint as any });
+  };
+
+  // Move o item idx pra cima/baixo trocando position com o vizinho
+  const handleMove = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= items.length) return;
+    const a = items[idx];
+    const b = items[target];
+    reorder.mutate({
+      tentId,
+      order: [
+        { type: a.type, id: a.id, position: b.position },
+        { type: b.type, id: b.id, position: a.position },
+      ],
+    });
+  };
+
+  const handleRemove = (item: any) => {
+    if (item.type === 'scene') removeScene.mutate({ id: item.id });
+    else removeDevice.mutate({ id: item.id });
+  };
+
+  // Preview do grid 2x3 (preenche slots vazios pra mostrar como vai aparecer)
+  const previewSlots = Array.from({ length: 6 }, (_, i) => items[i] ?? null);
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-amber-500" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Cenas e controles do display</CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                {totalCount === 0
+                  ? 'Vincule cenas e dispositivos pra aparecerem no display ESP32'
+                  : `${totalCount}/6 itens — aparecem na aba "Cenas" do display`}
+              </CardDescription>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4 pb-4">
+        {/* Preview FUNCIONAL do grid 2x3 — réplica do display ESP, agora
+            clicável: cada slot dispara a mesma ação que o botão da row.
+            Estado (on/off pra device, enabled/disabled pra automation) sincroniza
+            via React Query cache (mesmo query key dos botões da row). */}
+        {totalCount > 0 && (
+          <div>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+              Preview do display <span className="text-muted-foreground/50 normal-case font-normal">— clicável</span>
+            </p>
+            <div className="rounded-xl border border-border/60 bg-background/60 p-2.5">
+              <div className="grid grid-cols-3 gap-1.5">
+                {previewSlots.map((slot: any, i) => {
+                  if (!slot) return (
+                    <div key={i} className="aspect-square rounded-lg border border-dashed border-border/40 bg-muted/20" />
+                  );
+                  // Mesma lógica de fallback da row: cena sem hint → 'pump' (gota),
+                  // device sem hint → 'other' (raio).
+                  const isSceneSlot = slot.type === 'scene';
+                  const sceneDefault = isSceneSlot ? 'pump' : 'other';
+                  const Icon = ICON_HINT_COMPONENTS[slot.iconHint ?? sceneDefault] ?? Zap;
+                  const ringColor = isSceneSlot ? 'ring-amber-500/30' : 'ring-blue-500/30';
+                  const iconColor = isSceneSlot ? 'text-amber-500' : 'text-blue-500';
+                  const isAutomationSlot = isSceneSlot && slot.sceneType === 'automation';
+
+                  // Despacha pro componente certo. Cada um tem seus próprios
+                  // hooks tRPC (queries + mutations) — React Query cache faz a
+                  // sync com a row.
+                  if (slot.type === 'device') {
+                    // Câmera não tem toggle on/off — abre dialog com stream
+                    if (slot.iconHint === 'camera') {
+                      return <PreviewCameraSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
+                    }
+                    return <PreviewDeviceSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
+                  }
+                  if (isAutomationSlot) {
+                    return <PreviewAutomationSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
+                  }
+                  return <PreviewSceneSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lista combinada com ↑↓ */}
+        {totalCount > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Itens vinculados</p>
+            {(items as any[]).map((item: any, idx: number) => {
+              const isScene = item.type === 'scene';
+              // Cenas e devices ambos usam iconHint salvo (ICON_HINT_COMPONENTS).
+              // Cenas sem hint caem em pump (gota — default razoável: maioria das
+              // cenas vinculadas é rega manual). Devices sem hint caem em other (Zap).
+              const sceneDefault = isScene ? 'pump' : 'other';
+              const Icon = ICON_HINT_COMPONENTS[item.iconHint ?? sceneDefault] ?? Zap;
+              const iconBg = isScene ? 'bg-amber-500/15' : 'bg-blue-500/15';
+              const iconColor = isScene ? 'text-amber-500' : 'text-blue-500';
+              const isAutomation = isScene && item.sceneType === 'automation';
+              return (
+                <div key={`${item.type}-${item.id}`} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-muted/40">
+                  {/* Setas ↑↓ */}
+                  <div className="flex flex-col -space-y-0.5 shrink-0">
+                    <button
+                      onClick={() => handleMove(idx, -1)}
+                      disabled={idx === 0 || reorder.isPending}
+                      title="Mover pra cima"
+                      className="w-5 h-4 rounded hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleMove(idx, 1)}
+                      disabled={idx === items.length - 1 || reorder.isPending}
+                      title="Mover pra baixo"
+                      className="w-5 h-4 rounded hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Container do ícone com badge Clock no canto pra automations
+                      (só quando o iconHint não é 'schedule' — senão fica redundante). */}
+                  <div className={`relative w-7 h-7 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
+                    <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+                    {isAutomation && item.iconHint !== 'schedule' && (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-blue-500/90 ring-1 ring-card flex items-center justify-center">
+                        <Clock className="w-2 h-2 text-white" strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">{item.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {isScene
+                        ? (item.sceneType === 'automation' ? 'Automação programada' : 'Cena (one-shot)')
+                        : (ICON_HINT_LABELS[item.iconHint ?? 'other'] ?? 'Dispositivo')}
+                    </p>
+                  </div>
+                  {/* Ação inline — espelha o que aparece no display ESP32:
+                      - device:     toggle on/off
+                      - scene:      ▶ disparar (one-shot)
+                      - automation: ⏰ toggle ativa/pausa schedule */}
+                  {isScene
+                    ? (item.sceneType === 'automation'
+                        ? <AutomationToggleButton automationId={item.refId} automationName={item.name} />
+                        : <ScenePlayButton sceneId={item.refId} sceneName={item.name} />)
+                    : (item.iconHint === 'camera'
+                        ? <CameraButton deviceId={item.refId} deviceName={item.name} />
+                        : <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />)
+                  }
+                  <button
+                    onClick={() => handleRemove(item)}
+                    disabled={removeScene.isPending || removeDevice.isPending}
+                    className="shrink-0 w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {totalCount === 0 && !showSceneAdd && !showDeviceAdd && (
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 py-6 px-4 text-center">
+            <p className="text-xs text-muted-foreground">Nenhum item vinculado ainda. O display vai mostrar a lista padrão da conta.</p>
+          </div>
+        )}
+
+        {/* Form: adicionar cena */}
+        {showSceneAdd && (
+          <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+            <p className="text-xs font-semibold">Adicionar cena</p>
+            {scenesLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando cenas Tuya...
+              </div>
+            ) : (
+              <>
+                <select
+                  value={selectedSceneId}
+                  onChange={e => setSelectedSceneId(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">— Escolha uma cena —</option>
+                  {(allScenes as any[])
+                    .filter((s: any) => !linkedSceneRefIds.has(s.sceneId))
+                    .map((s: any) => (
+                      <option key={s.sceneId} value={s.sceneId}>
+                        {s.name} {s.homeName ? `(${s.homeName})` : ''}
+                      </option>
+                    ))}
+                </select>
+                {/* Dropdown de iconHint — escolhe ícone que aparece no display ESP
+                    e na lista. Default 'pump' (gota) porque maioria das cenas
+                    vinculadas é rega manual. */}
+                <select
+                  value={selectedSceneIconHint}
+                  onChange={e => setSelectedSceneIconHint(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  {Object.entries(ICON_HINT_LABELS).map(([k, label]) => (
+                    <option key={k} value={k}>{label}</option>
+                  ))}
+                </select>
+
+                {/* Duração da cena em segundos — ESP usa pra spinner "executando".
+                    Só faz sentido pra cenas one-shot (Tap-to-Run). Pra automation,
+                    o tempo é controlado pela própria regra do Tuya — esconde input. */}
+                {(() => {
+                  const sel = (allScenes as any[]).find((s: any) => s.sceneId === selectedSceneId);
+                  const isAutomation = sel?.homeName === 'Automações';
+                  if (isAutomation) return null;
+                  return (
+                    <div>
+                      <label className="text-[11px] text-muted-foreground block mb-1">
+                        Duração (segundos)
+                        <span className="ml-1 text-muted-foreground/60">— quanto tempo o display mostra "executando"</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={600}
+                        value={selectedSceneExecSec}
+                        onChange={e => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!Number.isFinite(v)) return;
+                          setSelectedSceneExecSec(Math.max(1, Math.min(600, v)));
+                        }}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                  );
+                })()}
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowSceneAdd(false); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); setSelectedSceneExecSec(5); }}>Cancelar</Button>
+                  <Button size="sm" className="flex-1" disabled={!selectedSceneId || addScene.isPending} onClick={handleAddScene}>
+                    {addScene.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Adicionar'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Form: adicionar device */}
+        {showDeviceAdd && (
+          <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+            <p className="text-xs font-semibold">Adicionar dispositivo</p>
+            {devicesLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando dispositivos Tuya...
+              </div>
+            ) : (
+              <>
+                <select
+                  value={selectedDeviceId}
+                  onChange={e => setSelectedDeviceId(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">— Escolha um dispositivo —</option>
+                  {(allDevices as any[])
+                    .filter((d: any) => !linkedDeviceRefIds.has(d.id))
+                    .map((d: any) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} {d.online ? '🟢' : '⚫'}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  value={selectedIconHint}
+                  onChange={e => setSelectedIconHint(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                >
+                  {Object.entries(ICON_HINT_LABELS).map(([k, label]) => (
+                    <option key={k} value={k}>{label}</option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowDeviceAdd(false); setSelectedDeviceId(''); }}>Cancelar</Button>
+                  <Button size="sm" className="flex-1" disabled={!selectedDeviceId || addDevice.isPending} onClick={handleAddDevice}>
+                    {addDevice.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Adicionar'}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Botões "+ Adicionar" — só se não estiver no limite */}
+        {!atLimit && !showSceneAdd && !showDeviceAdd && (
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowSceneAdd(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Cena
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowDeviceAdd(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Dispositivo
+            </Button>
+          </div>
+        )}
+
+        {atLimit && (
+          <p className="text-[11px] text-amber-500 text-center pt-1">
+            Limite atingido (6 itens). Remova algum pra adicionar outro.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Pareamento ESP32 Display (RFC 8628 Device Authorization Grant) ─────────
+
+function PairDisplayCard({ tentId }: { tentId: number }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const cleaned = code.trim().toUpperCase();
+      // Aceita "MR4-K8X" ou "MR4K8X" (insere hifen no meio se faltar)
+      const normalized = cleaned.includes('-') ? cleaned : (cleaned.length === 6 ? cleaned.slice(0,3) + '-' + cleaned.slice(3) : cleaned);
+      const r = await fetch('/api/device/pair-claim', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: normalized, tentId }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || `Erro ${r.status}`);
+      setSuccess(true);
+      toast.success(`Display "${data.deviceName}" conectado!`);
+      setTimeout(() => { setOpen(false); setCode(''); setSuccess(false); }, 1500);
+    } catch (e: any) {
+      setError(e.message || 'Falha ao parear');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center">
+                <Monitor className="w-4 h-4 text-violet-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Display ESP32</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Conecte o display físico desta estufa
+                </CardDescription>
+              </div>
+            </div>
+            <Button size="sm" onClick={() => { setOpen(true); setError(''); setSuccess(false); setCode(''); }}>
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Conectar
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <Dialog open={open} onOpenChange={(v) => { if (!submitting) setOpen(v); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conectar display ESP32</DialogTitle>
+            <DialogDescription>
+              No display, ligue o aparelho. Ele vai mostrar um código de 6 letras/números
+              (exemplo: <span className="font-mono font-bold">MR4-K8X</span>). Digite aqui:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <input
+              type="text"
+              value={code}
+              onChange={e => { setCode(e.target.value.toUpperCase()); setError(''); }}
+              placeholder="MR4-K8X"
+              maxLength={7}
+              autoFocus
+              autoComplete="off"
+              spellCheck={false}
+              disabled={submitting || success}
+              className="w-full bg-muted rounded-xl px-4 py-4 text-center text-2xl font-mono font-bold tracking-widest text-foreground outline-none placeholder:text-muted-foreground/30 focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            />
+
+            {error && (
+              <p className="text-sm text-red-500 text-center">{error}</p>
+            )}
+            {success && (
+              <p className="text-sm text-emerald-500 text-center font-medium">✓ Display conectado!</p>
+            )}
+
+            <p className="text-[11px] text-muted-foreground text-center">
+              O código vale por 10 minutos. Se expirar, é só reiniciar o display que ele gera outro.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={submitting}>Cancelar</Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || success || code.replace('-', '').length < 6}
+            >
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Conectando...</> : 'Conectar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -587,7 +1734,7 @@ export default function TentDetails() {
     <span>${tent.name} &nbsp;·&nbsp; ${phase} &nbsp;·&nbsp; ${generatedAt}</span>
   </div>
 
-  <script>window.onload = () => { window.print(); }<\/script>
+  <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`;
 
@@ -731,60 +1878,65 @@ export default function TentDetails() {
               <div className="w-10 h-10 rounded-xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center shrink-0">
                 <TentIcon className="w-5 h-5 text-primary" />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{tent.name}</h1>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-xs text-muted-foreground">
-                    {tent.category} • {tent.width}×{tent.depth}×{tent.height}cm
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base md:text-xl font-bold text-foreground truncate leading-tight">{tent.name}</h1>
+
+                {/* Linha 1: dimensões + última leitura */}
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <p className="text-xs text-muted-foreground shrink-0">
+                    {tent.width}×{tent.depth}×{tent.height}cm
                   </p>
-                  {/* Semana corrente do ciclo */}
-                  {cycle && currentPhase && currentWeek && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary/80">
-                      <Calendar className="w-3 h-3" />
-                      Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : "Vega"}
-                      {" · "}
-                      <span className="text-muted-foreground font-normal">
-                        início {format(new Date(cycle.startDate), "dd/MM", { locale: ptBR })}
-                      </span>
-                    </span>
-                  )}
-                  {/* Freshness badge — último registro */}
+                  {/* Freshness badge */}
                   {logs && logs.length > 0 && (() => {
                     const lastLogDate = new Date(logs[0].logDate);
                     const hoursAgo = differenceInHours(new Date(), lastLogDate);
                     const daysAgo = differenceInDays(new Date(), lastLogDate);
                     if (hoursAgo < 24) return (
-                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                         {hoursAgo === 0 ? 'Agora' : `${hoursAgo}h atrás`}
                       </span>
                     );
                     if (daysAgo === 1) return (
-                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                         Ontem
                       </span>
                     );
                     return (
-                      <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                      <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
                         {daysAgo}d sem registro
                       </span>
                     );
                   })()}
                 </div>
+
+                {/* Linha 2: semana do ciclo (só se tiver) */}
+                {cycle && currentPhase && currentWeek && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Calendar className="w-3 h-3 text-primary/60 shrink-0" />
+                    <span className="text-[11px] font-semibold text-primary/80">
+                      Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : "Vega"}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      · início {format(new Date(cycle.startDate), "dd/MM", { locale: ptBR })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Ações */}
             <div className="flex items-center gap-2 shrink-0 print-hide">
               {cycle && (
-                <PhaseBadge
-                  phase={tent.category === "MAINTENANCE" ? "MAINTENANCE" : currentPhase ?? "VEGA"}
-                  week={currentWeek ?? undefined}
-                  size="sm"
-                  className="hidden sm:inline-flex"
-                />
+                <div className="hidden sm:block">
+                  <PhaseBadge
+                    phase={tent.category === "MAINTENANCE" ? "MAINTENANCE" : currentPhase ?? "VEGA"}
+                    week={currentWeek ?? undefined}
+                    size="sm"
+                  />
+                </div>
               )}
               {/* QR + Monitor — só desktop */}
               <div className="hidden sm:flex items-center gap-2">
@@ -853,106 +2005,37 @@ export default function TentDetails() {
       {/* Main Content */}
       <main className="container py-6 max-w-7xl space-y-6">
 
-        {/* ── Stat cards do ÚLTIMO registro ── */}
-        {(() => {
-          const last = logs?.[0];
-          type StatCard = { label: string; value: string; unit: string; icon: React.ReactNode; ok: boolean | null };
-          const stats: StatCard[] = [
-            {
-              label: "Temperatura",
-              value: last?.tempC ? parseFloat(last.tempC).toFixed(1) : "—",
-              unit: "°C",
-              icon: <ThermometerSun className="w-4 h-4 text-orange-500" />,
-              ok: last?.tempC ? (parseFloat(last.tempC) >= 20 && parseFloat(last.tempC) <= 28) : null,
-            },
-            {
-              label: "Umidade",
-              value: last?.rhPct ? parseFloat(last.rhPct).toFixed(0) : "—",
-              unit: "%",
-              icon: <Droplets className="w-4 h-4 text-teal-400" />,
-              ok: last?.rhPct ? (parseFloat(last.rhPct) >= 40 && parseFloat(last.rhPct) <= 70) : null,
-            },
-            {
-              label: "PPFD",
-              value: last?.ppfd ? String(last.ppfd) : "—",
-              unit: "µmol",
-              icon: <Sun className="w-4 h-4 text-yellow-500" />,
-              ok: last?.ppfd ? (last.ppfd >= 400 && last.ppfd <= 900) : null,
-            },
-            {
-              label: "pH",
-              value: last?.ph ? parseFloat(last.ph).toFixed(1) : "—",
-              unit: "",
-              icon: <TestTube className="w-4 h-4 text-purple-500" />,
-              ok: last?.ph ? (parseFloat(last.ph) >= 5.8 && parseFloat(last.ph) <= 6.5) : null,
-            },
-            {
-              label: "EC",
-              value: last?.ec ? parseFloat(last.ec).toFixed(1) : "—",
-              unit: "mS",
-              icon: <Zap className="w-4 h-4 text-emerald-500" />,
-              ok: last?.ec ? (parseFloat(last.ec) >= 1.0 && parseFloat(last.ec) <= 2.5) : null,
-            },
-            {
-              label: "Rega",
-              value: last?.wateringVolume ? String(last.wateringVolume) : "—",
-              unit: "ml",
-              icon: <Droplets className="w-4 h-4 text-cyan-400" />,
-              ok: null,
-            },
-            {
-              label: "Runoff",
-              value: last?.runoffPercentage ? `${parseFloat(last.runoffPercentage).toFixed(0)}%` : "—",
-              unit: "",
-              icon: <Percent className="w-4 h-4 text-emerald-400" />,
-              ok: last?.runoffPercentage ? (parseFloat(last.runoffPercentage) >= 10 && parseFloat(last.runoffPercentage) <= 30) : null,
-            },
-            {
-              label: "Fotoperíodo",
-              value: (weekTargets as any)?.photoperiod ?? "—",
-              unit: "",
-              icon: <Sun className="w-4 h-4 text-amber-400" />,
-              ok: null,
-            },
-          ];
+        {/* ── Último registro — linha compacta ── */}
+        {logs && logs.length > 0 && (() => {
+          const last = logs[0];
+          type Pill = { icon: React.ReactNode; value: string; ok: boolean | null };
+          const pills: Pill[] = [
+            { icon: <ThermometerSun className="w-3 h-3 text-orange-400" />, value: last.tempC ? `${parseFloat(last.tempC).toFixed(1)}°C` : "—", ok: last.tempC ? (parseFloat(last.tempC) >= 20 && parseFloat(last.tempC) <= 28) : null },
+            { icon: <Droplets className="w-3 h-3 text-teal-400" />,         value: last.rhPct  ? `${parseFloat(last.rhPct).toFixed(0)}%`  : "—", ok: last.rhPct  ? (parseFloat(last.rhPct)  >= 40 && parseFloat(last.rhPct)  <= 70) : null },
+            { icon: <TestTube  className="w-3 h-3 text-purple-400" />,      value: last.ph     ? `pH ${parseFloat(last.ph).toFixed(1)}`    : "—", ok: last.ph     ? (parseFloat(last.ph)    >= 5.8 && parseFloat(last.ph)    <= 6.5) : null },
+            { icon: <Zap       className="w-3 h-3 text-emerald-400" />,     value: last.ec     ? `${parseFloat(last.ec).toFixed(1)} mS`    : "—", ok: last.ec     ? (parseFloat(last.ec)    >= 1.0 && parseFloat(last.ec)    <= 2.5) : null },
+            { icon: <Droplets  className="w-3 h-3 text-cyan-400" />,        value: last.wateringVolume ? `${last.wateringVolume}ml`         : "—", ok: null },
+            { icon: <Sun       className="w-3 h-3 text-amber-400" />,       value: (weekTargets as any)?.photoperiod ? `${(weekTargets as any).photoperiod}h` : "—", ok: null },
+          ].filter(p => p.value !== "—");
+          if (pills.length === 0) return null;
           return (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  Último registro
-                  {last && (
-                    <span className="text-xs text-muted-foreground/70 ml-1">
-                      {format(new Date(last.logDate), "dd/MM HH:mm", { locale: ptBR })}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-8 gap-2">
-                {stats.map((s) => (
-                  <div
-                    key={s.label}
-                    className={`rounded-xl border p-3 flex flex-col gap-1 ${
-                      s.ok === null
-                        ? "bg-muted/40 border-border"
-                        : s.ok
-                        ? "bg-emerald-500/5 border-emerald-500/20"
-                        : "bg-red-500/5 border-red-500/20"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      {s.icon}
-                      <span className="text-xs text-muted-foreground font-medium">{s.label}</span>
-                    </div>
-                    <p className={`text-xl font-bold leading-none ${
-                      s.ok === null ? "text-muted-foreground" : s.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
-                    }`}>
-                      {s.value}
-                      {s.unit && <span className="text-xs font-normal ml-0.5 text-muted-foreground">{s.unit}</span>}
-                    </p>
-                  </div>
-                ))}
-              </div>
+            <div className="flex items-center gap-1 flex-wrap px-1">
+              <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mr-1 shrink-0">
+                <Clock className="w-2.5 h-2.5" />
+                {format(new Date(last.logDate), "dd/MM HH:mm", { locale: ptBR })}
+              </span>
+              {pills.map((p, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                    p.ok === null    ? "bg-muted/30 border-border/40 text-muted-foreground" :
+                    p.ok            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
+                                      "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {p.icon}{p.value}
+                </span>
+              ))}
             </div>
           );
         })()}
@@ -1072,30 +2155,48 @@ export default function TentDetails() {
           </>
         )}
 
-        {/* Sensor SmartLife */}
-        <TentSensorCard tentId={tentId} />
-
-        {/* Plantas — sempre visível */}
-        <TentPlantsTab tentId={tentId} tentName={tent.name} />
-
-        {/* Charts and History */}
-        <Tabs defaultValue="charts" className="space-y-6" id="charts-container">
-          <TabsList className="bg-card/90 backdrop-blur-sm w-full flex p-1 h-auto gap-1">
-            <TabsTrigger value="charts" className="flex-1">
-              Gráficos
+        {/* Tabs principais — agrupa as 4 áreas da estufa numa nav só.
+            Antes eram 4 cards empilhados (sensor / pair / cenas / plantas) +
+            tabs internas de gráficos. Agora tudo em 4 tabs no mesmo nível,
+            menos scroll vertical, foco visual numa área por vez.
+            id="charts-container" mantido pra compat com PDF export que faz
+            scrollIntoView nele antes de capturar. */}
+        <Tabs defaultValue="plantas" className="space-y-6" id="charts-container">
+          <TabsList className="bg-card/90 backdrop-blur-sm w-full grid grid-cols-4 p-1 h-auto gap-1">
+            <TabsTrigger value="plantas" className="gap-1.5 text-xs sm:text-sm">
+              <Sprout className="w-3.5 h-3.5" />
+              <span>Plantas</span>
             </TabsTrigger>
-            <Button asChild size="sm" className="flex-1 h-8 gap-1.5 rounded-sm font-semibold shadow-none">
-              <Link href={`/tent/${tentId}/log`}>
-                <Plus className="w-4 h-4" />
-                Registrar
-              </Link>
-            </Button>
-            <TabsTrigger value="history" className="flex-1">
-              Histórico
+            <TabsTrigger value="smartlife" className="gap-1.5 text-xs sm:text-sm">
+              <Wifi className="w-3.5 h-3.5" />
+              <span>SmartLife</span>
+            </TabsTrigger>
+            <TabsTrigger value="metricas" className="gap-1.5 text-xs sm:text-sm">
+              <ThermometerSun className="w-3.5 h-3.5" />
+              <span>Métricas</span>
+            </TabsTrigger>
+            <TabsTrigger value="historico" className="gap-1.5 text-xs sm:text-sm">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Histórico</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="charts" className="space-y-6">
+          {/* Tab Plantas (default) — lista de plantas + ações */}
+          <TabsContent value="plantas" className="space-y-4">
+            <TentPlantsTab tentId={tentId} tentName={tent.name} />
+          </TabsContent>
+
+          {/* Tab SmartLife — ESP primeiro (vínculos display + ações inline),
+              depois pareamento, depois sensor.
+              Hierarquia: o que o user usa mais frequente fica no topo. */}
+          <TabsContent value="smartlife" className="space-y-4">
+            <TentDisplayItemsCard tentId={tentId} />
+            <PairDisplayCard tentId={tentId} />
+            <TentSensorCard tentId={tentId} />
+          </TabsContent>
+
+          {/* Tab Métricas (gráficos — antes era a tab "charts") */}
+          <TabsContent value="metricas" className="space-y-6">
             {/* Date Range Selector */}
             <div className="flex items-center gap-3">
               <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -1141,7 +2242,6 @@ export default function TentDetails() {
               <>
                 {/* Temperature Chart */}
                 <Card className="bg-card/90 backdrop-blur-sm relative overflow-hidden group/chart">
-                  {/* Pulsing glow — subtle "live data" feel */}
                   <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover/chart:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 0 1px rgba(249,115,22,0.15) inset' }} />
                   <div className="chart-glow-line pointer-events-none absolute bottom-0 left-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent" />
                   <CardHeader>
@@ -1164,8 +2264,8 @@ export default function TentDetails() {
                         <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                         <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[15, 35]} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "var(--foreground)" }}
                         />
                         <Area
                           type="monotone"
@@ -1212,8 +2312,8 @@ export default function TentDetails() {
                         <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                         <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[30, 90]} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "var(--foreground)" }}
                         />
                         <Area
                           type="monotone"
@@ -1258,8 +2358,8 @@ export default function TentDetails() {
                         <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                         <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 1200]} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                          labelStyle={{ color: "hsl(var(--foreground))" }}
+                          contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                          labelStyle={{ color: "var(--foreground)" }}
                         />
                         <Area
                           type="monotone"
@@ -1306,8 +2406,8 @@ export default function TentDetails() {
                           <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                           <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[4.5, 8]} tickCount={8} />
                           <Tooltip
-                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                            labelStyle={{ color: "hsl(var(--foreground))" }}
+                            contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                            labelStyle={{ color: "var(--foreground)" }}
                           />
                           <Area
                             type="monotone"
@@ -1356,8 +2456,8 @@ export default function TentDetails() {
                           <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
                           <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 4]} tickCount={9} />
                           <Tooltip
-                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "13px" }}
-                            labelStyle={{ color: "hsl(var(--foreground))" }}
+                            contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
+                            labelStyle={{ color: "var(--foreground)" }}
                           />
                           <Area
                             type="monotone"
@@ -1406,7 +2506,7 @@ export default function TentDetails() {
                           <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="ml" width={48} />
                           <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="%" width={36} domain={[0, 100]} />
                           <Tooltip
-                            contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                            contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
                             formatter={(value: any, name: any) => name === "Rega" ? [`${value} ml`, name] : [`${value}%`, name]}
                           />
                           <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
@@ -1427,7 +2527,8 @@ export default function TentDetails() {
             )}
           </TabsContent>
 
-          <TabsContent value="history">
+          {/* Tab Histórico (tabela de logs — antes era "history") */}
+          <TabsContent value="historico">
             {logsLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -1604,6 +2705,7 @@ export default function TentDetails() {
               </Card>
             )}
           </TabsContent>
+
         </Tabs>
       </main>
 
@@ -1700,114 +2802,109 @@ export default function TentDetails() {
   );
 }
 
-// Componente para aba de plantas da estufa
-function TentPlantsTab({ tentId, tentName }: { tentId: number; tentName: string }) {
+// Componente para lista de plantas da estufa — estilo PlantsList (cards foto full-cover)
+function TentPlantsTab({ tentId, tentName: _tentName }: { tentId: number; tentName: string }) {
   const { data: plants, isLoading } = trpc.plants.list.useQuery({ tentId });
   const { data: strains } = trpc.strains.list.useQuery();
 
-  const getStrainName = (strainId: number) => {
-    return strains?.find((s) => s.id === strainId)?.name || "--";
-  };
-
-  // getStatusColor e getStatusLabel importados de @/lib/plantUtils
-
-  const getHealthIcon = (status?: string) => {
-    switch (status) {
-      case "HEALTHY": return <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0 inline-block"/>;
-      case "STRESSED": return <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0 inline-block"/>;
-      case "SICK": return <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block"/>;
-      case "RECOVERING": return <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0 inline-block"/>;
-      default: return <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/30 shrink-0 inline-block"/>;
-    }
-  };
+  const getStrainName = (strainId: number) =>
+    strains?.find((s) => s.id === strainId)?.name ?? null;
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="grid grid-cols-3 gap-2.5">
+        {[1,2,3].map(i => (
+          <div key={i} className="rounded-2xl aspect-[3/4] bg-muted/40 animate-pulse" />
+        ))}
       </div>
     );
   }
 
   if (!plants || plants.length === 0) {
     return (
-      <Card className="bg-card/90 backdrop-blur-sm">
-        <CardContent className="p-12 text-center">
-          <Leaf className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground mb-2">Nenhuma planta nesta estufa</p>
-          <p className="text-muted-foreground mb-4">Adicione plantas para acompanhar o crescimento</p>
-          <Button asChild>
-            <Link href="/plants/new">
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Planta
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <Leaf className="w-10 h-10 text-muted-foreground/20" />
+        <p className="text-sm text-muted-foreground">Nenhuma planta nesta estufa</p>
+        <Button asChild size="sm" variant="outline">
+          <Link href="/plants/new"><Plus className="w-3.5 h-3.5 mr-1.5" />Nova Planta</Link>
+        </Button>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {plants.length} {plants.length === 1 ? "planta" : "plantas"} em {tentName}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-0.5">
+        <p className="text-xs text-muted-foreground">
+          {plants.length} {plants.length === 1 ? "planta" : "plantas"}
         </p>
-        <Button asChild size="sm">
-          <Link href="/plants/new">
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Planta
-          </Link>
+        <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
+          <Link href="/plants/new"><Plus className="w-3 h-3 mr-1" />Nova</Link>
         </Button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {plants.map((plant: any) => (
-          <Link key={plant.id} href={`/plants/${plant.id}`}>
-            <Card className="bg-card/90 backdrop-blur-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer h-full">
-              {/* Foto da planta */}
-              {plant.lastHealthPhoto && (
-                <div className="aspect-[4/3] overflow-hidden rounded-t-lg">
-                  <img
-                    src={plant.lastHealthPhoto}
-                    alt={plant.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              <CardHeader className={plant.lastHealthPhoto ? "pt-3" : ""}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{plant.name}</CardTitle>
-                    {plant.code && (
-                      <CardDescription className="text-sm font-mono">{plant.code}</CardDescription>
-                    )}
-                  </div>
-                  <div className={`px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(plant.status)}`}>
-                    {getStatusLabel(plant.status)}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2 pt-0">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Sprout className="w-4 h-4" />
-                  <span>{getStrainName(plant.strainId)}</span>
-                </div>
-                {plant.lastHealthStatus && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{getHealthIcon(plant.lastHealthStatus)}</span>
-                    <span>Saúde: {plant.lastHealthStatus === "HEALTHY" ? "Saudável" : plant.lastHealthStatus === "STRESSED" ? "Estressada" : plant.lastHealthStatus === "SICK" ? "Doente" : plant.lastHealthStatus === "RECOVERING" ? "Recuperando" : "--"}</span>
+
+      <div className="grid grid-cols-3 gap-2.5">
+        {plants.map((plant: any) => {
+          const thumbUrl = plant.lastHealthPhotoUrl
+            ? (plant.lastHealthPhotoUrl.startsWith('/uploads/')
+                ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=220&h=300&q=55`
+                : plant.lastHealthPhotoUrl)
+            : null;
+
+          const cardBg =
+            plant.cyclePhase === 'FLORA' ? '#581c87' :
+            plant.cyclePhase === 'VEGA'  ? '#14532d' : '#1e293b';
+
+          const healthBadge =
+            plant.lastHealthStatus === 'HEALTHY'    ? { icon: '✓', bg: 'rgba(74,222,128,0.22)',  color: '#4ade80' } :
+            plant.lastHealthStatus === 'STRESSED'   ? { icon: '!', bg: 'rgba(251,191,36,0.25)',  color: '#fbbf24' } :
+            plant.lastHealthStatus === 'SICK'       ? { icon: '✕', bg: 'rgba(248,113,113,0.25)', color: '#f87171' } :
+            plant.lastHealthStatus === 'RECOVERING' ? { icon: '↻', bg: 'rgba(96,165,250,0.25)',  color: '#60a5fa' } :
+            null;
+
+          const phaseLabel =
+            plant.cyclePhase === 'FLORA' && plant.cycleWeek ? `Flora · S${plant.cycleWeek}` :
+            plant.cyclePhase === 'VEGA'  && plant.cycleWeek ? `Vega · S${plant.cycleWeek}`  :
+            getStrainName(plant.strainId) ?? '—';
+
+          return (
+            <Link key={plant.id} href={`/plants/${plant.id}`}>
+              <div
+                className="rounded-2xl overflow-hidden relative aspect-[3/4] active:scale-95 transition-transform duration-150"
+                style={{ background: cardBg }}
+              >
+                {/* Badge saúde */}
+                {healthBadge && (
+                  <span
+                    className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm"
+                    style={{ background: healthBadge.bg, color: healthBadge.color }}
+                  >
+                    {healthBadge.icon}
+                  </span>
+                )}
+
+                {/* Foto ou inicial */}
+                {thumbUrl ? (
+                  <img src={thumbUrl} alt={plant.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-4xl font-black text-white/30 select-none">
+                      {(plant.name ?? '?')[0].toUpperCase()}
+                    </span>
                   </div>
                 )}
-                {plant.cyclePhase && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Leaf className="w-4 h-4 text-primary" />
-                    <span className="text-primary font-medium">{plant.cyclePhase}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+
+                {/* Gradiente + texto */}
+                <div className="absolute inset-x-0 bottom-0 pointer-events-none"
+                  style={{ height: '55%', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)' }} />
+                <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5">
+                  <p className="text-white font-bold text-xs leading-tight truncate drop-shadow">{plant.name}</p>
+                  <p className="text-white/60 text-[10px] mt-0.5 truncate">{phaseLabel}</p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

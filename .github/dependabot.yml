@@ -1,0 +1,68 @@
+# Dependabot — atualizações automáticas semanais.
+#
+# Cria PRs (1 por week) com bumps de patch/minor agrupados por ecossistema.
+# Major versions saem em PR separado pra revisão manual (mais risco de breaking).
+
+version: 2
+updates:
+  # ── npm/pnpm — dependências do app ────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    # Agrupa updates compatíveis num só PR (evita 50 PRs por semana).
+    groups:
+      # devDependencies (test + lint + build tooling) — agrupado, baixo risco
+      dev-tooling:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      # Tipos do TypeScript — sempre batch
+      types:
+        patterns:
+          - "@types/*"
+      # Radix UI components — costumam atualizar em batch
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
+      # Drizzle ORM (core + kit + driver)
+      drizzle:
+        patterns:
+          - "drizzle-*"
+          - "@drizzle/*"
+      # tRPC stack
+      trpc:
+        patterns:
+          - "@trpc/*"
+    # Ignora majors de coisas críticas — atualiza manual com plano de migração.
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "drizzle-orm"
+        update-types: ["version-update:semver-major"]
+
+  # ── GitHub Actions ─────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"

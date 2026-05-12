@@ -70,6 +70,7 @@ export default function DisplayMode() {
     try { if ("wakeLock" in navigator) setWakeLock(await (navigator as any).wakeLock.request("screen")); } catch { /* silent */ }
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { requestWakeLock(); return () => { wakeLock?.release(); }; }, []);
   useEffect(() => {
     const fn = () => { if (document.visibilityState === "visible") requestWakeLock(); };

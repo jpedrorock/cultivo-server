@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Pencil, X } from 'lucide-react';
+import { Wifi, WifiOff, Check, RefreshCw, ToggleLeft, ToggleRight, ChevronUp, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageTransition } from '@/components/PageTransition';
 import { PageHeader } from '@/components/PageHeader';
@@ -60,7 +60,7 @@ export default function TuyaSettings() {
   useEffect(() => {
     if (config) {
       setAccessId(config.accessId);
-      setAccessSecret(config.accessSecret);
+      setAccessSecret(''); // Nunca popular com o segredo — usuário digita novo apenas se quiser trocar
       setRegion(config.region as Region);
       setPollInterval(config.pollIntervalMin as PollInterval);
       setIntegrationEnabled(config.enabled);
@@ -138,7 +138,6 @@ export default function TuyaSettings() {
     persistMappings(updated);
   };
 
-  const handleSaveMappings = () => persistMappings(mappings);
 
   if (isLoading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -203,7 +202,7 @@ export default function TuyaSettings() {
               {/* Credenciais */}
               <div className="bg-card border border-border rounded-2xl divide-y divide-border overflow-hidden">
                 <CredentialField label="Access ID" value={accessId} onChange={(v) => { setAccessId(v); setConnStatus(null); setConnMsg(''); }} placeholder="Ex: 9gk3qwi8nf2mxxx" mono secret />
-                <CredentialField label="Access Secret" value={accessSecret} onChange={(v) => { setAccessSecret(v); setConnStatus(null); setConnMsg(''); }} placeholder="Ex: a1b2c3d4e5f6..." mono secret />
+                <CredentialField label="Access Secret" value={accessSecret} onChange={(v) => { setAccessSecret(v); setConnStatus(null); setConnMsg(''); }} placeholder={config?.accessSecretMasked ? "Segredo salvo — deixe vazio para manter" : "Ex: a1b2c3d4e5f6..."} mono secret />
               </div>
 
               {/* Região */}

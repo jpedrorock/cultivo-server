@@ -1,11 +1,15 @@
 import type { Express, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
+import { randomBytes } from 'node:crypto';
 import {
   getUserByEmail,
   getUserByOpenId,
   createUser,
   updateUserLastSignedIn,
   updateUserAvatar,
-  countUsers,
+  updateUserPassword,
+  linkUserOpenId,
+  registerUserAtomic,
 } from '../db-auth';
 import {
   hashPassword,
@@ -18,31 +22,24 @@ import {
 import { ENV } from './env';
 
 // ---------------------------------------------------------------------------
-// Rate limiter in-memory simples — sem dependência externa
-// Protege login e register de brute force
+// Rate limiters por endpoint sensível
+// Inclui Retry-After + X-RateLimit-* headers padrão
 // ---------------------------------------------------------------------------
-interface RateLimitEntry { count: number; resetAt: number }
-const rateLimitStore = new Map<string, RateLimitEntry>();
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,           // 15 minutos
+  limit: 10,                          // 10 tentativas por janela
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+});
 
-function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return true; // dentro do limite
-  }
-  entry.count++;
-  if (entry.count > maxRequests) return false; // bloqueado
-  return true;
-}
-
-// Limpar entradas expiradas a cada 10 minutos
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore) {
-    if (now > entry.resetAt) rateLimitStore.delete(key);
-  }
-}, 10 * 60 * 1000);
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,           // 1 hora
+  limit: 5,                           // 5 registros por hora
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de registro. Tente novamente em 1 hora.' },
+});
 
 // ---------------------------------------------------------------------------
 
@@ -55,13 +52,7 @@ export function registerAuthRoutes(app: Express) {
    * POST /api/auth/register
    * Registra um novo usuário com email e senha
    */
-  app.post('/api/auth/register', async (req: Request, res: Response) => {
-    // Rate limit: 5 registros por hora por IP
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-    if (!checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000)) {
-      res.status(429).json({ error: 'Muitas tentativas de registro. Tente novamente em 1 hora.' });
-      return;
-    }
+  app.post('/api/auth/register', registerLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password, name } = req.body as {
         email: string;
@@ -74,8 +65,8 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      if (password.length < 6) {
-        res.status(400).json({ error: 'Senha deve ter no mínimo 6 caracteres' });
+      if (password.length < 12) {
+        res.status(400).json({ error: 'Senha deve ter no mínimo 12 caracteres' });
         return;
       }
 
@@ -87,23 +78,19 @@ export function registerAuthRoutes(app: Express) {
 
       const passwordHash = await hashPassword(password);
 
-      // Primeiro usuário → admin aprovado automaticamente; demais aguardam aprovação
-      const total = await countUsers();
-      const isFirst = total === 0;
-
-      const user = await createUser({
+      // Decisão "primeiro = admin aprovado" feita atomicamente (lock MySQL)
+      // para evitar race com 2 POSTs simultâneos virando 2 admins.
+      const { user, isFirst } = await registerUserAtomic({
         email,
         passwordHash,
         name: name || null,
-        role: isFirst ? 'admin' : 'user',
-        approved: isFirst,
         lastSignedIn: new Date(),
       });
 
       if (!isFirst) {
-        // Notificar admins via push notification (fire-and-forget)
-        import('../pushService').then(({ sendPushToAll }) => {
-          sendPushToAll({
+        // Notificar APENAS admins via push notification (fire-and-forget)
+        import('../pushService').then(({ sendPushToAdmins }) => {
+          sendPushToAdmins({
             title: 'Novo usuário aguardando aprovação',
             body: `${name || email} solicitou acesso ao app Cultivo`,
             url: '/settings',
@@ -139,13 +126,7 @@ export function registerAuthRoutes(app: Express) {
    * POST /api/auth/login
    * Autentica um usuário com email e senha
    */
-  app.post('/api/auth/login', async (req: Request, res: Response) => {
-    // Rate limit: 10 tentativas de login por 15 minutos por IP
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
-    if (!checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000)) {
-      res.status(429).json({ error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' });
-      return;
-    }
+  app.post('/api/auth/login', loginLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body as { email: string; password: string };
 
@@ -160,8 +141,8 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      const valid = await comparePassword(password, user.passwordHash);
-      if (!valid) {
+      const { ok, needsRehash } = await comparePassword(password, user.passwordHash);
+      if (!ok) {
         res.status(401).json({ error: 'Email ou senha incorretos' });
         return;
       }
@@ -169,6 +150,16 @@ export function registerAuthRoutes(app: Express) {
       if (!user.approved) {
         res.status(403).json({ error: 'Sua conta ainda não foi aprovada por um administrador.', code: 'PENDING_APPROVAL' });
         return;
+      }
+
+      // Migração transparente: hashes legados (bcrypt) → argon2 ao logar
+      if (needsRehash) {
+        try {
+          const newHash = await hashPassword(password);
+          await updateUserPassword(user.id, newHash);
+        } catch (e) {
+          console.warn('[Auth] Falha ao migrar hash para argon2 (login continua OK)', String(e));
+        }
       }
 
       await updateUserLastSignedIn(user.id);
@@ -227,6 +218,18 @@ export function registerAuthRoutes(app: Express) {
       res.status(503).json({ error: 'Google OAuth não configurado. Adicione GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no .env' });
       return;
     }
+    // CSRF: gera state aleatório e armazena em cookie httpOnly. Callback compara
+    // o state da query (vindo do Google) com o do cookie. Sem isso, atacante
+    // pode levar a vítima ao callback com seu próprio code → vítima loga na conta dele.
+    const state = randomBytes(32).toString('hex');
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: ENV.isProduction,
+      sameSite: 'lax',         // precisa lax — Strict não volta no redirect cross-domain
+      maxAge: 10 * 60 * 1000,  // 10 minutos é suficiente
+      path: '/api/auth/google',
+    });
+
     const protocol = ENV.isProduction ? 'https' : 'http';
     const redirectUri = `${protocol}://${ENV.domain}/api/auth/google/callback`;
     const params = new URLSearchParams({
@@ -235,6 +238,7 @@ export function registerAuthRoutes(app: Express) {
       response_type: 'code',
       scope: 'openid email profile',
       access_type: 'online',
+      state,
     });
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   });
@@ -244,10 +248,20 @@ export function registerAuthRoutes(app: Express) {
    * Recebe o código do Google e autentica o usuário
    */
   app.get('/api/auth/google/callback', async (req: Request, res: Response) => {
-    const { code, error } = req.query as { code?: string; error?: string };
+    const { code, error, state } = req.query as { code?: string; error?: string; state?: string };
+    const cookieState = req.cookies?.oauth_state as string | undefined;
+    // Limpa cookie em qualquer fluxo subsequente — é single-use
+    res.clearCookie('oauth_state', { path: '/api/auth/google' });
 
     if (error || !code) {
       res.redirect('/login?error=google_cancelled');
+      return;
+    }
+
+    // Validação CSRF: state da query DEVE igualar state do cookie
+    if (!state || !cookieState || state !== cookieState) {
+      console.warn('[Auth] Google OAuth state mismatch — possível ataque CSRF');
+      res.redirect('/login?error=google_state_invalid');
       return;
     }
 
@@ -276,7 +290,7 @@ export function registerAuthRoutes(app: Express) {
 
       const tokenData = await tokenRes.json() as { access_token: string };
 
-      // Buscar dados do usuário no Google
+      // Buscar dados do usuário no Google (inclui verified_email)
       const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
@@ -289,31 +303,59 @@ export function registerAuthRoutes(app: Express) {
       const googleUser = await userRes.json() as {
         id: string;
         email: string;
+        verified_email?: boolean;
         name?: string;
         picture?: string;
       };
 
-      // Buscar ou criar usuário
+      // Bloqueia se Google diz que email não foi verificado
+      // (Sem isso, atacante poderia usar email de terceiros não verificado.)
+      if (googleUser.verified_email === false) {
+        console.warn(`[Auth] Google email não verificado: ${googleUser.email}`);
+        res.redirect('/login?error=google_email_not_verified');
+        return;
+      }
+
+      // Buscar usuário pelo openId (Google ID estável)
       let user = await getUserByOpenId(googleUser.id);
 
       if (!user) {
-        // Verificar se já existe conta com o mesmo email
-        user = await getUserByEmail(googleUser.email);
-        if (!user) {
-          // Primeiro usuário → admin aprovado; demais aguardam aprovação
-          const total = await countUsers();
-          const isFirst = total === 0;
-          user = await createUser({
-            email: googleUser.email,
-            name: googleUser.name ?? null,
-            role: isFirst ? 'admin' : 'user',
-            approved: isFirst,
-            lastSignedIn: new Date(),
-            openId: googleUser.id,
-            loginMethod: 'google',
-            avatarUrl: googleUser.picture ?? null,
-          });
+        // Não existe vinculação com Google. Verificar se há conta com mesmo email.
+        const existingByEmail = await getUserByEmail(googleUser.email);
+
+        if (existingByEmail) {
+          // CASO PERIGOSO: conta com o email já existe MAS não tem openId vinculado.
+          //
+          // Cenário de ataque:
+          //   1. Atacante cria conta vitima@gmail.com com email/senha
+          //   2. Vítima entra com Google (mesmo email)
+          //   3. Sem proteção, código faria merge silencioso → vítima loga na conta do atacante
+          //
+          // Bloqueamos o merge automático. Para vincular Google a uma conta
+          // existente, o usuário deve fazer login com email/senha primeiro
+          // e usar a opção "Vincular Google" no perfil (a implementar).
+          if (existingByEmail.openId && existingByEmail.openId !== googleUser.id) {
+            // Conta já vinculada a OUTRO Google ID — definitivamente não é a mesma pessoa
+            console.warn(`[Auth] Tentativa de login Google para email com openId diferente: ${googleUser.email}`);
+            res.redirect('/login?error=google_account_conflict');
+            return;
+          }
+
+          // Sem openId vinculado — bloqueia e instrui o usuário
+          res.redirect('/login?error=google_email_exists');
+          return;
         }
+
+        // Email novo — cria conta atomicamente (mesma proteção contra race do "primeiro = admin")
+        const created = await registerUserAtomic({
+          email: googleUser.email,
+          name: googleUser.name ?? null,
+          lastSignedIn: new Date(),
+          openId: googleUser.id,
+          loginMethod: 'google',
+          avatarUrl: googleUser.picture ?? null,
+        });
+        user = created.user;
       }
 
       // Bloquear login de usuários não aprovados
@@ -339,3 +381,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 }
+
+// linkUserOpenId é usado pelo procedure de "Vincular Google" no perfil (a implementar).
+// Mantido aqui para que o import sobreviva ao tree-shaking quando o procedure for criado.
+export { linkUserOpenId };

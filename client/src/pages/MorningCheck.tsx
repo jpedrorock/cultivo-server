@@ -5,7 +5,7 @@ import { Plus, ThermometerSun, Droplets, Sun, Clock, CheckCircle2, AlertTriangle
 import { Button } from "@/components/ui/button";
 import { differenceInHours, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { PageTransition } from "@/components/PageTransition";
+import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { PageHeader } from "@/components/PageHeader";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -227,16 +227,17 @@ export default function MorningCheck() {
               Nenhuma estufa cadastrada
             </div>
           ) : (
-            <div className="space-y-3">
+            <StaggerList className="space-y-3">
               {tents.map((tent: any) => (
-                <TentMorningCard
-                  key={tent.id}
-                  tent={tent}
-                  log={latestLogs[tent.id] ?? null}
-                  cycle={cycleByTent[tent.id] ?? null}
-                />
+                <ListItemAnimation key={tent.id}>
+                  <TentMorningCard
+                    tent={tent}
+                    log={latestLogs[tent.id] ?? null}
+                    cycle={cycleByTent[tent.id] ?? null}
+                  />
+                </ListItemAnimation>
               ))}
-            </div>
+            </StaggerList>
           )}
         </main>
       </div>

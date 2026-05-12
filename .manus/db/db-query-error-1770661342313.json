@@ -1,8 +1,0 @@
-{
-  "query": "\nINSERT INTO tents (name, tentType, width, depth, height, volume, powerW) VALUES\n('Estufa A', 'INDOOR', 1.20, 1.20, 2.00, 2.88, 600),\n('Estufa B', 'INDOOR', 0.80, 0.80, 1.60, 1.02, 300),\n('Estufa C', 'GREENHOUSE', 2.00, 1.50, 2.50, 7.50, 1000);\n\nINSERT INTO strains (name, type, vegaDays, floraDays, notes) VALUES\n('OG Kush', 'HYBRID', 28, 56, 'Strain clássica, resistente e produtiva');\n\nINSERT INTO cycles (tentId, strainId, startDate, status) VALUES\n(2, 1, DATE_SUB(CURDATE(), INTERVAL 14 DAYS), 'ACTIVE');\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nINSERT INTO tents (name, tentType, width, depth, height, volume, powerW) VALUES\n('Estufa A', 'INDOOR', 1.20, 1.20, 2.00, 2.88, 600),\n('Estufa B', 'INDOOR', 0.80, 0.80, 1.60, 1.02, 300),\n('Estufa C', 'GREENHOUSE', 2.00, 1.50, 2.50, 7.50, 1000);\n\nINSERT INTO strains (name, type, vegaDays, floraDays, notes) VALUES\n('OG Kush', 'HYBRID', 28, 56, 'Strain clássica, resistente e produtiva');\n\nINSERT INTO cycles (tentId, strainId, startDate, status) VALUES\n(2, 1, DATE_SUB(CURDATE(), INTERVAL 14 DAYS), 'ACTIVE');\n",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1265 (01000) at line 2: Data truncated for column 'tentType' at row 1"
-  ]
-}

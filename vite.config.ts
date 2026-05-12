@@ -29,6 +29,20 @@ export default defineConfig({
           "vendor-charts": ["recharts"],
           // date-fns separado — ~80KB
           "vendor-dates": ["date-fns"],
+          // Three.js — ~600KB. Só carrega no PlantTrainingPage / Plant3DView.
+          // Sem chunk dedicado, ia parar dentro do bundle da rota e inflar
+          // qualquer chunk que importasse algo dela transitivamente.
+          "vendor-three": ["three"],
+          // Animações — framer-motion. Tirar do main pra cache mais agressivo.
+          "vendor-motion": ["framer-motion"],
+          // Validação de schemas — usado pelo trpc client e forms
+          "vendor-zod": ["zod"],
+          // Forms
+          "vendor-forms": ["react-hook-form", "@hookform/resolvers"],
+          // Roteador — pequeno mas sempre carregado, isolar pra cache
+          "vendor-router": ["wouter"],
+          // Toast lib
+          "vendor-toast": ["sonner"],
           // Radix UI (muitos pacotes pequenos juntos)
           "vendor-radix": [
             "@radix-ui/react-dialog",

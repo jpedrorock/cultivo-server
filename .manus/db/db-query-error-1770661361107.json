@@ -1,8 +1,0 @@
-{
-  "query": "\nINSERT INTO tents (name, tentType, width, depth, height, volume, powerW) VALUES\n('Estufa A', 'A', 120, 120, 200, 2.880, 600),\n('Estufa B', 'B', 80, 80, 160, 1.024, 300),\n('Estufa C', 'C', 200, 150, 250, 7.500, 1000);\n\nINSERT INTO strains (name, type, vegaDays, floraDays, notes) VALUES\n('OG Kush', 'HYBRID', 28, 56, 'Strain clássica, resistente e produtiva');\n\nINSERT INTO cycles (tentId, strainId, startDate, status) VALUES\n(120001, 1, DATE_SUB(CURDATE(), INTERVAL 14 DAYS), 'ACTIVE');\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute \nINSERT INTO tents (name, tentType, width, depth, height, volume, powerW) VALUES\n('Estufa A', 'A', 120, 120, 200, 2.880, 600),\n('Estufa B', 'B', 80, 80, 160, 1.024, 300),\n('Estufa C', 'C', 200, 150, 250, 7.500, 1000);\n\nINSERT INTO strains (name, type, vegaDays, floraDays, notes) VALUES\n('OG Kush', 'HYBRID', 28, 56, 'Strain clássica, resistente e produtiva');\n\nINSERT INTO cycles (tentId, strainId, startDate, status) VALUES\n(120001, 1, DATE_SUB(CURDATE(), INTERVAL 14 DAYS), 'ACTIVE');\n",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1054 (42S22) at line 7: Unknown column 'type' in 'field list'"
-  ]
-}

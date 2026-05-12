@@ -6,11 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Download, Calendar, Filter, Table as TableIcon, Pencil, Trash2, FileDown, ClipboardList, Share2, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react";
+import { Loader2, Download, Filter, Table as TableIcon, Pencil, Trash2, ClipboardList, Share2, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from "lucide-react";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -260,18 +259,7 @@ export default function HistoryTable() {
     }
   };
 
-  if (tentsLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <PageHeader backHref="/" title="Histórico" subtitle="Carregando…" />
-        <main className="container mx-auto px-4 py-8">
-          <HistoryTableSkeleton count={6} />
-        </main>
-      </div>
-    );
-  }
-
-  // VPD helper: kPa
+  // VPD helper: kPa (declarado antes do early return para manter ordem dos hooks)
   const calcVPD = (tempC: number | null | undefined, rhPct: number | null | undefined): string | null => {
     if (tempC == null || rhPct == null) return null;
     const t = parseFloat(String(tempC));
@@ -280,7 +268,7 @@ export default function HistoryTable() {
     return (0.6108 * Math.exp(17.27 * t / (t + 237.3)) * (1 - rh / 100)).toFixed(2);
   };
 
-  // Apply client-side turn filter + sort
+  // Apply client-side turn filter + sort — useMemo DEVE vir antes de qualquer early return
   const displayedLogs = useMemo(() => {
     if (!logsData?.logs) return [];
     const filtered = turnFilter === "ALL"
@@ -305,6 +293,18 @@ export default function HistoryTable() {
 
   const currentPage = Math.floor(offset / limit) + 1;
   const totalPages = logsData?.total ? Math.ceil(logsData.total / limit) : 1;
+
+  // Early return DEPOIS de todos os hooks
+  if (tentsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <PageHeader backHref="/" title="Histórico" subtitle="Carregando…" />
+        <main className="container mx-auto px-4 py-8">
+          <HistoryTableSkeleton count={6} />
+        </main>
+      </div>
+    );
+  }
 
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {

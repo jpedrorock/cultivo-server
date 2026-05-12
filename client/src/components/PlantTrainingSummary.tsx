@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  Scissors, Sprout, Loader2, Maximize2, X, Save,
+  Sprout, Loader2, Maximize2, X, Save, LayoutGrid, Boxes,
 } from "lucide-react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { toast } from "sonner";
@@ -16,8 +17,9 @@ interface Props {
 }
 
 export default function PlantTrainingSummary({ plantId }: Props) {
+  const [, navigate] = useLocation();
   const { data: logs = [], isLoading, refetch } = trpc.plantLST.list.useQuery({ plantId });
-  const { data: stats } = trpc.plantLST.stats.useQuery({ plantId });
+  trpc.plantLST.stats.useQuery({ plantId });
   const utils = trpc.useUtils();
 
   // ── Sandbox ───────────────────────────────────────────────────────────────
@@ -188,19 +190,28 @@ export default function PlantTrainingSummary({ plantId }: Props) {
           <button
             onClick={openSandbox}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Abrir editor"
+            title="Abrir editor 2D rápido"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
         </div>
         <PlantNodeMap plantId={plantId} compact onCompactTap={openSandbox} />
-        <button
-          onClick={openSandbox}
-          className="w-full py-2 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors flex items-center justify-center gap-1.5 border-t border-border/20"
-        >
-          <Scissors className="w-3 h-3" />
-          Abrir editor de treinamento
-        </button>
+        <div className="grid grid-cols-2 gap-px border-t border-border/20 bg-border/20">
+          <button
+            onClick={() => navigate(`/plants/${plantId}/training?sandbox=1&view=top`)}
+            className="py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 bg-card hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            Editar 2D
+          </button>
+          <button
+            onClick={() => navigate(`/plants/${plantId}/training?sandbox=1&view=3d`)}
+            className="py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 bg-card hover:bg-blue-500/10 text-blue-600 dark:text-blue-400 transition-colors"
+          >
+            <Boxes className="w-3.5 h-3.5" />
+            Editar 3D
+          </button>
+        </div>
       </div>
 
       {/* ── Histórico recente ─────────────────────────────────────────────── */}

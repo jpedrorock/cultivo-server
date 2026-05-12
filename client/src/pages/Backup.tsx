@@ -95,7 +95,7 @@ export default function Backup() {
       toast.info("Fazendo backup automático semanal…", { duration: 3000 });
       doExport(true).catch(() => {});
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoBackupEnabled, lastAutoBackup, doExport]);
 
   const handleImport = () => {
     const input = document.createElement("input");
@@ -338,8 +338,8 @@ export default function Backup() {
                 setImportConfirm(false);
                 setIsImporting(true);
                 try {
-                  await importBackup.mutateAsync(pendingFile);
-                } catch (e) {
+                  await importBackup.mutateAsync(pendingFile as any);
+                } catch (_e) {
                   // handled by onError
                 }
                 setPendingFile(null);

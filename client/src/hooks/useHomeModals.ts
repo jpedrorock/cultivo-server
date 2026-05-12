@@ -11,8 +11,6 @@ export function useHomeModals() {
   const [tentToDelete, setTentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [editTentDialogOpen, setEditTentDialogOpen] = useState(false);
   const [tentToEdit, setTentToEdit] = useState<any>(null);
-  const [showMoveAllPlants, setShowMoveAllPlants] = useState(false);
-  const [targetTentId, setTargetTentId] = useState<string>("");
   const [deletePreviewTentId, setDeletePreviewTentId] = useState<number | null>(null);
   const [finalizeCycleConfirm, setFinalizeCycleConfirm] = useState<{
     open: boolean;
@@ -31,8 +29,6 @@ export function useHomeModals() {
     tentToDelete, setTentToDelete,
     editTentDialogOpen, setEditTentDialogOpen,
     tentToEdit, setTentToEdit,
-    showMoveAllPlants, setShowMoveAllPlants,
-    targetTentId, setTargetTentId,
     deletePreviewTentId, setDeletePreviewTentId,
     finalizeCycleConfirm, setFinalizeCycleConfirm,
   };

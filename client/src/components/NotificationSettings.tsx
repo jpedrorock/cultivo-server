@@ -6,7 +6,6 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
@@ -92,6 +91,7 @@ export function NotificationSettings() {
     }, 1000);
     
     return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, permission]);
 
   const requestPermission = async () => {
@@ -177,14 +177,6 @@ export function NotificationSettings() {
     }
   };
 
-  const handleToggleDailyReminder = (enabled: boolean) => {
-    if (enabled && permission !== "granted") {
-      requestPermission();
-      return;
-    }
-    setConfig({ ...config, dailyReminderEnabled: enabled });
-  };
-
   const handleToggleAlerts = (enabled: boolean) => {
     if (enabled && permission !== "granted") {
       requestPermission();
@@ -205,10 +197,6 @@ export function NotificationSettings() {
     if (enabled) {
       toast.success("Lembretes de tarefas ativados! Você será notificado sobre tarefas pendentes.");
     }
-  };
-
-  const handleTimeChange = (time: string) => {
-    setConfig({ ...config, reminderTime: time });
   };
 
   const testNotification = () => {

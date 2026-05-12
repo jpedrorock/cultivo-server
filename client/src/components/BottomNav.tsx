@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, Sunrise, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,6 @@ type NavItem = {
 
 // Rotas onde o BottomNav deve ficar oculto (telas de foco total)
 const HIDDEN_NAV_ROUTES = ["/quick-log"];
-const HIDDEN_NAV_PREFIXES = ["/tent/", "/display"];
 
 // Avatar colors — light usa 700 (sóbrio), dark mantém 500 (vibrante)
 const AVATAR_GRADIENTS = [
@@ -99,7 +98,7 @@ function ChatPlantPicker({
               <button
                 key={p.id}
                 onClick={() => onSelect(p)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted/60 active:scale-[0.98] transition-all text-left"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted/60 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
               >
                 <div className={`w-11 h-11 rounded-xl ${grad} flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm`}>
                   {letter}
@@ -108,7 +107,7 @@ function ChatPlantPicker({
                   <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />
               </button>
             );
           })}
@@ -124,7 +123,7 @@ function ChatPlantPicker({
         <button
           key={group.key}
           onClick={() => setSelectedGroup(group.key)}
-          className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-all text-left"
+          className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
         >
           <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
             <TentIcon className="w-6 h-6 text-muted-foreground" />
@@ -133,7 +132,7 @@ function ChatPlantPicker({
             <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground/40 shrink-0" />
+          <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
         </button>
       ))}
     </div>
@@ -202,23 +201,17 @@ export function BottomNav() {
     return () => vv.removeEventListener('resize', handleResize);
   }, []);
 
-  // Ocultar nav em telas de foco (ex: registro rápido) ou com teclado aberto — após todos os hooks
-  const isHidden =
-    HIDDEN_NAV_ROUTES.includes(location) ||
-    location.endsWith("/display") ||
-    location.endsWith("/training") ||
-    keyboardOpen;
-
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/plants", icon: Leaf, label: "Plantas" },
-    { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
+    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
 
   const moreMenuItems: NavItem[] = [
+    { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
-    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
+    { href: "/smartlife", icon: Wifi, label: "SmartLife" },
     { href: "/manage-strains", icon: Sprout, label: "Strains" },
     { href: "/help", icon: BookOpen, label: "Guia do Usuário" },
     { href: "/settings", icon: Settings, label: "Configurações" },
@@ -226,11 +219,13 @@ export function BottomNav() {
 
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
 
-  if (isHidden) return null;
+  if (HIDDEN_NAV_ROUTES.includes(location) || location.endsWith("/display") || location.endsWith("/training")) return null;
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-[100] md:hidden"
+      className={`fixed bottom-0 left-0 right-0 z-[100] md:hidden transition-[opacity,transform] duration-200 ease-in-out ${
+        keyboardOpen ? 'opacity-0 pointer-events-none translate-y-2' : 'opacity-100 pointer-events-auto translate-y-0'
+      }`}
       style={{
         transform: 'translateZ(0)',
         WebkitTransform: 'translateZ(0)',
@@ -240,6 +235,12 @@ export function BottomNav() {
         overflow: 'visible',
       }}
     >
+      {/* Gradient fade acima da barra — dissolve a transição entre conteúdo e nav */}
+      <div
+        className="absolute left-0 right-0 h-8 pointer-events-none bg-gradient-to-b from-transparent to-card"
+        style={{ top: '-32px' }}
+      />
+
       {/* Curved SVG background — cobre apenas a área da barra (65px) */}
       {/* SVG não consegue resolver CSS vars confiável no iOS: usamos um rect bg-card por baixo */}
       <div className="absolute top-0 left-0 w-full bg-card pointer-events-none" style={{ height: '65px' }} />
@@ -364,10 +365,10 @@ export function BottomNav() {
                     <p className="text-base font-semibold text-foreground leading-tight">Treinamento</p>
                     <p className="text-xs text-muted-foreground/60 mt-0.5">LST, topping, super crop</p>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                 </button>
 
-                {/* IA Especialista — abre picker de planta */}
+                {/* Doctor Jáh — abre picker de planta */}
                 <button
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setChatPickerOpen(true); }}
                   className="flex items-center gap-4 px-5 py-4 hover:bg-blue-500/8 active:bg-blue-500/15 transition-colors w-full text-left"
@@ -376,10 +377,10 @@ export function BottomNav() {
                     <Bot className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-foreground leading-tight">IA Especialista</p>
+                    <p className="text-base font-semibold text-foreground leading-tight">Doctor Jáh</p>
                     <p className="text-xs text-muted-foreground/60 mt-0.5">Diagnóstico · LST · Tricomas</p>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                 </button>
               </div>
             )}
@@ -398,14 +399,9 @@ export function BottomNav() {
                 ) : (
                   <div className="space-y-2 max-h-72 overflow-y-auto pb-2">
                     {activePlants.map((plant: any) => (
-                      <button
+                      <div
                         key={plant.id}
-                        onClick={() => {
-                          triggerHapticFeedback();
-                          setTrainingPickerOpen(false);
-                          navigate(`/plants/${plant.id}/training?sandbox=1`);
-                        }}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 active:scale-[0.98] transition-all text-left"
+                        className="flex items-center gap-2 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors"
                       >
                         <span className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-emerald-500">
                           {(plant.name ?? '?')[0].toUpperCase()}
@@ -416,8 +412,29 @@ export function BottomNav() {
                             <p className="text-xs text-muted-foreground truncate">{plant.strain}</p>
                           )}
                         </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
-                      </button>
+                        <button
+                          onClick={() => {
+                            triggerHapticFeedback();
+                            setTrainingPickerOpen(false);
+                            navigate(`/plants/${plant.id}/training?sandbox=1&view=top`);
+                          }}
+                          className="px-2.5 h-7 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          title="Editar em 2D (vista de cima)"
+                        >
+                          2D
+                        </button>
+                        <button
+                          onClick={() => {
+                            triggerHapticFeedback();
+                            setTrainingPickerOpen(false);
+                            navigate(`/plants/${plant.id}/training?sandbox=1&view=3d`);
+                          }}
+                          className="px-2.5 h-7 rounded-md text-[11px] font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          title="Editar em 3D"
+                        >
+                          3D
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -470,18 +487,16 @@ export function BottomNav() {
             </button>
           </div>
 
-          {/* Nav items — Alertas (após o FAB) */}
+          {/* Nav items — terceiro slot (após o FAB) */}
           {navItems.slice(2).map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
-            const isAlertsItem = item.href === "/alerts";
             const showBadge = item.badge !== undefined && item.badge > 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={triggerHapticFeedback}
-                data-tour={item.href === "/alerts" ? "alerts-menu" : undefined}
                 aria-label={item.label}
                 className={cn(
                   "flex items-center justify-center p-3 rounded-xl transition-colors relative",
@@ -495,7 +510,7 @@ export function BottomNav() {
                   <span
                     className={cn(
                       "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
-                      isAlertsItem && badgeShaking ? "animate-badge-shake" : "animate-pulse"
+                      "animate-pulse"
                     )}
                   >
                     {item.badge! > 9 ? '9+' : item.badge}
@@ -510,8 +525,9 @@ export function BottomNav() {
             <SheetTrigger asChild>
               <button
                 onClick={triggerHapticFeedback}
+                aria-label="Mais opções"
                 className={cn(
-                  "flex items-center justify-center p-3 rounded-xl transition-colors",
+                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
                   "hover:bg-primary/10",
                   isMoreMenuActive
                     ? "text-primary bg-primary/10"
@@ -519,6 +535,17 @@ export function BottomNav() {
                 )}
               >
                 <MoreHorizontal className={cn("w-6 h-6", isMoreMenuActive && "stroke-[2.5]")} />
+                {/* Badge agregado: soma alertas + secagem (qualquer item do Mais com badge) */}
+                {((alertCount ?? 0) + (harvestQueueCount ?? 0)) > 0 && (
+                  <span
+                    className={cn(
+                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
+                      badgeShaking ? "animate-badge-shake" : "animate-pulse",
+                    )}
+                  >
+                    {((alertCount ?? 0) + (harvestQueueCount ?? 0)) > 9 ? "9+" : ((alertCount ?? 0) + (harvestQueueCount ?? 0))}
+                  </span>
+                )}
               </button>
             </SheetTrigger>
             <SheetContent side="bottom" className="h-auto pb-safe">
@@ -539,7 +566,11 @@ export function BottomNav() {
                         triggerHapticFeedback();
                         setMoreMenuOpen(false);
                       }}
-                      data-tour={item.href === "/history" ? "history-menu" : undefined}
+                      data-tour={
+                        item.href === "/history" ? "history-menu" :
+                        item.href === "/alerts" ? "alerts-menu" :
+                        undefined
+                      }
                       className={cn(
                         "flex items-center gap-4 px-4 py-4 rounded-lg transition-colors relative",
                         "hover:bg-primary/10",

@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS `wateringApplications` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `tentId` int NOT NULL,\n  `cycleId` int,\n  `applicationDate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `recipeName` varchar(100) NOT NULL,\n  `potSizeL` decimal(5,2) NOT NULL,\n  `numberOfPots` int NOT NULL,\n  `waterPerPotL` decimal(5,2) NOT NULL,\n  `totalWaterL` decimal(7,2) NOT NULL,\n  `targetRunoffPercent` decimal(4,1),\n  `expectedRunoffL` decimal(6,2),\n  `actualRunoffL` decimal(6,2),\n  `actualRunoffPercent` decimal(4,1),\n  `notes` text,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  INDEX `tentId_idx` (`tentId`),\n  INDEX `cycleId_idx` (`cycleId`),\n  INDEX `applicationDate_idx` (`applicationDate`)\n);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 28MX9rHeRYrkZKS.5ffbe178d99f --database AhyBXV9CDav4cSFRqphBxc --execute CREATE TABLE IF NOT EXISTS `wateringApplications` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `tentId` int NOT NULL,\n  `cycleId` int,\n  `applicationDate` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `recipeName` varchar(100) NOT NULL,\n  `potSizeL` decimal(5,2) NOT NULL,\n  `numberOfPots` int NOT NULL,\n  `waterPerPotL` decimal(5,2) NOT NULL,\n  `totalWaterL` decimal(7,2) NOT NULL,\n  `targetRunoffPercent` decimal(4,1),\n  `expectedRunoffL` decimal(6,2),\n  `actualRunoffL` decimal(6,2),\n  `actualRunoffPercent` decimal(4,1),\n  `notes` text,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  INDEX `tentId_idx` (`tentId`),\n  INDEX `cycleId_idx` (`cycleId`),\n  INDEX `applicationDate_idx` (`applicationDate`)\n);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 391
-}

@@ -76,7 +76,7 @@ export default function MoveTentModal({
   };
 
   // Mapear ciclos por tentId
-  const cyclesByTent = cycles?.reduce((acc, cycle) => {
+  const cyclesByTent = cycles?.reduce((acc: Record<number, any>, cycle: any) => {
     acc[cycle.tentId] = cycle;
     return acc;
   }, {} as Record<number, any>) || {};

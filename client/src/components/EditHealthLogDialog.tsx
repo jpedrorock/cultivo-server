@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Image, X, Upload, Loader2, FolderOpen, Pencil } from "lucide-react";
+import { Camera, X, Loader2, FolderOpen, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
 

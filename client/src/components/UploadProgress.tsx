@@ -10,7 +10,7 @@ interface UploadProgressProps {
 
 export default function UploadProgress({
   status,
-  progress = 0,
+  progress: _progress = 0,
   message,
 }: UploadProgressProps) {
   const [displayProgress, setDisplayProgress] = useState(0);

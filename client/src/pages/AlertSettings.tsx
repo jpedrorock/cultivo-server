@@ -22,7 +22,6 @@ import { PageTransition } from "@/components/PageTransition";
 export default function AlertSettings() {
   const [newReminderTime, setNewReminderTime] = useState<string>("08:00");
   const [permission, setPermission] = useState<string>(getNotificationPermission());
-  const [isSyncing, setIsSyncing] = useState(false);
   const cleanupRemindersRef = useRef<(() => void) | null>(null);
 
   // ── Fonte de verdade: banco de dados ──────────────────────────────────────
@@ -38,7 +37,6 @@ export default function AlertSettings() {
 
   // Query VAPID e mutations push
   const { data: vapidData } = trpc.push.getVapidKey.useQuery(undefined, { retry: false });
-  const subscribeMutation = trpc.push.subscribe.useMutation();
   const updateReminderMutation = trpc.push.updateReminderSettings.useMutation();
 
   // Horários salvos no banco (fonte de verdade)

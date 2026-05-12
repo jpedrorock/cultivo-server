@@ -2,12 +2,9 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getMysqlPool } from "./mysql-pool";
-import { getUserById, updateUserProfile, updateUserPassword, getUserByEmail, approveUser, revokeUser, getPendingUsers } from "./db-auth";
-import { hashPassword, comparePassword } from "./_core/auth";
-import { users, userAiSettings, aiChatMessages } from "../drizzle/schema";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
 import { z } from "zod";
-import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray, getTableColumns } from "drizzle-orm";
 import * as db from "./db";
 import { getDb, applyPhaseTransitionLimits } from "./db";
 import {
@@ -15,16 +12,11 @@ import {
   strains,
   cycles,
   dailyLogs,
-  recipes,
   alerts,
   weeklyTargets,
-  taskInstances,
   taskTemplates,
-  standaloneTasks,
   tentAState,
   cloningEvents,
-  alertSettings,
-  alertHistory,
   notificationHistory,
   plants,
   plantTentHistory,
@@ -34,436 +26,142 @@ import {
   plantHealthLogs,
   plantTrichomeLogs,
   plantLSTLogs,
-  plantStructures,
   fertilizationPresets,
   wateringPresets,
   pumpPresets,
   recipeTemplates,
   nutrientApplications,
   wateringApplications,
-  groups,
 } from "../drizzle/schema";
-import { nanoid } from "nanoid";
-import crypto from "node:crypto";
+// Imports de db-auth, _core/auth, nanoid e tabelas users/groups/userAiSettings/
+// aiChatMessages foram movidos pra server/routers/{userManagement,aiChat}.ts
+// junto com os routers que os usavam.
 
-/**
- * Valida que uma estufa pertence ao grupo do usuário.
- * Lança erro se não pertencer — use em todos os routers que acessam recursos via tentId.
- */
-async function validateTentOwnership(tentId: number, groupId: number | null | undefined): Promise<void> {
-  const database = await getDb();
-  if (!database) throw new Error("Banco de dados não inicializado");
-  if (groupId == null) throw new Error("Acesso negado: usuário sem grupo atribuído");
-  const [tent] = await database.select({ id: tents.id, groupId: tents.groupId }).from(tents).where(eq(tents.id, tentId)).limit(1);
-  if (!tent) throw new Error("Estufa não encontrada");
-  if (tent.groupId !== groupId) {
-    throw new Error("Acesso negado: estufa não pertence ao seu grupo");
-  }
-}
+// Sub-routers extraídos pra arquivos próprios (parte do refactor de quebrar
+// este monstro de 7900+ linhas em pedaços manejáveis):
+import { groupsRouter, profileRouter, adminRouter } from "./routers/userManagement";
+import { aiChatRouter } from "./routers/aiChat";
+import {
+  plantsRouter,
+  plantObservationsRouter,
+  plantPhotosRouter,
+  plantRunoffRouter,
+  plantHealthRouter,
+  plantTrichomesRouter,
+  plantLSTRouter,
+  plantStructureRouter,
+} from "./routers/plants";
+import { cyclesRouter } from "./routers/cycles";
+import { tentsRouter } from "./routers/tents";
+import { dailyLogsRouter } from "./routers/dailyLogs";
+import { alertsRouter, weeklyTargetsRouter } from "./routers/alerts";
+import { tasksRouter, taskTemplatesRouter } from "./routers/tasks";
+import { backupRouter } from "./routers/backup";
 
-/**
- * Valida que um ciclo pertence ao grupo do usuário (via tent do ciclo).
- */
-async function validateCycleOwnership(cycleId: number, groupId: number | null | undefined): Promise<void> {
-  const database = await getDb();
-  if (!database) throw new Error("Banco de dados não inicializado");
-  const [cycle] = await database.select({ id: cycles.id, tentId: cycles.tentId }).from(cycles).where(eq(cycles.id, cycleId)).limit(1);
-  if (!cycle) throw new Error("Ciclo não encontrado");
-  await validateTentOwnership(cycle.tentId, groupId);
-}
-
-/**
- * Valida que uma planta pertence ao grupo do usuário.
- */
-async function validatePlantOwnership(plantId: number, groupId: number | null | undefined): Promise<void> {
-  const database = await getDb();
-  if (!database) throw new Error("Banco de dados não inicializado");
-  if (groupId == null) throw new Error("Acesso negado: usuário sem grupo atribuído");
-  const [plant] = await database.select({ id: plants.id, groupId: plants.groupId }).from(plants).where(eq(plants.id, plantId)).limit(1);
-  if (!plant) throw new Error("Planta não encontrada");
-  if (plant.groupId !== groupId) {
-    throw new Error("Acesso negado: planta não pertence ao seu grupo");
-  }
-}
+// Helpers compartilhados (validators de ownership) — antes inline aqui,
+// agora em routers/_helpers.ts pra que sub-routers extraídos consigam importar.
+import { validateTentOwnership } from "./routers/_helpers";
 
 /**
  * D3 — Seed task instances for a tent immediately after cycle creation.
  * This ensures tasks appear on the Home/Tasks tab without the user
  * needing to navigate to the tasks tab first.
  */
-async function seedWeekTasks(
-  database: Awaited<ReturnType<typeof getDb>>,
-  tentId: number,
-  tentCategory: string,
-  phase: "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING",
-  weekNumber: number
-): Promise<void> {
-  if (!database) return;
 
-  const context = tentCategory === "MAINTENANCE" ? "TENT_A" : "TENT_BC";
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - now.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  // MAINTENANCE and DRYING don't filter by weekNumber
-  const noWeekFilter = phase === "MAINTENANCE" || phase === "DRYING" || phase === "CLONING";
-
-  const templates = await database
-    .select()
-    .from(taskTemplates)
-    .where(
-      noWeekFilter
-        ? and(eq(taskTemplates.context, context), eq(taskTemplates.phase, phase))
-        : and(
-            eq(taskTemplates.context, context),
-            eq(taskTemplates.phase, phase),
-            eq(taskTemplates.weekNumber, weekNumber)
-          )
-    );
-
-  for (const template of templates) {
-    const existing = await database
-      .select({ id: taskInstances.id })
-      .from(taskInstances)
-      .where(
-        and(
-          eq(taskInstances.tentId, tentId),
-          eq(taskInstances.taskTemplateId, template.id),
-          eq(taskInstances.occurrenceDate, startOfWeek)
-        )
-      )
-      .limit(1);
-
-    if (existing.length === 0) {
-      await database.insert(taskInstances).values({
-        tentId,
-        taskTemplateId: template.id,
-        occurrenceDate: startOfWeek,
-        isDone: false,
-      });
-    }
-  }
-}
-
-// ── AI helpers ────────────────────────────────────────────────────────────────
-
-function buildBaseSystemPrompt(): string {
-  return `Você é um especialista em cultivo de cannabis indoor com 20 anos de experiência prática.
-Responda SEMPRE em português brasileiro. Seja direto, prático e objetivo.
-Use linguagem técnica mas acessível. Quando houver foto, analise-a cuidadosamente.
-
-Seus domínios de especialidade:
-- Diagnóstico visual de deficiências nutricionais, pragas e doenças
-- Técnicas de treinamento: LST, topping, FIM, super crop, ScrOG, mainlining, lollipopping
-- Leitura de tricomas e determinação do ponto ideal de colheita
-- Nutrição, ajuste de pH e EC em cada fase do cultivo
-- Ambiência: VPD, DLI, temperatura, umidade relativa, espectro de luz
-- Gestão de espaço, fotoperiodo e transição vega→flora
-
-Ao diagnosticar problemas, siga esta estrutura:
-1. O que está acontecendo
-2. Possível causa (deficiência/excesso/praga/ambiente)
-3. Como corrigir (ação imediata + prevenção)
-`;
-}
-
-function buildPlantContext(ctx: {
-  plantName: string; strainName: string; daysOld: number; weekNumber: number;
-  phase: string; tentName: string; avgTemp: string; avgRh: string;
-  avgPpfd: string; avgPh: string; avgEc: string;
-  healthLogs: { logDate: any; healthStatus: string | null; symptoms: string | null; notes: string | null }[];
-}): string {
-  const healthStr = ctx.healthLogs.length
-    ? ctx.healthLogs.map(h =>
-        `  - ${new Date(h.logDate).toLocaleDateString('pt-BR')}: ${h.healthStatus ?? ''} ${h.symptoms ? `| Sintomas: ${h.symptoms}` : ''} ${h.notes ? `| Nota: ${h.notes}` : ''}`
-      ).join('\n')
-    : "  Sem registros de saúde";
-
-  return `
-━━━ CONTEXTO DA PLANTA ━━━
-Nome: ${ctx.plantName}
-Strain: ${ctx.strainName}
-Dias de vida: ${ctx.daysOld} | Semana ${ctx.weekNumber} | Fase: ${ctx.phase}
-Estufa: ${ctx.tentName}
-
-CONDIÇÕES AMBIENTAIS (últimos 7 dias):
-  Temperatura média: ${ctx.avgTemp}°C
-  Umidade relativa: ${ctx.avgRh}%
-  PPFD: ${ctx.avgPpfd} μmol/m²/s
-  pH: ${ctx.avgPh}
-  EC: ${ctx.avgEc} mS/cm
-
-HISTÓRICO DE SAÚDE (últimos 5 registros):
-${healthStr}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-`;
-}
-
-/** Modelos fallback por provedor (em ordem de preferência) */
-const PROVIDER_FALLBACKS: Record<string, string[]> = {
-  gemini:    ["gemini-2.0-flash-lite", "gemini-2.5-pro-preview-03-25", "gemini-2.0-flash", "gemini-pro"],
-  openai:    ["gpt-4o-mini", "gpt-3.5-turbo"],
-  anthropic: ["claude-haiku-4-5-20251001", "claude-3-haiku-20240307"],
-  deepseek:  ["deepseek-chat"],
-  kimi:      ["moonshot-v1-8k"],
-};
-
-/** Busca modelos disponíveis do Gemini via ListModels API */
-async function fetchGeminiModels(apiKey: string): Promise<string[]> {
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
-    );
-    if (!res.ok) return [];
-    const data: any = await res.json();
-    return (data.models ?? [])
-      .filter((m: any) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
-      .map((m: any) => (m.name as string).replace("models/", ""))
-      .filter((name: string) => name.startsWith("gemini"));
-  } catch {
-    return [];
-  }
-}
-
-/** Verifica se o erro é de modelo não encontrado/depreciado */
-function isModelNotFoundError(msg: string): boolean {
-  const lower = msg.toLowerCase();
-  return lower.includes("not found") || lower.includes("no longer available") ||
-    lower.includes("not supported") || lower.includes("deprecated") ||
-    lower.includes("does not exist");
-}
-
-/** Extrai uma mensagem legível de uma resposta de erro de API */
-async function parseProviderError(res: Response, provider: string): Promise<string> {
-  const status = res.status;
-  let body = "";
-  try { body = await res.text(); } catch { /* ignore */ }
-
-  // Tentar parsear JSON para extrair mensagem
-  let msg = "";
-  try {
-    const json = JSON.parse(body);
-    msg =
-      json?.error?.message ||      // OpenAI / Gemini
-      json?.error?.msg ||
-      json?.message ||              // genérico
-      json?.error?.error?.message || // Anthropic nested
-      "";
-  } catch { /* body não é JSON */ }
-
-  if (!msg) msg = body.slice(0, 150);
-
-  // Mensagens amigáveis por status
-  if (status === 401) return `Chave de API inválida ou expirada. Verifique em Configurações → Conta.`;
-  if (status === 403) return `Acesso negado pela API. Verifique se a chave tem permissão para o modelo.`;
-  if (status === 429) return `Limite de requisições atingido (${provider}). Aguarde um momento e tente novamente. Se persistir, verifique sua cota em ${provider === "gemini" ? "aistudio.google.com" : "platform.openai.com"}.`;
-  if (status >= 500) return `Servidor da ${provider} com problema temporário. Tente novamente em alguns segundos.`;
-
-  return msg || `Erro ${status} na API ${provider}.`;
-}
-
-async function callAiProvider(opts: {
-  provider: string; model: string; apiKey: string; systemPrompt: string;
-  history: { role: "user" | "assistant"; content: string }[];
-  message: string; imageBase64?: string; imageMime?: string;
-}): Promise<string> {
-  const { provider, model, apiKey, systemPrompt, history, message, imageBase64, imageMime } = opts;
-
-  if (provider === "openai") {
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
-      ...history.map(h => ({ role: h.role, content: h.content })),
-      {
-        role: "user" as const,
-        content: imageBase64
-          ? [
-              { type: "text", text: message },
-              { type: "image_url", image_url: { url: `data:${imageMime ?? "image/jpeg"};base64,${imageBase64}`, detail: "high" } },
-            ]
-          : message,
-      },
-    ];
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages, max_tokens: 1500 }),
-    });
-    if (!res.ok) throw new Error(await parseProviderError(res, "OpenAI"));
-    const data: any = await res.json();
-    return data.choices?.[0]?.message?.content ?? "Sem resposta";
-  }
-
-  if (provider === "anthropic") {
-    const userContent: any[] = imageBase64
-      ? [
-          { type: "image", source: { type: "base64", media_type: imageMime ?? "image/jpeg", data: imageBase64 } },
-          { type: "text", text: message },
-        ]
-      : [{ type: "text", text: message }];
-
-    const messages = [
-      ...history.map(h => ({ role: h.role, content: h.content })),
-      { role: "user" as const, content: userContent },
-    ];
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({ model, max_tokens: 1500, system: systemPrompt, messages }),
-    });
-    if (!res.ok) throw new Error(await parseProviderError(res, "Anthropic"));
-    const data: any = await res.json();
-    return data.content?.[0]?.text ?? "Sem resposta";
-  }
-
-  if (provider === "gemini") {
-    const parts: any[] = [];
-    if (imageBase64) parts.push({ inlineData: { mimeType: imageMime ?? "image/jpeg", data: imageBase64 } });
-    parts.push({ text: message });
-
-    const contents = [
-      ...history.map(h => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.content }] })),
-      { role: "user", parts },
-    ];
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents,
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: { maxOutputTokens: 1500 },
-        }),
-      }
-    );
-    if (!res.ok) throw new Error(await parseProviderError(res, "Gemini"));
-    const data: any = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Sem resposta";
-  }
-
-  // DeepSeek e Kimi são compatíveis com a API da OpenAI — só muda a base URL
-  if (provider === "deepseek" || provider === "kimi") {
-    const baseUrl = provider === "deepseek"
-      ? "https://api.deepseek.com/v1"
-      : "https://api.moonshot.cn/v1";
-
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
-      ...history.map(h => ({ role: h.role, content: h.content })),
-      {
-        role: "user" as const,
-        content: imageBase64 && provider === "deepseek"
-          ? [
-              { type: "text", text: message },
-              { type: "image_url", image_url: { url: `data:${imageMime ?? "image/jpeg"};base64,${imageBase64}` } },
-            ]
-          : message, // Kimi não suporta visão por base64 na v1
-      },
-    ];
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, messages, max_tokens: 1500 }),
-    });
-    if (!res.ok) throw new Error(await parseProviderError(res, provider === "deepseek" ? "DeepSeek" : "Kimi"));
-    const data: any = await res.json();
-    return data.choices?.[0]?.message?.content ?? "Sem resposta";
-  }
-
-  throw new Error(`Provedor desconhecido: ${provider}`);
-}
-
-/** Chama o provider com auto-fallback se o modelo for deprecado/não encontrado */
-async function callAiProviderWithFallback(opts: Parameters<typeof callAiProvider>[0]): Promise<{ reply: string; modelUsed: string }> {
-  const { provider, model, apiKey } = opts;
-
-  // Para Gemini: busca modelos reais da API antes de tentar
-  let candidates: string[];
-  if (provider === "gemini") {
-    const liveModels = await fetchGeminiModels(apiKey);
-    if (liveModels.length > 0) {
-      // Prefere o modelo salvo se disponível, senão usa o primeiro da lista
-      candidates = liveModels.includes(model)
-        ? [model, ...liveModels.filter(m => m !== model)]
-        : liveModels;
-      console.log(`[aiChat] Gemini: ${liveModels.length} modelos disponíveis, usando ${candidates[0]}`);
-    } else {
-      // Fallback estático se ListModels falhar
-      candidates = [model, ...PROVIDER_FALLBACKS[provider].filter(m => m !== model)];
-    }
-  } else {
-    candidates = [model, ...(PROVIDER_FALLBACKS[provider] ?? []).filter(m => m !== model)];
-  }
-
-  let lastError = "";
-  for (const candidate of candidates) {
-    try {
-      const reply = await callAiProvider({ ...opts, model: candidate });
-      if (candidate !== model) {
-        console.log(`[aiChat] Modelo ${model} indisponível, usando fallback: ${candidate}`);
-      }
-      return { reply, modelUsed: candidate };
-    } catch (err: any) {
-      lastError = err?.message ?? String(err);
-      if (!isModelNotFoundError(lastError)) {
-        throw err; // Não é erro de modelo — lança imediatamente
-      }
-      console.warn(`[aiChat] Modelo ${candidate} não disponível, tentando próximo...`);
-    }
-  }
-  throw new Error(lastError || `Nenhum modelo disponível para ${provider}`);
-}
+// Backup helpers (MAX_BACKUP_*, safeBackupValue, safeBackupRow) foram movidos
+// pra server/routers/backup.ts junto com o backup router que os usava.
 
 // ─── Tuya / SmartLife integration router ─────────────────────────────────────
 
 const POLL_INTERVAL_OPTIONS = [30, 60, 180, 480, 720] as const;
+
+/** Busca credenciais Tuya do usuário no banco. Lança NOT_FOUND se não configurado. */
+async function getTuyaConfig(userId: number, opts: { requireEnabled?: boolean } = {}) {
+  const pool = getMysqlPool();
+  const enabledClause = opts.requireEnabled ? ' AND enabled = 1' : '';
+  const [rows]: any = await pool.execute(
+    `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ?${enabledClause}`,
+    [userId]
+  );
+  if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
+  const row = rows[0] as { accessId: string; accessSecret: string; region: import("./lib/tuya").TuyaRegion; homeId: string | null };
+  try {
+    const { decryptAndMigrate } = await import("./aiCrypto");
+    row.accessSecret = await decryptAndMigrate(row.accessSecret, async (newCipher) => {
+      await pool.execute(`UPDATE tuyaConfig SET accessSecret = ? WHERE userId = ?`, [newCipher, userId]);
+    });
+  } catch (err) {
+    console.warn("[Tuya] decrypt accessSecret failed", (err as Error).message);
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao decifrar credenciais Tuya. Reconfigure no Settings." });
+  }
+  return row;
+}
 
 const tuyaRouter = router({
   /** Salva credenciais Tuya do usuário */
   saveConfig: protectedProcedure
     .input(z.object({
       accessId: z.string().min(1).max(100),
-      accessSecret: z.string().min(1).max(100),
+      // Vazio = manter segredo existente no banco (não sobrescrever)
+      accessSecret: z.string().max(100).optional(),
       region: z.enum(["eu", "us", "cn", "in"]),
       pollIntervalMin: z.number().refine(v => POLL_INTERVAL_OPTIONS.includes(v as any)),
       enabled: z.boolean(),
+      homeId: z.string().max(50).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const pool = getMysqlPool();
-      await pool.execute(
-        `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           accessId = VALUES(accessId),
-           accessSecret = VALUES(accessSecret),
-           region = VALUES(region),
-           pollIntervalMin = VALUES(pollIntervalMin),
-           enabled = VALUES(enabled)`,
-        [ctx.user.id, input.accessId, input.accessSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0]
-      );
+      if (input.accessSecret) {
+        // Novo segredo fornecido: criptografar e salvar
+        const { encryptApiKey } = await import("./aiCrypto");
+        const encryptedSecret = encryptApiKey(input.accessSecret);
+        await pool.execute(
+          `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled, homeId)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             accessId = VALUES(accessId),
+             accessSecret = VALUES(accessSecret),
+             region = VALUES(region),
+             pollIntervalMin = VALUES(pollIntervalMin),
+             enabled = VALUES(enabled),
+             homeId = VALUES(homeId)`,
+          [ctx.user.id, input.accessId, encryptedSecret, input.region, input.pollIntervalMin, input.enabled ? 1 : 0, input.homeId ?? null]
+        );
+      } else {
+        // Sem novo segredo: atualizar tudo exceto accessSecret
+        await pool.execute(
+          `INSERT INTO tuyaConfig (userId, accessId, accessSecret, region, pollIntervalMin, enabled, homeId)
+           VALUES (?, ?, '', ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             accessId = VALUES(accessId),
+             region = VALUES(region),
+             pollIntervalMin = VALUES(pollIntervalMin),
+             enabled = VALUES(enabled),
+             homeId = VALUES(homeId)`,
+          [ctx.user.id, input.accessId, input.region, input.pollIntervalMin, input.enabled ? 1 : 0, input.homeId ?? null]
+        );
+      }
       return { ok: true };
     }),
 
-  /** Busca credenciais salvas */
+  /** Busca credenciais salvas — accessSecret retorna mascarado ao client */
   getConfig: protectedProcedure.query(async ({ ctx }) => {
     const pool = getMysqlPool();
     const [rows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region, pollIntervalMin, enabled FROM tuyaConfig WHERE userId = ?`,
+      `SELECT accessId, accessSecret, region, pollIntervalMin, enabled, homeId FROM tuyaConfig WHERE userId = ?`,
       [ctx.user.id]
     );
     if (rows.length === 0) return null;
     const r = rows[0];
+    // Nunca retornar o segredo descriptografado ao client; apenas indicar se está configurado
+    const hasSecret = Boolean(r.accessSecret);
     return {
       accessId: r.accessId as string,
-      accessSecret: r.accessSecret as string,
+      accessSecretMasked: hasSecret ? "••••••••••••" : "",
       region: r.region as string,
       pollIntervalMin: r.pollIntervalMin as number,
       enabled: Boolean(r.enabled),
+      homeId: r.homeId as string | null,
     };
   }),
 
@@ -479,17 +177,40 @@ const tuyaRouter = router({
       return testTuyaConnection(input.accessId, input.accessSecret, input.region);
     }),
 
+  /**
+   * Dado o UID do usuário SmartLife, busca as casas (homeId + nome).
+   * Usar no Config tab: usuário cola o UID que encontrou no API Explorer.
+   */
+  resolveHomeId: protectedProcedure
+    .input(z.object({ smartlifeUid: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_-]+$/, "UID inválido") }))
+    .mutation(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { listHomesForUid } = await import("./lib/tuya");
+      try {
+        const homes = await listHomesForUid(input.smartlifeUid, cfg.accessId, cfg.accessSecret, cfg.region);
+        return homes;
+      } catch (e: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Tuya: ${e?.message ?? String(e)}` });
+      }
+    }),
+
+  getAutomationDetails: protectedProcedure
+    .input(z.object({ ruleId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { getTuyaRuleDetails } = await import("./lib/tuya");
+      try {
+        return await getTuyaRuleDetails(input.ruleId, cfg.accessId, cfg.accessSecret, cfg.region, cfg.homeId ? Number(cfg.homeId) : undefined);
+      } catch (e: any) {
+        return { conditions: [], actions: [], found: false };
+      }
+    }),
+
   /** Lista dispositivos da conta Tuya */
   listDevices: protectedProcedure.query(async ({ ctx }) => {
-    const pool = getMysqlPool();
-    const [rows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1`,
-      [ctx.user.id]
-    );
-    if (rows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Configure as credenciais Tuya primeiro" });
-    const cfg = rows[0];
+    const cfg = await getTuyaConfig(ctx.user.id, { requireEnabled: true });
     const { listTuyaDevices } = await import("./lib/tuya");
-    return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region);
+    return listTuyaDevices(cfg.accessId, cfg.accessSecret, cfg.region, cfg.homeId ? Number(cfg.homeId) : undefined);
   }),
 
   /** Salva mapeamento dispositivo ↔ estufa */
@@ -602,10 +323,16 @@ const tuyaRouter = router({
       if (cfgRows.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum sensor ativo para esta estufa" });
       const cfg = cfgRows[0];
 
+      // accessSecret está cifrado no banco — decifra e migra para v1 se for legado
+      const { decryptAndMigrate } = await import("./aiCrypto");
+      const accessSecret = await decryptAndMigrate(cfg.accessSecret, async (newCipher) => {
+        await pool.execute(`UPDATE tuyaConfig SET accessSecret = ? WHERE userId = ?`, [newCipher, ctx.user.id]);
+      });
+
       const { readTuyaDeviceStatus } = await import("./lib/tuya");
       let reading: { tempC: number | null; rhPct: number | null };
       try {
-        reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+        reading = await readTuyaDeviceStatus(cfg.deviceId, cfg.accessId, accessSecret, cfg.region);
       } catch (err: any) {
         const msg = err?.message ?? String(err);
         // "permission deny" → orientar o usuário a vincular o dispositivo no portal
@@ -657,17 +384,602 @@ const tuyaRouter = router({
 
       return { ...reading, readAt: new Date() };
     }),
+
+  // ─── Device control ─────────────────────────────────────────────────────────
+
+  /** Salva mapeamentos de dispositivos controláveis por estufa */
+  saveDeviceMappings: protectedProcedure
+    .input(z.array(z.object({
+      tentId: z.number(),
+      deviceId: z.string().min(1),
+      deviceName: z.string(),
+      switchCode: z.string().default("switch_1"),
+      enabled: z.boolean(),
+    })))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const tentIds = [...new Set(input.map(m => m.tentId))];
+      for (const tentId of tentIds) {
+        await pool.execute(
+          `DELETE FROM tuyaDeviceMappings WHERE userId = ? AND tentId = ?`,
+          [ctx.user.id, tentId]
+        );
+      }
+      for (const m of input) {
+        await pool.execute(
+          `INSERT INTO tuyaDeviceMappings (userId, tentId, deviceId, deviceName, switchCode, enabled)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE deviceName=VALUES(deviceName), switchCode=VALUES(switchCode), enabled=VALUES(enabled)`,
+          [ctx.user.id, m.tentId, m.deviceId, m.deviceName, m.switchCode, m.enabled ? 1 : 0]
+        );
+      }
+      return { ok: true };
+    }),
+
+  /** Busca mapeamentos de dispositivos controláveis */
+  getDeviceMappings: protectedProcedure.query(async ({ ctx }) => {
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT tentId, deviceId, deviceName, switchCode, enabled FROM tuyaDeviceMappings WHERE userId = ? AND enabled = 1`,
+      [ctx.user.id]
+    );
+    return (rows as any[]).map(r => ({
+      tentId: r.tentId as number,
+      deviceId: r.deviceId as string,
+      deviceName: r.deviceName as string,
+      switchCode: r.switchCode as string,
+      enabled: Boolean(r.enabled),
+    }));
+  }),
+
+  /** Estado atual (online + switch on/off) de um dispositivo */
+  getDeviceCurrentStatus: protectedProcedure
+    .input(z.object({ deviceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id, { requireEnabled: true });
+      const { getTuyaDeviceSwitchState } = await import("./lib/tuya");
+      return getTuyaDeviceSwitchState(input.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+    }),
+
+  /** Liga / desliga um dispositivo */
+  sendDeviceCommand: protectedProcedure
+    .input(z.object({
+      deviceId: z.string(),
+      switchCode: z.string().default("switch_1"),
+      value: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id, { requireEnabled: true });
+      const { controlTuyaDevice } = await import("./lib/tuya");
+      const result = await controlTuyaDevice(input.deviceId, input.switchCode, input.value, cfg.accessId, cfg.accessSecret, cfg.region);
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Erro ao controlar dispositivo" });
+      return { ok: true };
+    }),
+
+  // ─── SmartLife scenes ────────────────────────────────────────────────────────
+
+  /** Lista todas as cenas SmartLife.
+   *  Se homeId estiver salvo na config, usa diretamente (bypass da listTuyaHomes).
+   *  Caso contrário, tenta auto-detectar as casas via API. */
+  listScenes: protectedProcedure.query(async ({ ctx }) => {
+    const cfg = await getTuyaConfig(ctx.user.id);
+    const { listTuyaScenesIoTCore } = await import("./lib/tuya");
+
+    // ── Tentativa 1: IoT Core (/v2.0/cloud/scene/rule) ─────────────────────────
+    let iotCoreError = "";
+    try {
+      const iotScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
+      if (iotScenes.length > 0) {
+        console.log(`[Tuya] listScenes: IoT Core retornou ${iotScenes.length} cenas`);
+        return iotScenes.map(s => ({
+          sceneId: s.sceneId,
+          name: s.name,
+          homeId: 0,
+          homeName: s.type === "automation" ? "Automações" : "Cenas",
+          conditions: s.conditions ?? [],
+        }));
+      }
+      iotCoreError = "IoT Core retornou 0 cenas";
+    } catch (e: any) {
+      iotCoreError = e?.message ?? String(e);
+      console.warn(`[Tuya] listScenes IoT Core falhou: ${iotCoreError}`);
+    }
+
+    // ── Tentativa 2: Smart Home com homeId manual ───────────────────────────────
+    if (cfg.homeId) {
+      const { listTuyaScenes, listTuyaAutomations } = await import("./lib/tuya");
+      try {
+        const [scenes, automations] = await Promise.allSettled([
+          listTuyaScenes(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region),
+          listTuyaAutomations(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region),
+        ]);
+
+        const result: any[] = [];
+
+        if (scenes.status === "fulfilled") {
+          result.push(...scenes.value.map(s => ({ ...s, homeName: "Minha Casa", conditions: [] })));
+        }
+        if (automations.status === "fulfilled" && automations.value.length > 0) {
+          result.push(...automations.value.map(a => ({ ...a, homeName: "Automações", conditions: a.conditions })));
+        }
+
+        if (result.length > 0) return result;
+      } catch (e: any) {
+        console.warn(`[Tuya] listScenes Smart Home homeId=${cfg.homeId}: ${e?.message}`);
+      }
+    }
+
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `IoT Core: ${iotCoreError}. Verifique se a região na aba Config está correta (Europa/América/China) e se o serviço "Scene Linkage Rules" está ativo no projeto Tuya.`,
+    });
+  }),
+
+  /** Lista cenas salvas manualmente */
+  listManualScenes: protectedProcedure.query(async ({ ctx }) => {
+    const pool = getMysqlPool();
+    const [rows]: any = await pool.execute(
+      `SELECT id, homeId, sceneId, name, COALESCE(type, 'tap') as type FROM tuyaManualScenes WHERE userId = ? ORDER BY createdAt DESC`,
+      [ctx.user.id]
+    );
+    return (rows as any[]).map((r: any) => ({
+      id: r.id as number,
+      homeId: Number(r.homeId),
+      sceneId: r.sceneId as string,
+      name: r.name as string,
+      type: (r.type as string) === 'automation' ? 'automation' : 'tap',
+    }));
+  }),
+
+  /** Salva uma cena manual */
+  saveManualScene: protectedProcedure
+    .input(z.object({ homeId: z.string().max(50).optional(), sceneId: z.string().min(1), name: z.string().min(1).max(200), type: z.enum(['tap', 'automation']).default('tap') }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      await pool.execute(
+        `INSERT INTO tuyaManualScenes (userId, homeId, sceneId, name, type)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE homeId = VALUES(homeId), name = VALUES(name), type = VALUES(type)`,
+        [ctx.user.id, input.homeId ?? '', input.sceneId, input.name, input.type]
+      );
+      return { ok: true };
+    }),
+
+  /** Remove uma cena manual */
+  deleteManualScene: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      await pool.execute(`DELETE FROM tuyaManualScenes WHERE id = ? AND userId = ?`, [input.id, ctx.user.id]);
+      return { ok: true };
+    }),
+
+  /** Dispara uma cena SmartLife (homeId opcional — tenta endpoints sem homeId como fallback) */
+  triggerScene: protectedProcedure
+    .input(z.object({ homeId: z.number().optional(), sceneId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { triggerTuyaScene } = await import("./lib/tuya");
+      const result = await triggerTuyaScene(input.homeId ?? 0, input.sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao disparar cena" });
+      return { ok: true };
+    }),
+
+  /** Lê o estado enabled/disabled de uma automation Tuya (cena programada). */
+  getAutomationEnabled: protectedProcedure
+    .input(z.object({ automationId: z.string(), homeId: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { getTuyaAutomationEnabled } = await import("./lib/tuya");
+      const enabled = await getTuyaAutomationEnabled(input.automationId, cfg.accessId, cfg.accessSecret, cfg.region, input.homeId ?? 0);
+      return { enabled };
+    }),
+
+  /** Habilita/desabilita uma automation Tuya (cena programada). */
+  toggleAutomation: protectedProcedure
+    .input(z.object({ automationId: z.string(), enabled: z.boolean(), homeId: z.number().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { setTuyaAutomationEnabled } = await import("./lib/tuya");
+      const result = await setTuyaAutomationEnabled(input.automationId, input.enabled, cfg.accessId, cfg.accessSecret, cfg.region, input.homeId ?? 0);
+      if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Falha ao alterar automação" });
+      return { ok: true, enabled: input.enabled };
+    }),
+
+  /**
+   * Aloca uma URL de stream pra uma câmera Tuya/SmartLife.
+   *
+   * Mutation (não query) porque a chamada ao Tuya tem side-effect de alocar
+   * recursos no lado deles + URL expira (~10min). Cliente chama uma vez
+   * pra abrir o player, e re-chama periodicamente pra renovar.
+   *
+   * Type default 'hls' (player web via hls.js).
+   */
+  getCameraStream: protectedProcedure
+    .input(z.object({
+      deviceId: z.string().min(1).max(64),
+      type: z.enum(['hls', 'rtsp']).default('hls'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const cfg = await getTuyaConfig(ctx.user.id);
+      const { allocateTuyaCameraStream } = await import("./lib/tuya");
+      const result = await allocateTuyaCameraStream(input.deviceId, input.type, cfg.accessId, cfg.accessSecret, cfg.region);
+      if (!result.url) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.msg ?? "Tuya não retornou URL de stream" });
+      return { url: result.url, type: input.type };
+    }),
+});
+
+// ─── tentScenes router (cenas Tuya vinculadas a estufa) ────────────────────────
+//
+// Permite ao user vincular cenas Tuya específicas a uma estufa, controlando
+// quais aparecem no display ESP32 dela. Mesma cena pode ser vinculada a
+// múltiplas estufas (compartilhada).
+const tentScenesRouter = router({
+  /** Lista cenas vinculadas a uma estufa (ordenadas por position) */
+  list: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT id, sceneId, name, position, type, iconHint, executionSec FROM tentScenes WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        [input.tentId]
+      );
+      return (rows as any[]).map(r => ({
+        id: r.id as number,
+        sceneId: r.sceneId as string,
+        name: r.name as string,
+        position: r.position as number,
+        type: (r.type === 'automation' ? 'automation' : 'scene') as 'scene' | 'automation',
+        iconHint: r.iconHint as string | null,
+        executionSec: (r.executionSec as number | null) ?? 5,
+      }));
+    }),
+
+  /** Adiciona uma cena à estufa (position auto = max+1). Bloqueia duplicatas. */
+  add: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      sceneId: z.string().min(1).max(64),
+      name: z.string().min(1).max(100),
+      // Tipo vindo da listagem Tuya — afeta qual botão a UI mostra
+      // (scene = Tap-to-Run → ▶ play one-shot;
+      //  automation = scheduled rule → ⏰ toggle enable/disable).
+      type: z.enum(['scene', 'automation']).default('scene'),
+      // Mesmo enum dos devices — UI escolhe ícone do mapeamento (light=Lightbulb,
+      // pump=Droplet pra rega, fan=Fan, schedule=Timer pra automações, etc).
+      // Opcional — fallback Zap (raio).
+      iconHint: z.enum(['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'camera', 'other']).optional(),
+      // Duração real da cena em segundos. ESP usa pra mostrar spinner "executando"
+      // até a duração real terminar (em vez de 5s fixo). Range 1-600s (10min).
+      // Default 5 (= comportamento antigo).
+      executionSec: z.number().int().min(1).max(600).default(5),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+
+      // Verifica duplicata
+      const [dup]: any = await pool.execute(
+        `SELECT id FROM tentScenes WHERE tentId = ? AND sceneId = ? LIMIT 1`,
+        [input.tentId, input.sceneId]
+      );
+      if (dup.length > 0) throw new TRPCError({ code: 'CONFLICT', message: 'Cena já vinculada a esta estufa' });
+
+      // Limita a 6 itens totais (cenas + devices)
+      const [counts]: any = await pool.execute(
+        `SELECT
+           (SELECT COUNT(*) FROM tentScenes WHERE tentId = ?) +
+           (SELECT COUNT(*) FROM tentDevices WHERE tentId = ?) AS total`,
+        [input.tentId, input.tentId]
+      );
+      if (counts[0].total >= 6) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Limite de 6 itens (cenas + devices) por estufa atingido' });
+      }
+
+      // position = max+1 ENTRE AS DUAS TABELAS (apêndice no final do grid combinado)
+      const [maxRow]: any = await pool.execute(
+        `SELECT GREATEST(
+           COALESCE((SELECT MAX(position) FROM tentScenes  WHERE tentId = ?), -1),
+           COALESCE((SELECT MAX(position) FROM tentDevices WHERE tentId = ?), -1)
+         ) + 1 AS next_pos`,
+        [input.tentId, input.tentId]
+      );
+      const nextPos = maxRow[0].next_pos;
+
+      const [ins]: any = await pool.execute(
+        `INSERT INTO tentScenes (tentId, sceneId, name, position, type, iconHint, executionSec) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [input.tentId, input.sceneId, input.name, nextPos, input.type, input.iconHint ?? null, input.executionSec]
+      );
+      return { id: ins.insertId as number, position: nextPos, type: input.type };
+    }),
+
+  /** Remove uma cena vinculada (compacta positions depois). */
+  remove: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      // Carrega tentId e valida ownership
+      const [rows]: any = await pool.execute(
+        `SELECT tentId FROM tentScenes WHERE id = ? LIMIT 1`,
+        [input.id]
+      );
+      if (rows.length === 0) throw new TRPCError({ code: 'NOT_FOUND' });
+      await validateTentOwnership(rows[0].tentId, ctx.user.groupId);
+
+      await pool.execute(`DELETE FROM tentScenes WHERE id = ?`, [input.id]);
+      return { ok: true };
+    }),
+
+  /** Reordena: aceita lista [{id, position}] em batch. */
+  reorder: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      order: z.array(z.object({ id: z.number(), position: z.number().int().min(0).max(99) })).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      // Valida que todos os IDs pertencem à tentId (anti-tamper)
+      if (input.order.length > 0) {
+        const ids = input.order.map(o => o.id);
+        const placeholders = ids.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentScenes WHERE tentId = ? AND id IN (${placeholders})`,
+          [input.tentId, ...ids]
+        );
+        if (rows.length !== ids.length) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs inválidos' });
+        }
+      }
+      for (const o of input.order) {
+        await pool.execute(`UPDATE tentScenes SET position = ? WHERE id = ?`, [o.position, o.id]);
+      }
+      return { ok: true };
+    }),
+});
+
+// ─── tentDevices router (dispositivos Tuya vinculados a estufa) ────────────────
+const ICON_HINTS = ['light', 'fan', 'pump', 'heater', 'ac', 'humidifier', 'dehumidifier', 'co2', 'schedule', 'refresh', 'camera', 'other'] as const;
+
+const tentDevicesRouter = router({
+  list: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT id, deviceId, name, position, iconHint, switchCode FROM tentDevices WHERE tentId = ? ORDER BY position ASC, id ASC`,
+        [input.tentId]
+      );
+      return (rows as any[]).map(r => ({
+        id: r.id as number,
+        deviceId: r.deviceId as string,
+        name: r.name as string,
+        position: r.position as number,
+        iconHint: r.iconHint as string | null,
+        switchCode: r.switchCode as string | null,
+      }));
+    }),
+
+  add: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      deviceId: z.string().min(1).max(64),
+      name: z.string().min(1).max(100),
+      iconHint: z.enum(ICON_HINTS).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+
+      const [dup]: any = await pool.execute(
+        `SELECT id FROM tentDevices WHERE tentId = ? AND deviceId = ? LIMIT 1`,
+        [input.tentId, input.deviceId]
+      );
+      if (dup.length > 0) throw new TRPCError({ code: 'CONFLICT', message: 'Device já vinculado a esta estufa' });
+
+      const [counts]: any = await pool.execute(
+        `SELECT
+           (SELECT COUNT(*) FROM tentScenes WHERE tentId = ?) +
+           (SELECT COUNT(*) FROM tentDevices WHERE tentId = ?) AS total`,
+        [input.tentId, input.tentId]
+      );
+      if (counts[0].total >= 6) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Limite de 6 itens (cenas + devices) por estufa atingido' });
+      }
+
+      // position = max+1 ENTRE AS DUAS TABELAS (apêndice no final do grid combinado)
+      const [maxRow]: any = await pool.execute(
+        `SELECT GREATEST(
+           COALESCE((SELECT MAX(position) FROM tentScenes  WHERE tentId = ?), -1),
+           COALESCE((SELECT MAX(position) FROM tentDevices WHERE tentId = ?), -1)
+         ) + 1 AS next_pos`,
+        [input.tentId, input.tentId]
+      );
+      const nextPos = maxRow[0].next_pos;
+
+      // Descobre switchCode AGORA (não depende disso pra criar — falha silenciosa
+      // se Tuya estiver lenta/offline; o /device-toggle faz fallback de discovery
+      // pra rows sem switchCode salvo).
+      // Bug fix: ANTES o switchCode era descoberto a cada toggle e podia escolher
+      // o DP errado (ex: switch_1 em vez de switch_led pra LEDs). Agora salvamos
+      // o switchCode de uma vez e o toggle usa direto — alinha com o pattern do
+      // app web (tuyaSensorMappings.switchCode).
+      let switchCode: string | null = null;
+      try {
+        const [cfgRows]: any = await pool.execute(
+          `SELECT accessId, accessSecret, region FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
+          [ctx.user.id]
+        );
+        if (cfgRows.length > 0) {
+          const cfg = cfgRows[0];
+          const { getTuyaDeviceSwitchState } = await import("./lib/tuya");
+          const state = await getTuyaDeviceSwitchState(input.deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
+          switchCode = state.switchCode;
+          console.log(`[tentDevices.add] device=${input.deviceId} switchCode descoberto: ${switchCode ?? '(null — device não expõe switch)'}`);
+        }
+      } catch (e: any) {
+        console.warn(`[tentDevices.add] device=${input.deviceId} falhou descoberta de switchCode: ${e?.message} — segue NULL, /device-toggle vai re-tentar`);
+      }
+
+      const [ins]: any = await pool.execute(
+        `INSERT INTO tentDevices (tentId, deviceId, name, position, iconHint, switchCode) VALUES (?, ?, ?, ?, ?, ?)`,
+        [input.tentId, input.deviceId, input.name, nextPos, input.iconHint ?? null, switchCode]
+      );
+      return { id: ins.insertId as number, position: nextPos, switchCode };
+    }),
+
+  remove: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const pool = getMysqlPool();
+      const [rows]: any = await pool.execute(
+        `SELECT tentId FROM tentDevices WHERE id = ? LIMIT 1`,
+        [input.id]
+      );
+      if (rows.length === 0) throw new TRPCError({ code: 'NOT_FOUND' });
+      await validateTentOwnership(rows[0].tentId, ctx.user.groupId);
+      await pool.execute(`DELETE FROM tentDevices WHERE id = ?`, [input.id]);
+      return { ok: true };
+    }),
+
+  reorder: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      order: z.array(z.object({ id: z.number(), position: z.number().int().min(0).max(99) })).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      if (input.order.length > 0) {
+        const ids = input.order.map(o => o.id);
+        const placeholders = ids.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentDevices WHERE tentId = ? AND id IN (${placeholders})`,
+          [input.tentId, ...ids]
+        );
+        if (rows.length !== ids.length) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs inválidos' });
+        }
+      }
+      for (const o of input.order) {
+        await pool.execute(`UPDATE tentDevices SET position = ? WHERE id = ?`, [o.position, o.id]);
+      }
+      return { ok: true };
+    }),
+});
+
+// ─── tentDisplay router (operações que cruzam scenes + devices) ────────────────
+//
+// Endpoint reorder unificado: aceita lista combinada [{type, id, position}]
+// e atualiza positions nas duas tabelas em sequência. Sem transação MySQL —
+// se cair no meio, fica inconsistente, mas como é só UI ordering, baixo risco.
+const tentDisplayRouter = router({
+  /**
+   * Lista TUDO (scenes + devices) já merged, ordenado por position.
+   * Usado pra pintar o grid 2x3 de preview no app web.
+   */
+  listItems: protectedProcedure
+    .input(z.object({ tentId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+      const [scenes]: any = await pool.execute(
+        `SELECT id, sceneId, name, position, type, iconHint, executionSec FROM tentScenes WHERE tentId = ?`,
+        [input.tentId]
+      );
+      const [devices]: any = await pool.execute(
+        `SELECT id, deviceId, name, position, iconHint, switchCode FROM tentDevices WHERE tentId = ?`,
+        [input.tentId]
+      );
+      const items = [
+        ...(scenes as any[]).map((s: any) => ({
+          // 'type' aqui é tipo do item (scene vs device pra UI saber qual lista),
+          // 'sceneType' é tipo da CENA Tuya (scene one-shot vs automation enable/disable)
+          type: 'scene' as const,
+          sceneType: (s.type === 'automation' ? 'automation' : 'scene') as 'scene' | 'automation',
+          id: s.id as number,
+          refId: s.sceneId as string,
+          name: s.name as string,
+          position: s.position as number,
+          iconHint: s.iconHint as string | null,
+          switchCode: null as string | null,
+          executionSec: (s.executionSec as number | null) ?? 5,
+        })),
+        ...(devices as any[]).map((d: any) => ({
+          type: 'device' as const,
+          sceneType: null as 'scene' | 'automation' | null,
+          id: d.id as number,
+          refId: d.deviceId as string,
+          name: d.name as string,
+          position: d.position as number,
+          iconHint: d.iconHint as string | null,
+          switchCode: d.switchCode as string | null,
+          executionSec: null as number | null,  // só faz sentido pra cenas
+        })),
+      ];
+      items.sort((a, b) => a.position - b.position || a.id - b.id);
+      return items;
+    }),
+
+  /**
+   * Reordena combinando scenes + devices. Aceita batch de [{type, id, position}].
+   * Tipo decide qual tabela atualizar.
+   */
+  reorder: protectedProcedure
+    .input(z.object({
+      tentId: z.number(),
+      order: z.array(z.object({
+        type: z.enum(['scene', 'device']),
+        id: z.number(),
+        position: z.number().int().min(0).max(99),
+      })).max(20),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await validateTentOwnership(input.tentId, ctx.user.groupId);
+      const pool = getMysqlPool();
+
+      // Anti-tamper: valida que cada (id,type) pertence à tentId
+      const sceneIds = input.order.filter(o => o.type === 'scene').map(o => o.id);
+      const deviceIds = input.order.filter(o => o.type === 'device').map(o => o.id);
+
+      if (sceneIds.length > 0) {
+        const ph = sceneIds.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentScenes WHERE tentId = ? AND id IN (${ph})`,
+          [input.tentId, ...sceneIds]
+        );
+        if (rows.length !== sceneIds.length) throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs de cena inválidos' });
+      }
+      if (deviceIds.length > 0) {
+        const ph = deviceIds.map(() => '?').join(',');
+        const [rows]: any = await pool.execute(
+          `SELECT id FROM tentDevices WHERE tentId = ? AND id IN (${ph})`,
+          [input.tentId, ...deviceIds]
+        );
+        if (rows.length !== deviceIds.length) throw new TRPCError({ code: 'FORBIDDEN', message: 'IDs de device inválidos' });
+      }
+
+      for (const o of input.order) {
+        const table = o.type === 'scene' ? 'tentScenes' : 'tentDevices';
+        await pool.execute(`UPDATE ${table} SET position = ? WHERE id = ?`, [o.position, o.id]);
+      }
+      return { ok: true };
+    }),
 });
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   tuya: tuyaRouter,
-  auth: router({
-    // Simplified auth for standalone deployment
-    me: protectedProcedure.query(() => ({ id: 1, name: "Local User", email: "user@local" })),
-    logout: protectedProcedure.mutation(() => ({ success: true })),
-  }),
+  tentScenes: tentScenesRouter,
+  tentDevices: tentDevicesRouter,
+  tentDisplay: tentDisplayRouter,
+  // Auth real está em /api/auth/* (REST) — registerAuthRoutes em _core/authRoutes.ts.
+  // O sub-router tRPC `auth` foi removido: retornava { id:1, name:"Local User" }
+  // hardcoded mesmo dentro de protectedProcedure (bug latente — qualquer caller
+  // que chamasse trpc.auth.me.query() recebia dados fictícios em vez do user real).
 
   // Weather (Clima)
   weather: router({
@@ -693,270 +1005,6 @@ export const appRouter = router({
   }),
 
   // Tents (Estufas)
-  tents: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      return db.getAllTents(ctx.user.groupId);
-    }),
-    getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input, ctx }) => {
-      const database = await getDb();
-      if (!database) throw new Error("DB not available");
-      const tent = await db.getTentById(input.id);
-      if (!tent) return undefined;
-      await validateTentOwnership(input.id, ctx.user.groupId);
-      // Para estufas de manutenção, buscar último evento de clonagem e último ciclo com clonesProduced
-      let lastCloningAt: number | null = null;
-      let lastCloningCount: number | null = null;
-      if (tent.category === 'MAINTENANCE') {
-        // lastCloningAt: data do último cloningEvent (quando a estufa foi para clonagem)
-        const lastCloningEvent = await database
-          .select()
-          .from(cloningEvents)
-          .where(eq(cloningEvents.tentId, tent.id))
-          .orderBy(desc(cloningEvents.startDate))
-          .limit(1);
-        if (lastCloningEvent[0]) {
-          lastCloningAt = new Date(lastCloningEvent[0].startDate).getTime();
-        }
-        // lastCloningCount: número de clones produzidos no último ciclo com clonesProduced
-        const lastCycleWithClones = await database
-          .select({ clonesProduced: cycles.clonesProduced })
-          .from(cycles)
-          .where(and(eq(cycles.tentId, tent.id), isNotNull(cycles.clonesProduced)))
-          .orderBy(desc(cycles.createdAt))
-          .limit(1);
-        if (lastCycleWithClones[0]) {
-          lastCloningCount = lastCycleWithClones[0].clonesProduced ?? null;
-        }
-      }
-      return { ...tent, lastCloningAt, lastCloningCount };
-    }),
-    create: protectedProcedure
-      .input(
-        z.object({
-          name: z.string().min(1).max(50),
-          category: z.enum(["MAINTENANCE", "VEGA", "FLORA", "DRYING"]),
-          width: z.number().int().positive(),
-          depth: z.number().int().positive(),
-          height: z.number().int().positive(),
-          powerW: z.number().int().positive().optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-
-        // Calcular volume (em litros)
-        const volume = (input.width * input.depth * input.height) / 1000;
-
-        const [result] = await database.insert(tents).values({
-          ...input,
-          volume: volume.toFixed(3),
-          groupId: ctx.user.groupId ?? null,
-        });
-
-        return { success: true, id: result.insertId };
-      }),
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: z.number(),
-          name: z.string().min(1).max(50),
-          category: z.enum(["MAINTENANCE", "VEGA", "FLORA", "DRYING"]),
-          width: z.number().int().positive(),
-          depth: z.number().int().positive(),
-          height: z.number().int().positive(),
-          powerW: z.number().int().positive().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-
-        // Verificar ownership
-        await validateTentOwnership(input.id, ctx.user.groupId);
-
-        // Verificar se a estufa existe
-        const existingTent = await database
-          .select()
-          .from(tents)
-          .where(eq(tents.id, input.id))
-          .limit(1);
-
-        if (existingTent.length === 0) {
-          throw new Error("Estufa não encontrada");
-        }
-        
-        // Calcular volume (em litros)
-        const volume = (input.width * input.depth * input.height) / 1000;
-        
-        const { id, ...updateData } = input;
-        
-        // Se powerW não foi fornecido, definir como null explicitamente
-        const dataToUpdate = {
-          ...updateData,
-          volume: volume.toFixed(3),
-          powerW: input.powerW ?? null,
-        };
-        
-        await database
-          .update(tents)
-          .set(dataToUpdate)
-          .where(eq(tents.id, id));
-        
-        return { success: true };
-      }),
-    getDeletePreview: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado.");
-        }
-        await validateTentOwnership(input.id, ctx.user.groupId);
-        
-        // Contar registros relacionados que serão deletados
-        const [cyclesCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(cycles)
-          .where(eq(cycles.tentId, input.id));
-        
-        const [plantsCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(plants)
-          .where(eq(plants.currentTentId, input.id));
-        
-        const [recipesCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(recipes)
-          .where(eq(recipes.tentId, input.id));
-        
-        const [dailyLogsCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(dailyLogs)
-          .where(eq(dailyLogs.tentId, input.id));
-        
-        const [alertsCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(alerts)
-          .where(eq(alerts.tentId, input.id));
-        
-        const [taskInstancesCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(taskInstances)
-          .where(eq(taskInstances.tentId, input.id));
-        
-        const [plantHistoryCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(plantTentHistory)
-          .where(
-            or(
-              eq(plantTentHistory.fromTentId, input.id),
-              eq(plantTentHistory.toTentId, input.id)
-            )
-          );
-        
-        // Verificar se há ciclos ativos (bloqueador)
-        const [activeCyclesCount] = await database
-          .select({ count: sql<number>`count(*)` })
-          .from(cycles)
-          .where(and(
-            eq(cycles.tentId, input.id),
-            eq(cycles.status, "ACTIVE")
-          ));
-        
-        return {
-          canDelete: plantsCount.count === 0 && activeCyclesCount.count === 0,
-          blockers: {
-            activeCycles: activeCyclesCount.count,
-            plants: plantsCount.count,
-          },
-          willDelete: {
-            cycles: cyclesCount.count,
-            recipes: recipesCount.count,
-            dailyLogs: dailyLogsCount.count,
-            alerts: alertsCount.count,
-            taskInstances: taskInstancesCount.count,
-            plantHistory: plantHistoryCount.count,
-          },
-          totalRecords: 
-            cyclesCount.count + 
-            recipesCount.count + 
-            dailyLogsCount.count + 
-            alertsCount.count + 
-            taskInstancesCount.count + 
-            plantHistoryCount.count,
-        };
-      }),
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        // Verificar ownership
-        await validateTentOwnership(input.id, ctx.user.groupId);
-        // Verificar se há ciclos ativos
-        const activeCycles = await database
-          .select({ id: cycles.id })
-          .from(cycles)
-          .where(and(
-            eq(cycles.tentId, input.id),
-            eq(cycles.status, "ACTIVE")
-          ));
-        
-        if (activeCycles.length > 0) {
-          throw new Error("Não é possível excluir uma estufa com ciclos ativos. Finalize o ciclo primeiro.");
-        }
-        
-        // Verificar se há plantas na estufa
-        const plantsInTent = await database
-          .select({ id: plants.id })
-          .from(plants)
-          .where(eq(plants.currentTentId, input.id));
-        
-        if (plantsInTent.length > 0) {
-          throw new Error(`Não é possível excluir uma estufa com ${plantsInTent.length} planta(s). Mova ou finalize as plantas primeiro.`);
-        }
-        
-        // Buscar todos os ciclos da estufa (ativos e finalizados)
-        const allCycles = await database
-          .select({ id: cycles.id })
-          .from(cycles)
-          .where(eq(cycles.tentId, input.id));
-        
-        const cycleIds = allCycles.map((c: any) => c.id);
-        
-        // Tudo dentro de uma transação — se qualquer delete falhar,
-        // o banco volta ao estado original automaticamente.
-        await database.transaction(async (tx) => {
-          await tx.delete(dailyLogs).where(eq(dailyLogs.tentId, input.id));
-          await tx.delete(taskInstances).where(eq(taskInstances.tentId, input.id));
-          await tx.delete(cycles).where(eq(cycles.tentId, input.id));
-          await tx.delete(alertSettings).where(eq(alertSettings.tentId, input.id));
-          await tx.delete(alertHistory).where(eq(alertHistory.tentId, input.id));
-          await tx.delete(alerts).where(eq(alerts.tentId, input.id));
-          await tx.delete(tentAState).where(eq(tentAState.tentId, input.id));
-          await tx.delete(cloningEvents).where(eq(cloningEvents.tentId, input.id));
-          await tx.delete(recipes).where(eq(recipes.tentId, input.id));
-          await tx.delete(plantTentHistory).where(
-            or(
-              eq(plantTentHistory.fromTentId, input.id),
-              eq(plantTentHistory.toTentId, input.id)
-            )
-          );
-          // Desvincula plantas antes de deletar a estufa (evita FK violation)
-          await tx.update(plants).set({ currentTentId: null }).where(eq(plants.currentTentId, input.id));
-          await tx.delete(tents).where(eq(tents.id, input.id));
-        });
-
-        return { success: true };
-      }),
-  }),
 
   // Strains (Variedades)
   strains: router({
@@ -1103,2477 +1151,9 @@ export const appRouter = router({
   // Called by cycles.create and cycles.initiate so tasks appear immediately
   // without the user needing to open the Tasks tab first (D3).
 
-  // Cycles (Ciclos)
-  cycles: router({
-    listActive: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) throw new Error("Banco de dados não inicializado");
-      const allCycles = await database
-        .select({
-          id: cycles.id,
-          status: cycles.status,
-          tentId: cycles.tentId,
-          tentGroupId: tents.groupId,
-          startDate: cycles.startDate,
-          floraStartDate: cycles.floraStartDate,
-          cloningStartDate: cycles.cloningStartDate,
-        })
-        .from(cycles)
-        .leftJoin(tents, eq(cycles.tentId, tents.id))
-        .where(eq(cycles.status, "ACTIVE"));
-      return allCycles.filter(c =>
-        ctx.user.groupId == null || c.tentGroupId == null || c.tentGroupId === ctx.user.groupId
-      );
-    }),
-    getActiveCyclesWithProgress: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) {
-        throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-      }
-
-      // Filtro de groupId na query
-      const groupConditions = eq(cycles.status, "ACTIVE");
-
-      // Buscar ciclos ativos com tent e strain
-      const activeCycles = await database
-        .select({
-          id: cycles.id,
-          tentId: cycles.tentId,
-          tentName: tents.name,
-          tentCategory: tents.category,
-          tentGroupId: tents.groupId,
-          strainId: cycles.strainId,
-          strainName: strains.name,
-          startDate: cycles.startDate,
-          cloningStartDate: cycles.cloningStartDate,
-          floraStartDate: cycles.floraStartDate,
-          status: cycles.status,
-          vegaWeeks: strains.vegaWeeks,
-          floraWeeks: strains.floraWeeks,
-        })
-        .from(cycles)
-        .leftJoin(tents, eq(cycles.tentId, tents.id))
-        .leftJoin(strains, eq(cycles.strainId, strains.id))
-        .where(groupConditions);
-
-      // Filtrar pelo grupo do usuário
-      const filtered = activeCycles.filter(c =>
-        ctx.user.groupId == null || c.tentGroupId == null || c.tentGroupId === ctx.user.groupId
-      );
-      
-      const now = new Date();
-      
-      return filtered.map((cycle: any) => {
-        const startDate = new Date(cycle.startDate);
-        const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        let currentWeek = 1;
-        let totalWeeks = cycle.vegaWeeks || 4;
-        let phase: 'MAINTENANCE' | 'CLONING' | 'VEGA' | 'FLORA' = 'VEGA';
-        let daysUntilHarvest = 0;
-        
-        // Detectar fase baseado nos campos de data
-        if (cycle.tentCategory === 'MAINTENANCE') {
-          // Ciclo de manutenção/clonagem
-          if (cycle.cloningStartDate) {
-            phase = 'CLONING';
-            const cloningStartDate = new Date(cycle.cloningStartDate);
-            const daysSinceCloning = Math.floor((now.getTime() - cloningStartDate.getTime()) / (1000 * 60 * 60 * 24));
-            currentWeek = Math.floor(daysSinceCloning / 7) + 1;
-            totalWeeks = 2; // 2 semanas de clonagem
-          } else {
-            phase = 'MAINTENANCE';
-            currentWeek = Math.floor(daysSinceStart / 7) + 1;
-            totalWeeks = 999; // Manutenção contínua
-          }
-          daysUntilHarvest = 0; // Não se aplica
-        } else if (cycle.floraStartDate) {
-          // Ciclo em floração
-          const floraStartDate = new Date(cycle.floraStartDate);
-          const daysSinceFlora = Math.floor((now.getTime() - floraStartDate.getTime()) / (1000 * 60 * 60 * 24));
-          currentWeek = Math.floor(daysSinceFlora / 7) + 1;
-          totalWeeks = cycle.floraWeeks || 8;
-          phase = 'FLORA';
-          daysUntilHarvest = Math.max(0, (totalWeeks * 7) - daysSinceFlora);
-        } else {
-          // Ciclo em vegetação
-          currentWeek = Math.floor(daysSinceStart / 7) + 1;
-          totalWeeks = cycle.vegaWeeks || 4;
-          phase = 'VEGA';
-          daysUntilHarvest = ((cycle.vegaWeeks || 4) * 7) + ((cycle.floraWeeks || 8) * 7) - daysSinceStart;
-        }
-        
-        const progress = Math.min(100, (currentWeek / totalWeeks) * 100);
-        const estimatedHarvestDate = new Date(now.getTime() + (daysUntilHarvest * 24 * 60 * 60 * 1000));
-        
-        return {
-          ...cycle,
-          currentWeek,
-          totalWeeks,
-          phase,
-          progress: Math.round(progress),
-          daysUntilHarvest,
-          estimatedHarvestDate,
-        };
-      });
-    }),
-    getByTent: protectedProcedure.input(z.object({ tentId: z.number() })).query(async ({ input, ctx }) => {
-      await validateTentOwnership(input.tentId, ctx.user.groupId);
-      return db.getCycleByTentId(input.tentId);
-    }),
-    create: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number(),
-          strainId: z.number().optional().nullable(),
-          startDate: z.date(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        await database.insert(cycles).values(input);
-
-        // D3 — seed week-1 tasks immediately after cycle creation
-        const [tent] = await database
-          .select({ category: tents.category })
-          .from(tents)
-          .where(eq(tents.id, input.tentId))
-          .limit(1);
-        if (tent) {
-          const phase = tent.category === "MAINTENANCE"
-            ? "MAINTENANCE"
-            : tent.category === "DRYING"
-            ? "DRYING"
-            : (tent.category as "VEGA" | "FLORA");
-          await seedWeekTasks(database, input.tentId, tent.category, phase, 1);
-        }
-
-        return { success: true };
-      }),
-    transitionToFlora: protectedProcedure
-      .input(
-        z.object({
-          cycleId: z.number(),
-          floraStartDate: z.date(),
-          targetTentId: z.number().optional(),
-
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-
-        // Buscar ciclo atual
-        const [cycle] = await database
-          .select()
-          .from(cycles)
-          .where(eq(cycles.id, input.cycleId));
-
-        if (!cycle) {
-          throw new Error("Ciclo não encontrado");
-        }
-
-        if (cycle.floraStartDate) {
-          throw new Error("Ciclo já está em floração");
-        }
-        
-        // Atualizar ciclo com floraStartDate
-        await database
-          .update(cycles)
-          .set({ floraStartDate: input.floraStartDate })
-          .where(eq(cycles.id, input.cycleId));
-        
-        // Se targetTentId fornecido, mover plantas e atualizar estufa do ciclo
-        if (input.targetTentId) {
-          // Mover todas as plantas do ciclo para nova estufa
-          await database
-            .update(plants)
-            .set({ currentTentId: input.targetTentId })
-            .where(eq(plants.currentTentId, cycle.tentId));
-          
-          // Atualizar estufa do ciclo
-          await database
-            .update(cycles)
-            .set({ tentId: input.targetTentId })
-            .where(eq(cycles.id, input.cycleId));
-          
-          // Atualizar categoria da estufa de destino para FLORA
-          await database
-            .update(tents)
-            .set({ category: "FLORA" })
-            .where(eq(tents.id, input.targetTentId));
-          
-          // Ajustar margens de alerta automaticamente para FLORA
-          await applyPhaseTransitionLimits(input.targetTentId, "FLORA");
-        } else {
-          // Sem mudança de estufa: ajustar margens da estufa atual para FLORA
-          await applyPhaseTransitionLimits(cycle.tentId, "FLORA");
-        }
-        
-        return { success: true };
-      }),
-    finalize: protectedProcedure
-      .input(z.object({ cycleId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-        await database
-          .update(cycles)
-          .set({ status: "FINISHED" })
-          .where(eq(cycles.id, input.cycleId));
-        return { success: true };
-      }),
-    transitionToDrying: protectedProcedure
-      .input(
-        z.object({
-          cycleId: z.number(),
-          dryingStartDate: z.date(),
-          targetTentId: z.number().optional(),
-          harvestNotes: z.string().optional(),
-          harvestWeight: z.number().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-
-        // Buscar ciclo atual
-        const [cycle] = await database
-          .select()
-          .from(cycles)
-          .where(eq(cycles.id, input.cycleId));
-
-        if (!cycle) {
-          throw new Error("Ciclo não encontrado");
-        }
-
-        if (!cycle.floraStartDate) {
-          throw new Error("Ciclo não está em floração");
-        }
-        
-        // Finalizar ciclo atual e salvar dados de colheita
-        await database
-          .update(cycles)
-          .set({ 
-            status: "FINISHED",
-            harvestWeight: input.harvestWeight ? input.harvestWeight.toString() : null,
-            harvestNotes: input.harvestNotes || null,
-          })
-          .where(eq(cycles.id, input.cycleId));
-        
-        // Buscar plantas do ciclo
-        const cyclePlants = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.currentTentId, cycle.tentId));
-        
-        // Marcar plantas como HARVESTED e adicionar notas
-        await database
-          .update(plants)
-          .set({ 
-            status: "HARVESTED",
-            finishedAt: input.dryingStartDate,
-            finishReason: input.harvestNotes || "Colhida e iniciada secagem"
-          })
-          .where(eq(plants.currentTentId, cycle.tentId));
-        
-        // Se targetTentId fornecido, criar ciclo de secagem e mover plantas
-        if (input.targetTentId) {
-          // Criar novo ciclo de secagem
-          await database.insert(cycles).values({
-            tentId: input.targetTentId,
-            strainId: cycle.strainId,
-            startDate: input.dryingStartDate,
-            status: "ACTIVE",
-          });
-          
-          // Mover plantas para estufa de secagem
-          await database
-            .update(plants)
-            .set({ currentTentId: input.targetTentId })
-            .where(eq(plants.currentTentId, cycle.tentId));
-          
-          // Atualizar categoria da estufa de destino para DRYING
-          await database
-            .update(tents)
-            .set({ category: "DRYING" })
-            .where(eq(tents.id, input.targetTentId));
-          
-          // Ajustar margens de alerta automaticamente para DRYING
-          await applyPhaseTransitionLimits(input.targetTentId, "DRYING");
-          
-          // Resetar categoria da estufa original para FLORA (vazia, disponível)
-          await database
-            .update(tents)
-            .set({ category: "FLORA" })
-            .where(eq(tents.id, cycle.tentId));
-        } else {
-          // Sem estufa destino: a estufa original vira DRYING na mesma estufa
-          await database
-            .update(tents)
-            .set({ category: "DRYING" })
-            .where(eq(tents.id, cycle.tentId));
-          // Criar novo ciclo de secagem na mesma estufa
-          await database.insert(cycles).values({
-            tentId: cycle.tentId,
-            strainId: cycle.strainId,
-            startDate: input.dryingStartDate,
-            status: "ACTIVE",
-          });
-          // Ajustar margens de alerta automaticamente para DRYING
-          await applyPhaseTransitionLimits(cycle.tentId, "DRYING");
-        }
-        
-        return { success: true, plantsHarvested: cyclePlants.length };
-      }),
-    
-    // Transição MAINTENANCE → CLONING
-    transitionToCloning: protectedProcedure
-      .input(
-        z.object({
-          cycleId: z.number(),
-          cloningStartDate: z.date(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-
-        // Buscar ciclo atual
-        const [cycle] = await database
-          .select()
-          .from(cycles)
-          .where(eq(cycles.id, input.cycleId));
-
-        if (!cycle) {
-          throw new Error("Ciclo não encontrado");
-        }
-        
-        // Permitir retornar para clonagem mesmo se já esteve em clonagem antes
-        // (usuário pode voltar de MAINTENANCE para CLONING múltiplas vezes)
-        
-        // Atualizar ciclo para CLONING
-        await database
-          .update(cycles)
-          .set({ cloningStartDate: input.cloningStartDate })
-          .where(eq(cycles.id, input.cycleId));
-        
-        // Ajustar margens de alerta automaticamente para CLONING
-        await applyPhaseTransitionLimits(cycle.tentId, "CLONING");
-        
-        return { success: true };
-      }),
-    
-    // Transição CLONING → MAINTENANCE
-    transitionToMaintenance: protectedProcedure
-      .input(
-        z.object({
-          cycleId: z.number(),
-          clonesProduced: z.number().min(0).optional(), // Número de clones produzidos
-          targetTentId: z.number().optional(), // Estufa destino para as mudas
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-        
-        // Buscar ciclo atual
-        const [cycle] = await database
-          .select()
-          .from(cycles)
-          .where(eq(cycles.id, input.cycleId));
-        
-        if (!cycle) {
-          throw new Error("Ciclo não encontrado");
-        }
-        
-        if (!cycle.cloningStartDate) {
-          throw new Error("Ciclo não está em clonagem");
-        }
-        
-        // Retornar para MAINTENANCE (remover cloningStartDate e salvar clonesProduced)
-        await database
-          .update(cycles)
-          .set({ 
-            cloningStartDate: null,
-            clonesProduced: input.clonesProduced || null
-          })
-          .where(eq(cycles.id, input.cycleId));
-        
-        // Se clones foram produzidos, criar mudas (SEEDLING)
-        if (input.clonesProduced && input.clonesProduced > 0) {
-          // Validar que targetTentId foi fornecido
-          if (!input.targetTentId) {
-            throw new Error("Estufa destino é obrigatória ao criar mudas");
-          }
-
-          // Buscar nome da strain do ciclo
-          let strainName = 'Sem strain';
-          if (cycle.strainId) {
-            const [strain] = await database.select({ name: strains.name }).from(strains).where(eq(strains.id, cycle.strainId));
-            strainName = strain?.name || 'Sem strain';
-          }
-
-          const seedlings = [];
-          for (let i = 1; i <= input.clonesProduced; i++) {
-            seedlings.push({
-              name: `Clone ${i} - ${strainName}`,
-              strainId: cycle.strainId,
-              currentTentId: input.targetTentId, // Mudas vão para estufa selecionada
-              plantStage: "SEEDLING" as const,
-              status: "ACTIVE" as const,
-            });
-          }
-          await database.insert(plants).values(seedlings);
-        }
-        
-        // Ajustar margens de alerta automaticamente para MAINTENANCE
-        await applyPhaseTransitionLimits(cycle.tentId, "MAINTENANCE");
-        
-        return { success: true, seedlingsCreated: input.clonesProduced || 0 };
-      }),
-    
-    initiate: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number(),
-          strainId: z.number().optional().nullable(),
-          startDate: z.date(),
-          phase: z.enum(["CLONING", "MAINTENANCE", "VEGA", "FLORA", "DRYING"]),
-          weekNumber: z.number().min(1),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-
-        // Calcular startDate baseado na fase e semana
-        const startDate = new Date(input.startDate);
-        const weeksToSubtract = input.weekNumber - 1;
-        startDate.setDate(startDate.getDate() - (weeksToSubtract * 7));
-        
-        // Se fase for FLORA, definir floraStartDate
-        const floraStartDate = input.phase === "FLORA" ? new Date(input.startDate) : null;
-        
-        await database.insert(cycles).values({
-          tentId: input.tentId,
-          strainId: input.strainId,
-          startDate,
-          floraStartDate,
-        });
-        
-        // Atualizar categoria da estufa baseado na fase
-        let category: "MAINTENANCE" | "VEGA" | "FLORA" | "DRYING" = "MAINTENANCE";
-        if (input.phase === "CLONING" || input.phase === "MAINTENANCE") {
-          category = "MAINTENANCE";
-        } else if (input.phase === "VEGA") {
-          category = "VEGA";
-        } else if (input.phase === "FLORA") {
-          category = "FLORA";
-        } else if (input.phase === "DRYING") {
-          category = "DRYING";
-        }
-        
-        await database
-          .update(tents)
-          .set({ category })
-          .where(eq(tents.id, input.tentId));
-        
-        // Ajustar margens de alerta automaticamente para a fase inicial do ciclo
-        const initPhase = (input.phase === "CLONING" || input.phase === "MAINTENANCE")
-          ? "MAINTENANCE"
-          : input.phase as "VEGA" | "FLORA" | "DRYING";
-        await applyPhaseTransitionLimits(input.tentId, initPhase);
-
-        // D3 — seed task instances for the current week immediately
-        await seedWeekTasks(database, input.tentId, category, input.phase, input.weekNumber);
-
-        return { success: true };
-      }),
-    edit: protectedProcedure
-      .input(
-        z.object({
-          cycleId: z.number(),
-          strainId: z.number().optional(),
-          startDate: z.date().optional(),
-          floraStartDate: z.date().optional().nullable(),
-          phase: z.enum(["CLONING", "MAINTENANCE", "VEGA", "FLORA", "DRYING"]).optional(),
-          weekNumber: z.number().min(1).optional(),
-          motherPlantId: z.number().optional(),
-          clonesProduced: z.number().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-
-        console.log('[cycles.edit] Input received:', input);
-        
-        const updates: any = {};
-        
-        if (input.startDate && input.phase && input.weekNumber) {
-          // Recalcular startDate baseado na fase e semana
-          const startDate = new Date(input.startDate);
-          console.log('[cycles.edit] Original startDate:', startDate.toISOString());
-          const weeksToSubtract = input.weekNumber - 1;
-          console.log('[cycles.edit] Weeks to subtract:', weeksToSubtract);
-          startDate.setDate(startDate.getDate() - (weeksToSubtract * 7));
-          console.log('[cycles.edit] Calculated new startDate:', startDate.toISOString());
-          updates.startDate = startDate;
-          
-          // Se fase for FLORA, definir floraStartDate
-          if (input.phase === "FLORA") {
-            updates.floraStartDate = new Date(input.startDate);
-          } else {
-            updates.floraStartDate = null;
-          }
-        } else if (input.startDate) {
-          updates.startDate = input.startDate;
-        }
-        
-        if (input.floraStartDate !== undefined) {
-          updates.floraStartDate = input.floraStartDate;
-        }
-        
-        if (input.strainId) {
-          updates.strainId = input.strainId;
-        }
-        
-        if (input.motherPlantId) {
-          updates.motherPlantId = input.motherPlantId;
-        }
-        
-        if (input.clonesProduced) {
-          updates.clonesProduced = input.clonesProduced;
-        }
-        
-        await database
-          .update(cycles)
-          .set(updates)
-          .where(eq(cycles.id, input.cycleId));
-        
-        // Atualizar categoria da estufa se fase foi especificada
-        if (input.phase) {
-          // Buscar tentId do ciclo
-          const cycleData = await database
-            .select()
-            .from(cycles)
-            .where(eq(cycles.id, input.cycleId))
-            .limit(1);
-          
-          if (cycleData.length > 0) {
-            const tentId = cycleData[0].tentId;
-            
-            // Mapear fase para categoria da estufa
-            let category: "MAINTENANCE" | "VEGA" | "FLORA" | "DRYING" = "MAINTENANCE";
-            if (input.phase === "CLONING" || input.phase === "MAINTENANCE") {
-              category = "MAINTENANCE";
-            } else if (input.phase === "VEGA") {
-              category = "VEGA";
-            } else if (input.phase === "FLORA") {
-              category = "FLORA";
-            } else if (input.phase === "DRYING") {
-              category = "DRYING";
-            }
-            
-            // Atualizar categoria da estufa
-            await database
-              .update(tents)
-              .set({ category })
-              .where(eq(tents.id, tentId));
-            
-            // Ajustar margens de alerta automaticamente para a nova fase
-            const editPhase = (input.phase === "CLONING" || input.phase === "MAINTENANCE")
-              ? "MAINTENANCE"
-              : input.phase as "VEGA" | "FLORA" | "DRYING";
-            await applyPhaseTransitionLimits(tentId, editPhase);
-          }
-        }
-        
-        return { success: true };
-      }),
-    
-    // Finalizar clonagem e gerar mudas
-    finishCloning: protectedProcedure
-      .input(
-        z.object({
-          cycleId: z.number(),
-          targetTentId: z.number(), // Estufa destino para as mudas
-          motherPlantId: z.number(), // Planta-mãe selecionada
-          clonesProduced: z.number().min(1).max(50), // Quantidade de mudas a gerar
-          seedlingCount: z.number().min(1).max(50).optional(), // Alias para clonesProduced (compatibilidade)
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado.");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-
-        // Buscar ciclo atual
-        const [cycle] = await database
-          .select()
-          .from(cycles)
-          .where(eq(cycles.id, input.cycleId));
-
-        if (!cycle) {
-          throw new Error("Ciclo não encontrado");
-        }
-
-        // Usar motherPlantId e clonesProduced dos inputs
-        const motherPlantId = input.motherPlantId;
-        const clonesProduced = input.clonesProduced || input.seedlingCount || 10;
-        
-        // Buscar planta-mãe
-        const [motherPlant] = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, motherPlantId));
-        
-        if (!motherPlant) {
-          throw new Error("Planta-mãe não encontrada");
-        }
-        
-        // Buscar estufa destino
-        const [targetTent] = await database
-          .select()
-          .from(tents)
-          .where(eq(tents.id, input.targetTentId));
-        
-        if (!targetTent) {
-          throw new Error("Estufa destino não encontrada");
-        }
-        
-        // Verificar se estufa destino está vazia (sem ciclo ativo)
-        const [existingCycle] = await database
-          .select()
-          .from(cycles)
-          .where(and(
-            eq(cycles.tentId, input.targetTentId),
-            eq(cycles.status, "ACTIVE")
-          ));
-        
-        if (existingCycle) {
-          throw new Error(`Estufa ${targetTent.name} já possui um ciclo ativo. Finalize o ciclo atual antes de criar mudas.`);
-        }
-        
-        // Criar mudas
-        const seedlings = [];
-        const count = input.seedlingCount || cycle.clonesProduced || 3;
-        for (let i = 1; i <= count; i++) {
-          const [newSeedling] = await database
-            .insert(plants)
-            .values({
-              name: `${motherPlant.name} Clone #${i}`,
-              code: `${motherPlant.code || 'CL'}-${String(i).padStart(3, '0')}`,
-              strainId: motherPlant.strainId,
-              currentTentId: input.targetTentId,
-              plantStage: "SEEDLING",
-              status: "ACTIVE",
-            });
-          
-          seedlings.push(newSeedling);
-          
-          // Registrar histórico de movimentação
-          await database
-            .insert(plantTentHistory)
-            .values({
-              plantId: newSeedling.insertId,
-              fromTentId: null, // Primeira entrada
-              toTentId: input.targetTentId,
-              reason: `Clonagem finalizada - mãe: ${motherPlant.name}`,
-            });
-        }
-        
-        // Criar novo ciclo na estufa destino (fase VEGA)
-        await database
-          .insert(cycles)
-          .values({
-            tentId: input.targetTentId,
-            strainId: motherPlant.strainId,
-            startDate: new Date(),
-            status: "ACTIVE",
-          });
-        
-        // Atualizar categoria da estufa destino para VEGA
-        await database
-          .update(tents)
-          .set({ category: "VEGA" })
-          .where(eq(tents.id, input.targetTentId));
-        
-        // Limpar campos de clonagem do ciclo atual (volta para MAINTENANCE)
-        await database
-          .update(cycles)
-          .set({
-            cloningStartDate: null,
-            motherPlantId: null,
-            clonesProduced: null,
-          })
-          .where(eq(cycles.id, input.cycleId));
-        
-        // Atualizar categoria da estufa atual para MAINTENANCE
-        await database
-          .update(tents)
-          .set({ category: "MAINTENANCE" })
-          .where(eq(tents.id, cycle.tentId));
-        
-        return {
-          success: true,
-          seedlingsCreated: count,
-          targetTentName: targetTent.name,
-        };
-      }),
-    
-    // Promover fase (VEGA→FLORA ou FLORA→DRYING)
-    promotePhase: protectedProcedure
-      .input(
-        z.object({
-          cycleId: z.number(),
-          targetPhase: z.enum(["FLORA", "DRYING"]),
-          moveToTent: z.boolean(),
-          targetTentId: z.number().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado.");
-        }
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-
-        // Buscar ciclo atual
-        const [cycle] = await database
-          .select()
-          .from(cycles)
-          .where(eq(cycles.id, input.cycleId));
-        
-        if (!cycle) {
-          throw new Error("Ciclo não encontrado");
-        }
-        
-        // Se mover para outra estufa
-        if (input.moveToTent && input.targetTentId) {
-          // Buscar estufa destino
-          const [targetTent] = await database
-            .select()
-            .from(tents)
-            .where(eq(tents.id, input.targetTentId));
-          
-          if (!targetTent) {
-            throw new Error("Estufa destino não encontrada");
-          }
-          
-          // Verificar se estufa destino está vazia
-          const [existingCycle] = await database
-            .select()
-            .from(cycles)
-            .where(and(
-              eq(cycles.tentId, input.targetTentId),
-              eq(cycles.status, "ACTIVE")
-            ));
-          
-          if (existingCycle) {
-            throw new Error(`Estufa ${targetTent.name} já possui um ciclo ativo. Finalize o ciclo atual antes de mover plantas.`);
-          }
-          
-          // Buscar todas as plantas do ciclo atual
-          const cyclePlants = await database
-            .select()
-            .from(plants)
-            .where(and(
-              eq(plants.currentTentId, cycle.tentId),
-              eq(plants.status, "ACTIVE")
-            ));
-          
-          // Mover plantas para nova estufa
-          for (const plant of cyclePlants) {
-            await database
-              .update(plants)
-              .set({ currentTentId: input.targetTentId })
-              .where(eq(plants.id, plant.id));
-            
-            // Registrar histórico de movimentação
-            await database
-              .insert(plantTentHistory)
-              .values({
-                plantId: plant.id,
-                fromTentId: cycle.tentId,
-                toTentId: input.targetTentId,
-                reason: `Promoção para ${input.targetPhase}`,
-              });
-          }
-          
-          // Criar novo ciclo na estufa destino
-          const newCycleData: any = {
-            tentId: input.targetTentId,
-            strainId: cycle.strainId,
-            startDate: cycle.startDate, // Mantém data original
-            status: "ACTIVE",
-          };
-          
-          if (input.targetPhase === "FLORA") {
-            newCycleData.floraStartDate = new Date();
-          }
-          
-          await database.insert(cycles).values(newCycleData);
-          
-          // Atualizar categoria da estufa destino
-          const targetCategory = input.targetPhase === "FLORA" ? "FLORA" : "DRYING";
-          await database
-            .update(tents)
-            .set({ category: targetCategory })
-            .where(eq(tents.id, input.targetTentId));
-          
-          // Aplicar limites de alerta para a nova fase na estufa destino
-          await applyPhaseTransitionLimits(input.targetTentId, input.targetPhase);
-          
-          // Resetar categoria da estufa original para VEGA (vazia, disponível)
-          // Se estava em VEGA e foi para FLORA, a estufa original fica como VEGA vazia
-          // Se estava em FLORA e foi para DRYING, a estufa original fica como FLORA vazia
-          const sourceCategory = input.targetPhase === "FLORA" ? "VEGA" : "FLORA";
-          await database
-            .update(tents)
-            .set({ category: sourceCategory })
-            .where(eq(tents.id, cycle.tentId));
-          
-          // Finalizar ciclo antigo
-          await database
-            .update(cycles)
-            .set({ status: "FINISHED" })
-            .where(eq(cycles.id, input.cycleId));
-          
-          return {
-            success: true,
-            message: `Plantas movidas para ${targetTent.name} e ciclo promovido para ${input.targetPhase}`,
-            movedPlants: cyclePlants.length,
-          };
-        } else {
-          // Promover fase na mesma estufa
-          const updates: any = {};
-          
-          if (input.targetPhase === "FLORA") {
-            updates.floraStartDate = new Date();
-          }
-          
-          await database
-            .update(cycles)
-            .set(updates)
-            .where(eq(cycles.id, input.cycleId));
-          
-          // Atualizar categoria da estufa
-          const targetCategory = input.targetPhase === "FLORA" ? "FLORA" : "DRYING";
-          await database
-            .update(tents)
-            .set({ category: targetCategory })
-            .where(eq(tents.id, cycle.tentId));
-          
-          // Aplicar limites de alerta para a nova fase
-          await applyPhaseTransitionLimits(cycle.tentId, input.targetPhase);
-          
-          return {
-            success: true,
-            message: `Ciclo promovido para ${input.targetPhase} na mesma estufa`,
-          };
-        }
-      }),
-    
-    getReportData: protectedProcedure
-      .input(z.object({ cycleId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
-
-        // Buscar informações do ciclo
-        const cycleData = await database
-          .select()
-          .from(cycles)
-          .where(eq(cycles.id, input.cycleId))
-          .limit(1);
-        
-        if (!cycleData || cycleData.length === 0) throw new Error("Cycle not found");
-        const cycle = cycleData[0];
-        
-        // Buscar tent
-        const tent = await database.select().from(tents).where(eq(tents.id, cycle.tentId)).limit(1);
-        
-        // Buscar strain (pode ser null se ciclo tem múltiplas strains)
-        let strain: any[] = [];
-        if (cycle.strainId) {
-          strain = await database.select().from(strains).where(eq(strains.id, cycle.strainId)).limit(1);
-        }
-        
-        // Buscar strains das plantas ativas na estufa
-        const tentPlants = await database
-          .select({ strainId: plants.strainId })
-          .from(plants)
-          .where(and(eq(plants.currentTentId, cycle.tentId), eq(plants.status, "ACTIVE")));
-        const uniqueStrainIds = Array.from(new Set(tentPlants.map((p: any) => p.strainId)));
-        let tentStrains: any[] = [];
-        if (uniqueStrainIds.length > 0) {
-          tentStrains = await database.select().from(strains).where(sql`${strains.id} IN (${sql.join(uniqueStrainIds.map(id => sql`${id}`), sql`, `)})`);
-        }
-        
-        // Buscar logs diários do tent durante o período do ciclo
-        const logs = await database
-          .select()
-          .from(dailyLogs)
-          .where(eq(dailyLogs.tentId, cycle.tentId))
-          .orderBy(dailyLogs.logDate);
-        
-        // Buscar tarefas do tent durante o período do ciclo
-        const tasks = await database
-          .select()
-          .from(taskInstances)
-          .where(eq(taskInstances.tentId, cycle.tentId));
-        
-        return {
-          cycle,
-          tent: tent[0],
-          strain: strain[0] || null,
-          tentStrains,
-          logs,
-          tasks,
-        };
-      }),
-  }),
-
-  // Daily Logs (Registros Diários)
-  dailyLogs: router({
-    list: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number(),
-          limit: z.number().optional(),
-        })
-      )
-      .query(async ({ input, ctx }) => {
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        return db.getDailyLogs(input.tentId, input.limit);
-      }),
-    // getHistoricalWithTargets removido - usar getDailyLogs diretamente
-    create: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number(),
-          logDate: z.date(),
-          turn: z.enum(["AM", "PM"]),
-          tempC: z.string().optional().refine(
-            (val) => !val || (parseFloat(val) >= -10 && parseFloat(val) <= 50),
-            { message: "Temperatura deve estar entre -10°C e 50°C" }
-          ),
-          rhPct: z.string().optional().refine(
-            (val) => !val || (parseFloat(val) >= 0 && parseFloat(val) <= 100),
-            { message: "Umidade deve estar entre 0% e 100%" }
-          ),
-          ppfd: z.number().optional().refine(
-            (val) => !val || (val >= 0 && val <= 2000),
-            { message: "PPFD deve estar entre 0 e 2000 µmol/m²/s" }
-          ),
-          ph: z.string().optional().refine(
-            (val) => !val || (parseFloat(val) >= 0 && parseFloat(val) <= 14),
-            { message: "pH deve estar entre 0 e 14" }
-          ),
-          ec: z.string().optional().refine(
-            (val) => !val || (parseFloat(val) >= 0 && parseFloat(val) <= 5),
-            { message: "EC deve estar entre 0 e 5 mS/cm" }
-          ),
-          wateringVolume: z.number().optional().refine(
-            (val) => !val || val >= 0,
-            { message: "Volume regado deve ser maior ou igual a 0" }
-          ),
-          runoffCollected: z.number().optional().refine(
-            (val) => !val || val >= 0,
-            { message: "Runoff coletado deve ser maior ou igual a 0" }
-          ),
-          // runoffPh e runoffEc removidos: ph/ec da rega já medem o runoff
-          notes: z.string().max(2000).optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-
-        // Calcular runoffPercentage se ambos wateringVolume e runoffCollected foram fornecidos
-        let runoffPercentage: string | undefined;
-        if (input.wateringVolume && input.runoffCollected) {
-          if (input.runoffCollected > input.wateringVolume) {
-            throw new Error("Runoff coletado não pode ser maior que o volume regado");
-          }
-          runoffPercentage = ((input.runoffCollected / input.wateringVolume) * 100).toFixed(2);
-        }
-        
-        const valuesToInsert = {
-          ...input,
-          runoffPercentage,
-        };
-
-        
-        const result = await database.insert(dailyLogs).values(valuesToInsert);
-        
-        // Verificar alertas automaticamente
-        const { checkAndNotifyAlerts } = await import("./alertChecker");
-        await checkAndNotifyAlerts(input.tentId, {
-          tempC: input.tempC,
-          rhPct: input.rhPct,
-          ppfd: input.ppfd,
-        });
-        
-        return { success: true };
-      }),
-    getLatestByTent: protectedProcedure
-      .input(z.object({ tentId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        const result = await database
-          .select()
-          .from(dailyLogs)
-          .where(eq(dailyLogs.tentId, input.tentId))
-          .orderBy(desc(dailyLogs.logDate))
-          .limit(1);
-        return result[0] || null;
-      }),
-    
-    getWeeklyData: protectedProcedure
-      .input(z.object({ tentId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        
-        // Get logs from last 7 days
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        
-        const logs = await database
-          .select({
-            logDate: dailyLogs.logDate,
-            tempC: dailyLogs.tempC,
-            rhPct: dailyLogs.rhPct,
-            ppfd: dailyLogs.ppfd,
-            ph: dailyLogs.ph,
-            ec: dailyLogs.ec,
-          })
-          .from(dailyLogs)
-          .where(
-            and(
-              eq(dailyLogs.tentId, input.tentId),
-              sql`${dailyLogs.logDate} >= ${sevenDaysAgo}`
-            )
-          )
-          .orderBy(dailyLogs.logDate);
-        
-        // Format data for chart
-        return logs.map((log: any) => ({
-          date: new Date(log.logDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-          temp: log.tempC ? parseFloat(log.tempC) : undefined,
-          rh: log.rhPct ? parseFloat(log.rhPct) : undefined,
-          ppfd: log.ppfd || undefined,
-          ph: log.ph ? parseFloat(log.ph) : undefined,
-          ec: log.ec ? parseFloat(log.ec) : undefined,
-        }));
-      }),
-    
-    listAll: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number().optional(),
-          startDate: z.date().optional(),
-          endDate: z.date().optional(),
-          limit: z.number().default(50),
-          offset: z.number().default(0),
-        })
-      )
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        // Validate tent ownership if tentId provided
-        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
-
-        // Build filter conditions
-        const conditions = [];
-        if (input.tentId) {
-          conditions.push(eq(dailyLogs.tentId, input.tentId));
-        }
-        // Filter by groupId when no specific tentId (show only logs from tents of same group)
-        if (!input.tentId && ctx.user.groupId != null) {
-          conditions.push(eq(tents.groupId, ctx.user.groupId));
-        }
-        if (input.startDate) {
-          conditions.push(sql`${dailyLogs.logDate} >= ${input.startDate}`);
-        }
-        if (input.endDate) {
-          conditions.push(sql`${dailyLogs.logDate} <= ${input.endDate}`);
-        }
-        
-        // Build base query
-        let baseQuery = database
-          .select({
-            id: dailyLogs.id,
-            tentId: dailyLogs.tentId,
-            logDate: dailyLogs.logDate,
-            turn: dailyLogs.turn,
-            tempC: dailyLogs.tempC,
-            rhPct: dailyLogs.rhPct,
-            ppfd: dailyLogs.ppfd,
-            ph: dailyLogs.ph,
-            ec: dailyLogs.ec,
-            notes: dailyLogs.notes,
-            tentName: tents.name,
-          })
-          .from(dailyLogs)
-          .leftJoin(tents, eq(dailyLogs.tentId, tents.id))
-          .$dynamic();
-        
-        // Apply filters
-        if (conditions.length > 0) {
-          baseQuery = baseQuery.where(and(...conditions));
-        }
-        
-        // Apply ordering and pagination
-        const logs = await baseQuery
-          .orderBy(desc(dailyLogs.logDate), desc(dailyLogs.id))
-          .limit(input.limit)
-          .offset(input.offset);
-        
-        // Get total count for pagination (must include the same JOIN as baseQuery)
-        let countQuery = database
-          .select({ count: sql<number>`count(*)` })
-          .from(dailyLogs)
-          .leftJoin(tents, eq(dailyLogs.tentId, tents.id))
-          .$dynamic();
-
-        if (conditions.length > 0) {
-          countQuery = countQuery.where(and(...conditions));
-        }
-
-        const countResult = await countQuery;
-        const total = Number(countResult[0]?.count || 0);
-        
-        return {
-          logs,
-          total,
-          hasMore: input.offset + logs.length < total,
-        };
-      }),
-    
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: z.number(),
-          tempC: z.string().optional(),
-          rhPct: z.string().optional(),
-          ppfd: z.number().optional(),
-          ph: z.string().optional(),
-          ec: z.string().optional(),
-          notes: z.string().max(2000).optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        // Validate ownership via the log's tentId
-        const [log] = await database.select({ tentId: dailyLogs.tentId }).from(dailyLogs).where(eq(dailyLogs.id, input.id)).limit(1);
-        if (log) await validateTentOwnership(log.tentId, ctx.user.groupId);
-
-        const { id, ...updateData } = input;
-
-        await database
-          .update(dailyLogs)
-          .set(updateData)
-          .where(eq(dailyLogs.id, id));
-
-        return { success: true };
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        const [log] = await database.select({ tentId: dailyLogs.tentId }).from(dailyLogs).where(eq(dailyLogs.id, input.id)).limit(1);
-        if (log) await validateTentOwnership(log.tentId, ctx.user.groupId);
-
-        await database
-          .delete(dailyLogs)
-          .where(eq(dailyLogs.id, input.id));
-
-        return { success: true };
-      }),
-
-    // Buscar último log de cada estufa em batch (evita N+1 no MorningCheck)
-    latestByTents: protectedProcedure
-      .input(z.object({ tentIds: z.array(z.number()) }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        if (input.tentIds.length === 0) return {};
-
-        // 1 query: buscar todos os logs das estufas solicitadas, ordenado por data desc
-        const rows = await database
-          .select()
-          .from(dailyLogs)
-          .where(inArray(dailyLogs.tentId, input.tentIds))
-          .orderBy(desc(dailyLogs.logDate));
-
-        // Manter apenas o mais recente por estufa
-        const latest: Record<number, typeof rows[0]> = {};
-        for (const row of rows) {
-          if (row.tentId != null && !(row.tentId in latest)) {
-            latest[row.tentId] = row;
-          }
-        }
-        return latest;
-      }),
-
-    // Streak de registros diários consecutivos para uma estufa
-    streak: protectedProcedure
-      .input(z.object({ tentId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-
-        // Busca todos os logs da estufa em DESC — precisamos de datas únicas por dia
-        const rows = await database
-          .select({ logDate: dailyLogs.logDate })
-          .from(dailyLogs)
-          .where(eq(dailyLogs.tentId, input.tentId))
-          .orderBy(desc(dailyLogs.logDate));
-
-        if (rows.length === 0) return { current: 0, longest: 0, todayDone: false };
-
-        // Extrair set de datas únicas (YYYY-MM-DD) em ordem DESC
-        const toDay = (d: Date | string) => {
-          const dt = typeof d === 'string' ? new Date(d) : d;
-          return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-        };
-
-        const uniqueDays = Array.from(new Set(rows.map((r: { logDate: Date | string }) => toDay(r.logDate))));
-
-        const today = toDay(new Date());
-        const yesterday = toDay(new Date(Date.now() - 86400_000));
-
-        const todayDone = uniqueDays[0] === today;
-
-        // Contar streak atual a partir do dia mais recente
-        let current = 0;
-        let longest = 0;
-        let streak = 0;
-
-        // Construir array de dias consecutivos
-        let refDay = new Date(uniqueDays[0]);
-        for (const day of uniqueDays) {
-          const refStr = toDay(refDay);
-          if (day === refStr) {
-            streak++;
-            refDay = new Date(refDay.getTime() - 86400_000);
-          } else {
-            if (streak > longest) longest = streak;
-            if (current === 0) current = streak; // primeiro break = fim do streak atual
-            streak = 1;
-            refDay = new Date(new Date(day).getTime() - 86400_000);
-          }
-        }
-        if (streak > longest) longest = streak;
-        if (current === 0) current = streak;
-
-        // Se o último log não é hoje nem ontem, streak atual = 0
-        if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) {
-          current = 0;
-        }
-
-        return { current, longest, todayDone };
-      }),
-  }),
-
   // Alerts (Alertas)
-  alerts: router({
-    // Configurações de alertas
-    getSettings: protectedProcedure
-      .input(z.object({ tentId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        const settings = await database
-          .select()
-          .from(alertSettings)
-          .where(eq(alertSettings.tentId, input.tentId))
-          .limit(1);
-        return settings[0] || null;
-      }),
-
-    getIdealValues: protectedProcedure
-      .input(z.object({ tentId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        return db.getIdealValuesByTent(input.tentId);
-      }),
-    
-    updateSettings: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number(),
-          alertsEnabled: z.boolean().optional(),
-          tempEnabled: z.boolean().optional(),
-          rhEnabled: z.boolean().optional(),
-          ppfdEnabled: z.boolean().optional(),
-          phEnabled: z.boolean().optional(),
-          tempMargin: z.number().optional(),
-          rhMargin: z.number().optional(),
-          ppfdMargin: z.number().optional(),
-          phMargin: z.number().optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-
-        // Verificar se já existe configuração
-        const existing = await database
-          .select()
-          .from(alertSettings)
-          .where(eq(alertSettings.tentId, input.tentId))
-          .limit(1);
-        
-        if (existing.length > 0) {
-          // Atualizar existente
-          await database
-            .update(alertSettings)
-            .set({
-              alertsEnabled: input.alertsEnabled,
-              tempEnabled: input.tempEnabled,
-              rhEnabled: input.rhEnabled,
-              ppfdEnabled: input.ppfdEnabled,
-              phEnabled: input.phEnabled,
-              tempMargin: input.tempMargin !== undefined ? String(input.tempMargin) : undefined,
-              rhMargin: input.rhMargin !== undefined ? String(input.rhMargin) : undefined,
-              ppfdMargin: input.ppfdMargin !== undefined ? input.ppfdMargin : undefined,
-              phMargin: input.phMargin !== undefined ? String(input.phMargin) : undefined,
-            })
-            .where(eq(alertSettings.tentId, input.tentId));
-        } else {
-          // Criar nova
-          await database.insert(alertSettings).values({
-            tentId: input.tentId,
-            alertsEnabled: input.alertsEnabled ?? true,
-            tempEnabled: input.tempEnabled ?? true,
-            rhEnabled: input.rhEnabled ?? true,
-            ppfdEnabled: input.ppfdEnabled ?? true,
-            phEnabled: input.phEnabled ?? false,
-            tempMargin: input.tempMargin !== undefined ? String(input.tempMargin) : "2",
-            rhMargin: input.rhMargin !== undefined ? String(input.rhMargin) : "5",
-            ppfdMargin: input.ppfdMargin ?? 50,
-            phMargin: input.phMargin !== undefined ? String(input.phMargin) : "0.2",
-          });
-        }
-        
-        return { success: true };
-      }),
-    
-    // Histórico de alertas
-    getHistory: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number().optional(),
-          limit: z.number().default(50),
-        })
-      )
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) return [];
-        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
-
-        if (input.tentId) {
-          return database
-            .select()
-            .from(alertHistory)
-            .where(eq(alertHistory.tentId, input.tentId))
-            .orderBy(desc(alertHistory.createdAt))
-            .limit(input.limit);
-        }
-        
-        return database
-          .select()
-          .from(alertHistory)
-          .orderBy(desc(alertHistory.createdAt))
-          .limit(input.limit);
-      }),
-    
-    list: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number().optional(),
-          status: z.enum(["NEW", "SEEN"]).optional(),
-        })
-      )
-      .query(async ({ input, ctx }) => {
-        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
-        return db.getAlerts(input.tentId, input.status);
-      }),
-    getNewCount: protectedProcedure
-      .input(z.object({ tentId: z.number().optional() }))
-      .query(async ({ input, ctx }) => {
-        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
-        return db.getNewAlertsCount(input.tentId);
-      }),
-    markAsSeen: protectedProcedure
-      .input(z.object({ alertId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        const [alert] = await database.select({ tentId: alerts.tentId }).from(alerts).where(eq(alerts.id, input.alertId)).limit(1);
-        if (alert) await validateTentOwnership(alert.tentId, ctx.user.groupId);
-        await database.update(alerts).set({ status: "SEEN" }).where(eq(alerts.id, input.alertId));
-        return { success: true };
-      }),
-
-    markAllAsSeen: protectedProcedure
-      .input(z.object({ tentId: z.number().optional() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
-        const conditions = [eq(alerts.status, "NEW")];
-        if (input.tentId !== undefined) {
-          conditions.push(eq(alerts.tentId, input.tentId));
-        }
-        const result = await database
-          .update(alerts)
-          .set({ status: "SEEN" })
-          .where(and(...conditions));
-        return { success: true, updated: result[0]?.affectedRows ?? 0 };
-      }),
-
-    checkAlerts: protectedProcedure
-      .input(z.object({ tentId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        return db.checkAlertsForTent(input.tentId);
-      }),
-    
-    checkAllTents: protectedProcedure
-      .mutation(async () => {
-        const { checkAllTentsAlerts } = await import("./cron/alertsChecker");
-        return checkAllTentsAlerts();
-      }),
-    
-    // Phase Alert Margins (Margens de Alertas por Fase)
-    getPhaseMargins: protectedProcedure.query(async () => {
-      const database = await getDb();
-      if (!database) return [];
-      const { phaseAlertMargins } = await import("../drizzle/schema");
-      return database.select().from(phaseAlertMargins).orderBy(phaseAlertMargins.phase);
-    }),
-    
-    updatePhaseMargin: protectedProcedure
-      .input(
-        z.object({
-          phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]),
-          tempMargin: z.number().optional(),
-          rhMargin: z.number().optional(),
-          ppfdMargin: z.number().optional(),
-          phMargin: z.number().optional(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        
-        const { phaseAlertMargins } = await import("../drizzle/schema");
-        
-        await database
-          .update(phaseAlertMargins)
-          .set({
-            tempMargin: input.tempMargin !== undefined ? String(input.tempMargin) : undefined,
-            rhMargin: input.rhMargin !== undefined ? String(input.rhMargin) : undefined,
-            ppfdMargin: input.ppfdMargin !== undefined ? input.ppfdMargin : undefined,
-            phMargin: input.phMargin !== undefined ? String(input.phMargin) : undefined,
-          })
-          .where(eq(phaseAlertMargins.phase, input.phase));
-        
-        return { success: true };
-      }),
-    
-    // Restaurar margens de uma fase para os valores padrão do sistema
-    resetPhaseMarginToDefault: protectedProcedure
-      .input(
-        z.object({
-          phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]),
-        })
-      )
-      .mutation(async ({ input }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Banco de dados não inicializado.");
-
-        // Valores padrão por fase (espelham os dados inseridos pelo seed-alerts.mjs)
-        const defaults: Record<string, { tempMargin: string; rhMargin: string; ppfdMargin: number; phMargin: string | null }> = {
-          MAINTENANCE: { tempMargin: "2.0", rhMargin: "5.0", ppfdMargin: 75,  phMargin: "0.3" },
-          CLONING:     { tempMargin: "1.5", rhMargin: "4.0", ppfdMargin: 50,  phMargin: "0.2" },
-          VEGA:        { tempMargin: "2.0", rhMargin: "5.0", ppfdMargin: 100, phMargin: "0.3" },
-          FLORA:       { tempMargin: "1.5", rhMargin: "3.0", ppfdMargin: 100, phMargin: "0.2" },
-          DRYING:      { tempMargin: "1.0", rhMargin: "2.0", ppfdMargin: 0,   phMargin: null  },
-        };
-
-        const d = defaults[input.phase];
-        const { phaseAlertMargins } = await import("../drizzle/schema");
-
-        await database
-          .update(phaseAlertMargins)
-          .set({
-            tempMargin:  d.tempMargin,
-            rhMargin:    d.rhMargin,
-            ppfdMargin:  d.ppfdMargin,
-            phMargin:    d.phMargin,
-          })
-          .where(eq(phaseAlertMargins.phase, input.phase));
-
-        return {
-          success: true,
-          phase: input.phase,
-          margins: {
-            tempMargin:  parseFloat(d.tempMargin),
-            rhMargin:    parseFloat(d.rhMargin),
-            ppfdMargin:  d.ppfdMargin,
-            phMargin:    d.phMargin !== null ? parseFloat(d.phMargin) : null,
-          },
-        };
-      }),
-
-    // Notification Settings (Configurações de Notificações)
-    getNotificationSettings: protectedProcedure.query(async () => {
-      const database = await getDb();
-      if (!database) return null;
-      const { notificationSettings } = await import("../drizzle/schema");
-      
-      // Pegar primeira configuração (sem autenticação)
-      const settings = await database
-        .select()
-        .from(notificationSettings)
-        .limit(1);
-      
-      return settings[0] || null;
-    }),
-    
-    toggleSystemPaused: protectedProcedure
-      .mutation(async () => {
-        const database = await getDb();
-        if (!database) throw new Error("Banco de dados não inicializado.");
-        const { notificationSettings } = await import("../drizzle/schema");
-        const existing = await database.select().from(notificationSettings).limit(1);
-        if (existing.length > 0) {
-          const newValue = !existing[0].systemPaused;
-          await database
-            .update(notificationSettings)
-            .set({ systemPaused: newValue })
-            .where(eq(notificationSettings.id, existing[0].id));
-          return { systemPaused: newValue };
-        } else {
-          await database.insert(notificationSettings).values({ systemPaused: true });
-          return { systemPaused: true };
-        }
-      }),
-
-    updateNotificationSettings: protectedProcedure
-      .input(
-        z.object({
-          systemPaused: z.boolean().optional(),
-          tempAlertsEnabled: z.boolean().optional(),
-          rhAlertsEnabled: z.boolean().optional(),
-          ppfdAlertsEnabled: z.boolean().optional(),
-          phAlertsEnabled: z.boolean().optional(),
-          taskRemindersEnabled: z.boolean().optional(),
-          dailySummaryEnabled: z.boolean().optional(),
-          dailySummaryTime: z.string().optional(),
-          dailyReminderEnabled: z.boolean().optional(),
-          reminderTimes: z.string().optional(), // JSON array serializado
-        })
-      )
-      .mutation(async ({ input }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        
-        const { notificationSettings } = await import("../drizzle/schema");
-        
-        // Verificar se já existe configuração
-        const existing = await database
-          .select()
-          .from(notificationSettings)
-          .limit(1);
-        
-        if (existing.length > 0) {
-          // Atualizar existente (primeira configuração)
-          await database
-            .update(notificationSettings)
-            .set(input)
-            .where(eq(notificationSettings.id, existing[0].id));
-        } else {
-          // Criar nova
-          await database.insert(notificationSettings).values(input);
-        }
-        
-        return { success: true };
-      }),
-  }),
-
-  // Weekly Targets (Padrões Semanais)
-  weeklyTargets: router({
-    get: protectedProcedure
-      .input(
-        z.object({
-          phase: z.enum(["vega", "flora"]),
-          weekNumber: z.number(),
-        })
-      )
-      .query(async ({ input }) => {
-        const database = await getDb();
-        if (!database) return null;
-        
-        // Converte para uppercase para match com o enum do banco
-        const phaseUpper = input.phase.toUpperCase() as "VEGA" | "FLORA";
-        
-        // Busca targets genéricos (pode ser de qualquer strain)
-        // Para calculadora genérica, retorna valores padrão baseados na fase/semana
-        const targets = await database
-          .select()
-          .from(weeklyTargets)
-          .where(
-            and(
-              eq(weeklyTargets.phase, phaseUpper),
-              eq(weeklyTargets.weekNumber, input.weekNumber)
-            )
-          )
-          .limit(1);
-        
-        // Se não encontrar targets específicos, retorna valores padrão
-        if (targets.length === 0) {
-          // Valores padrão de EC por fase e semana
-          const defaultEC = input.phase === "vega" 
-            ? 1.0 + (input.weekNumber - 1) * 0.2 // Vega: 1.0 a 2.0
-            : 1.6 + (input.weekNumber - 1) * 0.15; // Flora: 1.6 a 2.65
-          
-          return {
-            targetEC: Math.min(defaultEC, input.phase === "vega" ? 2.0 : 2.8).toFixed(1),
-            phase: phaseUpper,
-            weekNumber: input.weekNumber,
-          };
-        }
-        
-        // Retorna o target encontrado com targetEC calculado da média de ecMin e ecMax
-        const target = targets[0];
-        const ecMin = parseFloat(target.ecMin || "0");
-        const ecMax = parseFloat(target.ecMax || "0");
-        const targetEC = ecMax > 0 ? ((ecMin + ecMax) / 2).toFixed(1) : "1.5";
-        
-        return {
-          ...target,
-          targetEC,
-        };
-      }),
-    getTargetsByWeek: protectedProcedure
-      .input(
-        z.object({
-          strainId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
-          weekNumber: z.number(),
-        })
-      )
-      .query(async ({ input }) => {
-        const database = await getDb();
-        if (!database) return null;
-        
-        const targets = await database
-          .select()
-          .from(weeklyTargets)
-          .where(
-            and(
-              eq(weeklyTargets.strainId, input.strainId),
-              eq(weeklyTargets.phase, input.phase),
-              eq(weeklyTargets.weekNumber, input.weekNumber)
-            )
-          )
-          .limit(1);
-        
-        return targets[0] || null;
-      }),
-    // Busca targets por estufa - calcula média das strains das plantas ativas
-    getTargetsByTent: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
-          weekNumber: z.number(),
-        })
-      )
-      .query(async ({ input }) => {
-        const database = await getDb();
-        if (!database) return null;
-        
-        // Buscar strains únicas das plantas ativas na estufa
-        const tentPlants = await database
-          .select({ strainId: plants.strainId })
-          .from(plants)
-          .where(and(
-            eq(plants.currentTentId, input.tentId),
-            eq(plants.status, "ACTIVE")
-          ));
-        
-        const uniqueStrainIds = Array.from(new Set(tentPlants.map((p: any) => p.strainId))) as number[];
-        if (uniqueStrainIds.length === 0) return null;
-        
-        if (uniqueStrainIds.length === 1) {
-          // Uma única strain: retornar targets direto
-          const targets = await database
-            .select()
-            .from(weeklyTargets)
-            .where(
-              and(
-                eq(weeklyTargets.strainId, uniqueStrainIds[0]),
-                eq(weeklyTargets.phase, input.phase),
-                eq(weeklyTargets.weekNumber, input.weekNumber)
-              )
-            )
-            .limit(1);
-          return targets[0] || null;
-        }
-        
-        // Múltiplas strains: calcular média
-        const allTargets = await database
-          .select()
-          .from(weeklyTargets)
-          .where(
-            and(
-              sql`${weeklyTargets.strainId} IN (${sql.join(uniqueStrainIds.map((id: number) => sql`${id}`), sql`, `)})`,
-              eq(weeklyTargets.phase, input.phase),
-              eq(weeklyTargets.weekNumber, input.weekNumber)
-            )
-          );
-        
-        if (allTargets.length === 0) return null;
-        
-        // Calcular média
-        const avgDecimal = (field: string) => {
-          const vals = allTargets.map((t: any) => t[field]).filter((v: any) => v !== null && v !== undefined);
-          if (vals.length === 0) return null;
-          const sum = vals.reduce((a: number, b: any) => a + parseFloat(String(b)), 0);
-          return (sum / vals.length).toFixed(1);
-        };
-        const avgInt = (field: string) => {
-          const vals = allTargets.map((t: any) => t[field]).filter((v: any) => v !== null && v !== undefined);
-          if (vals.length === 0) return null;
-          const sum = vals.reduce((a: number, b: any) => a + Number(b), 0);
-          return Math.round(sum / vals.length);
-        };
-        
-        return {
-          ...allTargets[0],
-          tempMin: avgDecimal('tempMin'),
-          tempMax: avgDecimal('tempMax'),
-          rhMin: avgDecimal('rhMin'),
-          rhMax: avgDecimal('rhMax'),
-          ppfdMin: avgInt('ppfdMin'),
-          ppfdMax: avgInt('ppfdMax'),
-          phMin: avgDecimal('phMin'),
-          phMax: avgDecimal('phMax'),
-          ecMin: avgDecimal('ecMin'),
-          ecMax: avgDecimal('ecMax'),
-          _isAverage: true,
-          _strainCount: uniqueStrainIds.length,
-        };
-      }),
-    getCurrentWeekTargets: protectedProcedure.query(async () => {
-      // Busca os targets da semana atual de todos os ciclos ativos
-      const database = await getDb();
-      if (!database) return [];
-
-      const activeCycles = await database
-        .select()
-        .from(cycles)
-        .where(eq(cycles.status, "ACTIVE"));
-
-      if (activeCycles.length === 0) return [];
-
-      // Pega o primeiro ciclo ativo para mostrar os targets
-      const cycle = activeCycles[0];
-      
-      // Calcula a fase e semana atual
-      const now = new Date();
-      const startDate = new Date(cycle.startDate);
-      const floraStartDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-      
-      let phase: "VEGA" | "FLORA" = "VEGA";
-      let weekNumber = 1;
-      
-      if (floraStartDate && now >= floraStartDate) {
-        phase = "FLORA";
-        const weeksSinceFlora = Math.floor((now.getTime() - floraStartDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-        weekNumber = Math.min(weeksSinceFlora + 1, 8);
-      } else {
-        const weeksSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-        weekNumber = Math.min(weeksSinceStart + 1, 6);
-      }
-      
-      // Busca os targets da semana atual
-      if (cycle.strainId) {
-        // Ciclo com strain definida
-        const targets = await database
-          .select()
-          .from(weeklyTargets)
-          .where(
-            and(
-              eq(weeklyTargets.strainId, cycle.strainId),
-              eq(weeklyTargets.phase, phase),
-              eq(weeklyTargets.weekNumber, weekNumber)
-            )
-          )
-          .limit(1);
-        return targets;
-      } else {
-        // Ciclo sem strain: buscar strains das plantas ativas
-        const tentPlants = await database
-          .select({ strainId: plants.strainId })
-          .from(plants)
-          .where(and(
-            eq(plants.currentTentId, cycle.tentId),
-            eq(plants.status, "ACTIVE")
-          ));
-        const uniqueStrainIds = Array.from(new Set(tentPlants.map((p: any) => p.strainId))) as number[];
-        if (uniqueStrainIds.length === 0) return [];
-        
-        const allTargets = await database
-          .select()
-          .from(weeklyTargets)
-          .where(
-            and(
-              sql`${weeklyTargets.strainId} IN (${sql.join(uniqueStrainIds.map((id: number) => sql`${id}`), sql`, `)})`,
-              eq(weeklyTargets.phase, phase),
-              eq(weeklyTargets.weekNumber, weekNumber)
-            )
-          );
-        
-        if (allTargets.length === 0) return [];
-        if (uniqueStrainIds.length === 1) return [allTargets[0]];
-        
-        // Média
-        const avgDec = (f: string) => {
-          const v = allTargets.map((t: any) => t[f]).filter((x: any) => x != null);
-          return v.length ? (v.reduce((a: number, b: any) => a + parseFloat(String(b)), 0) / v.length).toFixed(1) : null;
-        };
-        const avgI = (f: string) => {
-          const v = allTargets.map((t: any) => t[f]).filter((x: any) => x != null);
-          return v.length ? Math.round(v.reduce((a: number, b: any) => a + Number(b), 0) / v.length) : null;
-        };
-        return [{
-          ...allTargets[0],
-          tempMin: avgDec('tempMin'), tempMax: avgDec('tempMax'),
-          rhMin: avgDec('rhMin'), rhMax: avgDec('rhMax'),
-          ppfdMin: avgI('ppfdMin'), ppfdMax: avgI('ppfdMax'),
-          phMin: avgDec('phMin'), phMax: avgDec('phMax'),
-          ecMin: avgDec('ecMin'), ecMax: avgDec('ecMax'),
-        }];
-      }
-    }),
-    getByStrain: protectedProcedure.input(z.object({ strainId: z.number() })).query(async ({ input }) => {
-      return db.getWeeklyTargetsByStrain(input.strainId);
-    }),
-    create: protectedProcedure
-      .input(
-        z.object({
-          strainId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
-          weekNumber: z.number(),
-          tempMin: z.string().optional(),
-          tempMax: z.string().optional(),
-          rhMin: z.string().optional(),
-          rhMax: z.string().optional(),
-          ppfdMin: z.number().optional(),
-          ppfdMax: z.number().optional(),
-          photoperiod: z.string().optional(),
-          phMin: z.string().optional(),
-          phMax: z.string().optional(),
-          ecMin: z.string().optional(),
-          ecMax: z.string().optional(),
-          notes: z.string().max(2000).optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        await database.insert(weeklyTargets).values({ ...input, groupId: ctx.user.groupId ?? null });
-        return { success: true };
-      }),
-
-    // Upsert: atualiza se já existe (strainId+phase+weekNumber), senão cria
-    upsert: protectedProcedure
-      .input(
-        z.object({
-          strainId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
-          weekNumber: z.number(),
-          tempMin: z.string().optional(),
-          tempMax: z.string().optional(),
-          rhMin: z.string().optional(),
-          rhMax: z.string().optional(),
-          ppfdMin: z.number().optional(),
-          ppfdMax: z.number().optional(),
-          photoperiod: z.string().optional(),
-          phMin: z.string().optional(),
-          phMax: z.string().optional(),
-          ecMin: z.string().optional(),
-          ecMax: z.string().optional(),
-          notes: z.string().max(2000).optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        const { strainId, phase, weekNumber, ...fields } = input;
-
-        // Verificar se já existe target para esta cepa/fase/semana
-        const existing = await database
-          .select({ id: weeklyTargets.id })
-          .from(weeklyTargets)
-          .where(and(
-            eq(weeklyTargets.strainId, strainId),
-            eq(weeklyTargets.phase, phase),
-            eq(weeklyTargets.weekNumber, weekNumber),
-          ))
-          .limit(1);
-
-        if (existing.length > 0) {
-          await database
-            .update(weeklyTargets)
-            .set(fields)
-            .where(eq(weeklyTargets.id, existing[0].id));
-          return { success: true, action: "updated" };
-        } else {
-          await database.insert(weeklyTargets).values({ strainId, phase, weekNumber, ...fields, groupId: ctx.user.groupId ?? null });
-          return { success: true, action: "created" };
-        }
-      }),
-  }),
 
   // Task Instances (Tarefas)
-  tasks: router({
-    list: protectedProcedure
-      .input(
-        z.object({
-          tentId: z.number(),
-        })
-      )
-      .query(async ({ input, ctx }) => {
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        return db.getTaskInstances(input.tentId);
-      }),
-    getTasksByTent: protectedProcedure
-      .input(z.object({ tentId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await validateTentOwnership(input.tentId, ctx.user.groupId);
-        const database = await getDb();
-        if (!database) return [];
-
-        // Get current active cycle for this tent
-        const cycle = await db.getCycleByTentId(input.tentId);
-        if (!cycle) return [];
-
-        // Get tent info
-        const tent = await db.getTentById(input.tentId);
-        if (!tent) return [];
-
-        // Calculate current phase and week
-        const now = new Date();
-        const startDate = new Date(cycle.startDate);
-        const floraStartDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-
-        let currentPhase: "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
-        let weekNumber: number;
-
-        // Determine phase based on tent category
-        if (tent.category === "MAINTENANCE") {
-          currentPhase = "MAINTENANCE";
-          weekNumber = 1;
-        } else if (tent.category === "VEGA") {
-          currentPhase = "VEGA";
-          const weeksSinceStart = Math.floor(
-            (now.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
-          );
-          weekNumber = weeksSinceStart + 1;
-        } else if (tent.category === "FLORA") {
-          currentPhase = "FLORA";
-          const weeksSinceStart = floraStartDate
-            ? Math.floor((now.getTime() - floraStartDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
-            : Math.floor((now.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-          weekNumber = weeksSinceStart + 1;
-        } else if (tent.category === "DRYING") {
-          currentPhase = "DRYING";
-          const weeksSinceStart = Math.floor(
-            (now.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
-          );
-          weekNumber = Math.min(weeksSinceStart + 1, 2); // Máximo 2 semanas de secagem
-        } else {
-          // Fallback
-          currentPhase = "MAINTENANCE";
-          weekNumber = 1;
-        }
-
-        // Get templates for this phase/week
-        const context = tent.category === "MAINTENANCE" ? "TENT_A" : "TENT_BC";
-        let templates;
-        if (currentPhase === "MAINTENANCE" || currentPhase === "DRYING") {
-          // For maintenance and drying, don't filter by week number
-          templates = await database
-            .select()
-            .from(taskTemplates)
-            .where(
-              and(
-                eq(taskTemplates.context, context),
-                eq(taskTemplates.phase, currentPhase)
-              )
-            );
-        } else {
-          templates = await database
-            .select()
-            .from(taskTemplates)
-            .where(
-              and(
-                eq(taskTemplates.context, context),
-                eq(taskTemplates.phase, currentPhase),
-                eq(taskTemplates.weekNumber, weekNumber)
-              )
-            );
-        }
-
-        const tasks = [];
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        for (const template of templates) {
-          // Check if instance already exists for this week
-          const existing = await database
-            .select()
-            .from(taskInstances)
-            .where(
-              and(
-                eq(taskInstances.tentId, input.tentId),
-                eq(taskInstances.taskTemplateId, template.id),
-                eq(taskInstances.occurrenceDate, startOfWeek)
-              )
-            )
-            .limit(1);
-
-          if (existing.length === 0) {
-            // Create instance
-            await database.insert(taskInstances).values({
-              tentId: input.tentId,
-              taskTemplateId: template.id,
-              occurrenceDate: startOfWeek,
-              isDone: false,
-            });
-
-            tasks.push({
-              id: 0, // Will be fetched
-              title: template.title,
-              description: template.description,
-              phase: currentPhase,
-              weekNumber,
-              isDone: false,
-              completedAt: null,
-              notes: null,
-            });
-          } else {
-            tasks.push({
-              id: existing[0].id,
-              title: template.title,
-              description: template.description,
-              phase: currentPhase,
-              weekNumber,
-              isDone: existing[0].isDone,
-              completedAt: existing[0].completedAt,
-              notes: existing[0].notes,
-            });
-          }
-        }
-
-        return tasks;
-      }),
-    getPendingTasks: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) throw new Error("Database not available");
-
-      // Get all active cycles (filtered by group via tent join)
-      const allCycles = await db.getAllCycles();
-      const activeCycles = allCycles.filter((c: any) => c.status === "ACTIVE");
-      const pendingTasks: any[] = [];
-
-      for (const cycle of activeCycles) {
-        // Get tent info
-        const tent = await database.select().from(tents).where(eq(tents.id, cycle.tentId)).limit(1);
-        if (tent.length === 0) continue;
-        // Filter by group
-        if (ctx.user.groupId != null && tent[0].groupId != null && tent[0].groupId !== ctx.user.groupId) continue;
-
-        // Get all incomplete tasks for this tent in current week
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        const incompleteTasks = await database
-          .select()
-          .from(taskInstances)
-          .leftJoin(taskTemplates, eq(taskInstances.taskTemplateId, taskTemplates.id))
-          .where(
-            and(
-              eq(taskInstances.tentId, cycle.tentId),
-              eq(taskInstances.isDone, false),
-              eq(taskInstances.occurrenceDate, startOfWeek)
-            )
-          );
-
-        for (const task of incompleteTasks) {
-          pendingTasks.push({
-            id: task.task_instances.id,
-            tentId: cycle.tentId,
-            tentName: tent[0].name,
-            title: task.task_templates?.title || "Tarefa",
-            description: task.task_templates?.description || "",
-            occurrenceDate: task.task_instances.occurrenceDate,
-          });
-        }
-      }
-
-      return pendingTasks;
-    }),
-    getCurrentWeekTasks: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) throw new Error("Database not available");
-
-      // Get all active cycles
-      const allCycles = await db.getAllCycles();
-      const activeCycles = allCycles.filter((c: any) => c.status === "ACTIVE");
-      const allTasks: any[] = [];
-
-      for (const cycle of activeCycles) {
-        // Calculate current phase and week
-        const now = new Date();
-        const startDate = new Date(cycle.startDate);
-        const floraStartDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-
-        let currentPhase: "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
-        let weekNumber: number | null;
-        let context: "TENT_BC" | "TENT_A";
-
-        // Get tent info to check category
-        const tent = await database.select().from(tents).where(eq(tents.id, cycle.tentId)).limit(1);
-        if (!tent[0]) continue;
-        // Filter by group
-        if (ctx.user.groupId != null && tent[0].groupId != null && tent[0].groupId !== ctx.user.groupId) continue;
-        const tentCategory = tent[0]?.category;
-        
-        // Determine phase based on tent category
-        if (tentCategory === "MAINTENANCE") {
-          currentPhase = "MAINTENANCE";
-          weekNumber = null;
-          context = "TENT_A";
-        } else if (tentCategory === "DRYING") {
-          currentPhase = "DRYING";
-          weekNumber = null;
-          context = "TENT_BC";
-        } else if (tentCategory === "FLORA") {
-          currentPhase = "FLORA";
-          const weeksSinceFlora = floraStartDate
-            ? Math.floor((now.getTime() - floraStartDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
-            : Math.floor((now.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-          weekNumber = weeksSinceFlora + 1;
-          context = "TENT_BC";
-        } else if (tentCategory === "VEGA") {
-          currentPhase = "VEGA";
-          const weeksSinceStart = Math.floor(
-            (now.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
-          );
-          weekNumber = weeksSinceStart + 1;
-          context = "TENT_BC";
-        } else {
-          // Fallback
-          currentPhase = "MAINTENANCE";
-          weekNumber = null;
-          context = "TENT_A";
-        }
-
-        // Get templates for this phase/week
-        let templates;
-        if (currentPhase === "MAINTENANCE" || currentPhase === "DRYING") {
-          // For maintenance and drying, get tasks without week number filter
-          templates = await database
-            .select()
-            .from(taskTemplates)
-            .where(
-              and(
-                eq(taskTemplates.context, context),
-                eq(taskTemplates.phase, currentPhase)
-              )
-            );
-        } else {
-          // For VEGA/FLORA, filter by week number
-          templates = await database
-            .select()
-            .from(taskTemplates)
-            .where(
-              and(
-                eq(taskTemplates.context, context),
-                eq(taskTemplates.phase, currentPhase),
-                eq(taskTemplates.weekNumber, weekNumber!)
-              )
-            );
-        }
-
-        for (const template of templates) {
-          // Check if instance already exists for this week
-          const startOfWeek = new Date(now);
-          startOfWeek.setDate(now.getDate() - now.getDay());
-          startOfWeek.setHours(0, 0, 0, 0);
-
-          const existing = await database
-            .select()
-            .from(taskInstances)
-            .where(
-              and(
-                eq(taskInstances.tentId, cycle.tentId),
-                eq(taskInstances.taskTemplateId, template.id),
-                eq(taskInstances.occurrenceDate, startOfWeek)
-              )
-            )
-            .limit(1);
-
-          if (existing.length === 0) {
-            // Create instance
-            await database.insert(taskInstances).values({
-              tentId: cycle.tentId,
-              taskTemplateId: template.id,
-              occurrenceDate: startOfWeek,
-              isDone: false,
-            });
-
-            // Fetch the created instance to get the ID
-            const created = await database
-              .select()
-              .from(taskInstances)
-              .where(
-                and(
-                  eq(taskInstances.tentId, cycle.tentId),
-                  eq(taskInstances.taskTemplateId, template.id),
-                  eq(taskInstances.occurrenceDate, startOfWeek)
-                )
-              )
-              .limit(1);
-
-            allTasks.push({
-              id: created[0]?.id || 0,
-              tentId: cycle.tentId,
-              tentName: tent[0]?.name || `Estufa ${cycle.tentId}`,
-              title: template.title,
-              description: template.description,
-              phase: currentPhase,
-              weekNumber,
-              isDone: false,
-              completedAt: null,
-              notes: null,
-              dueDate: startOfWeek,
-            });
-          } else {
-            allTasks.push({
-              id: existing[0].id,
-              tentId: cycle.tentId,
-              tentName: tent[0]?.name || `Estufa ${cycle.tentId}`,
-              title: template.title,
-              description: template.description,
-              phase: currentPhase,
-              weekNumber,
-              isDone: existing[0].isDone,
-              completedAt: existing[0].completedAt,
-              notes: existing[0].notes,
-              dueDate: existing[0].occurrenceDate,
-            });
-          }
-        }
-      }
-
-      return allTasks;
-    }),
-    markAsDone: protectedProcedure
-      .input(
-        z.object({
-          taskId: z.number(),
-          notes: z.string().max(2000).optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        const [task] = await database.select({ tentId: taskInstances.tentId }).from(taskInstances).where(eq(taskInstances.id, input.taskId)).limit(1);
-        if (task) await validateTentOwnership(task.tentId, ctx.user.groupId);
-        await database
-          .update(taskInstances)
-          .set({ isDone: true, completedAt: new Date(), notes: input.notes })
-          .where(eq(taskInstances.id, input.taskId));
-        return { success: true };
-      }),
-    toggleTask: protectedProcedure
-      .input(z.object({ taskId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-
-        // Get current state
-        const task = await database
-          .select()
-          .from(taskInstances)
-          .where(eq(taskInstances.id, input.taskId))
-          .limit(1);
-
-        if (task.length === 0) throw new Error("Task not found");
-        await validateTentOwnership(task[0].tentId, ctx.user.groupId);
-
-        const newIsDone = !task[0].isDone;
-        await database
-          .update(taskInstances)
-          .set({
-            isDone: newIsDone,
-            completedAt: newIsDone ? new Date() : null
-          })
-          .where(eq(taskInstances.id, input.taskId));
-
-        return { success: true, isDone: newIsDone };
-      }),
-    delete: protectedProcedure
-      .input(z.object({ taskId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) {
-          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
-        }
-        const [task] = await database.select({ tentId: taskInstances.tentId }).from(taskInstances).where(eq(taskInstances.id, input.taskId)).limit(1);
-        if (task) await validateTentOwnership(task.tentId, ctx.user.groupId);
-        await database.delete(taskInstances).where(eq(taskInstances.id, input.taskId));
-        return { success: true };
-      }),
-
-    // ── Standalone tasks ──────────────────────────────────────────────────────
-    listStandalone: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) throw new Error("Database not available");
-      return database
-        .select()
-        .from(standaloneTasks)
-        .where(eq(standaloneTasks.userId, ctx.user.id))
-        .orderBy(standaloneTasks.isDone, standaloneTasks.dueDate, standaloneTasks.createdAt);
-    }),
-    createStandalone: protectedProcedure
-      .input(z.object({
-        title: z.string().min(1).max(200),
-        description: z.string().max(2000).optional(),
-        priority: z.enum(["LOW", "MEDIUM", "HIGH"]).optional(),
-        dueDate: z.date().optional(),
-        tentId: z.number().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await database.insert(standaloneTasks).values({
-          userId: ctx.user.id,
-          title: input.title,
-          description: input.description,
-          priority: input.priority ?? "MEDIUM",
-          dueDate: input.dueDate,
-          tentId: input.tentId,
-          isDone: false,
-        });
-        return { success: true };
-      }),
-    toggleStandalone: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        const [task] = await database.select().from(standaloneTasks).where(
-          and(eq(standaloneTasks.id, input.id), eq(standaloneTasks.userId, ctx.user.id))
-        ).limit(1);
-        if (!task) throw new TRPCError({ code: "NOT_FOUND" });
-        const newIsDone = !task.isDone;
-        await database.update(standaloneTasks).set({
-          isDone: newIsDone,
-          completedAt: newIsDone ? new Date() : null,
-        }).where(eq(standaloneTasks.id, input.id));
-        return { success: true };
-      }),
-    deleteStandalone: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await database.delete(standaloneTasks).where(
-          and(eq(standaloneTasks.id, input.id), eq(standaloneTasks.userId, ctx.user.id))
-        );
-        return { success: true };
-      }),
-  }),
 
 
   // Tent A (Estufa A - Clonagem)
@@ -3654,7 +1234,7 @@ export const appRouter = router({
     create: protectedProcedure
       .input(
         z.object({
-          type: z.enum(["daily_reminder", "environment_alert", "task_reminder"]),
+          type: z.enum(["daily_reminder", "environment_alert", "task_reminder", "incomplete_log"]),
           title: z.string(),
           message: z.string(),
           metadata: z.string().optional(),
@@ -3686,1808 +1266,6 @@ export const appRouter = router({
       }),
   }),
 
-  // Plants (Plantas Individuais)
-  plants: router({
-    // Criar nova planta
-    create: protectedProcedure
-      .input(z.object({
-        name: z.string(),
-        code: z.string().optional(),
-        strainId: z.number(),
-        currentTentId: z.number(),
-        notes: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.currentTentId, ctx.user.groupId);
-
-        const result = await database.insert(plants).values({
-          name: input.name,
-          code: input.code,
-          strainId: input.strainId,
-          currentTentId: input.currentTentId,
-          notes: input.notes,
-          status: "ACTIVE",
-          groupId: ctx.user.groupId ?? null,
-        });
-
-        // Retornar o ID inserido
-        return { id: result.insertId };
-      }),
-
-    // Clonar planta existente
-    clone: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        name: z.string().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        const [original] = await database
-          .select()
-          .from(plants)
-          .where(and(eq(plants.id, input.plantId), eq(plants.groupId, ctx.user.groupId ?? 0)))
-          .limit(1);
-
-        if (!original) throw new Error("Planta não encontrada");
-
-        const cloneName = input.name ?? `${original.name} (Clone)`;
-
-        const [result] = await database
-          .insert(plants)
-          .values({
-            name: cloneName,
-            strainId: original.strainId,
-            currentTentId: original.currentTentId,
-            plantStage: "SEEDLING",
-            status: "ACTIVE",
-            groupId: ctx.user.groupId ?? null,
-            notes: original.notes
-              ? `Clone de: ${original.name}\n\n${original.notes}`
-              : `Clone de: ${original.name}`,
-          });
-
-        const newPlantId = (result as any).insertId;
-
-        if (original.currentTentId) {
-          await database.insert(plantTentHistory).values({
-            plantId: newPlantId,
-            tentId: original.currentTentId,
-            movedAt: new Date(),
-            reason: `Clone criado de "${original.name}"`,
-          });
-        }
-
-        return { id: newPlantId, name: cloneName };
-      }),
-
-    // Listar plantas (apenas ACTIVE por padrão)
-    list: protectedProcedure
-      .input(z.object({
-        tentId: z.number().optional(),
-        strainId: z.number().optional(),
-        status: z.enum(["ACTIVE", "HARVESTED", "DEAD", "DISCARDED", "AWAITING_DRYING"]).optional(),
-      }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        if (input.tentId) await validateTentOwnership(input.tentId, ctx.user.groupId);
-
-        let conditions = [];
-
-        // Filter by group
-        if (ctx.user.groupId != null) {
-          conditions.push(eq(plants.groupId, ctx.user.groupId));
-        }
-
-        // Excluir plantas na lixeira (soft-delete)
-        conditions.push(isNull(plants.deletedAt));
-
-        // Filtrar apenas plantas ACTIVE por padrão
-        if (input.status) {
-          conditions.push(eq(plants.status, input.status));
-        } else {
-          conditions.push(eq(plants.status, "ACTIVE"));
-        }
-
-        if (input.tentId) {
-          conditions.push(eq(plants.currentTentId, input.tentId));
-        }
-        if (input.strainId) {
-          conditions.push(eq(plants.strainId, input.strainId));
-        }
-
-        let query = database.select().from(plants).where(and(...conditions));
-        
-        const plantsList = await query as any;
-
-        if (plantsList.length === 0) return [];
-
-        const plantIds = plantsList.map((p: any) => p.id);
-        const tentIds = [...new Set(plantsList.map((p: any) => p.currentTentId).filter(Boolean))] as number[];
-
-        // 1 query: último health log por planta (em vez de 2 queries duplicadas por planta)
-        const healthRows = await database
-          .select()
-          .from(plantHealthLogs)
-          .where(inArray(plantHealthLogs.plantId, plantIds))
-          .orderBy(desc(plantHealthLogs.logDate));
-
-        // Mapa: plantId → primeiro (mais recente) health log
-        const healthMap = new Map<number, any>();
-        for (const row of healthRows) {
-          if (!healthMap.has(row.plantId)) healthMap.set(row.plantId, row);
-        }
-
-        // 1 query: ciclos ativos para todas as estufas relevantes
-        const activeCycleRows = tentIds.length > 0
-          ? await database
-              .select()
-              .from(cycles)
-              .where(and(inArray(cycles.tentId, tentIds), eq(cycles.status, "ACTIVE")))
-          : [];
-
-        // Mapa: tentId → ciclo ativo
-        const cycleMap = new Map<number, any>();
-        for (const c of activeCycleRows) cycleMap.set(c.tentId, c);
-
-        const now = new Date();
-
-        return plantsList.map((plant: any) => {
-          const lastHealth = healthMap.get(plant.id) ?? null;
-          const activeCycle = cycleMap.get(plant.currentTentId) ?? null;
-
-          let cyclePhase = null;
-          let cycleWeek = null;
-
-          if (activeCycle) {
-            const startDate = new Date(activeCycle.startDate);
-            const floraStartDate = activeCycle.floraStartDate ? new Date(activeCycle.floraStartDate) : null;
-            if (floraStartDate && now >= floraStartDate) {
-              cyclePhase = "FLORA";
-              cycleWeek = Math.floor((now.getTime() - floraStartDate.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
-            } else {
-              cyclePhase = "VEGA";
-              cycleWeek = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1;
-            }
-          }
-
-          return {
-            ...plant,
-            lastHealthPhotoUrl: lastHealth?.photoUrl ?? null,
-            lastHealthStatus: lastHealth?.healthStatus ?? null,
-            cyclePhase,
-            cycleWeek,
-          };
-        });
-      }),
-
-    // Obter planta por ID
-    getById: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.id, ctx.user.groupId);
-
-        const [plant] = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, input.id));
-
-        return plant;
-      }),
-
-    // Atualizar planta
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: z.number(),
-          name: z.string().min(1).optional(),
-          code: z.string().optional(),
-          notes: z.string().max(2000).optional(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.id, ctx.user.groupId);
-
-        // Verificar se planta existe
-        const existingPlant = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, input.id))
-          .limit(1);
-
-        if (existingPlant.length === 0) {
-          throw new Error("Planta não encontrada");
-        }
-
-        // Preparar campos para atualização (apenas os fornecidos)
-        const updateData: any = {};
-        if (input.name !== undefined) updateData.name = input.name;
-        if (input.code !== undefined) updateData.code = input.code;
-        if (input.notes !== undefined) updateData.notes = input.notes;
-
-        // Verificar se há algo para atualizar
-        if (Object.keys(updateData).length === 0) {
-          return { success: true }; // Nada para atualizar
-        }
-
-        // Atualizar planta
-        await database
-          .update(plants)
-          .set(updateData)
-          .where(eq(plants.id, input.id));
-
-        return { success: true };
-      }),
-
-    // Mover planta para outra estufa
-    moveTent: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        toTentId: z.number(),
-        reason: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await validateTentOwnership(input.toTentId, ctx.user.groupId);
-        
-        // Buscar estufa atual
-        const [plant] = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, input.plantId));
-        
-        if (!plant) throw new Error("Plant not found");
-        
-        // Registrar histórico
-        await database.insert(plantTentHistory).values({
-          plantId: input.plantId,
-          fromTentId: plant.currentTentId,
-          toTentId: input.toTentId,
-          reason: input.reason,
-        });
-        
-        // Atualizar estufa atual
-        await database
-          .update(plants)
-          .set({ currentTentId: input.toTentId })
-          .where(eq(plants.id, input.plantId));
-        
-        return { success: true };
-      }),
-
-    // Mover todas as plantas de uma estufa para outra
-    moveAllPlants: protectedProcedure
-      .input(z.object({
-        fromTentId: z.number(),
-        toTentId: z.number(),
-        reason: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.fromTentId, ctx.user.groupId);
-        await validateTentOwnership(input.toTentId, ctx.user.groupId);
-        
-        // Buscar todas as plantas na estufa de origem
-        const plantsToMove = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.currentTentId, input.fromTentId));
-        
-        if (plantsToMove.length === 0) {
-          return { success: true, movedCount: 0 };
-        }
-        
-        // Buscar estufa de destino para verificar se é VEGA
-        const [toTent] = await database
-          .select()
-          .from(tents)
-          .where(eq(tents.id, input.toTentId));
-        
-        // Mover cada planta e registrar histórico
-        for (const plant of plantsToMove) {
-          // Registrar histórico
-          await database.insert(plantTentHistory).values({
-            plantId: plant.id,
-            fromTentId: input.fromTentId,
-            toTentId: input.toTentId,
-            reason: input.reason || "Movimentação em lote",
-          });
-          
-          // Promover SEEDLING para PLANT se indo para estufa VEGA
-          const newStage = (plant.plantStage === "SEEDLING" && toTent?.category === "VEGA") 
-            ? "PLANT" 
-            : plant.plantStage;
-          
-          // Atualizar estufa atual e estágio
-          await database
-            .update(plants)
-            .set({ 
-              currentTentId: input.toTentId,
-              plantStage: newStage
-            })
-            .where(eq(plants.id, plant.id));
-        }
-        
-        return { success: true, movedCount: plantsToMove.length };
-      }),
-
-    // Mover plantas específicas (seleção manual)
-    moveSelectedPlants: protectedProcedure
-      .input(z.object({
-        plantIds: z.array(z.number()),
-        toTentId: z.number(),
-        reason: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.toTentId, ctx.user.groupId);
-        
-        if (input.plantIds.length === 0) {
-          return { success: true, movedCount: 0 };
-        }
-        
-        // Mover cada planta e registrar histórico
-        for (const plantId of input.plantIds) {
-          // Buscar planta atual para pegar fromTentId
-          const [plant] = await database
-            .select()
-            .from(plants)
-            .where(eq(plants.id, plantId));
-
-          if (!plant) continue; // Skip if plant not found
-
-          // Verificar que a planta pertence ao grupo do usuário
-          await validatePlantOwnership(plantId, ctx.user.groupId);
-          
-          // Registrar histórico
-          await database.insert(plantTentHistory).values({
-            plantId: plantId,
-            fromTentId: plant.currentTentId,
-            toTentId: input.toTentId,
-            reason: input.reason || "Movimentação em lote (seleção manual)",
-          });
-          
-          // Atualizar estufa atual
-          await database
-            .update(plants)
-            .set({ currentTentId: input.toTentId })
-            .where(eq(plants.id, plantId));
-        }
-        
-        return { success: true, movedCount: input.plantIds.length };
-      }),
-
-    // Transplantar para Flora (encontra automaticamente estufa de Flora)
-    transplantToFlora: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        // Buscar planta atual
-        const [plant] = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, input.plantId));
-        
-        if (!plant) throw new Error("Plant not found");
-        
-        // Buscar estufa de Flora (ciclo ativo em fase FLORA)
-        const [floraTent] = await database
-          .select({
-            tentId: cycles.tentId,
-            tentName: tents.name,
-          })
-          .from(cycles)
-          .innerJoin(tents, eq(cycles.tentId, tents.id))
-          .where(and(
-            eq(cycles.status, "ACTIVE"),
-            isNotNull(cycles.floraStartDate)
-          ))
-          .limit(1);
-        
-        if (!floraTent) {
-          throw new Error("Nenhuma estufa de Flora ativa encontrada");
-        }
-        
-        // Registrar histórico
-        await database.insert(plantTentHistory).values({
-          plantId: input.plantId,
-          fromTentId: plant.currentTentId,
-          toTentId: floraTent.tentId,
-          reason: "Transplante para Flora",
-        });
-        
-        // Atualizar estufa atual
-        await database
-          .update(plants)
-          .set({ currentTentId: floraTent.tentId })
-          .where(eq(plants.id, input.plantId));
-        
-        return { success: true, tentName: floraTent.tentName };
-      }),
-
-    // Finalizar planta (harvest)
-    finish: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        status: z.enum(["HARVESTED", "DEAD"]),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        await database
-          .update(plants)
-          .set({ status: input.status })
-          .where(eq(plants.id, input.plantId));
-        
-        return { success: true };
-      }),
-
-    // Promover muda para planta (SEEDLING → PLANT)
-    promoteToPlant: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        // Buscar planta atual
-        const [plant] = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, input.plantId));
-        
-        if (!plant) {
-          throw new Error("Planta não encontrada");
-        }
-        
-        if (plant.plantStage !== "SEEDLING") {
-          throw new Error("Apenas mudas podem ser promovidas para plantas");
-        }
-        
-        // Promover para PLANT
-        await database
-          .update(plants)
-          .set({ plantStage: "PLANT" })
-          .where(eq(plants.id, input.plantId));
-        
-        return { success: true };
-      }),
-
-    // Promover múltiplas mudas para plantas (ação em lote)
-    bulkPromote: protectedProcedure
-      .input(z.object({
-        plantIds: z.array(z.number()),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        
-        // Verificar se todas são mudas
-        const plantsToPromote = await database
-          .select()
-          .from(plants)
-          .where(inArray(plants.id, input.plantIds));
-        
-        const nonSeedlings = plantsToPromote.filter((p: any) => p.plantStage !== "SEEDLING");
-        if (nonSeedlings.length > 0) {
-          throw new Error(`${nonSeedlings.length} planta(s) não são mudas e não podem ser promovidas`);
-        }
-        
-        // Promover todas para PLANT
-        await database
-          .update(plants)
-          .set({ plantStage: "PLANT" })
-          .where(inArray(plants.id, input.plantIds));
-        
-        return { success: true, count: input.plantIds.length };
-      }),
-
-    // Mover múltiplas plantas para outra estufa (ação em lote)
-    bulkMove: protectedProcedure
-      .input(z.object({
-        plantIds: z.array(z.number()),
-        targetTentId: z.number(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validateTentOwnership(input.targetTentId, ctx.user.groupId);
-        
-        // Verificar se estufa destino existe
-        const [targetTent] = await database
-          .select()
-          .from(tents)
-          .where(eq(tents.id, input.targetTentId));
-        
-        if (!targetTent) {
-          throw new Error("Estufa destino não encontrada");
-        }
-        
-        // Mover todas as plantas
-        await database
-          .update(plants)
-          .set({ currentTentId: input.targetTentId })
-          .where(inArray(plants.id, input.plantIds));
-        
-        return { success: true, count: input.plantIds.length };
-      }),
-
-    // Marcar múltiplas plantas como colhidas (ação em lote)
-    bulkHarvest: protectedProcedure
-      .input(z.object({
-        plantIds: z.array(z.number()),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        
-        // Marcar todas como colhidas
-        await database
-          .update(plants)
-          .set({ 
-            status: "HARVESTED",
-            finishedAt: new Date(),
-          })
-          .where(inArray(plants.id, input.plantIds));
-        
-        return { success: true, count: input.plantIds.length };
-      }),
-
-    // Descartar múltiplas plantas (ação em lote)
-    bulkDiscard: protectedProcedure
-      .input(z.object({
-        plantIds: z.array(z.number()),
-        reason: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        
-        // Descartar todas as plantas
-        await database
-          .update(plants)
-          .set({ 
-            status: "DISCARDED",
-            finishedAt: new Date(),
-            finishReason: input.reason,
-          })
-          .where(inArray(plants.id, input.plantIds));
-        
-        return { success: true, count: input.plantIds.length };
-      }),
-
-    // Descartar planta (doente ou com problemas)
-    discard: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        reason: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        // Atualizar status para DISCARDED
-        await database
-          .update(plants)
-          .set({ 
-            status: "DISCARDED",
-            notes: input.reason ? `Descartada: ${input.reason}` : "Descartada"
-          })
-          .where(eq(plants.id, input.plantId));
-        
-        return { success: true };
-      }),
-
-    // Mover planta para lixeira (soft-delete)
-    delete: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await database.update(plants).set({ deletedAt: new Date() }).where(eq(plants.id, input.plantId));
-        return { success: true };
-      }),
-
-    // Mover múltiplas plantas para lixeira em massa
-    bulkDelete: protectedProcedure
-      .input(z.object({ plantIds: z.array(z.number()) }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        if (!input.plantIds.length) return { count: 0 };
-        await database.update(plants).set({ deletedAt: new Date() }).where(inArray(plants.id, input.plantIds));
-        return { count: input.plantIds.length };
-      }),
-
-    // Listar plantas na lixeira
-    listDeleted: protectedProcedure
-      .query(async ({ ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        const conditions = [isNotNull(plants.deletedAt)];
-        if (ctx.user.groupId != null) conditions.push(eq(plants.groupId, ctx.user.groupId));
-        return await database.select().from(plants).where(and(...conditions)).orderBy(desc(plants.deletedAt)) as any[];
-      }),
-
-    // Restaurar planta da lixeira
-    restore: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await database.update(plants).set({ deletedAt: null }).where(eq(plants.id, input.plantId));
-        return { success: true };
-      }),
-
-    // Excluir planta permanentemente (da lixeira)
-    permanentDelete: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await database.transaction(async (tx) => {
-          await tx.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
-          await tx.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
-          await tx.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
-          await tx.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
-          await tx.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
-          await tx.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
-          await tx.delete(plantTentHistory).where(eq(plantTentHistory.plantId, input.plantId));
-          await tx.delete(plants).where(eq(plants.id, input.plantId));
-        });
-        return { success: true };
-      }),
-
-    // Buscar histórico de movimentação entre estufas
-    getTentHistory: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        
-        const history = await database
-          .select({
-            id: plantTentHistory.id,
-            plantId: plantTentHistory.plantId,
-            fromTentId: plantTentHistory.fromTentId,
-            toTentId: plantTentHistory.toTentId,
-            movedAt: plantTentHistory.movedAt,
-            reason: plantTentHistory.reason,
-          })
-          .from(plantTentHistory)
-          .where(eq(plantTentHistory.plantId, input.plantId))
-          .orderBy(asc(plantTentHistory.movedAt));
-        
-        // Buscar nomes das estufas
-        const allTents = await database.select({ id: tents.id, name: tents.name }).from(tents);
-        const tentMap = Object.fromEntries(allTents.map((t: any) => [t.id, t.name]));
-        
-        return history.map((h: any) => ({
-          ...h,
-          fromTentName: h.fromTentId ? tentMap[h.fromTentId] ?? `Estufa #${h.fromTentId}` : null,
-          toTentName: tentMap[h.toTentId] ?? `Estufa #${h.toTentId}`,
-        }));
-      }),
-
-    getEnvironmentHistory: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        // 1. Buscar planta
-        const [plant] = await database.select().from(plants).where(eq(plants.id, input.plantId));
-        if (!plant) throw new Error("Plant not found");
-
-        // 2. Buscar histórico de movimentação de estufas
-        const history = await database
-          .select()
-          .from(plantTentHistory)
-          .where(eq(plantTentHistory.plantId, input.plantId))
-          .orderBy(asc(plantTentHistory.movedAt));
-
-        // 3. Buscar todas as estufas para mapeamento de nomes
-        const allTents = await database.select({ id: tents.id, name: tents.name }).from(tents);
-        const tentMap = Object.fromEntries(allTents.map((t: any) => [t.id, t.name]));
-
-        // 4. Reconstruir períodos: quando a planta estava em qual estufa
-        // Cada entrada: plant entra em toTentId em movedAt, sai quando a próxima entrada começa
-        const periods: Array<{ tentId: number; tentName: string; start: Date; end: Date | null }> = [];
-
-        for (let i = 0; i < history.length; i++) {
-          const entry = history[i] as any;
-          if (!entry.toTentId) continue;
-          const start = new Date(entry.movedAt);
-          const end = i + 1 < history.length ? new Date((history[i + 1] as any).movedAt) : null;
-          periods.push({
-            tentId: entry.toTentId,
-            tentName: tentMap[entry.toTentId] ?? `Estufa #${entry.toTentId}`,
-            start,
-            end,
-          });
-        }
-
-        // Se não há histórico mas planta tem estufa atual, criar período desde criação
-        if (periods.length === 0 && plant.currentTentId) {
-          periods.push({
-            tentId: plant.currentTentId,
-            tentName: tentMap[plant.currentTentId] ?? `Estufa #${plant.currentTentId}`,
-            start: new Date(plant.createdAt),
-            end: null,
-          });
-        }
-
-        // 5. Para cada período, buscar logs da estufa naquele intervalo de datas
-        const periodsWithLogs = await Promise.all(
-          periods.map(async (period) => {
-            const allLogs = await database
-              .select()
-              .from(dailyLogs)
-              .where(eq(dailyLogs.tentId, period.tentId))
-              .orderBy(asc(dailyLogs.logDate), asc(dailyLogs.turn));
-
-            // Filtrar por intervalo de datas em JS (evita imports adicionais de drizzle)
-            const logs = (allLogs as any[]).filter((log) => {
-              const logDate = new Date(log.logDate);
-              if (logDate < period.start) return false;
-              if (period.end && logDate >= period.end) return false;
-              return true;
-            });
-
-            const daysInTent = period.end
-              ? Math.floor((period.end.getTime() - period.start.getTime()) / (1000 * 60 * 60 * 24))
-              : Math.floor((Date.now() - period.start.getTime()) / (1000 * 60 * 60 * 24));
-
-            return {
-              tentId: period.tentId,
-              tentName: period.tentName,
-              start: period.start.toISOString(),
-              end: period.end?.toISOString() ?? null,
-              daysInTent,
-              logCount: logs.length,
-              logs,
-            };
-          })
-        );
-
-        return periodsWithLogs;
-      }),
-
-    // Buscar fotos da planta
-    getPhotos: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        const photos = await database
-          .select()
-          .from(plantPhotos)
-          .where(eq(plantPhotos.plantId, input.plantId))
-          .orderBy(desc(plantPhotos.createdAt));
-        
-        return photos;
-      }),
-
-    // Upload foto da planta
-    uploadPhoto: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        imageData: z.string().max(20 * 1024 * 1024), // max ~15MB base64
-        mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        // Converter base64 para Buffer
-        const base64Data = input.imageData.replace(/^data:[^;]+;base64,/, '');
-        const buffer = Buffer.from(base64Data, 'base64');
-
-        // Extensão segura a partir do enum validado
-        const ext = input.mimeType.split('/')[1]; // seguro pois é enum
-
-        // Upload para S3
-        const { storagePut } = await import("./storage");
-        const fileKey = `plants/${input.plantId}/${Date.now()}.${ext}`;
-        const { url } = await storagePut(fileKey, buffer, input.mimeType);
-        
-        // Salvar no banco
-        const [photo] = await database
-          .insert(plantPhotos)
-          .values({
-            plantId: input.plantId,
-            url,
-            fileKey,
-          })
-          .returning();
-        
-        return photo;
-      }),
-
-    // Excluir foto da planta
-    deletePhoto: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        // Verificar ownership: buscar a foto e validar a planta associada
-        const [photo] = await database
-          .select({ plantId: plantPhotos.plantId })
-          .from(plantPhotos)
-          .where(eq(plantPhotos.id, input.id))
-          .limit(1);
-        if (!photo) throw new Error("Foto não encontrada");
-        await validatePlantOwnership(photo.plantId, ctx.user.groupId);
-
-        await database
-          .delete(plantPhotos)
-          .where(eq(plantPhotos.id, input.id));
-
-        return { success: true };
-      }),
-
-    // Arquivar planta (marcar como HARVESTED ou DISCARDED)
-    archive: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        status: z.enum(["HARVESTED", "DISCARDED"]),
-        finishReason: z.string().max(1000).optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        // Verificar se planta está ACTIVE
-        const [plant] = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, input.plantId));
-        
-        if (!plant) {
-          throw new Error("Planta não encontrada");
-        }
-        
-        if (plant.status !== "ACTIVE") {
-          throw new Error("Apenas plantas ativas podem ser arquivadas");
-        }
-        
-        // Atualizar status e remover de estufa
-        await database
-          .update(plants)
-          .set({
-            status: input.status,
-            finishedAt: new Date(),
-            finishReason: input.finishReason,
-            currentTentId: null as any, // Remove da estufa
-          })
-          .where(eq(plants.id, input.plantId));
-        
-        return { success: true };
-      }),
-
-    // Desarquivar planta (voltar para ACTIVE)
-    unarchive: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        targetTentId: z.number(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await validateTentOwnership(input.targetTentId, ctx.user.groupId);
-        
-        // Verificar se planta está arquivada
-        const [plant] = await database
-          .select()
-          .from(plants)
-          .where(eq(plants.id, input.plantId));
-        
-        if (!plant) {
-          throw new Error("Planta não encontrada");
-        }
-        
-        if (plant.status === "ACTIVE") {
-          throw new Error("Planta já está ativa");
-        }
-        
-        // Restaurar para ACTIVE e colocar em estufa
-        await database
-          .update(plants)
-          .set({
-            status: "ACTIVE",
-            finishedAt: null,
-            finishReason: null,
-            currentTentId: input.targetTentId,
-          })
-          .where(eq(plants.id, input.plantId));
-        
-        // Registrar histórico de movimentação
-        await database.insert(plantTentHistory).values({
-          plantId: input.plantId,
-          fromTentId: null,
-          toTentId: input.targetTentId,
-          reason: "Planta restaurada do arquivo",
-        });
-        
-        return { success: true };
-      }),
-
-    // Listar plantas arquivadas
-    listArchived: protectedProcedure
-      .input(z.object({
-        status: z.enum(["HARVESTED", "DISCARDED", "DEAD"]).optional(),
-      }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        if (ctx.user.groupId == null) throw new Error("Acesso negado: usuário sem grupo atribuído");
-
-        const statusCondition = input.status
-          ? eq(plants.status, input.status)
-          : or(
-              eq(plants.status, "HARVESTED"),
-              eq(plants.status, "DISCARDED"),
-              eq(plants.status, "DEAD")
-            );
-
-        let query = database
-          .select()
-          .from(plants)
-          .where(and(statusCondition, eq(plants.groupId, ctx.user.groupId)))
-          .orderBy(desc(plants.finishedAt));
-        
-        const archivedPlants = await query;
-        if (archivedPlants.length === 0) return [];
-
-        // Batch queries — sem N+1
-        const plantIds    = archivedPlants.map((p: any) => p.id);
-        const strainIds   = [...new Set(archivedPlants.map((p: any) => p.strainId).filter(Boolean))];
-        const tentIds     = [...new Set(archivedPlants.map((p: any) => p.currentTentId).filter(Boolean))];
-
-        const [strainsMap, lastPhotosRows, tentsRows, cyclesRows] = await Promise.all([
-          // 1. Todas as strains de uma vez
-          strainIds.length
-            ? database.select({ id: strains.id, name: strains.name }).from(strains)
-                .where(inArray(strains.id, strainIds as number[]))
-            : Promise.resolve([]),
-
-          // 2. Última foto de saúde por planta (subquery via ORDER + GROUP não suportado pelo Drizzle,
-          //    então buscamos todas ordenadas e pegamos a primeira por plantId)
-          database.select({ plantId: plantHealthLogs.plantId, photoUrl: plantHealthLogs.photoUrl })
-            .from(plantHealthLogs)
-            .where(inArray(plantHealthLogs.plantId, plantIds))
-            .orderBy(desc(plantHealthLogs.logDate)),
-
-          // 3. Todas as estufas relevantes
-          tentIds.length
-            ? database.select({ id: tents.id, name: tents.name }).from(tents)
-                .where(inArray(tents.id, tentIds as number[]))
-            : Promise.resolve([]),
-
-          // 4. Ciclos finalizados mais recentes por estufa
-          tentIds.length
-            ? database.select({ tentId: cycles.tentId, harvestWeight: cycles.harvestWeight, harvestNotes: cycles.harvestNotes })
-                .from(cycles)
-                .where(and(inArray(cycles.tentId, tentIds as number[]), eq(cycles.status, "FINISHED")))
-                .orderBy(desc(cycles.createdAt))
-            : Promise.resolve([]),
-        ]);
-
-        // Montar mapas para lookup O(1)
-        const strainById  = new Map((strainsMap as any[]).map(s => [s.id, s.name]));
-        const tentNameById = new Map((tentsRows as any[]).map(t => [t.id, t.name]));
-        const lastPhotoByPlant = new Map<number, string | null>();
-        for (const row of lastPhotosRows as any[]) {
-          if (!lastPhotoByPlant.has(row.plantId)) lastPhotoByPlant.set(row.plantId, row.photoUrl);
-        }
-        const cycleByTent = new Map<number, { harvestWeight: string | null; harvestNotes: string | null }>();
-        for (const row of cyclesRows as any[]) {
-          if (!cycleByTent.has(row.tentId)) cycleByTent.set(row.tentId, { harvestWeight: row.harvestWeight, harvestNotes: row.harvestNotes });
-        }
-
-        const plantsWithDetails = archivedPlants.map((plant: any) => ({
-          ...plant,
-          strainName: strainById.get(plant.strainId) || "Desconhecida",
-          lastHealthPhotoUrl: lastPhotoByPlant.get(plant.id) || null,
-          tentName: plant.currentTentId ? tentNameById.get(plant.currentTentId) || null : null,
-          harvestWeight: plant.currentTentId ? cycleByTent.get(plant.currentTentId)?.harvestWeight || null : null,
-          harvestNotes: plant.currentTentId ? cycleByTent.get(plant.currentTentId)?.harvestNotes || null : null,
-        }));
-
-        return plantsWithDetails;
-      }),
-
-    // Excluir planta permanentemente (apenas para erros de cadastro)
-    deletePermanently: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        // Deletar todos os registros relacionados + planta em transação (cascade manual atômico)
-        await database.transaction(async (tx) => {
-          await tx.delete(plantHealthLogs).where(eq(plantHealthLogs.plantId, input.plantId));
-          await tx.delete(plantTrichomeLogs).where(eq(plantTrichomeLogs.plantId, input.plantId));
-          await tx.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
-          await tx.delete(plantPhotos).where(eq(plantPhotos.plantId, input.plantId));
-          await tx.delete(plantObservations).where(eq(plantObservations.plantId, input.plantId));
-          await tx.delete(plantTentHistory).where(eq(plantTentHistory.plantId, input.plantId));
-          await tx.delete(plantRunoffLogs).where(eq(plantRunoffLogs.plantId, input.plantId));
-          await tx.delete(plants).where(eq(plants.id, input.plantId));
-        });
-
-        return { success: true };
-      }),
-  }),
-
-  // Plant Observations
-  plantObservations: router({
-    create: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        content: z.string(),
-        observationDate: z.date().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        await database.insert(plantObservations).values({
-          plantId: input.plantId,
-          content: input.content,
-          ...(input.observationDate ? { observationDate: input.observationDate } : {}),
-        });
-
-        return { success: true };
-      }),
-
-    list: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        return await database
-          .select()
-          .from(plantObservations)
-          .where(eq(plantObservations.plantId, input.plantId))
-          .orderBy(desc(plantObservations.observationDate));
-      }),
-
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        content: z.string().min(1),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        // Ownership via planta associada
-        const [obs] = await database
-          .select({ plantId: plantObservations.plantId })
-          .from(plantObservations)
-          .where(eq(plantObservations.id, input.id))
-          .limit(1);
-        if (!obs) throw new Error("Observação não encontrada");
-        await validatePlantOwnership(obs.plantId, ctx.user.groupId);
-
-        await database
-          .update(plantObservations)
-          .set({ content: input.content })
-          .where(eq(plantObservations.id, input.id));
-
-        return { success: true };
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        const [obs] = await database
-          .select({ plantId: plantObservations.plantId })
-          .from(plantObservations)
-          .where(eq(plantObservations.id, input.id))
-          .limit(1);
-        if (!obs) throw new Error("Observação não encontrada");
-        await validatePlantOwnership(obs.plantId, ctx.user.groupId);
-
-        await database
-          .delete(plantObservations)
-          .where(eq(plantObservations.id, input.id));
-
-        return { success: true };
-      }),
-  }),
-
-  // Plant Photos
-  plantPhotos: router({
-    list: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        // Fotos dedicadas (tabela plantPhotos)
-        const galleryPhotos = await database
-          .select()
-          .from(plantPhotos)
-          .where(eq(plantPhotos.plantId, input.plantId))
-          .orderBy(desc(plantPhotos.photoDate));
-
-        // Fotos dos registros de saúde (plantHealthLogs que têm photoUrl)
-        const healthPhotos = await database
-          .select({
-            id: plantHealthLogs.id,
-            plantId: plantHealthLogs.plantId,
-            photoUrl: plantHealthLogs.photoUrl,
-            photoKey: plantHealthLogs.photoKey,
-            description: plantHealthLogs.notes,
-            photoDate: plantHealthLogs.logDate,
-            createdAt: plantHealthLogs.createdAt,
-            healthStatus: plantHealthLogs.healthStatus,
-          })
-          .from(plantHealthLogs)
-          .where(and(
-            eq(plantHealthLogs.plantId, input.plantId),
-            isNotNull(plantHealthLogs.photoUrl)
-          ))
-          .orderBy(desc(plantHealthLogs.logDate));
-
-        // Unificar com source tag
-        const unified = [
-          ...galleryPhotos.map(p => ({ ...p, source: "gallery" as const, cycleId: p.cycleId ?? null, weekNumber: p.weekNumber ?? null, healthStatus: null })),
-          ...healthPhotos.map(p => ({ ...p, source: "health" as const, cycleId: null, weekNumber: null })),
-        ].sort((a, b) => new Date(b.photoDate).getTime() - new Date(a.photoDate).getTime());
-
-        return unified;
-      }),
-
-    upload: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        photoBase64: z.string(), // Base64 data URL
-        description: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        // Auto-capture active cycle and week for this plant
-        let capturedCycleId: number | undefined;
-        let capturedWeekNumber: number | undefined;
-        try {
-          const plant = await database.select({ currentTentId: plants.currentTentId }).from(plants).where(eq(plants.id, input.plantId)).limit(1);
-          if (plant[0]?.currentTentId) {
-            const cycle = await database.select({ id: cycles.id, startDate: cycles.startDate, floraStartDate: cycles.floraStartDate })
-              .from(cycles).where(and(eq(cycles.tentId, plant[0].currentTentId), eq(cycles.status, 'ACTIVE'))).limit(1);
-            if (cycle[0]) {
-              capturedCycleId = cycle[0].id;
-              const now = new Date();
-              const floraStart = cycle[0].floraStartDate ? new Date(cycle[0].floraStartDate) : null;
-              const refDate = floraStart && now >= floraStart ? floraStart : new Date(cycle[0].startDate);
-              capturedWeekNumber = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-            }
-          }
-        } catch {}
-
-        let photoUrl: string | undefined;
-        let photoKey: string | undefined;
-
-        // Upload foto para storage
-        try {
-          // Remover prefixo data:image/...;base64,
-          const base64Data = input.photoBase64.replace(/^data:image\/\w+;base64,/, "");
-          const buffer = Buffer.from(base64Data, 'base64');
-          
-          // Upload para storage local
-          const { storagePut } = await import("./storage");
-          photoKey = `plants/${input.plantId}/${Date.now()}.jpg`;
-          const result = await storagePut(photoKey, buffer, "image/jpeg");
-          photoUrl = result.url;
-        } catch (error) {
-          console.error('Erro ao fazer upload da foto:', error);
-          throw new Error('Falha ao salvar foto');
-        }
-        
-        const inserted: any = await database.insert(plantPhotos).values({
-          plantId: input.plantId,
-          photoUrl,
-          photoKey,
-          cycleId: capturedCycleId,
-          weekNumber: capturedWeekNumber,
-          description: input.description,
-          photoDate: new Date(),
-        });
-        const photoId: number = Number(inserted?.insertId ?? inserted?.[0]?.insertId ?? 0);
-
-        // Push SSE: notifica ESP da estufa onde a planta esta, pra que ele
-        // pre-baixe a foto em background. UX: ao tocar na planta no display,
-        // a foto aparece instantaneo (ja' cacheada) em vez de spinner ~2s.
-        try {
-          const plantRow = await database.query.plants.findFirst({
-            where: eq(plants.id, input.plantId),
-            columns: { currentTentId: true },
-          });
-          const tentId = plantRow?.currentTentId;
-          if (tentId) {
-            const { deviceEvents } = await import("./_core/deviceEvents");
-            deviceEvents.emitForTent(tentId, {
-              type: "photo",
-              plantId: input.plantId,
-              photoId,
-              photoDate: new Date().toISOString(),
-            });
-          }
-        } catch (e) {
-          // SSE e' best-effort — falha aqui nao afeta o upload.
-          console.warn("[plantPhotos.upload] SSE emit falhou:", (e as any)?.message);
-        }
-
-        return { success: true, photoUrl };
-      }),
-    
-    // Salvar URL de foto já enviada para o storage via /api/upload/image
-    saveUrl: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        photoUrl: z.string().url(),
-        description: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        // Auto-capture ciclo ativo e semana da planta
-        let capturedCycleId: number | undefined;
-        let capturedWeekNumber: number | undefined;
-        try {
-          const plant = await database.select({ currentTentId: plants.currentTentId }).from(plants).where(eq(plants.id, input.plantId)).limit(1);
-          if (plant[0]?.currentTentId) {
-            const cycle = await database.select({ id: cycles.id, startDate: cycles.startDate, floraStartDate: cycles.floraStartDate })
-              .from(cycles).where(and(eq(cycles.tentId, plant[0].currentTentId), eq(cycles.status, 'ACTIVE'))).limit(1);
-            if (cycle[0]) {
-              capturedCycleId = cycle[0].id;
-              const now = new Date();
-              const floraStart = cycle[0].floraStartDate ? new Date(cycle[0].floraStartDate) : null;
-              const refDate = floraStart && now >= floraStart ? floraStart : new Date(cycle[0].startDate);
-              capturedWeekNumber = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
-            }
-          }
-        } catch {}
-
-        await database.insert(plantPhotos).values({
-          plantId: input.plantId,
-          photoUrl: input.photoUrl,
-          cycleId: capturedCycleId,
-          weekNumber: capturedWeekNumber,
-          description: input.description,
-          photoDate: new Date(),
-        });
-
-        return { success: true, photoUrl: input.photoUrl };
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ photoId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        // Verificar ownership: buscar a foto e validar a planta associada
-        const [photo] = await database
-          .select({ plantId: plantPhotos.plantId })
-          .from(plantPhotos)
-          .where(eq(plantPhotos.id, input.photoId))
-          .limit(1);
-        if (!photo) throw new Error("Foto não encontrada");
-        await validatePlantOwnership(photo.plantId, ctx.user.groupId);
-
-        await database
-          .delete(plantPhotos)
-          .where(eq(plantPhotos.id, input.photoId));
-
-        return { success: true };
-      }),
-  }),
-
-  // Plant Runoff Logs
-  plantRunoff: router({
-    create: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        volumeIn: z.number(),
-        volumeOut: z.number(),
-        notes: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        const runoffPercent = (input.volumeOut / input.volumeIn) * 100;
-        
-        await database.insert(plantRunoffLogs).values({
-          plantId: input.plantId,
-          volumeIn: input.volumeIn.toString(),
-          volumeOut: input.volumeOut.toString(),
-          runoffPercent: runoffPercent.toFixed(2),
-          notes: input.notes,
-        });
-        
-        return { success: true, runoffPercent };
-      }),
-
-    list: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        return await database
-          .select()
-          .from(plantRunoffLogs)
-          .where(eq(plantRunoffLogs.plantId, input.plantId))
-          .orderBy(desc(plantRunoffLogs.logDate));
-      }),
-  }),
-
-  // Plant Health Logs
-  plantHealth: router({
-    create: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        healthStatus: z.enum(["HEALTHY", "STRESSED", "SICK", "RECOVERING"]),
-        symptoms: z.string().optional(),
-        treatment: z.string().optional(),
-        notes: z.string().optional(),
-        photoUrl: z.string().optional(),   // URL ou caminho relativo da foto enviada via /api/upload/image
-        photoBase64: z.string().optional(),       // Legado: base64 (mantido para compatibilidade)
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        let resolvedPhotoUrl: string | undefined = input.photoUrl; // preferência: URL pré-enviada
-        let photoKey: string | undefined;
-
-        // Fallback legado: base64 (caso o frontend antigo ainda envie)
-        if (!resolvedPhotoUrl && input.photoBase64) {
-          console.log('[PlantHealth.create] Fallback base64 upload...');
-          try {
-            const base64Data = input.photoBase64.replace(/^data:image\/\w+;base64,/, "");
-            const buffer = Buffer.from(base64Data, 'base64');
-            const { storagePut } = await import("./storage");
-            photoKey = `health/${input.plantId}/${Date.now()}.jpg`;
-            const result = await storagePut(photoKey, buffer, "image/jpeg");
-            resolvedPhotoUrl = result.url;
-          } catch (error: any) {
-            console.error('[PlantHealth] Base64 fallback upload failed:', error.message);
-          }
-        }
-
-        await database.insert(plantHealthLogs).values({
-          plantId: input.plantId,
-          healthStatus: input.healthStatus,
-          symptoms: input.symptoms,
-          treatment: input.treatment,
-          notes: input.notes,
-          photoUrl: resolvedPhotoUrl,
-          photoKey,
-        });
-
-        return { success: true };
-      }),
-
-    list: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        return await database
-          .select()
-          .from(plantHealthLogs)
-          .where(eq(plantHealthLogs.plantId, input.plantId))
-          .orderBy(desc(plantHealthLogs.logDate));
-      }),
-
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        healthStatus: z.enum(["HEALTHY", "STRESSED", "SICK", "RECOVERING"]).optional(),
-        symptoms: z.string().optional(),
-        treatment: z.string().optional(),
-        notes: z.string().optional(),
-        photoUrl: z.string().optional(),  // URL ou caminho relativo da foto enviada via /api/upload/image
-        removePhoto: z.boolean().optional(),    // true = remover foto existente
-        photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
-      }))
-      .mutation(async ({ input }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        
-        const updateData: any = {};
-        
-        if (input.healthStatus) updateData.healthStatus = input.healthStatus;
-        if (input.symptoms !== undefined) updateData.symptoms = input.symptoms;
-        if (input.treatment !== undefined) updateData.treatment = input.treatment;
-        if (input.notes !== undefined) updateData.notes = input.notes;
-        
-        // Nova foto via URL S3 pré-enviada
-        if (input.photoUrl) {
-          updateData.photoUrl = input.photoUrl;
-        } else if (input.removePhoto) {
-          updateData.photoUrl = null;
-          updateData.photoKey = null;
-        } else if (input.photoBase64) {
-          // Fallback legado: base64
-          try {
-            const [currentLog] = await database
-              .select()
-              .from(plantHealthLogs)
-              .where(eq(plantHealthLogs.id, input.id));
-            
-            if (currentLog) {
-              const base64Data = input.photoBase64.replace(/^data:image\/\w+;base64,/, "");
-              const buffer = Buffer.from(base64Data, 'base64');
-              const { storagePut } = await import("./storage");
-              const photoKey = `health/${currentLog.plantId}/${Date.now()}.jpg`;
-              const result = await storagePut(photoKey, buffer, "image/jpeg");
-              updateData.photoUrl = result.url;
-              updateData.photoKey = photoKey;
-            }
-          } catch (error) {
-            console.error('Erro ao fazer upload da nova foto (base64 fallback):', error);
-          }
-        }
-        
-        await database
-          .update(plantHealthLogs)
-          .set(updateData)
-          .where(eq(plantHealthLogs.id, input.id));
-        
-        return { success: true };
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        
-        // Opcional: deletar foto do storage também
-        // const [log] = await database.select().from(plantHealthLogs).where(eq(plantHealthLogs.id, input.id));
-        // if (log?.photoKey) {
-        //   const { storageDelete } = await import('./storage');
-        //   await storageDelete(log.photoKey);
-        // }
-        
-        await database
-          .delete(plantHealthLogs)
-          .where(eq(plantHealthLogs.id, input.id));
-        
-        return { success: true };
-      }),
-  }),
-
-  // Plant Trichome Logs
-  plantTrichomes: router({
-    create: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        weekNumber: z.number(),
-        trichomeStatus: z.enum(["CLEAR", "CLOUDY", "AMBER", "MIXED"]),
-        clearPercent: z.number().optional(),
-        cloudyPercent: z.number().optional(),
-        amberPercent: z.number().optional(),
-        notes: z.string().optional(),
-        photoUrl: z.string().optional(),  // URL ou caminho relativo da foto enviada via /api/upload/image
-        photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        
-        let resolvedPhotoUrl: string | undefined = input.photoUrl;
-        let photoKey: string | undefined;
-
-        // Fallback legado: base64
-        if (!resolvedPhotoUrl && input.photoBase64) {
-          try {
-            const base64Data = input.photoBase64.replace(/^data:image\/\w+;base64,/, "");
-            const buffer = Buffer.from(base64Data, 'base64');
-            const { storagePut } = await import("./storage");
-            photoKey = `trichomes/${input.plantId}/${Date.now()}.jpg`;
-            const result = await storagePut(photoKey, buffer, "image/jpeg");
-            resolvedPhotoUrl = result.url;
-          } catch (error: any) {
-            console.error('[PlantTrichomes] Base64 fallback upload failed:', error.message);
-          }
-        }
-
-        if (!photoKey && resolvedPhotoUrl?.startsWith('/uploads/')) {
-          photoKey = resolvedPhotoUrl.replace(/^\/uploads\//, '');
-        }
-
-        await database.insert(plantTrichomeLogs).values({
-          plantId: input.plantId,
-          weekNumber: input.weekNumber,
-          trichomeStatus: input.trichomeStatus,
-          clearPercent: input.clearPercent,
-          cloudyPercent: input.cloudyPercent,
-          amberPercent: input.amberPercent,
-          notes: input.notes,
-          photoUrl: resolvedPhotoUrl,
-          photoKey,
-        });
-        
-        return { success: true };
-      }),
-
-    list: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        return await database
-          .select()
-          .from(plantTrichomeLogs)
-          .where(eq(plantTrichomeLogs.plantId, input.plantId))
-          .orderBy(desc(plantTrichomeLogs.logDate));
-      }),
-  }),
-
-  // Plant LST Logs
-  plantLST: router({
-    create: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        technique: z.string(),
-        response: z.string().optional(),
-        notes: z.string().optional(),
-        nodePosition: z.string().optional(),
-        techniqueConfig: z.object({
-          expectedTops: z.number(),
-          recoveryDays: z.number(),
-        }).optional(),
-        snapshotJson: z.string().optional(), // PlantGraphNode[] serializado
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        const baseValues = {
-          plantId: input.plantId,
-          technique: input.technique,
-          response: input.response,
-          notes: input.notes,
-          nodePosition: input.nodePosition,
-          techniqueConfig: input.techniqueConfig ? JSON.stringify(input.techniqueConfig) : null,
-          actualResult: null as null,
-        };
-
-        try {
-          // Tenta inserir com snapshotJson (requer migration: ALTER TABLE ADD COLUMN snapshotJson)
-          await database.insert(plantLSTLogs).values({
-            ...baseValues,
-            ...(input.snapshotJson != null ? { snapshotJson: input.snapshotJson } : {}),
-          });
-        } catch (e: any) {
-          // Fallback: coluna snapshotJson ainda não existe na DB (migration pendente)
-          if (e?.message?.includes('snapshotJson') || e?.errno === 1054) {
-            await database.insert(plantLSTLogs).values(baseValues);
-          } else {
-            throw e;
-          }
-        }
-
-        return { success: true };
-      }),
-
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        plantId: z.number(),
-        actualResult: z.object({
-          actualTops: z.number(),
-          vigor: z.enum(["low", "medium", "high"]),
-          confirmedAt: z.string(),
-        }).optional(),
-        notes: z.string().optional(),
-        response: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        await database
-          .update(plantLSTLogs)
-          .set({
-            ...(input.actualResult !== undefined && {
-              actualResult: JSON.stringify(input.actualResult),
-            }),
-            ...(input.notes !== undefined && { notes: input.notes }),
-            ...(input.response !== undefined && { response: input.response }),
-          })
-          .where(eq(plantLSTLogs.id, input.id));
-
-        return { success: true };
-      }),
-
-    list: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        const rows = await database
-          .select()
-          .from(plantLSTLogs)
-          .where(eq(plantLSTLogs.plantId, input.plantId))
-          .orderBy(desc(plantLSTLogs.logDate));
-
-        // Parse JSON text columns
-        return rows.map((r) => ({
-          ...r,
-          techniqueConfig: r.techniqueConfig ? JSON.parse(r.techniqueConfig as string) : null,
-          actualResult:    r.actualResult    ? JSON.parse(r.actualResult    as string) : null,
-          snapshotJson:    (() => {
-            try { return r.snapshotJson ? JSON.parse(r.snapshotJson as string) : null; }
-            catch { return null; }
-          })(),
-        }));
-      }),
-
-    stats: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-        const logs = await database
-          .select()
-          .from(plantLSTLogs)
-          .where(eq(plantLSTLogs.plantId, input.plantId));
-
-        const byTechnique: Record<string, number> = {};
-        for (const log of logs) {
-          const key = log.technique;
-          byTechnique[key] = (byTechnique[key] ?? 0) + 1;
-        }
-
-        return {
-          total: logs.length,
-          byTechnique,
-          lastTrainingDate: logs[0]?.logDate ?? null,
-        };
-      }),
-
-    deleteLog: protectedProcedure
-      .input(z.object({ id: z.number(), plantId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await database.delete(plantLSTLogs).where(eq(plantLSTLogs.id, input.id));
-        return { success: true };
-      }),
-
-    clearLogs: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        await database.delete(plantLSTLogs).where(eq(plantLSTLogs.plantId, input.plantId));
-        return { success: true };
-      }),
-  }),
-
-  // CannaPrune — Plant Structure (nós interativos da planta)
-  plantStructure: router({
-    /** Retorna a estrutura salva da planta, ou null se ainda não foi criada */
-    get: protectedProcedure
-      .input(z.object({ plantId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        const database = await getDb();
-        if (!database) throw new Error('Banco indisponível');
-        const [row] = await database
-          .select()
-          .from(plantStructures)
-          .where(eq(plantStructures.plantId, input.plantId))
-          .limit(1);
-        if (!row) return null;
-        return {
-          id: row.id,
-          plantId: row.plantId,
-          nodes: JSON.parse(row.nodesJson as string),
-          updatedAt: row.updatedAt,
-        };
-      }),
-
-    /** Salva (upsert) a estrutura da planta */
-    save: protectedProcedure
-      .input(z.object({
-        plantId: z.number(),
-        nodes: z.array(z.any()),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        const database = await getDb();
-        if (!database) throw new Error('Banco indisponível');
-        const nodesJson = JSON.stringify(input.nodes);
-        const existing = await database
-          .select({ id: plantStructures.id })
-          .from(plantStructures)
-          .where(eq(plantStructures.plantId, input.plantId))
-          .limit(1);
-        if (existing.length > 0) {
-          await database
-            .update(plantStructures)
-            .set({ nodesJson })
-            .where(eq(plantStructures.plantId, input.plantId));
-        } else {
-          await database.insert(plantStructures).values({
-            plantId: input.plantId,
-            nodesJson,
-          });
-        }
-        return { success: true };
-      }),
-  }),
 
   // Fertilization Presets (Predefinições de Fertilização)
   fertilizationPresets: router({
@@ -5748,102 +1526,6 @@ export const appRouter = router({
       }),
   }),
 
-  taskTemplates: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) throw new Error("Database not available");
-
-      const conditions = [];
-      if (ctx.user.groupId != null) {
-        conditions.push(
-          sql`(${taskTemplates.groupId} IS NULL OR ${taskTemplates.groupId} = ${ctx.user.groupId})`
-        );
-      }
-
-      return await database
-        .select()
-        .from(taskTemplates)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(taskTemplates.phase, taskTemplates.weekNumber, taskTemplates.title);
-    }),
-
-    create: protectedProcedure
-      .input(
-        z.object({
-          title: z.string().min(1),
-          description: z.string().max(2000).optional(),
-          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
-          context: z.enum(["TENT_A", "TENT_BC"]),
-          weekNumber: z.number().int().min(1).max(12).nullable(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        const [newTemplate] = await database.insert(taskTemplates).values({
-          title: input.title,
-          description: input.description || null,
-          phase: input.phase,
-          context: input.context,
-          weekNumber: input.weekNumber,
-          groupId: ctx.user.groupId ?? null,
-        });
-
-        return { success: true, id: newTemplate.insertId };
-      }),
-
-    update: protectedProcedure
-      .input(
-        z.object({
-          id: z.number(),
-          title: z.string().min(1),
-          description: z.string().max(2000).optional(),
-          phase: z.enum(["VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
-          context: z.enum(["TENT_A", "TENT_BC"]),
-          weekNumber: z.number().int().min(1).max(12).nullable(),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        await database
-          .update(taskTemplates)
-          .set({
-            title: input.title,
-            description: input.description || null,
-            phase: input.phase,
-            context: input.context,
-            weekNumber: input.weekNumber,
-          })
-          .where(eq(taskTemplates.id, input.id));
-
-        return { success: true };
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        // Verificar se o template existe
-        const existing = await database
-          .select()
-          .from(taskTemplates)
-          .where(eq(taskTemplates.id, input.id))
-          .limit(1);
-
-        if (existing.length === 0) {
-          throw new Error("Template de tarefa não encontrado");
-        }
-
-        await database.delete(taskTemplates).where(eq(taskTemplates.id, input.id));
-
-        return { success: true };
-      }),
-  }),
 
   // Nutrient Recipes (Receitas de Nutrientes)
   nutrients: router({
@@ -6056,9 +1738,13 @@ export const appRouter = router({
         const database = await getDb();
         if (!database) throw new Error("Database not available");
 
-        let query = database
+        const conditions = [];
+        if (input?.tentId) conditions.push(eq(wateringApplications.tentId, input.tentId));
+        if (input?.cycleId) conditions.push(eq(wateringApplications.cycleId, input.cycleId));
+
+        const base = database
           .select({
-            ...wateringApplications,
+            ...getTableColumns(wateringApplications),
             cycleStartDate: cycles.startDate,
             cycleFloraStartDate: cycles.floraStartDate,
             tentName: tents.name,
@@ -6067,173 +1753,15 @@ export const appRouter = router({
           .leftJoin(cycles, eq(wateringApplications.cycleId, cycles.id))
           .leftJoin(tents, eq(wateringApplications.tentId, tents.id));
 
-        const conditions = [];
-        if (input?.tentId) conditions.push(eq(wateringApplications.tentId, input.tentId));
-        if (input?.cycleId) conditions.push(eq(wateringApplications.cycleId, input.cycleId));
+        const filtered = conditions.length > 0 ? base.where(and(...conditions)) : base;
 
-        if (conditions.length > 0) {
-          query = query.where(and(...conditions)) as any;
-        }
-
-        return query
+        return filtered
           .orderBy(desc(wateringApplications.applicationDate))
           .limit(input?.limit || 50);
       }),
   }),
 
   // Backup & Restore
-  backup: router({
-    // Exportar backup completo
-    export: protectedProcedure.query(async () => {
-      const database = await getDb();
-      if (!database) throw new Error("Database not available");
-
-      // Buscar todos os dados
-      const [allTents, allStrains, allCycles, allPlants, allDailyLogs, allTaskTemplates, allAlertSettings, allAlerts, allPlantPhotos, allPlantHealth, allRecipeTemplates, allNutrientApplications, allWateringApplications] = await Promise.all([
-        database.select().from(tents),
-        database.select().from(strains),
-        database.select().from(cycles),
-        database.select().from(plants),
-        database.select().from(dailyLogs),
-        database.select().from(taskTemplates),
-        database.select().from(alertSettings),
-        database.select().from(alerts),
-        database.select().from(plantPhotos),
-        database.select().from(plantHealthLogs),
-        database.select().from(recipeTemplates),
-        database.select().from(nutrientApplications),
-        database.select().from(wateringApplications),
-      ]);
-
-      return {
-        version: "1.0",
-        exportDate: new Date().toISOString(),
-        data: {
-          tents: allTents,
-          strains: allStrains,
-          cycles: allCycles,
-          plants: allPlants,
-          dailyLogs: allDailyLogs,
-          taskTemplates: allTaskTemplates,
-          alertSettings: allAlertSettings,
-          alerts: allAlerts,
-          plantPhotos: allPlantPhotos,
-          plantHealthLogs: allPlantHealth,
-          recipeTemplates: allRecipeTemplates,
-          nutrientApplications: allNutrientApplications,
-          wateringApplications: allWateringApplications,
-        },
-      };
-    }),
-
-    // Importar backup
-    import: protectedProcedure
-      .input(
-        z.object({
-          version: z.string(),
-          exportDate: z.string(),
-          data: z.object({
-            tents: z.array(z.any()).optional(),
-            strains: z.array(z.any()).optional(),
-            cycles: z.array(z.any()).optional(),
-            plants: z.array(z.any()).optional(),
-            dailyLogs: z.array(z.any()).optional(),
-            taskTemplates: z.array(z.any()).optional(),
-            alertSettings: z.array(z.any()).optional(),
-            alerts: z.array(z.any()).optional(),
-            plantPhotos: z.array(z.any()).optional(),
-            plantHealthLogs: z.array(z.any()).optional(),
-            recipeTemplates: z.array(z.any()).optional(),
-            nutrientApplications: z.array(z.any()).optional(),
-            wateringApplications: z.array(z.any()).optional(),
-          }),
-        })
-      )
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        // Validar versão
-        if (input.version !== "1.0") {
-          throw new Error("Versão de backup não suportada");
-        }
-
-        const gid = ctx.user.groupId ?? null;
-
-        // Função auxiliar: converte strings de data para objetos Date
-        // Suporta: "2024-01-15T12:00:00Z" (datetime) e "2024-01-15" (date only)
-        const sanitizeDates = (rows: any[]): any[] =>
-          rows.map((row) => {
-            const out: Record<string, any> = {};
-            for (const [k, v] of Object.entries(row)) {
-              if (typeof v === "string" && (
-                /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v) ||
-                /^\d{4}-\d{2}-\d{2}$/.test(v)
-              )) {
-                const d = new Date(v);
-                out[k] = isNaN(d.getTime()) ? null : d;
-              } else {
-                out[k] = v;
-              }
-            }
-            return out;
-          });
-
-        // Carimbra o groupId do usuário logado nos recursos que pertencem ao grupo
-        const withGroup = (rows: any[]): any[] =>
-          sanitizeDates(rows).map((row) => ({ ...row, groupId: gid }));
-
-        // Tudo dentro de uma transação: se qualquer operação falhar,
-        // o banco volta ao estado original automaticamente.
-        await database.transaction(async (tx) => {
-          // Deletar dados existentes (ordem reversa de dependências)
-          await tx.delete(wateringApplications);
-          await tx.delete(nutrientApplications);
-          await tx.delete(plantRunoffLogs);
-          await tx.delete(plantTrichomeLogs);
-          await tx.delete(plantLSTLogs);
-          await tx.delete(plantObservations);
-          await tx.delete(plantHealthLogs);
-          await tx.delete(plantPhotos);
-          await tx.delete(plantTentHistory);
-          await tx.delete(recipeTemplates);
-          await tx.delete(wateringPresets);
-          await tx.delete(fertilizationPresets);
-          await tx.delete(recipes);
-          await tx.delete(notificationHistory);
-          await tx.delete(alertHistory);
-          await tx.delete(alerts);
-          await tx.delete(alertSettings);
-          await tx.delete(taskInstances);
-          await tx.delete(taskTemplates);
-          await tx.delete(dailyLogs);
-          await tx.delete(plants);
-          await tx.delete(cloningEvents);
-          await tx.delete(tentAState);
-          await tx.delete(cycles);
-          await tx.delete(weeklyTargets);
-          await tx.delete(strains);
-          await tx.delete(tents);
-
-          // Inserir dados do backup — tents/plants/templates recebem o groupId do usuário
-          if (input.data.tents?.length) await tx.insert(tents).values(withGroup(input.data.tents));
-          if (input.data.strains?.length) await tx.insert(strains).values(sanitizeDates(input.data.strains));
-          if (input.data.cycles?.length) await tx.insert(cycles).values(sanitizeDates(input.data.cycles));
-          if (input.data.plants?.length) await tx.insert(plants).values(withGroup(input.data.plants));
-          if (input.data.dailyLogs?.length) await tx.insert(dailyLogs).values(sanitizeDates(input.data.dailyLogs));
-          if (input.data.taskTemplates?.length) await tx.insert(taskTemplates).values(withGroup(input.data.taskTemplates));
-          if (input.data.alertSettings?.length) await tx.insert(alertSettings).values(sanitizeDates(input.data.alertSettings));
-          if (input.data.alerts?.length) await tx.insert(alerts).values(sanitizeDates(input.data.alerts));
-          if (input.data.plantPhotos?.length) await tx.insert(plantPhotos).values(sanitizeDates(input.data.plantPhotos));
-          if (input.data.plantHealthLogs?.length) await tx.insert(plantHealthLogs).values(sanitizeDates(input.data.plantHealthLogs));
-          if (input.data.recipeTemplates?.length) await tx.insert(recipeTemplates).values(withGroup(input.data.recipeTemplates));
-          if (input.data.nutrientApplications?.length) await tx.insert(nutrientApplications).values(sanitizeDates(input.data.nutrientApplications));
-          if (input.data.wateringApplications?.length) await tx.insert(wateringApplications).values(sanitizeDates(input.data.wateringApplications));
-        });
-
-        return { success: true, message: "Backup restaurado com sucesso" };
-      }),
-  }),
 
   // Área Aguardando Secagem (Harvest Queue)
   harvestQueue: router({
@@ -6479,13 +2007,19 @@ export const appRouter = router({
           }),
           reminderEnabled: z.boolean().optional(),
           reminderTimes: z.array(z.string()).optional(),
+          timezone: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         await saveSubscription(
           input.subscription as any,
-          input.reminderEnabled,
-          input.reminderTimes
+          ctx.user.id,
+          ctx.user.groupId ?? null,
+          {
+            reminderEnabled: input.reminderEnabled,
+            reminderTimes: input.reminderTimes,
+            timezone: input.timezone,
+          },
         );
         return { success: true };
       }),
@@ -6501,7 +2035,7 @@ export const appRouter = router({
           keysJson: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
         const { pushSubscriptions } = await import("../drizzle/schema");
@@ -6526,6 +2060,8 @@ export const appRouter = router({
         } else if (input.keysJson) {
           // Inserir novo registro (UPSERT) — só possível se temos as chaves
           await database.insert(pushSubscriptions).values({
+            userId: ctx.user.id,
+            groupId: ctx.user.groupId ?? null,
             endpoint: input.endpoint,
             keysJson: input.keysJson,
             reminderEnabled: input.reminderEnabled,
@@ -6538,13 +2074,12 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Enviar notificação de teste
-    sendTest: protectedProcedure.mutation(async () => {
+    // Enviar notificação de teste — APENAS para o usuário autenticado
+    sendTest: protectedProcedure.mutation(async ({ ctx }) => {
       if (!isPushConfigured()) {
         throw new Error("Web Push não configurado. Adicione VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY no .env");
       }
-      const { sendPushToAll } = await import("./pushService");
-      await sendPushToAll({
+      await sendPushToUser(ctx.user.id, {
         title: "🧪 Teste — App Cultivo",
         body: "Notificações Push funcionando! Toque para registrar. 🌱",
         url: "/quick-log",
@@ -6554,562 +2089,28 @@ export const appRouter = router({
     }),
   }),
 
-  groups: router({
-    // Buscar grupo do usuário atual
-    mine: protectedProcedure.query(async ({ ctx }) => {
-      if (!ctx.user.groupId) return null;
-      const database = await getDb();
-      if (!database) throw new Error('Banco indisponível');
-      const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
-      if (!group) return null;
-      // Contar membros
-      const members = await database.select({ id: users.id, name: users.name, email: users.email, role: users.role })
-        .from(users).where(eq(users.groupId, ctx.user.groupId));
-      return { ...group, members, isOwner: group.ownerId === ctx.user.id };
-    }),
-
-    // Criar novo grupo
-    create: protectedProcedure
-      .input(z.object({ name: z.string().min(1).max(100) }))
-      .mutation(async ({ ctx, input }) => {
-        const database = await getDb();
-        if (!database) throw new Error('Banco indisponível');
-        const inviteCode = nanoid(8).toUpperCase();
-        const [result] = await database.insert(groups).values({
-          name: input.name,
-          inviteCode,
-          ownerId: ctx.user.id,
-        });
-        const groupId = result.insertId;
-        // Atribuir usuário ao grupo
-        await database.update(users).set({ groupId }).where(eq(users.id, ctx.user.id));
-        return { success: true, groupId, inviteCode };
-      }),
-
-    // Entrar em um grupo via código de convite
-    join: protectedProcedure
-      .input(z.object({ inviteCode: z.string() }))
-      .mutation(async ({ ctx, input }) => {
-        const database = await getDb();
-        if (!database) throw new Error('Banco indisponível');
-        const [group] = await database.select().from(groups)
-          .where(eq(groups.inviteCode, input.inviteCode.toUpperCase())).limit(1);
-        if (!group) throw new Error('Código de convite inválido');
-        await database.update(users).set({ groupId: group.id }).where(eq(users.id, ctx.user.id));
-        return { success: true, groupId: group.id, groupName: group.name };
-      }),
-
-    // Regenerar código de convite (só o dono)
-    regenerateCode: protectedProcedure.mutation(async ({ ctx }) => {
-      if (!ctx.user.groupId) throw new Error('Você não pertence a nenhum grupo');
-      const database = await getDb();
-      if (!database) throw new Error('Banco indisponível');
-      const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
-      if (!group || group.ownerId !== ctx.user.id) throw new Error('Apenas o dono pode regenerar o código');
-      const inviteCode = nanoid(8).toUpperCase();
-      await database.update(groups).set({ inviteCode }).where(eq(groups.id, ctx.user.groupId));
-      return { inviteCode };
-    }),
-
-    // Remover membro do grupo (só o dono)
-    removeMember: protectedProcedure
-      .input(z.object({ userId: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        if (!ctx.user.groupId) throw new Error('Você não pertence a nenhum grupo');
-        const database = await getDb();
-        if (!database) throw new Error('Banco indisponível');
-        const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
-        if (!group || group.ownerId !== ctx.user.id) throw new Error('Apenas o dono pode remover membros');
-        if (input.userId === ctx.user.id) throw new Error('Não pode se remover do grupo');
-        await database.update(users).set({ groupId: null }).where(eq(users.id, input.userId));
-        return { success: true };
-      }),
-  }),
-
-  profile: router({
-    get: protectedProcedure.query(async ({ ctx }) => {
-      const user = await getUserById(ctx.user.id);
-      if (!user) throw new Error('Usuário não encontrado');
-      return { id: user.id, email: user.email, name: user.name, role: user.role };
-    }),
-
-    updateName: protectedProcedure
-      .input(z.object({ name: z.string().min(1).max(100) }))
-      .mutation(async ({ ctx, input }) => {
-        await updateUserProfile(ctx.user.id, { name: input.name });
-        return { success: true };
-      }),
-
-    updatePassword: protectedProcedure
-      .input(z.object({ currentPassword: z.string(), newPassword: z.string().min(6) }))
-      .mutation(async ({ ctx, input }) => {
-        const user = await getUserById(ctx.user.id);
-        if (!user) throw new Error('Usuário não encontrado');
-        if (user.passwordHash) {
-          const valid = await comparePassword(input.currentPassword, user.passwordHash);
-          if (!valid) throw new Error('Senha atual incorreta');
-        }
-        const hash = await hashPassword(input.newPassword);
-        await updateUserPassword(ctx.user.id, hash);
-        return { success: true };
-      }),
-
-    deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
-      const database = await getDb();
-      if (!database) throw new Error('Banco indisponível');
-      // Se for dono de um cultivo, dissolver o grupo (remover todos os membros)
-      if (ctx.user.groupId) {
-        const [group] = await database.select().from(groups).where(eq(groups.id, ctx.user.groupId)).limit(1);
-        if (group && group.ownerId === ctx.user.id) {
-          await database.update(users).set({ groupId: null }).where(eq(users.groupId, ctx.user.groupId));
-          await database.delete(groups).where(eq(groups.id, ctx.user.groupId));
-        }
-      }
-      await database.delete(users).where(eq(users.id, ctx.user.id));
-      return { success: true };
-    }),
-  }),
-
-  admin: router({
-    listUsers: adminProcedure.query(async () => {
-      const database = await getDb();
-      if (!database) throw new Error('Banco indisponível');
-      const result = await database
-        .select({ id: users.id, email: users.email, name: users.name, role: users.role, approved: users.approved, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
-        .from(users)
-        .orderBy(users.createdAt);
-      return result;
-    }),
-
-    listPendingUsers: adminProcedure.query(async () => {
-      return getPendingUsers();
-    }),
-
-    approveUser: adminProcedure
-      .input(z.object({ userId: z.number() }))
-      .mutation(async ({ input }) => {
-        await approveUser(input.userId);
-        return { success: true };
-      }),
-
-    revokeUser: adminProcedure
-      .input(z.object({ userId: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        if (input.userId === ctx.user.id) throw new Error('Não pode revogar o próprio acesso');
-        await revokeUser(input.userId);
-        return { success: true };
-      }),
-
-    deleteUser: adminProcedure
-      .input(z.object({ userId: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        if (input.userId === ctx.user.id) throw new Error('Não pode excluir sua própria conta por aqui');
-        const database = await getDb();
-        if (!database) throw new Error('Banco indisponível');
-        await database.delete(users).where(eq(users.id, input.userId));
-        return { success: true };
-      }),
-
-    setRole: adminProcedure
-      .input(z.object({ userId: z.number(), role: z.enum(['user', 'admin']) }))
-      .mutation(async ({ ctx, input }) => {
-        if (input.userId === ctx.user.id) throw new Error('Não pode alterar seu próprio role');
-        const database = await getDb();
-        if (!database) throw new Error('Banco indisponível');
-        await database.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
-        return { success: true };
-      }),
-  }),
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // AI Chat — Assistente especialista em cannabis indoor
-  // Cada usuário configura sua própria chave de API (OpenAI / Anthropic / Gemini)
-  // ──────────────────────────────────────────────────────────────────────────
-  aiChat: router({
-
-    // Salvar configurações de API do usuário
-    saveSettings: protectedProcedure
-      .input(z.object({
-        provider: z.enum(["openai", "anthropic", "gemini", "deepseek", "kimi"]),
-        apiKey:   z.string().min(1).max(2000).optional(), // omitir = manter chave existente
-        model:    z.string().max(64).optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        const existing = await database
-          .select({ id: userAiSettings.id, apiKey: userAiSettings.apiKey })
-          .from(userAiSettings)
-          .where(eq(userAiSettings.userId, ctx.user.id))
-          .limit(1);
-
-        let encryptedKey: string;
-        if (input.apiKey) {
-          const { encryptApiKey } = await import("./aiCrypto");
-          encryptedKey = encryptApiKey(input.apiKey);
-        } else if (existing.length > 0) {
-          encryptedKey = existing[0].apiKey; // manter chave existente
-        } else {
-          throw new Error("API key é obrigatória no primeiro cadastro");
-        }
-
-        if (existing.length > 0) {
-          await database
-            .update(userAiSettings)
-            .set({ provider: input.provider, apiKey: encryptedKey, model: input.model ?? null })
-            .where(eq(userAiSettings.userId, ctx.user.id));
-        } else {
-          await database.insert(userAiSettings).values({
-            userId: ctx.user.id,
-            provider: input.provider,
-            apiKey: encryptedKey,
-            model: input.model ?? null,
-          });
-        }
-        return { success: true };
-      }),
-
-    // Buscar configurações — nunca expõe a chave
-    getSettings: protectedProcedure
-      .query(async ({ ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-        const [settings] = await database
-          .select({ provider: userAiSettings.provider, model: userAiSettings.model })
-          .from(userAiSettings)
-          .where(eq(userAiSettings.userId, ctx.user.id))
-          .limit(1);
-        if (!settings) return { hasKey: false, provider: null, model: null };
-        return { hasKey: true, provider: settings.provider, model: settings.model };
-      }),
-
-    // Listar modelos disponíveis do provedor (para Gemini, busca da API)
-    listModels: protectedProcedure
-      .query(async ({ ctx }) => {
-        const database = await getDb();
-        if (!database) return { models: [] };
-
-        const [settings] = await database
-          .select()
-          .from(userAiSettings)
-          .where(eq(userAiSettings.userId, ctx.user.id))
-          .limit(1);
-        if (!settings) return { models: [] };
-
-        const { decryptApiKey } = await import("./aiCrypto");
-        const apiKey = decryptApiKey(settings.apiKey);
-        const provider = settings.provider;
-
-        if (provider === "gemini") {
-          const models = await fetchGeminiModels(apiKey);
-          return { models };
-        }
-
-        // Para outros provedores, retorna lista estática
-        const staticModels: Record<string, string[]> = {
-          openai:    ["gpt-4o-mini", "gpt-4o"],
-          anthropic: ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"],
-          deepseek:  ["deepseek-chat", "deepseek-reasoner"],
-          kimi:      ["moonshot-v1-8k", "moonshot-v1-32k"],
-        };
-        return { models: staticModels[provider] ?? [] };
-      }),
-
-    // Testar se a chave e modelo estão funcionando
-    testConnection: protectedProcedure
-      .mutation(async ({ ctx }) => {
-        const database = await getDb();
-        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
-
-        const [settings] = await database
-          .select()
-          .from(userAiSettings)
-          .where(eq(userAiSettings.userId, ctx.user.id))
-          .limit(1);
-        if (!settings) throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma chave configurada" });
-
-        const { decryptApiKey } = await import("./aiCrypto");
-        const apiKey = decryptApiKey(settings.apiKey);
-        const provider = settings.provider;
-        const defaultModels: Record<string, string> = {
-          openai: "gpt-4o-mini", anthropic: "claude-haiku-4-5-20251001",
-          gemini: "gemini-2.0-flash-lite", deepseek: "deepseek-chat", kimi: "moonshot-v1-8k",
-        };
-        const model = (settings.model && settings.model.length > 0) ? settings.model : (defaultModels[provider] ?? "gemini-2.0-flash-lite");
-
-        try {
-          const result = await callAiProviderWithFallback({
-            provider, model, apiKey,
-            systemPrompt: "Você é um assistente de cannabis.",
-            history: [],
-            message: "Responda apenas: OK",
-          });
-          return { success: true, provider, modelUsed: result.modelUsed };
-        } catch (err: any) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: err?.message ?? "Falha na conexão" });
-        }
-      }),
-
-    // Buscar histórico da conversa de uma planta
-    getHistory: protectedProcedure
-      .input(z.object({ plantId: z.number().optional() }))
-      .query(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        if (input.plantId) {
-          await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        }
-
-        const plantCondition = input.plantId != null
-          ? eq(aiChatMessages.plantId, input.plantId)
-          : isNull(aiChatMessages.plantId);
-
-        const msgs = await database
-          .select({ role: aiChatMessages.role, content: aiChatMessages.content, createdAt: aiChatMessages.createdAt })
-          .from(aiChatMessages)
-          .where(and(eq(aiChatMessages.userId, ctx.user.id), plantCondition))
-          .orderBy(asc(aiChatMessages.createdAt))
-          .limit(50);
-
-        return msgs;
-      }),
-
-    // Limpar histórico da conversa de uma planta
-    clearHistory: protectedProcedure
-      .input(z.object({ plantId: z.number().optional() }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new Error("Database not available");
-
-        if (input.plantId) {
-          await validatePlantOwnership(input.plantId, ctx.user.groupId);
-        }
-
-        const plantCondition = input.plantId != null
-          ? eq(aiChatMessages.plantId, input.plantId)
-          : isNull(aiChatMessages.plantId);
-
-        await database
-          .delete(aiChatMessages)
-          .where(and(eq(aiChatMessages.userId, ctx.user.id), plantCondition));
-
-        return { success: true };
-      }),
-
-    // Enviar mensagem para a IA
-    sendMessage: protectedProcedure
-      .input(z.object({
-        message:     z.string().min(1).max(4000),
-        plantId:     z.number().optional(),
-        imageBase64: z.string().max(10 * 1024 * 1024).optional(),
-        imageMime:   z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const database = await getDb();
-        if (!database) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
-
-        // 1. Buscar settings e descriptografar chave
-        const [settings] = await database
-          .select()
-          .from(userAiSettings)
-          .where(eq(userAiSettings.userId, ctx.user.id))
-          .limit(1);
-        if (!settings) throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Configure sua chave de API em Configurações → Conta → IA Especialista",
-        });
-
-        const { decryptApiKey } = await import("./aiCrypto");
-        const apiKey = decryptApiKey(settings.apiKey);
-        const provider = settings.provider;
-        const defaultModels: Record<string, string> = {
-          openai: "gpt-4o-mini",
-          anthropic: "claude-haiku-4-5-20251001",
-          gemini: "gemini-2.0-flash-lite",
-          deepseek: "deepseek-chat",
-          kimi: "moonshot-v1-8k",
-        };
-        const model = (settings.model && settings.model.length > 0)
-          ? settings.model
-          : (defaultModels[provider] ?? "gemini-2.0-flash");
-
-        // 2. Salvar mensagem do usuário no banco (tolerante — não quebra se tabela não existir)
-        const userContent = input.message.trim() ? input.message : "[Foto enviada para análise]";
-        const plantCondition = input.plantId != null
-          ? eq(aiChatMessages.plantId, input.plantId)
-          : isNull(aiChatMessages.plantId);
-
-        try {
-          await database.insert(aiChatMessages).values({
-            userId:  ctx.user.id,
-            plantId: input.plantId ?? null,
-            role:    "user",
-            content: userContent,
-          });
-        } catch (dbErr: any) {
-          console.warn("[aiChat] Erro ao salvar msg usuário (tabela pode não existir ainda):", dbErr?.message);
-        }
-
-        // 3. Buscar histórico do banco (tolerante)
-        let historyForAi: { role: "user" | "assistant"; content: string }[] = [];
-        try {
-          const dbHistory = await database
-            .select({ role: aiChatMessages.role, content: aiChatMessages.content })
-            .from(aiChatMessages)
-            .where(and(eq(aiChatMessages.userId, ctx.user.id), plantCondition))
-            .orderBy(desc(aiChatMessages.createdAt))
-            .limit(31);
-
-          historyForAi = dbHistory
-            .reverse()
-            .slice(0, -1)
-            .map((m: { role: "user" | "assistant"; content: string }) => ({ role: m.role, content: m.content }));
-        } catch (dbErr: any) {
-          console.warn("[aiChat] Erro ao buscar histórico:", dbErr?.message);
-        }
-
-        // 4. Buscar contexto da planta (se fornecido)
-        let systemPrompt = buildBaseSystemPrompt();
-
-        if (input.plantId) {
-          await validatePlantOwnership(input.plantId, ctx.user.groupId);
-
-          const [plant] = await database
-            .select()
-            .from(plants)
-            .where(eq(plants.id, input.plantId))
-            .limit(1);
-
-          if (plant) {
-            const [strain] = plant.strainId
-              ? await database.select({ name: strains.name }).from(strains).where(eq(strains.id, plant.strainId)).limit(1)
-              : [null];
-
-            const [tent] = plant.currentTentId
-              ? await database.select({ id: tents.id, name: tents.name }).from(tents).where(eq(tents.id, plant.currentTentId)).limit(1)
-              : [null];
-
-            const [cycle] = tent
-              ? await database.select().from(cycles)
-                  .where(and(eq(cycles.tentId, tent.id), eq(cycles.status, "ACTIVE")))
-                  .orderBy(desc(cycles.createdAt)).limit(1)
-              : [null];
-
-            const daysOld = plant.createdAt
-              ? Math.floor((Date.now() - new Date(plant.createdAt).getTime()) / 86400000)
-              : 0;
-            const weekNumber = Math.floor(daysOld / 7) + 1;
-            const isFlora = cycle?.floraStartDate != null;
-            const phase = isFlora ? "Flora" : "Vegetativa";
-
-            const sevenDaysAgo = new Date(Date.now() - 7 * 86400000);
-            const envLogs = tent
-              ? await database.select({
-                  tempC: dailyLogs.tempC, rhPct: dailyLogs.rhPct,
-                  ppfd: dailyLogs.ppfd, ph: dailyLogs.ph, ec: dailyLogs.ec,
-                }).from(dailyLogs)
-                  .where(and(eq(dailyLogs.tentId, tent.id), sql`${dailyLogs.logDate} >= ${sevenDaysAgo}`))
-                  .limit(50)
-              : [];
-
-            const avg = (arr: (string | number | null | undefined)[]) => {
-              const nums = arr.map(v => v != null ? parseFloat(String(v)) : null).filter((v): v is number => v !== null);
-              return nums.length ? (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1) : "—";
-            };
-
-            const healthLogs = await database
-              .select({ logDate: plantHealthLogs.logDate, healthStatus: plantHealthLogs.healthStatus, symptoms: plantHealthLogs.symptoms, notes: plantHealthLogs.notes })
-              .from(plantHealthLogs)
-              .where(eq(plantHealthLogs.plantId, input.plantId))
-              .orderBy(desc(plantHealthLogs.logDate))
-              .limit(5);
-
-            systemPrompt += buildPlantContext({
-              plantName: plant.name ?? `Planta ${plant.id}`,
-              strainName: strain?.name ?? "Desconhecida",
-              daysOld, weekNumber, phase,
-              tentName: tent?.name ?? "—",
-              avgTemp: avg(envLogs.map(l => l.tempC)),
-              avgRh: avg(envLogs.map(l => l.rhPct)),
-              avgPpfd: avg(envLogs.map(l => l.ppfd)),
-              avgPh: avg(envLogs.map(l => l.ph)),
-              avgEc: avg(envLogs.map(l => l.ec)),
-              healthLogs,
-            });
-          }
-        }
-
-        // 5. Chamar a API do provedor com auto-fallback — erros chegam ao cliente como BAD_REQUEST
-        let reply: string;
-        try {
-          const result = await callAiProviderWithFallback({ provider, model, apiKey, systemPrompt, history: historyForAi, message: input.message, imageBase64: input.imageBase64, imageMime: input.imageMime });
-          reply = result.reply;
-        } catch (aiErr: any) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: aiErr?.message ?? "Erro ao chamar a IA" });
-        }
-
-        // 6. Salvar resposta da IA no banco (tolerante)
-        try {
-          await database.insert(aiChatMessages).values({
-            userId:  ctx.user.id,
-            plantId: input.plantId ?? null,
-            role:    "assistant",
-            content: reply,
-          });
-        } catch (dbErr: any) {
-          console.warn("[aiChat] Erro ao salvar resposta da IA:", dbErr?.message);
-        }
-
-        return { reply };
-      }),
-  }),
-
-  // ── Terminais ESP32 — gestão de tokens ─────────────────────────────────────────
-  device: router({
-    listTokens: protectedProcedure.query(async ({ ctx }) => {
-      const pool = getMysqlPool();
-      const [rows]: any = await pool.execute(
-        `SELECT dt.id, dt.token, dt.name, dt.tentId, dt.createdAt, t.name AS tentName
-         FROM deviceTokens dt
-         LEFT JOIN tents t ON t.id = dt.tentId
-         WHERE dt.groupId = ?
-         ORDER BY dt.createdAt DESC`,
-        [ctx.user.groupId ?? 0]
-      );
-      return rows as Array<{
-        id: number; token: string; name: string;
-        tentId: number; tentName: string; createdAt: Date;
-      }>;
-    }),
-
-    createToken: protectedProcedure
-      .input(z.object({
-        name: z.string().min(1).max(100),
-        tentId: z.number().int().positive(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const pool = getMysqlPool();
-        const token = crypto.randomBytes(32).toString('hex');
-        await pool.execute(
-          `INSERT INTO deviceTokens (token, name, tentId, groupId) VALUES (?, ?, ?, ?)`,
-          [token, input.name, input.tentId, ctx.user.groupId ?? 0]
-        );
-        return { token };
-      }),
-
-    deleteToken: protectedProcedure
-      .input(z.object({ id: z.number().int().positive() }))
-      .mutation(async ({ input, ctx }) => {
-        const pool = getMysqlPool();
-        await pool.execute(
-          `DELETE FROM deviceTokens WHERE id = ? AND groupId = ?`,
-          [input.id, ctx.user.groupId ?? 0]
-        );
-        return { success: true };
-      }),
-  }),
+  // Sub-routers extraídos pra arquivos próprios em server/routers/*.ts.
+  // Mantém o appRouter limpo enquanto ainda funciona como fonte única de tipos.
+  groups: groupsRouter,
+  profile: profileRouter,
+  admin: adminRouter,
+  aiChat: aiChatRouter,
+  plants: plantsRouter,
+  plantObservations: plantObservationsRouter,
+  plantPhotos: plantPhotosRouter,
+  plantRunoff: plantRunoffRouter,
+  plantHealth: plantHealthRouter,
+  plantTrichomes: plantTrichomesRouter,
+  plantLST: plantLSTRouter,
+  plantStructure: plantStructureRouter,
+  cycles: cyclesRouter,
+  tents: tentsRouter,
+  dailyLogs: dailyLogsRouter,
+  alerts: alertsRouter,
+  weeklyTargets: weeklyTargetsRouter,
+  tasks: tasksRouter,
+  taskTemplates: taskTemplatesRouter,
+  backup: backupRouter,
 });
 
 export type AppRouter = typeof appRouter;

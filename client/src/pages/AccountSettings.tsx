@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 
@@ -326,7 +326,7 @@ function GroupCard() {
         <div>
           <p className="text-xs text-muted-foreground mb-2">{group.members.length} membro(s)</p>
           <div className="space-y-1.5">
-            {group.members.map(m => (
+            {group.members.map((m: any) => (
               <div key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted/50">
                 <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
                   <span className="text-white text-xs font-bold">{(m.name || m.email).charAt(0).toUpperCase()}</span>
@@ -412,7 +412,7 @@ function AiSettingsCard() {
 
   const [provider, setProvider] = useState<Provider>('gemini');
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState(PROVIDER_MODELS.gemini.models[0]);
+  const [model, setModel] = useState<string>(PROVIDER_MODELS.gemini.models[0]);
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -426,7 +426,7 @@ function AiSettingsCard() {
     const p = (settings.provider as Provider | null) ?? 'gemini';
     setProvider(p);
     setModel(settings.model ?? PROVIDER_MODELS[p]?.models[0] ?? PROVIDER_MODELS.gemini.models[0]);
-  }, [settings?.provider, settings?.model]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [settings]); // depende de settings inteiro para detectar qualquer mudança
 
   // Quando modelos live carregam e o modelo atual não está na lista, seleciona o primeiro
   useEffect(() => {
@@ -452,7 +452,7 @@ function AiSettingsCard() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-          IA Especialista
+          Doctor Jáh
         </CardTitle>
         <CardDescription className="text-xs sm:text-sm">
           Configure sua chave de API para usar o chat de diagnóstico de plantas

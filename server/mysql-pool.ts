@@ -23,3 +23,18 @@ export function getMysqlPool(): mysql.Pool {
   }
   return _pool;
 }
+
+/**
+ * Fecha o pool raw — chamado no shutdown gracioso (SIGTERM/SIGINT).
+ */
+export async function closeMysqlPool(): Promise<void> {
+  if (_pool) {
+    try {
+      await _pool.end();
+      console.log("[MySQLPool] Pool raw fechado");
+    } catch (err: any) {
+      console.warn("[MySQLPool] Erro ao fechar pool:", err?.message);
+    }
+    _pool = null;
+  }
+}

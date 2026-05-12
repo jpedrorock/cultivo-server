@@ -16,9 +16,9 @@ export const TentCardSkeleton: React.FC = () => {
               <div className="h-7 w-32 bg-muted rounded animate-pulse" style={{
                 background: `linear-gradient(
                   90deg,
-                  hsl(var(--muted)) 0%,
-                  hsl(var(--muted) / 0.8) 50%,
-                  hsl(var(--muted)) 100%
+                  var(--muted) 0%,
+                  color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                  var(--muted) 100%
                 )`,
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s ease-in-out infinite"
@@ -26,9 +26,9 @@ export const TentCardSkeleton: React.FC = () => {
               <div className="h-6 w-24 bg-muted rounded-full animate-pulse" style={{
                 background: `linear-gradient(
                   90deg,
-                  hsl(var(--muted)) 0%,
-                  hsl(var(--muted) / 0.8) 50%,
-                  hsl(var(--muted)) 100%
+                  var(--muted) 0%,
+                  color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                  var(--muted) 100%
                 )`,
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s ease-in-out infinite"
@@ -39,9 +39,9 @@ export const TentCardSkeleton: React.FC = () => {
             <div className="h-4 w-48 bg-muted rounded animate-pulse" style={{
               background: `linear-gradient(
                 90deg,
-                hsl(var(--muted)) 0%,
-                hsl(var(--muted) / 0.8) 50%,
-                hsl(var(--muted)) 100%
+                var(--muted) 0%,
+                color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                var(--muted) 100%
               )`,
               backgroundSize: "200% 100%",
               animation: "shimmer 1.5s ease-in-out infinite"
@@ -52,9 +52,9 @@ export const TentCardSkeleton: React.FC = () => {
           <div className="h-8 w-8 bg-muted rounded animate-pulse" style={{
             background: `linear-gradient(
               90deg,
-              hsl(var(--muted)) 0%,
-              hsl(var(--muted) / 0.8) 50%,
-              hsl(var(--muted)) 100%
+              var(--muted) 0%,
+              color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+              var(--muted) 100%
             )`,
             backgroundSize: "200% 100%",
             animation: "shimmer 1.5s ease-in-out infinite"
@@ -70,9 +70,9 @@ export const TentCardSkeleton: React.FC = () => {
               <div className="h-3 w-16 bg-muted rounded animate-pulse" style={{
                 background: `linear-gradient(
                   90deg,
-                  hsl(var(--muted)) 0%,
-                  hsl(var(--muted) / 0.8) 50%,
-                  hsl(var(--muted)) 100%
+                  var(--muted) 0%,
+                  color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                  var(--muted) 100%
                 )`,
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s ease-in-out infinite"
@@ -80,9 +80,9 @@ export const TentCardSkeleton: React.FC = () => {
               <div className="h-6 w-full bg-muted rounded animate-pulse" style={{
                 background: `linear-gradient(
                   90deg,
-                  hsl(var(--muted)) 0%,
-                  hsl(var(--muted) / 0.8) 50%,
-                  hsl(var(--muted)) 100%
+                  var(--muted) 0%,
+                  color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                  var(--muted) 100%
                 )`,
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s ease-in-out infinite"
@@ -97,9 +97,9 @@ export const TentCardSkeleton: React.FC = () => {
             <div className="h-5 w-32 bg-muted rounded animate-pulse" style={{
               background: `linear-gradient(
                 90deg,
-                hsl(var(--muted)) 0%,
-                hsl(var(--muted) / 0.8) 50%,
-                hsl(var(--muted)) 100%
+                var(--muted) 0%,
+                color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                var(--muted) 100%
               )`,
               backgroundSize: "200% 100%",
               animation: "shimmer 1.5s ease-in-out infinite"
@@ -107,9 +107,9 @@ export const TentCardSkeleton: React.FC = () => {
             <div className="h-4 w-12 bg-muted rounded animate-pulse" style={{
               background: `linear-gradient(
                 90deg,
-                hsl(var(--muted)) 0%,
-                hsl(var(--muted) / 0.8) 50%,
-                hsl(var(--muted)) 100%
+                var(--muted) 0%,
+                color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                var(--muted) 100%
               )`,
               backgroundSize: "200% 100%",
               animation: "shimmer 1.5s ease-in-out infinite"
@@ -122,9 +122,9 @@ export const TentCardSkeleton: React.FC = () => {
               <div className="h-4 w-4 bg-muted rounded animate-pulse" style={{
                 background: `linear-gradient(
                   90deg,
-                  hsl(var(--muted)) 0%,
-                  hsl(var(--muted) / 0.8) 50%,
-                  hsl(var(--muted)) 100%
+                  var(--muted) 0%,
+                  color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                  var(--muted) 100%
                 )`,
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s ease-in-out infinite"
@@ -132,9 +132,9 @@ export const TentCardSkeleton: React.FC = () => {
               <div className="h-4 w-full bg-muted rounded animate-pulse" style={{
                 background: `linear-gradient(
                   90deg,
-                  hsl(var(--muted)) 0%,
-                  hsl(var(--muted) / 0.8) 50%,
-                  hsl(var(--muted)) 100%
+                  var(--muted) 0%,
+                  color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+                  var(--muted) 100%
                 )`,
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s ease-in-out infinite"
@@ -147,9 +147,9 @@ export const TentCardSkeleton: React.FC = () => {
         <div className="h-9 w-full bg-muted rounded animate-pulse" style={{
           background: `linear-gradient(
             90deg,
-            hsl(var(--muted)) 0%,
-            hsl(var(--muted) / 0.8) 50%,
-            hsl(var(--muted)) 100%
+            var(--muted) 0%,
+            color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+            var(--muted) 100%
           )`,
           backgroundSize: "200% 100%",
           animation: "shimmer 1.5s ease-in-out infinite"

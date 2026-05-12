@@ -22,9 +22,9 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
           style={{
             background: `linear-gradient(
               90deg,
-              hsl(var(--muted)) 0%,
-              hsl(var(--muted) / 0.8) 50%,
-              hsl(var(--muted)) 100%
+              var(--muted) 0%,
+              color-mix(in oklch, var(--muted) 80%, transparent) 50%,
+              var(--muted) 100%
             )`,
             backgroundSize: "200% 100%",
             animation: "shimmer 1.5s ease-in-out infinite"
@@ -51,9 +51,9 @@ export const GallerySkeletonLoader: React.FC<{ count?: number }> = ({ count = 6 
             style={{
               background: `linear-gradient(
                 90deg,
-                hsl(var(--muted)) 0%,
-                hsl(var(--muted) / 0.7) 50%,
-                hsl(var(--muted)) 100%
+                var(--muted) 0%,
+                color-mix(in oklch, var(--muted) 70%, transparent) 50%,
+                var(--muted) 100%
               )`,
               backgroundSize: "200% 100%",
               animation: "shimmer 1.5s ease-in-out infinite"
