@@ -5226,7 +5226,11 @@ export const appRouter = router({
             console.error('[PlantTrichomes] Base64 fallback upload failed:', error.message);
           }
         }
-        
+
+        if (!photoKey && resolvedPhotoUrl?.startsWith('/uploads/')) {
+          photoKey = resolvedPhotoUrl.replace(/^\/uploads\//, '');
+        }
+
         await database.insert(plantTrichomeLogs).values({
           plantId: input.plantId,
           weekNumber: input.weekNumber,
