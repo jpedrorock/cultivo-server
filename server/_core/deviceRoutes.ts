@@ -619,11 +619,17 @@ function registerDeviceRoutes(app: express.Application) {
       // Subselects correlacionados: 1 por planta. Como cada estufa tem
       // poucas plantas (<30), o overhead é desprezível e o índice
       // (plantHealthLogs.plantIdx) cobre as buscas.
+      //
+      // IMPORTANTE: usamos `photoUrl IS NOT NULL` (não `photoKey`). O
+      // caminho moderno do plantHealth.create salva só `photoUrl` (URL
+      // tipo `/uploads/plant-photos/...`) e deixa `photoKey` NULL — só o
+      // fallback legado base64 preenchia photoKey. Filtrar por photoKey
+      // dava falso negativo pra todas as fotos novas.
       const [rows]: any = await pool.execute(
         `SELECT
            p.id, p.name, p.code, p.plantStage AS stage,
            (SELECT healthStatus FROM plantHealthLogs WHERE plantId = p.id ORDER BY id DESC LIMIT 1) AS healthStatus,
-           (SELECT logDate FROM plantHealthLogs WHERE plantId = p.id AND photoKey IS NOT NULL ORDER BY id DESC LIMIT 1) AS lastPhotoDate
+           (SELECT logDate FROM plantHealthLogs WHERE plantId = p.id AND photoUrl IS NOT NULL ORDER BY id DESC LIMIT 1) AS lastPhotoDate
          FROM plants p
          WHERE p.currentTentId = ?
            AND p.status = 'ACTIVE'
@@ -679,14 +685,18 @@ function registerDeviceRoutes(app: express.Application) {
       const h = Math.min(720, Math.max(60, parseInt(String(req.query.h ?? '240')) || 240));
       const q = Math.min(95, Math.max(20, parseInt(String(req.query.q ?? '70')) || 70));
 
-      // Busca o photoKey da última foto + verifica ownership por groupId.
+      // Busca a última foto (photoKey OU photoUrl) + verifica ownership.
       // Join com plants pra garantir multi-tenancy.
+      //
+      // Caminho moderno do plantHealth.create salva só `photoUrl`
+      // (`/uploads/<key>`) e deixa `photoKey` NULL. Caminho legado base64
+      // preenchia photoKey. Aceitamos ambos e derivamos o fileKey.
       const [rows]: any = await pool.execute(
-        `SELECT h.photoKey, h.logDate, h.healthStatus, p.groupId
+        `SELECT h.photoKey, h.photoUrl, h.logDate, h.healthStatus, p.groupId
          FROM plantHealthLogs h
          INNER JOIN plants p ON p.id = h.plantId
          WHERE h.plantId = ?
-           AND h.photoKey IS NOT NULL
+           AND (h.photoKey IS NOT NULL OR h.photoUrl IS NOT NULL)
          ORDER BY h.id DESC
          LIMIT 1`,
         [plantId]
@@ -699,13 +709,27 @@ function registerDeviceRoutes(app: express.Application) {
         return res.status(403).json({ error: 'Planta de outro grupo' });
       }
 
-      // Lê o arquivo do disco. photoKey é um caminho relativo dentro
+      // Resolve fileKey: prefere photoKey (legado), senão deriva do
+      // photoUrl removendo o prefixo `/uploads/`. Se photoUrl for URL
+      // externa (https://...), aborta — só local storage suportado.
+      let fileKey: string;
+      if (row.photoKey) {
+        fileKey = String(row.photoKey).replace(/^\/+/, '');
+      } else {
+        const url = String(row.photoUrl);
+        if (!url.startsWith('/uploads/')) {
+          console.warn(`[Device] photoUrl não é local: ${url}`);
+          return res.status(404).json({ error: 'Foto em storage externo não suportado' });
+        }
+        fileKey = url.replace(/^\/uploads\//, '');
+      }
+
+      // Lê o arquivo do disco. fileKey é um caminho relativo dentro
       // de UPLOADS_DIR — normaliza com path.join e valida que continua
       // dentro de UPLOADS_DIR (defesa contra `../../etc/passwd`).
-      const fileKey = String(row.photoKey).replace(/^\/+/, '');
       const filePath = path.join(UPLOADS_DIR, fileKey);
       if (!filePath.startsWith(UPLOADS_DIR + path.sep)) {
-        return res.status(400).json({ error: 'photoKey inválido' });
+        return res.status(400).json({ error: 'fileKey inválido' });
       }
 
       let inputBuffer: Buffer;
@@ -713,7 +737,7 @@ function registerDeviceRoutes(app: express.Application) {
         inputBuffer = await fsp.readFile(filePath);
       } catch (err: any) {
         if (err?.code === 'ENOENT') {
-          console.warn(`[Device] photoKey aponta pra arquivo inexistente: ${fileKey}`);
+          console.warn(`[Device] fileKey aponta pra arquivo inexistente: ${fileKey}`);
           return res.status(404).json({ error: 'Arquivo da foto não encontrado no disco' });
         }
         throw err;

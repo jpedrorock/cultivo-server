@@ -1481,6 +1481,15 @@ export const plantHealthRouter = router({
           }
         }
 
+        // Garante photoKey preenchido pra fotos locais (`/uploads/<key>`),
+        // mesmo no caminho moderno onde só vem photoUrl. Endpoint device
+        // (/api/device/plant/:id/photo) já cobre o caso photoKey=null
+        // derivando do photoUrl, mas preencher aqui evita falsos
+        // negativos em queries futuras que filtrem por photoKey.
+        if (!photoKey && resolvedPhotoUrl?.startsWith('/uploads/')) {
+          photoKey = resolvedPhotoUrl.replace(/^\/uploads\//, '');
+        }
+
         await database.insert(plantHealthLogs).values({
           plantId: input.plantId,
           healthStatus: input.healthStatus,
