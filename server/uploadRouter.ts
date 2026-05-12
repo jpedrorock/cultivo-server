@@ -135,17 +135,22 @@ router.post(
 
       console.log(`[upload] user=${userId} ${detectedFormat}→${outExt} ${inputBuffer.length}B→${outBuffer.length}B → ${fileKey}`);
 
-      // 5) Pre-gerar variant ESP (320x240 baseline JPEG q70, ~10KB).
+      // 5) Pre-gerar variant ESP (320x240 baseline JPEG q70, ~3-10KB).
       //    Endpoint /api/device/plant/:id/photo serve esse arquivo direto
       //    sem rodar Sharp na request → resposta vira <500ms (vs ~16s
-      //    on-demand observado no ESP). progressive:false e' CRITICO
-      //    porque TJPGD do LVGL so' decoda baseline.
-      //    Falha aqui nao bloqueia upload — endpoint device tem fallback.
+      //    on-demand observado no ESP).
+      //
+      //    SEM mozjpeg: TJPGD do LVGL so' decoda baseline JPEG. mozjpeg
+      //    encoder forca progressive (passes encoding) ignorando o flag
+      //    progressive:false. libjpeg-turbo default da baseline garantido.
+      //
+      //    Falha aqui nao bloqueia upload — endpoint device tem fallback
+      //    via Sharp on-demand (mais lento mas funciona).
       try {
         const espVariant = await sharp(inputBuffer)
           .rotate()
           .resize({ width: 320, height: 240, fit: "inside" })
-          .jpeg({ quality: 70, mozjpeg: true, progressive: false })
+          .jpeg({ quality: 70, progressive: false })
           .toBuffer();
         const espKey = fileKey.replace(/\.[^.]+$/, ".esp.jpg");
         await storagePut(espKey, espVariant, "image/jpeg");

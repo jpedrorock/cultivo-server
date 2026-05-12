@@ -17,7 +17,8 @@
     "db:reset": "node server/seed.mjs",
     "db:restart": "node server/db-reset.mjs",
     "db:migrate": "tsx server/_core/dbMigrations.ts",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "backfill:esp-variants": "node server/backfill-esp-variants.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

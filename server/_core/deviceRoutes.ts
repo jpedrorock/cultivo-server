@@ -778,11 +778,13 @@ function registerDeviceRoutes(app: express.Application) {
           outBuffer = await sharpLib(inputBuffer)
             .rotate()                                                    // respeita EXIF orientation
             .resize({ width: w, height: h, fit: 'inside' })
-            // progressive: false e' CRITICO — ESP decoda via TJPGD que so'
-            // suporta JPEG baseline. mozjpeg encoder por default produz
-            // progressive (rasteriza em passes), e TJPGD falha silencioso:
+            // SEM mozjpeg: ESP decoda via TJPGD que so' suporta JPEG
+            // baseline. mozjpeg encoder forca progressive (passes
+            // encoding) ignorando o flag progressive:false. Resultado:
             // foto baixa, "aplica", mas a tela fica preta no display.
-            .jpeg({ quality: q, mozjpeg: true, progressive: false })
+            // libjpeg-turbo default da baseline garantido — hit ~10-15%
+            // de tamanho (irrelevante pra arquivos de ~5KB).
+            .jpeg({ quality: q, progressive: false })
             .toBuffer();
         } catch (e: any) {
           console.warn(`[Device] sharp resize falhou, devolvendo original: ${e?.message}`);
