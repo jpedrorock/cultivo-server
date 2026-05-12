@@ -1092,6 +1092,49 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
+  // GET /api/device/plant/:plantId/photos — lista metadata das fotos da planta
+  //
+  // Pro Photo Timeline no ESP: display pega a lista (~10 fotos mais recentes),
+  // depois usa /plant/:id/photo?photoId=X pra baixar foto especifica ao
+  // navegar com setas ← →. Lista e' barata (so' metadata, sem bytes).
+  app.get('/api/device/plant/:plantId/photos', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const plantId = parseInt(req.params.plantId);
+      if (!Number.isInteger(plantId) || plantId <= 0) {
+        return res.status(400).json({ error: 'plantId inválido' });
+      }
+      // Multi-tenancy: planta tem que pertencer ao grupo do device
+      const [pRows]: any = await pool.execute(
+        `SELECT groupId FROM plants WHERE id = ? LIMIT 1`,
+        [plantId]
+      );
+      if (pRows.length === 0) return res.status(404).json({ error: 'Planta não encontrada' });
+      if (pRows[0].groupId !== device.groupId) {
+        return res.status(403).json({ error: 'Planta de outro grupo' });
+      }
+      const [rows]: any = await pool.execute(
+        `SELECT id, healthStatus, UNIX_TIMESTAMP(logDate) AS t
+         FROM plantHealthLogs
+         WHERE plantId = ? AND (photoKey IS NOT NULL OR photoUrl IS NOT NULL)
+         ORDER BY logDate DESC
+         LIMIT 10`,
+        [plantId]
+      );
+      res.json({
+        photos: (rows as any[]).map(r => ({
+          id: r.id as number,
+          healthStatus: (r.healthStatus as string | null) ?? null,
+          t: Number(r.t),  // epoch sec
+        })),
+      });
+    } catch (err: any) {
+      console.error('[Device] plant photos list error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
   // GET /api/device/plant/:plantId/photo — última foto do registro de saúde
   //
   // Lê o arquivo do disco (`uploads/<photoKey>`), resiza com Sharp pro
@@ -1133,22 +1176,35 @@ function registerDeviceRoutes(app: express.Application) {
       const h = Math.min(720, Math.max(60, parseInt(String(req.query.h ?? '240')) || 240));
       const q = Math.min(95, Math.max(20, parseInt(String(req.query.q ?? '70')) || 70));
 
-      // Busca a última foto (photoKey OU photoUrl) + verifica ownership.
-      // Join com plants pra garantir multi-tenancy.
-      //
+      // ?photoId=X: foto especifica (timeline navigation). Sem param,
+      // pega a mais recente.
+      const photoIdParam = parseInt(String(req.query.photoId ?? '0'));
+      const wantSpecific = Number.isInteger(photoIdParam) && photoIdParam > 0;
+
+      // Busca foto (especifica OU ultima) + verifica ownership via groupId.
       // Caminho moderno do plantHealth.create salva só `photoUrl`
       // (`/uploads/<key>`) e deixa `photoKey` NULL. Caminho legado base64
       // preenchia photoKey. Aceitamos ambos e derivamos o fileKey.
-      const [rows]: any = await pool.execute(
-        `SELECT h.photoKey, h.photoUrl, h.logDate, h.healthStatus, p.groupId
-         FROM plantHealthLogs h
-         INNER JOIN plants p ON p.id = h.plantId
-         WHERE h.plantId = ?
-           AND (h.photoKey IS NOT NULL OR h.photoUrl IS NOT NULL)
-         ORDER BY h.id DESC
-         LIMIT 1`,
-        [plantId]
-      );
+      const [rows]: any = wantSpecific
+        ? await pool.execute(
+            `SELECT h.photoKey, h.photoUrl, h.logDate, h.healthStatus, p.groupId
+             FROM plantHealthLogs h
+             INNER JOIN plants p ON p.id = h.plantId
+             WHERE h.id = ? AND h.plantId = ?
+               AND (h.photoKey IS NOT NULL OR h.photoUrl IS NOT NULL)
+             LIMIT 1`,
+            [photoIdParam, plantId]
+          )
+        : await pool.execute(
+            `SELECT h.photoKey, h.photoUrl, h.logDate, h.healthStatus, p.groupId
+             FROM plantHealthLogs h
+             INNER JOIN plants p ON p.id = h.plantId
+             WHERE h.plantId = ?
+               AND (h.photoKey IS NOT NULL OR h.photoUrl IS NOT NULL)
+             ORDER BY h.id DESC
+             LIMIT 1`,
+            [plantId]
+          );
       if (rows.length === 0) {
         return res.status(404).json({ error: 'Planta sem foto de saúde registrada' });
       }
