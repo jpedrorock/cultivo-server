@@ -182,13 +182,14 @@ function registerDeviceRoutes(app: express.Application) {
       }
 
       const [logRows]: any = await pool.execute(
-        `SELECT tempC, rhPct, ph, ec, ppfd FROM dailyLogs WHERE tentId = ? ORDER BY logDate DESC LIMIT 1`,
+        `SELECT tempC, rhPct, ph, ec, ppfd, logDate FROM dailyLogs WHERE tentId = ? ORDER BY logDate DESC LIMIT 1`,
         [tentId]
       );
 
       let tempC: number | null = null, rh: number | null = null, vpd: number | null = null;
       let ph: number | null = null, ec: number | null = null;
       let ppfd: number | null = null, lux: number | null = null;
+      let dailyLogAgeSec: number | null = null;
       if (logRows.length > 0) {
         const l = logRows[0];
         tempC = l.tempC != null ? parseFloat(l.tempC) : null;
@@ -202,9 +203,39 @@ function registerDeviceRoutes(app: express.Application) {
           const svp = 0.6108 * Math.exp((17.27 * tempC) / (tempC + 237.3));
           vpd = parseFloat((svp * (1 - rh / 100)).toFixed(2));
         }
+        if (l.logDate) {
+          dailyLogAgeSec = Math.floor((Date.now() - new Date(l.logDate).getTime()) / 1000);
+        }
       }
 
-      res.json({ tentName, tempC, rh, vpd, ph, ec, lux, ppfd, fase, semana, totalSem });
+      // Idade do sensor Tuya — leitura mais recente em sensorLatestReadings.
+      // Display usa pra mostrar badge verde/amarelo/vermelho de freshness:
+      // verde <120s, amarelo <900s (15min), vermelho >900s ou null.
+      let sensorAgeSec: number | null = null;
+      try {
+        const [sensorRows]: any = await pool.execute(
+          `SELECT MAX(slr.readAt) AS lastReadAt
+           FROM sensorLatestReadings slr
+           INNER JOIN tuyaSensorMappings tsm ON tsm.deviceId = slr.deviceId AND tsm.userId = slr.userId
+           INNER JOIN users u ON u.id = tsm.userId
+           WHERE tsm.tentId = ? AND tsm.enabled = 1 AND u.groupId = ?`,
+          [tentId, device.groupId]
+        );
+        if (sensorRows[0]?.lastReadAt) {
+          sensorAgeSec = Math.floor((Date.now() - new Date(sensorRows[0].lastReadAt).getTime()) / 1000);
+        }
+      } catch {
+        // sem mapping Tuya — fica null, ESP mostra "sem sensor" / cinza
+      }
+
+      res.json({
+        tentName, tempC, rh, vpd, ph, ec, lux, ppfd, fase, semana, totalSem,
+        // Idades em segundos pra ESP renderizar badge de freshness.
+        // sensorAgeSec = ultimo poll Tuya (mais "live"), dailyLogAgeSec
+        // inclui entradas manuais via app/display (pH/EC).
+        sensorAgeSec,
+        dailyLogAgeSec,
+      });
     } catch (err: any) {
       console.error('[Device] display error:', err?.message);
       res.status(500).json({ error: 'Erro interno' });
