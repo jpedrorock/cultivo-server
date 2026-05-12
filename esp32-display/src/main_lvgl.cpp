@@ -186,6 +186,9 @@ static void applyBloom(lv_obj_t *obj, uint32_t color) {
 // (o jeito atual e' callbacks via cultivoUI_set*Handler — refreshPending serve
 // p/ casos de "preciso re-fetch agora", se necessario no futuro).
 static volatile bool refreshPending = false;
+// User tocou no icone WiFi do header pedindo reconexao manual. netTaskFn
+// processa: forca disconnect + begin sem esperar o retry de 30s.
+static volatile bool wifiReconnectPending = false;
 
 // Tap em scene/device — handler LVGL nao pode chamar HTTPClient direto:
 // thread UI tem ~8KB stack, nao cobre TLS handshake + JsonDocument; estourava
@@ -1704,8 +1707,9 @@ static unsigned long lastPlantsFetch = 0;
 // 10min — lista de plantas muda pouco (user adiciona/remove no app raro)
 static const unsigned long PLANTS_FETCH_INTERVAL = 10UL * 60UL * 1000UL;
 
-// Buffer pra foto JPEG (PSRAM, lazy malloc). Max 128KB cobre 800x600 q=90.
-#define PLANT_JPEG_MAX_BYTES (128 * 1024)
+// Buffer pra foto. Agora recebemos RGB565 raw do server (fmt=rgb565):
+// 320x240x2 = 153600 bytes. Buffer 160KB cobre + margem.
+#define PLANT_JPEG_MAX_BYTES (160 * 1024)
 static uint8_t *plantPhotoBuf       = nullptr;
 static size_t   plantPhotoLen       = 0;
 static uint8_t  plantPhotoHealth    = 0;
@@ -1803,15 +1807,16 @@ static size_t fetchPlantPhoto(int plantId,
   if (!wifiOk) return 0;
   HTTPClient http;
   char url[192];
-  // 320x240 q=70 — alvo do display 480x320 com margem pros labels
+  // fmt=rgb565: server pre-decoda e envia 320x240x2=153600 bytes raw.
+  // Zero decode no ESP — so' memcpy pro framebuffer LVGL.
   snprintf(url, sizeof(url),
-           "%s/api/device/plant/%d/photo?w=320&h=240&q=70",
+           "%s/api/device/plant/%d/photo?w=320&h=240&fmt=rgb565",
            SERVER_URL, plantId);
   httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   // Solicita headers extras p/ parsing (HTTPClient ESP32 precisa)
-  const char *collectHdrs[] = {"X-Health-Status", "X-Log-Date", "Content-Length"};
-  http.collectHeaders(collectHdrs, 3);
+  const char *collectHdrs[] = {"X-Health-Status", "X-Log-Date", "X-Pixel-Format", "X-Pixel-Width", "X-Pixel-Height"};
+  http.collectHeaders(collectHdrs, 5);
   http.setTimeout(15000);  // foto pode demorar
   int code = http.GET();
   if (code != 200) {
@@ -1840,25 +1845,115 @@ static size_t fetchPlantPhoto(int plantId,
     }
   }
 
-  // Le body em chunks pro buffer
+  // CHUNKED-AWARE READ: Cloudflare adiciona Transfer-Encoding: chunked
+  // mesmo com Content-Length explicito do origin. Stream raw via
+  // getStreamPtr() inclui chunk size markers ("<hex>\r\n") entre os
+  // pixels — corrompe a imagem (renderiza primeira metade OK, segunda
+  // metade fica garbage).
+  //
+  // Solucao: parser de chunked encoding manual quando Transfer-Encoding:
+  // chunked esta presente, senao fallback pra leitura direta. http
+  // HTTPClient nao expõe writeToStream em todas versoes do framework.
   WiFiClient *stream = http.getStreamPtr();
   size_t total = 0;
+  int contentLen = http.getSize();
+  bool isChunked = (contentLen <= 0);  // Sem CL = provavelmente chunked
+  Serial.printf("[net] plant photo CL=%d (%s)\n", contentLen,
+                isChunked ? "chunked" : "identity");
+
+  size_t target = isChunked ? PLANT_JPEG_MAX_BYTES : (size_t)contentLen;
+  if (target > PLANT_JPEG_MAX_BYTES) target = PLANT_JPEG_MAX_BYTES;
+
   unsigned long start = millis();
-  while (http.connected() && (millis() - start < 15000)) {
-    size_t avail = stream->available();
-    if (avail == 0) { delay(5); continue; }
-    if (total + avail > PLANT_JPEG_MAX_BYTES) {
-      Serial.printf("[net] plant photo overflow %u + %u > %u\n",
-                    (unsigned)total, (unsigned)avail, (unsigned)PLANT_JPEG_MAX_BYTES);
-      break;
+  unsigned long lastProgress = millis();
+
+  if (isChunked) {
+    // Parser manual: loop ler <size>\r\n<data>\r\n ate' size=0
+    while (millis() - start < 30000) {
+      // 1) Le linha de tamanho (hex + ext + \r\n). Buffer 32 cobre
+      // "FFFFFFFF;name=value\r\n" sem overflow. RFC 7230 permite ext.
+      char sizeLine[32] = {0};
+      int slIdx = 0;
+      bool gotLine = false;
+      unsigned long lineStart = millis();
+      while (millis() - lineStart < 5000 && slIdx < (int)sizeof(sizeLine) - 1) {
+        if (!stream->available()) { delay(2); continue; }
+        int c = stream->read();
+        if (c < 0) break;
+        if (c == '\n' && slIdx > 0 && sizeLine[slIdx-1] == '\r') {
+          sizeLine[slIdx-1] = 0;  // termina string antes do \r
+          gotLine = true;
+          break;
+        }
+        sizeLine[slIdx++] = (char)c;
+      }
+      if (!gotLine) { Serial.println("[net] chunked: size line timeout"); break; }
+      // 2) Parseia hex (pode ter extensoes ;name=value que ignoramos)
+      char *semi = strchr(sizeLine, ';');
+      if (semi) *semi = 0;
+      char *endp = NULL;
+      long chunkSize = strtol(sizeLine, &endp, 16);
+      // Valida parsing: endp deve apontar pro fim da string (sem lixo).
+      // Reject negativo OU se nada foi parseado (endp == sizeLine).
+      if (endp == sizeLine || chunkSize < 0) {
+        Serial.printf("[net] chunked: invalid size '%s'\n", sizeLine);
+        break;
+      }
+      if (chunkSize == 0) break;  // last chunk (terminator)
+      if ((size_t)chunkSize > PLANT_JPEG_MAX_BYTES - total) {
+        Serial.printf("[net] chunked overflow: chunk=%ld total=%u max=%u\n",
+                      chunkSize, (unsigned)total, (unsigned)PLANT_JPEG_MAX_BYTES);
+        break;
+      }
+      // 3) Le os bytes do chunk
+      size_t want = (size_t)chunkSize;
+      while (want > 0 && millis() - start < 30000) {
+        int avail = stream->available();
+        if (avail <= 0) { delay(2); continue; }
+        size_t toRead = (size_t)avail < want ? (size_t)avail : want;
+        int r = stream->readBytes(plantPhotoBuf + total, toRead);
+        if (r <= 0) break;
+        total += r;
+        want -= r;
+        lastProgress = millis();
+      }
+      if (want > 0) { Serial.printf("[net] chunked: short read (%u left)\n", (unsigned)want); break; }
+      // 4) Consome \r\n apos chunk data
+      unsigned long crlfStart = millis();
+      int got = 0;
+      while (got < 2 && millis() - crlfStart < 2000) {
+        if (!stream->available()) { delay(2); continue; }
+        stream->read(); got++;
+      }
     }
-    int read = stream->readBytes(plantPhotoBuf + total, avail);
-    if (read <= 0) break;
-    total += read;
-    if (total > 0 && stream->available() == 0 && !http.connected()) break;
+  } else {
+    // Path identity (Content-Length conhecido) — leitura direta
+    while (total < target && (millis() - start < 30000)) {
+      size_t avail = stream->available();
+      if (avail == 0) {
+        if (millis() - lastProgress > 5000 && !http.connected()) break;
+        delay(5);
+        continue;
+      }
+      size_t remaining = target - total;
+      size_t toRead = avail > remaining ? remaining : avail;
+      int read = stream->readBytes(plantPhotoBuf + total, toRead);
+      if (read <= 0) break;
+      total += read;
+      lastProgress = millis();
+    }
   }
   http.end();
-  Serial.printf("[net] plant/%d/photo %u bytes\n", plantId, (unsigned)total);
+  Serial.printf("[net] plant/%d/photo %u bytes (RGB565 raw)\n", plantId, (unsigned)total);
+
+  // RGB565 raw: esperamos 320x240x2 = 153600 bytes. Se vier menor, foi
+  // truncado e a imagem fica corrompida. Log + retorna o que veio (UI
+  // mostra placeholder de erro).
+  const size_t EXPECTED_RGB565_LEN = 320 * 240 * 2;
+  if (total != EXPECTED_RGB565_LEN) {
+    Serial.printf("[net] WARN RGB565 size mismatch: %u (esperava %u)\n",
+                  (unsigned)total, (unsigned)EXPECTED_RGB565_LEN);
+  }
   return total;
 }
 
@@ -2096,8 +2191,65 @@ static void tapTaskFn(void *param) {
 }
 
 static void netTaskFn(void *param) {
+  // Warm-up: depois do primeiro WiFi OK, dispara tasks+plants imediatamente
+  // pra nao esperar 1min/10min do intervalo regular (UX ruim no boot).
+  // Depois disso as flags lastFetch tomam conta do schedule normal.
+  bool bootWarmed = false;
+  unsigned long lastWifiRetry = 0;
+  const unsigned long WIFI_RETRY_INTERVAL = 30000;  // 30s entre retries
+
   for (;;) {
-    if (!wifiOk) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
+    // Reconnect manual: user tocou no icone WiFi — forca retry imediato
+    // sem esperar o ciclo de 30s. Funciona estando online ou offline.
+    if (wifiReconnectPending) {
+      wifiReconnectPending = false;
+      lastWifiRetry = millis() - WIFI_RETRY_INTERVAL;  // dispara no proximo if
+      wifiOk = false;  // forca o bloco de retry abaixo
+      Serial.println("[net] WiFi reconnect via icon tap");
+    }
+
+    // WiFi retry: se nao conectou no boot, tenta a cada 30s pra recuperar
+    // sem precisar reboot manual. Cobre o caso de SSID temporariamente
+    // fora de range, roteador resetando, etc.
+    if (!wifiOk) {
+      if (WiFi.status() == WL_CONNECTED) {
+        // Estado dessincronizado — flag falsa, mas WiFi conectou. Sincroniza.
+        wifiOk = true;
+        Serial.println("[net] WiFi reconectou (sync)");
+      } else if (millis() - lastWifiRetry >= WIFI_RETRY_INTERVAL && strlen(WIFI_SSID) > 0) {
+        lastWifiRetry = millis();
+        Serial.printf("[net] WiFi retry: %s\n", WIFI_SSID);
+        WiFi.disconnect();
+        vTaskDelay(pdMS_TO_TICKS(200));
+        WiFi.begin(WIFI_SSID, WIFI_PASS);
+        // Espera ate' 10s pela conexao
+        for (int i = 0; i < 20 && WiFi.status() != WL_CONNECTED; i++) {
+          vTaskDelay(pdMS_TO_TICKS(500));
+        }
+        wifiOk = (WiFi.status() == WL_CONNECTED);
+        Serial.printf("[net] WiFi retry resultado: %s\n", wifiOk ? "OK" : "FALHOU");
+      } else {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+      }
+      continue;
+    }
+
+    // Detecta desconexao em runtime (router reset, signal loss)
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("[net] WiFi caiu — flag offline");
+      wifiOk = false;
+      lastWifiRetry = millis() - WIFI_RETRY_INTERVAL;  // tenta reconectar logo
+      continue;
+    }
+
+    if (!bootWarmed) {
+      bootWarmed = true;
+      Serial.println("[net] boot warm-up: tasks + plants");
+      fetchTasks();
+      lastTasksFetch = millis();
+      fetchPlants();
+      lastPlantsFetch = millis();
+    }
 
     // (taps sao processados pela tapTask em paralelo — nao bloqueia aqui)
 
@@ -2197,7 +2349,23 @@ static void luxSaveHandler(int ppfd) { postPpfd(ppfd); }
 // valores). Loop entao chama refreshHomeValues() pra atualizar a UI.
 static void refreshHandler() {
   refreshPending = true;
-  Serial.println("[ui] tap-to-refresh requested");
+  // Tambem zera os timers de fetch pra cada loop disparar IMEDIATAMENTE:
+  // display, history, scenes, tasks, plants. Sem isso o user tocava no
+  // refresh mas so' a Tuya recarregava (e nada de tarefas/plantas/cenas).
+  // millis()-INTERVAL faz millis()-last>=INTERVAL ser true logo na proxima
+  // iteracao do netTaskFn.
+  lastFetch       = millis() - FETCH_INTERVAL;
+  lastHistFetch   = millis() - HIST_FETCH_INTERVAL;
+  lastScenesFetch = millis() - SCENES_FETCH_INTERVAL;
+  lastTasksFetch  = millis() - TASKS_FETCH_INTERVAL;
+  lastPlantsFetch = millis() - PLANTS_FETCH_INTERVAL;
+  Serial.println("[ui] tap-to-refresh: forcando full reload");
+}
+// Tap no icone WiFi do header: forca reconexao imediata (sem esperar
+// retry de 30s). netTaskFn picka a flag e roda WiFi.disconnect+begin.
+static void wifiReconnectHandler() {
+  wifiReconnectPending = true;
+  Serial.println("[ui] WiFi reconnect requested");
 }
 // POST /api/device/device-toggle — manda novo state desejado e parseia state
 // REAL retornado (Tuya pode falhar ou tomar caminho diferente). Server
@@ -2401,6 +2569,7 @@ static void buildUI() {
   cultivoUI_setTaskToggleHandler(taskToggleHandler);
   cultivoUI_setPlantPhotoRequestHandler(plantPhotoRequestHandler);
   cultivoUI_setPlantDetailClosedHandler(plantDetailClosedHandler);
+  cultivoUI_setWifiReconnectHandler(wifiReconnectHandler);
   buildCultivoUI();
 }
 
@@ -2608,6 +2777,11 @@ void setup() {
   // LVGL v9: tick a partir de millis() (nao precisa de timer manual)
   lv_tick_set_cb([]() -> uint32_t { return millis(); });
 
+  // NOTA: lv_init() ja' chama lv_tjpgd_init() e lv_fs_memfs_init()
+  // automaticamente quando LV_USE_TJPGD=1 e LV_USE_FS_MEMFS=1
+  // (ver lv_init.c linhas 358/395). Chamar de novo aqui registra o
+  // decoder em duplicidade -> heap corruption + bootloop. NAO refazer.
+
   // LVGL v9: criar display + setar flush callback + buffers
   // (ordem importa: flush_cb antes de set_buffers; color format fica no default
   // que e' RGB565 quando LV_COLOR_DEPTH=16)
@@ -2696,11 +2870,15 @@ void setup() {
     lastHistFetch   = millis();
     lastScenesFetch = millis();
     refreshHomeValues();
-    // Dai em diante HTTP roda em background, loop() fica livre pra UI
-    startNetTask();
     // OTA disponivel enquanto o device ta online
     startOTA();
   }
+  // CRITICO: startNetTask() roda INCONDICIONALMENTE — netTaskFn tem
+  // WiFi auto-retry interno + processa wifiReconnectPending (tap no
+  // icone). Antes ficava dentro do `if (wifiOk)` e se WiFi falhasse
+  // no boot, a task nunca subia, deixando o device em offline-pra-
+  // sempre sem auto-recovery nem tap-to-reconnect.
+  startNetTask();
 
   // Timer de sleep — checa lv_display_get_inactive_time a cada 1s.
   // Apaga backlight apos SCREEN_SLEEP_MS sem touch. Wake on touch handled

@@ -80,12 +80,14 @@ static CultivoSavePhEcFn     onPhEcSave    = nullptr;
 static CultivoOpenConfigFn   onConfigOpen  = nullptr;
 static CultivoRefreshFn      onRefresh     = nullptr;
 static CultivoSceneTriggerFn onSceneTrigger = nullptr;
+static CultivoWifiReconnectFn onWifiReconnect = nullptr;
 
 extern "C" void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb)         { onLuxSave    = cb; }
 extern "C" void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb)       { onPhEcSave   = cb; }
 extern "C" void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb)   { onConfigOpen = cb; }
 extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRefresh    = cb; }
 extern "C" void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb) { onSceneTrigger = cb; }
+extern "C" void cultivoUI_setWifiReconnectHandler(CultivoWifiReconnectFn cb) { onWifiReconnect = cb; }
 
 // Estado de refresh em andamento + spin do icone refresh top-right.
 // refreshIcon = ponteiro pro ic_refresh do header (setado em buildHome).
@@ -139,8 +141,10 @@ extern "C" void cultivoUI_setRefreshing(bool active) {
 // no topo do tab. Largura por tab: 480/5 = 96px (alvo de tap confortavel,
 // icone 24-32px ao centro). Indicator ajusta proporcionalmente.
 #define NAV_COUNT 5
+// Ordem dos tabs (esquerda -> direita):
+//   0=Home  1=Plantas  2=Historico  3=Tarefas  4=Cenas
 static const lv_image_dsc_t *NAV_ICONS_IMG[NAV_COUNT] = {
-  &ic_home, &ic_activity, &ic_zap, &ic_tasks, &ic_sprout
+  &ic_home, &ic_sprout, &ic_activity, &ic_tasks, &ic_grid
 };
 
 static lv_obj_t *contentArea;
@@ -161,6 +165,9 @@ static lv_obj_t *lblPpfd = nullptr;  // legacy ref — pode sair se nada referen
 // cor do phase token. Atualizados em refreshHomeValues.
 static lv_obj_t *lblCycleVal   = nullptr;
 static lv_obj_t *lblCycleBadge = nullptr;
+// Container do card ciclo — guardamos pra re-tintar o gradient quando a
+// fase mudar (refreshHomeValues). Sem isso, o tint ficava fixo na fase do boot.
+static lv_obj_t *cardCycle     = nullptr;
 // lblTemp = numero grande do arc; lblEcHome/lblPhHome legacy.
 static lv_obj_t *lblEcHome = nullptr, *lblPhHome = nullptr;  // legacy
 static lv_obj_t *lblCiclo = nullptr, *ciclBar = nullptr;     // legacy
@@ -190,6 +197,18 @@ static lv_obj_t *btnModePpfd, *btnModeLux;
 // ════════════════════════════════════════════════════════════════════════════════
 // Helpers visuais (identicos ao main_lvgl.cpp)
 // ════════════════════════════════════════════════════════════════════════════════
+// Tint subtil do card: troca o topo do gradient pra uma versao escura da
+// cor da metrica, mantendo o bottom near-black. Aplicar APOS makeCard.
+//   factor = 30..80 fica subtle (recomendado 50). 0=preto, 255=cor pura.
+static void tintCard(lv_obj_t *c, uint32_t color, uint8_t factor = 50) {
+  uint8_t r = ((color >> 16) & 0xFF) * factor / 255;
+  uint8_t g = ((color >> 8)  & 0xFF) * factor / 255;
+  uint8_t b = ( color        & 0xFF) * factor / 255;
+  uint32_t top = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+  lv_obj_set_style_bg_color(c, lv_color_hex(top), 0);
+  // bg_grad_color ja' eh 0x050811 do makeCard — mantemos o fade pra preto
+}
+
 static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
   lv_obj_t *c = lv_obj_create(parent);
   lv_obj_set_size(c, w, h);
@@ -306,6 +325,19 @@ static void buildHome(lv_obj_t *tab) {
   lv_obj_set_style_image_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
   lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
   lblWifi = wifiIcon;
+  // Tap no icone — se offline, pede reconexao ao app (vai forcar WiFi
+  // begin novamente sem esperar o retry de 30s). Se online, so mostra
+  // toast de status — usuario sabe que ta tudo OK.
+  lv_obj_add_flag(wifiIcon, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(wifiIcon, sw(10));
+  lv_obj_add_event_cb(wifiIcon, [](lv_event_t *e) {
+    if (wifiOk) {
+      showToast("WiFi conectado");
+    } else {
+      showToast("Reconectando WiFi...");
+      if (onWifiReconnect) onWifiReconnect();
+    }
+  }, LV_EVENT_CLICKED, NULL);
 
   // Gear — abre modal de config. Era LV_SYMBOL_SETTINGS em font 24
   // (~15px efetivo, ficava menor que os icones rasterizados de 32px).
@@ -322,8 +354,27 @@ static void buildHome(lv_obj_t *tab) {
     if (onConfigOpen) onConfigOpen();
   }, LV_EVENT_CLICKED, NULL);
 
-  // (icone refresh removido — server polling a cada 30s torna refresh manual
-  // redundante. Atalho via tap no card UMID continua disponivel.)
+  // Refresh icon — botao explicito de "atualizar agora". Servia como
+  // backup quando polling 30s falhava em update visivel (WiFi lento, server
+  // demora, etc.). Trackado em refreshIcon pra a animacao de rotacao
+  // (controlada por isRefreshing) acontecer durante o fetch.
+  refreshIcon = lv_image_create(tab);
+  lv_image_set_src(refreshIcon, &ic_refresh);
+  lv_obj_set_style_image_recolor(refreshIcon, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_image_recolor_opa(refreshIcon, LV_OPA_COVER, 0);
+  lv_obj_align(refreshIcon, LV_ALIGN_TOP_RIGHT, -sw(84), sh(4));
+  lv_obj_add_flag(refreshIcon, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(refreshIcon, sw(8));
+  lv_obj_add_event_cb(refreshIcon, [](lv_event_t *e) {
+    (void)e;
+    if (onRefresh && !isRefreshing) {
+      isRefreshing = true;
+      showToast("Atualizando...");
+      onRefresh();  // netTask pega refreshPending e refaz fetchDisplay/scenes/tasks/plants/history
+    } else if (isRefreshing) {
+      showToast("Ja' atualizando");
+    }
+  }, LV_EVENT_CLICKED, NULL);
 
   // Single-face redesign: sem botao flip. Tap no arc cicla TEMP/pH/EC/FLORACAO.
   // Mini-cards UMID/VPD/PPFD ficam sempre visiveis a direita.
@@ -424,6 +475,9 @@ static void buildHome(lv_obj_t *tab) {
                           lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
     lv_obj_t *c = makeCard(parent, 0, yOffset, cardW, cardH);
     lv_obj_set_style_pad_all(c, sw(4), 0);
+    // Tint do gradient na cor da metrica — UMID ciano, VPD verde (COL_PRIMARY).
+    // Subtle (factor 50/255 ~= 20%) — fica obvio sem ser saturado.
+    tintCard(c, color, 50);
 
     int iconW      = sw(22);    // x-offset do label depois do icone
     int wifiW      = sw(14);    // espaco reservado pro mini wifi top-right
@@ -492,10 +546,14 @@ static void buildHome(lv_obj_t *tab) {
   // Slot 3 — CARD CICLO compacto (1 linha so'). Layout horizontal:
   //   Sem 4/16                                       [FLORACAO]
   // Sem icone planta — badge ja' comunica fase via cor, icone era ruido.
+  // Gradient tinted na cor da fase atual (re-tintado em refreshHomeValues
+  // quando FASE muda).
   {
     int yOffset = (cardH + cardGap) * 2;
     lv_obj_t *c = makeCard(homeFaceA, 0, yOffset, cardW, cycleH);
     lv_obj_set_style_pad_all(c, sw(6), 0);
+    cardCycle = c;  // expor pra refreshHomeValues re-tintar
+    tintCard(c, phaseColor(FASE), 50);
 
     // "Sem X/Y" esquerda, branco bold (FONT_BODY p/ caber bem)
     lblCycleVal = lv_label_create(c);
@@ -748,6 +806,8 @@ extern "C" void refreshHomeValues() {
     lv_label_set_text(lblCycleBadge, FASE);
     lv_obj_set_style_text_color(lblCycleBadge, lv_color_hex(pc), 0);
     lv_obj_set_style_bg_color(lblCycleBadge, lv_color_hex(pc), 0);
+    // Re-tinta o card inteiro na cor da fase atual (gradient top)
+    if (cardCycle) tintCard(cardCycle, pc, 50);
   }
 }
 
@@ -1571,7 +1631,9 @@ extern "C" {
   int   histCount = 0;  // 0 = sem dados ainda
 }
 
-static lv_obj_t *histChart = nullptr;
+static lv_obj_t *histChart    = nullptr;
+static lv_obj_t *histStatsLbl = nullptr;  // "Agora X · Min Y · Max Z"
+static lv_obj_t *histXAxisLbl = nullptr;  // "-24h ... agora"
 static lv_chart_series_t *histSer = nullptr;
 static int histMetric = 0;  // 0=temp, 1=rh, 2=ph, 3=ec
 
@@ -1582,15 +1644,19 @@ static const struct {
   // Multiplicador p/ converter float -> int do chart (LVGL chart usa int).
   // pH/EC vao em decimo (6.2 -> 62), tempC/rh inteiro.
   float scale;
+  // Unidade pra mostrar no header (ex: "TEMP: 24.5°C")
+  const char *unit;
+  // Casas decimais no display ("%.1f" pra TEMP/pH/EC, "%.0f" pra UMID)
+  int decimals;
   // Origem do array (escolhido por idx em applyHistData).
 } HIST_METRICS[4] = {
   // Cores DS: cada metrica tem cor distinta na sparkline pra leitura rapida
   // ("essa onda laranja e' temperatura"). Valor branco fica no header — cor
   // aqui e' decorativa, nao compete com primary/branding.
-  {"TEMP", COL_PHASE_HARVEST, 15, 35,  1.0f},   // laranja (igual app mobile)
-  {"UMID", COL_CYN,            0, 100, 1.0f},   // ciano
-  {"pH",   COL_PRP,           40, 90,  10.0f},  // roxo claro (5.5-7.5 -> 55-75)
-  {"EC",   COL_AMBER,          0, 40,  10.0f},  // amber (0-4.0 mS/cm)
+  {"TEMP", COL_PHASE_HARVEST, 15, 35,  1.0f,  "\xC2\xB0""C", 1},  // °C UTF-8
+  {"UMID", COL_CYN,            0, 100, 1.0f,  "%",           0},
+  {"pH",   COL_PRP,           40, 90,  10.0f, "",            1},
+  {"EC",   COL_AMBER,          0, 40,  10.0f, "",            1},
 };
 
 static const float *histArrayFor(int metric) {
@@ -1607,9 +1673,13 @@ static void applyHistData() {
   if (!histChart || !histSer) return;
   auto &m = HIST_METRICS[histMetric];
   lv_chart_set_range(histChart, LV_CHART_AXIS_PRIMARY_Y, m.ymin, m.ymax);
-  // Tudo na cor da metrica: linha, indicator, outline pulse — display
-  // "respira" na cor do que esta sendo monitorado.
+  // Tudo na cor da metrica: linha (via set_series_color, sobrescreve estilo),
+  // gradient fill, indicator (bolinha), outline pulse — display "respira"
+  // na cor do que esta sendo monitorado.
+  lv_chart_set_series_color(histChart, histSer, lv_color_hex(m.color));
   lv_obj_set_style_line_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_ITEMS);
+  lv_obj_set_style_bg_grad_color(histChart, lv_color_hex(COL_BG), LV_PART_ITEMS);
   lv_obj_set_style_bg_color(histChart, lv_color_hex(m.color), LV_PART_INDICATOR);
   lv_obj_set_style_outline_color(histChart, lv_color_hex(m.color), 0);
 
@@ -1619,15 +1689,61 @@ static void applyHistData() {
   // a direita do chart) — slot 23 = mais novo, slot 0 = mais antigo OU vazio.
   int valid = histCount > HIST_POINTS ? HIST_POINTS : histCount;
   int pad   = HIST_POINTS - valid;  // slots vazios a esquerda
+
+  // Coleta min/max/last/prev enquanto popula o chart
+  float minV = 0, maxV = 0, lastV = 0, prevV = 0;
+  bool hasAny = false, hasPrev = false;
+
   for (int i = 0; i < HIST_POINTS; i++) {
     if (i < pad) {
       lv_chart_set_value_by_id(histChart, histSer, i, LV_CHART_POINT_NONE);
     } else {
-      lv_chart_set_value_by_id(histChart, histSer, i,
-        (int32_t)(arr[i - pad] * m.scale));
+      float v = arr[i - pad];
+      lv_chart_set_value_by_id(histChart, histSer, i, (int32_t)(v * m.scale));
+      if (!hasAny) { minV = maxV = v; hasAny = true; }
+      else { if (v < minV) minV = v; if (v > maxV) maxV = v; }
+      if (hasAny) { prevV = lastV; hasPrev = true; }
+      lastV = v;  // ultimo valido = mais recente
     }
   }
+  // hasPrev so' eh true se temos pelo menos 2 pontos
+  hasPrev = hasPrev && (valid >= 2);
+
   lv_chart_refresh(histChart);
+
+  // Atualiza header de stats. Formato:
+  //   "Agora 24.5°C ↑+0.3  Min 21.2  Max 27.8"
+  //
+  // Seta de tendencia: compara ultimo vs penultimo. Threshold de 0.1 unidade
+  // pra evitar arrow tremulando em variacao desprezivel.
+  if (histStatsLbl) {
+    if (!hasAny) {
+      lv_label_set_text(histStatsLbl, "sem dados ainda");
+    } else {
+      char buf[128];
+      const char *fmt;
+      if (hasPrev) {
+        float delta = lastV - prevV;
+        const char *arrow = delta > 0.1f ? LV_SYMBOL_UP
+                          : delta < -0.1f ? LV_SYMBOL_DOWN
+                          : "";
+        if (m.decimals == 0) {
+          fmt = "Agora %.0f%s %s%+.0f  Min %.0f  Max %.0f";
+          snprintf(buf, sizeof(buf), fmt, lastV, m.unit, arrow, delta, minV, maxV);
+        } else {
+          fmt = "Agora %.1f%s %s%+.1f  Min %.1f  Max %.1f";
+          snprintf(buf, sizeof(buf), fmt, lastV, m.unit, arrow, delta, minV, maxV);
+        }
+      } else {
+        fmt = m.decimals == 0
+          ? "Agora %.0f%s  Min %.0f  Max %.0f"
+          : "Agora %.1f%s  Min %.1f  Max %.1f";
+        snprintf(buf, sizeof(buf), fmt, lastV, m.unit, minV, maxV);
+      }
+      lv_label_set_text(histStatsLbl, buf);
+      lv_obj_set_style_text_color(histStatsLbl, lv_color_hex(m.color), 0);
+    }
+  }
 }
 
 extern "C" void cultivoUI_applyHistory(void) {
@@ -1678,12 +1794,20 @@ static void buildHistorico(lv_obj_t *tab) {
   makeLabel(tab, "HISTORICO", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
   makeLabel(tab, "ultimas 24h", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
 
+  // Stats header: "Agora X · Min Y · Max Z" na cor da metrica
+  histStatsLbl = lv_label_create(tab);
+  lv_label_set_text(histStatsLbl, "carregando...");
+  lv_obj_set_style_text_color(histStatsLbl, lv_color_hex(COL_PHASE_HARVEST), 0);
+  lv_obj_set_style_text_font(histStatsLbl, FONT_CAPTION, 0);
+  lv_obj_align(histStatsLbl, LV_ALIGN_TOP_MID, 0, sh(22));
+
   // Chart DS — bg = COL_CARD elevado, border neutra finissima, line_width 3
   int btnH     = sh(32);
   int btnAreaH = btnH + sh(10);  // botao + gap
+  int xAxisH   = sh(10);          // espaco pros time labels
   histChart = lv_chart_create(tab);
-  lv_obj_set_size(histChart, SCREEN_W - sw(16), TAB_H - sh(34) - btnAreaH);
-  lv_obj_align(histChart, LV_ALIGN_TOP_MID, 0, sh(28));
+  lv_obj_set_size(histChart, SCREEN_W - sw(16), TAB_H - sh(48) - btnAreaH - xAxisH);
+  lv_obj_align(histChart, LV_ALIGN_TOP_MID, 0, sh(40));
   lv_chart_set_type(histChart, LV_CHART_TYPE_LINE);
   lv_chart_set_point_count(histChart, 24);
   lv_chart_set_div_line_count(histChart, 3, 5);
@@ -1693,8 +1817,17 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_radius(histChart, RADIUS_LG, 0);
   lv_obj_set_style_line_color(histChart, lv_color_hex(COL_BORDER), LV_PART_MAIN);
   lv_obj_set_style_line_width(histChart, sw(3), LV_PART_ITEMS);
-  lv_obj_set_style_width(histChart,  0, LV_PART_INDICATOR);
-  lv_obj_set_style_height(histChart, 0, LV_PART_INDICATOR);
+  // Gradient fill abaixo da linha — bg_opa 30 com gradient vertical
+  // do COL_BG (transparente) ate' a cor da metrica. Visual mais cheio.
+  lv_obj_set_style_bg_opa(histChart, LV_OPA_30, LV_PART_ITEMS);
+  lv_obj_set_style_bg_grad_dir(histChart, LV_GRAD_DIR_VER, LV_PART_ITEMS);
+  lv_obj_set_style_bg_main_stop(histChart, 0, LV_PART_ITEMS);
+  lv_obj_set_style_bg_grad_stop(histChart, 200, LV_PART_ITEMS);
+  // Ponto indicator: bolinha 7px na cor da metrica destaca os pontos.
+  // Antes era 0 (sem pontos visiveis); agora cada ponto valido vira um dot.
+  lv_obj_set_style_width(histChart,  sw(6), LV_PART_INDICATOR);
+  lv_obj_set_style_height(histChart, sw(6), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(histChart, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
   lv_obj_set_style_pad_all(histChart, sw(6), 0);
   histSer = lv_chart_add_series(histChart, lv_color_hex(COL_PRIMARY), LV_CHART_AXIS_PRIMARY_Y);
 
@@ -1702,6 +1835,15 @@ static void buildHistorico(lv_obj_t *tab) {
   // = TEMP (laranja); applyHistData troca a cor do outline conforme metrica
   // selecionada (laranja/ciano/roxo/amber).
   applyRingPulse(histChart, HIST_METRICS[0].color, MOTION_BREATH, 0);
+
+  // X-axis time labels — span igualmente espacado embaixo do chart.
+  // 5 marcadores: -24h, -18h, -12h, -6h, agora (cada ponto = 1h).
+  // Espacamento horizontal alinhado com o chart (mesma largura interna).
+  histXAxisLbl = lv_label_create(tab);
+  lv_label_set_text(histXAxisLbl, "-24h     -18h     -12h     -6h     agora");
+  lv_obj_set_style_text_color(histXAxisLbl, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(histXAxisLbl, FONT_CAPTION, 0);
+  lv_obj_align(histXAxisLbl, LV_ALIGN_TOP_MID, 0, sh(40) + (TAB_H - sh(48) - btnAreaH - xAxisH) + sh(2));
 
   // Botoes pill (segmented control) — DS style. Inicializa como botoes
   // neutros; histStylePills aplica o estado visual logo abaixo.
@@ -1760,9 +1902,10 @@ static void navSetActive(int idx) {
 
 static void switchScreen(int idx) {
   if (idx == activeScreen) return;
-  // 5 tabs: 0=Home, 1=Historico, 2=Dispositivos, 3=Tarefas, 4=Plantas
+  // 5 tabs: 0=Home, 1=Plantas, 2=Historico, 3=Tarefas, 4=Cenas
+  // (screenTarefa = Cenas/Dispositivos — nome legado da var)
   lv_obj_t *screens[NAV_COUNT] = {
-    screenHome, screenGrafic, screenTarefa, screenTasks, screenPlants
+    screenHome, screenPlants, screenGrafic, screenTasks, screenTarefa
   };
   if (idx < 0 || idx >= NAV_COUNT) return;
 
@@ -2086,6 +2229,7 @@ static lv_obj_t *plantDetailImage  = nullptr;
 static lv_obj_t *plantDetailStatus = nullptr;
 static lv_obj_t *plantDetailDate   = nullptr;
 static lv_obj_t *plantDetailName   = nullptr;
+static lv_obj_t *plantDetailLoad   = nullptr;  // label "Carregando foto..."
 static int       plantDetailId     = -1;  // qual planta esta sendo exibida
 
 // Buffer JPEG global na PSRAM (alocado lazy, 128KB folgado)
@@ -2289,8 +2433,18 @@ static void openPlantDetail(int idx) {
   if (idx < 0 || idx >= plantCount) return;
   plantDetailId = plants[idx].id;
 
-  // Cria overlay fullscreen
-  if (plantDetailScreen) lv_obj_del(plantDetailScreen);
+  // Cria overlay fullscreen. Se ja existe (user reabriu rapido), deleta
+  // primeiro e ZERA todos os child pointers — senao callbacks ou apply
+  // posterior podem tocar widgets ja deletados (use-after-free LVGL crash).
+  if (plantDetailScreen) {
+    lv_obj_del(plantDetailScreen);
+    plantDetailScreen = nullptr;
+    plantDetailImage  = nullptr;
+    plantDetailStatus = nullptr;
+    plantDetailDate   = nullptr;
+    plantDetailName   = nullptr;
+    plantDetailLoad   = nullptr;
+  }
   plantDetailScreen = lv_obj_create(lv_layer_top());
   lv_obj_remove_style_all(plantDetailScreen);
   lv_obj_set_size(plantDetailScreen, SCREEN_W, SCREEN_H);
@@ -2321,13 +2475,15 @@ static void openPlantDetail(int idx) {
   plantDetailImage = lv_image_create(plantDetailScreen);
   lv_obj_set_size(plantDetailImage, sw(280), sh(200));
   lv_obj_align(plantDetailImage, LV_ALIGN_CENTER, 0, -sh(12));
-  // Placeholder ate' a foto chegar — mostra mensagem loading
-  lv_obj_t *loadLbl = lv_label_create(plantDetailScreen);
-  lv_label_set_text(loadLbl, plants[idx].hasPhoto ? "Carregando foto..." : "Sem foto ainda\nRegistre uma no app");
-  lv_obj_set_style_text_align(loadLbl, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_color(loadLbl, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(loadLbl, FONT_CAPTION, 0);
-  lv_obj_align(loadLbl, LV_ALIGN_CENTER, 0, -sh(12));
+  // Placeholder ate' a foto chegar — mostra mensagem loading. Trackeado
+  // como plantDetailLoad pra deletar quando o JPEG aplicar (senão fica
+  // sobreposto na imagem).
+  plantDetailLoad = lv_label_create(plantDetailScreen);
+  lv_label_set_text(plantDetailLoad, plants[idx].hasPhoto ? "Carregando foto..." : "Sem foto ainda\nRegistre uma no app");
+  lv_obj_set_style_text_align(plantDetailLoad, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(plantDetailLoad, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(plantDetailLoad, FONT_CAPTION, 0);
+  lv_obj_align(plantDetailLoad, LV_ALIGN_CENTER, 0, -sh(12));
 
   // Status + data (rodape)
   plantDetailStatus = lv_label_create(plantDetailScreen);
@@ -2357,6 +2513,7 @@ static void openPlantDetail(int idx) {
 static void closePlantDetail() {
   if (plantDetailScreen) { lv_obj_del(plantDetailScreen); plantDetailScreen = nullptr; }
   plantDetailImage = plantDetailStatus = plantDetailDate = plantDetailName = nullptr;
+  plantDetailLoad  = nullptr;
   plantDetailId = -1;
   // Libera buffer JPEG da PSRAM — sem isso ficariam ~128KB pinados entre
   // aberturas. PSRAM realloca rapido na proxima foto.
@@ -2381,34 +2538,77 @@ extern "C" void cultivoUI_applyPlantPhoto(int plantId,
 
   if (!jpegBytes || len == 0) {
     printf("[ui] plant photo indisponivel (len=%u)\n", (unsigned)len);
+    // Atualiza o loading label pra mostrar mensagem de erro ao inves de
+    // ficar "Carregando..." pra sempre
+    if (plantDetailLoad) {
+      lv_label_set_text(plantDetailLoad, "Foto indisponivel");
+    }
     return;
   }
 
-  // Copia o JPEG pra buffer persistente em PSRAM (LVGL precisa do ponteiro
-  // valido enquanto a image estiver renderizada)
+  // RGB565 raw: server pre-decoda JPEG (Sharp .raw()) e empacota como
+  // 320x240x2 = 153600 bytes RGB565 little-endian. ESP so' faz memcpy
+  // pro buffer LVGL e seta cf=LV_COLOR_FORMAT_RGB565.
+  //
+  // Por que? Tentamos JPEG via TJPGD do LVGL:
+  //  - is_jpg() exige JFIF marker (Sharp omite) -> injetar JFIF
+  //  - decoder buffer-mode exige LV_USE_FS_MEMFS=1 -> heap crash
+  //  - Cloudflare adiciona chunked encoding -> strip prefix
+  // 3 problemas distintos por um decoder de 5KB. Pivotar pra pixels
+  // raw eliminou tudo.
+  const uint16_t IMG_W = 320, IMG_H = 240;
+  const size_t EXPECTED_LEN = (size_t)IMG_W * IMG_H * 2;
+
+  if (len < EXPECTED_LEN) {
+    printf("[ui] plant photo size mismatch: %u vs %u — render parcial\n",
+           (unsigned)len, (unsigned)EXPECTED_LEN);
+  }
+
+  // Copia pra buffer persistente em PSRAM (LVGL precisa do ponteiro valido)
   if (plantJpegBuf && plantJpegLen < len) {
     heap_caps_free(plantJpegBuf);
     plantJpegBuf = nullptr;
+    plantJpegLen = 0;  // sem isso, malloc fail abaixo deixa len cravado >0
+                       // e proxima call salta o malloc (NULL ptr crash em memcpy)
   }
   if (!plantJpegBuf) {
     plantJpegBuf = (uint8_t*)heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!plantJpegBuf) {
       printf("[ui] plant photo malloc fail (%u bytes)\n", (unsigned)len);
+      plantJpegLen = 0;  // garante reset pra proxima tentativa
+      if (plantDetailLoad) lv_label_set_text(plantDetailLoad, "Sem memoria");
       return;
     }
   }
+  // Safety: se jpegBytes for NULL (use-after-free se main_lvgl liberou
+  // plantPhotoBuf antes do apply chegar aqui), aborta sem memcpy.
+  if (!jpegBytes) {
+    printf("[ui] plant photo: jpegBytes NULL — abort\n");
+    plantJpegLen = 0;
+    if (plantDetailLoad) lv_label_set_text(plantDetailLoad, "Erro");
+    return;
+  }
+  // Server manda RGB565 LE (low byte primeiro). LVGL com LV_COLOR_DEPTH=16
+  // tambem usa LE nativo. Sem byte swap.
   memcpy(plantJpegBuf, jpegBytes, len);
   plantJpegLen = len;
 
-  // Cria descriptor LVGL apontando pro JPEG raw (TJPGD decoda on-the-fly)
-  plantJpegDsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-  plantJpegDsc.header.cf    = LV_COLOR_FORMAT_RAW;
-  plantJpegDsc.header.flags = 0;
-  plantJpegDsc.header.w     = 0;  // descoberto pelo decoder
-  plantJpegDsc.header.h     = 0;
-  plantJpegDsc.data         = plantJpegBuf;
-  plantJpegDsc.data_size    = len;
+  // Dsc pra pixels prontos — sem decoder, LVGL so' blita os bytes.
+  plantJpegDsc.header.magic  = LV_IMAGE_HEADER_MAGIC;
+  plantJpegDsc.header.cf     = LV_COLOR_FORMAT_RGB565;
+  plantJpegDsc.header.flags  = 0;
+  plantJpegDsc.header.w      = IMG_W;
+  plantJpegDsc.header.h      = IMG_H;
+  plantJpegDsc.header.stride = IMG_W * 2;
+  plantJpegDsc.data          = plantJpegBuf;
+  plantJpegDsc.data_size     = len;
 
+  // Remove o label de loading ANTES de setar a imagem (TJPGD pode demorar
+  // 50-100ms decodando — se label fica em cima da image, parece travado)
+  if (plantDetailLoad) {
+    lv_obj_del(plantDetailLoad);
+    plantDetailLoad = nullptr;
+  }
   lv_image_set_src(plantDetailImage, &plantJpegDsc);
 
   // Atualiza badge de status (vem do header X-Health-Status — pode diferir

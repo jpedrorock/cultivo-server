@@ -163,12 +163,16 @@ typedef void (*CultivoRefreshFn)(void);
 // Tap em botao de cena na tela CENAS — sceneId enum-like definido pelo app.
 // Identifiers atuais: 0=irrigar, 1=luz-off, 2=custom (extensivel).
 typedef void (*CultivoSceneTriggerFn)(int sceneId);
+// Tap no icone WiFi do header — app forca reconexao WiFi (sai do estado
+// offline sem precisar reboot). UI mostra toast de feedback.
+typedef void (*CultivoWifiReconnectFn)(void);
 
 void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb);
 void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb);
 void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb);
 void cultivoUI_setRefreshHandler(CultivoRefreshFn cb);
 void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb);
+void cultivoUI_setWifiReconnectHandler(CultivoWifiReconnectFn cb);
 
 // ── Indicacao de refresh em andamento ─────────────────────────────────────────
 // App chama cultivoUI_setRefreshing(true) ao iniciar refresh, false ao terminar.
