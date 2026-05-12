@@ -795,8 +795,14 @@ static void openConfigModal() {
 
       // Label com offset pra direita do icone
       makeLabel(row, label, COL_TEXT, FONT_BODY, LV_ALIGN_LEFT_MID, sw(36), 0);
-      // Chevron > na direita
-      makeLabel(row, LV_SYMBOL_RIGHT, COL_DIM, FONT_BODY, LV_ALIGN_RIGHT_MID, 0, 0);
+      // Chevron > na direita — usa montserrat_14 pq glyph LV_SYMBOL_RIGHT
+      // (FontAwesome) so' existe nessa font; Manrope/Geist (FONT_BODY) renderiza
+      // como quadrado vazio.
+      lv_obj_t *chev = lv_label_create(row);
+      lv_label_set_text(chev, LV_SYMBOL_RIGHT);
+      lv_obj_set_style_text_color(chev, lv_color_hex(COL_DIM), 0);
+      lv_obj_set_style_text_font(chev, &lv_font_montserrat_14, 0);
+      lv_obj_align(chev, LV_ALIGN_RIGHT_MID, 0, 0);
       lv_obj_add_event_cb(row, [](lv_event_t *e) {
         int tp = (int)(intptr_t)lv_event_get_user_data(e);
         cfgShowPage(tp);

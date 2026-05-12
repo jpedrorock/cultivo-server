@@ -1939,15 +1939,15 @@ static void applyHistData() {
       const char *fmt;
       if (hasPrev) {
         float delta = lastV - prevV;
-        const char *arrow = delta > 0.1f ? LV_SYMBOL_UP
-                          : delta < -0.1f ? LV_SYMBOL_DOWN
-                          : "";
+        // LV_SYMBOL_UP/DOWN sao glyphs FontAwesome em montserrat — Manrope
+        // (FONT_CAPTION) renderiza como quadrado vazio. O sign do +/- delta
+        // ja' indica direcao; deixamos so' isso pra zero risco de glyph faltando.
         if (m.decimals == 0) {
-          fmt = "Agora %.0f%s %s%+.0f  Min %.0f  Max %.0f";
-          snprintf(buf, sizeof(buf), fmt, lastV, m.unit, arrow, delta, minV, maxV);
+          fmt = "Agora %.0f%s  %+.0f  Min %.0f  Max %.0f";
+          snprintf(buf, sizeof(buf), fmt, lastV, m.unit, delta, minV, maxV);
         } else {
-          fmt = "Agora %.1f%s %s%+.1f  Min %.1f  Max %.1f";
-          snprintf(buf, sizeof(buf), fmt, lastV, m.unit, arrow, delta, minV, maxV);
+          fmt = "Agora %.1f%s  %+.1f  Min %.1f  Max %.1f";
+          snprintf(buf, sizeof(buf), fmt, lastV, m.unit, delta, minV, maxV);
         }
       } else {
         fmt = m.decimals == 0
