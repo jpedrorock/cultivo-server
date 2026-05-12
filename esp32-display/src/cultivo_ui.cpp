@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
+#include <math.h>     // pra isnan() unqualified (cmath so' tem std::isnan)
 #include <cstdlib>
 #include <ctime>      // pra localtime_r no ambient idle overlay
 
@@ -61,18 +62,30 @@ static const int TOUCH_MIN   = 32;
 // ════════════════════════════════════════════════════════════════════════════════
 // Sensor state — declarado em cultivo_ui.h como extern. App escreve aqui.
 // ════════════════════════════════════════════════════════════════════════════════
-char  TENT_NAME[50] = "ESTUFA 1";
+// Valores iniciais: no FIRMWARE sao sentinels (NaN/vazio) pra mostrar "--"
+// antes do primeiro fetch — usuario nao confunde demo data com dados reais.
+// fetchDisplayData() preenche valores reais no primeiro sucesso e mantem
+// (mesmo se WiFi cair, ultimos valores ficam > demo data confusa).
+// No SIMULADOR usamos defaults realistas pra UI ficar "viva" sem servidor.
+#ifdef CULTIVO_SIM
+char  TENT_NAME[50] = "ESTUFA SIM";
 char  FASE[20]      = "FLORACAO";
 float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, phv = 6.2f, ecv = 1.8f;
 int   semana = 4, totalSem = 16;
+#else
+char  TENT_NAME[50] = "";
+char  FASE[20]      = "";
+float tempC = NAN, rh = NAN, vpd = NAN, phv = NAN, ecv = NAN;
+int   semana = 0, totalSem = 0;
+#endif
 bool  wifiOk = false;        // firmware: setado pelo connectWifi(); sim: forcado p/ true em sim_main.cpp
 int   sensorAgeSec   = -1;   // -1 = sem dado; updated em fetchDisplayData
 int   dailyLogAgeSec = -1;   // idem
 int   lightOnHour    = 6;    // default 18/6 (VEGA) ate' fetchDisplay preencher
 int   lightOffHour   = 24;
 int   currentLux = 0;
-int   currentPpfd = 430;
-int   targetPpfd  = 450;
+int   currentPpfd = 0;
+int   targetPpfd  = 0;
 int   luxMode     = 0;       // 0=PPFD, 1=LUX
 static const int LUX_PER_PPFD = 54;
 static const int STEP_PPFD    = 25;
@@ -370,24 +383,33 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
 
   // Temp (esquerda) — laranja PHASE_HARVEST
   idleTempLbl = lv_label_create(idleOverlay);
-  snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
-  lv_label_set_text(idleTempLbl, buf);
+  if (isnan(tempC)) lv_label_set_text(idleTempLbl, "--");
+  else {
+    snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
+    lv_label_set_text(idleTempLbl, buf);
+  }
   lv_obj_set_style_text_color(idleTempLbl, lv_color_hex(COL_PHASE_HARVEST), 0);
   lv_obj_set_style_text_font(idleTempLbl, FONT_TITLE, 0);
   lv_obj_align(idleTempLbl, LV_ALIGN_CENTER, -sw(80), sh(40));
 
   // Umid (centro) — ciano
   idleRhLbl = lv_label_create(idleOverlay);
-  snprintf(buf, sizeof(buf), "%.0f%%", rh);
-  lv_label_set_text(idleRhLbl, buf);
+  if (isnan(rh)) lv_label_set_text(idleRhLbl, "--");
+  else {
+    snprintf(buf, sizeof(buf), "%.0f%%", rh);
+    lv_label_set_text(idleRhLbl, buf);
+  }
   lv_obj_set_style_text_color(idleRhLbl, lv_color_hex(COL_CYN), 0);
   lv_obj_set_style_text_font(idleRhLbl, FONT_TITLE, 0);
   lv_obj_align(idleRhLbl, LV_ALIGN_CENTER, 0, sh(40));
 
   // VPD (direita) — verde PRIMARY (consistente com card VPD da Home)
   idleVpdLbl = lv_label_create(idleOverlay);
-  snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
-  lv_label_set_text(idleVpdLbl, buf);
+  if (isnan(vpd)) lv_label_set_text(idleVpdLbl, "--");
+  else {
+    snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
+    lv_label_set_text(idleVpdLbl, buf);
+  }
   lv_obj_set_style_text_color(idleVpdLbl, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_text_font(idleVpdLbl, FONT_TITLE, 0);
   lv_obj_align(idleVpdLbl, LV_ALIGN_CENTER, sw(80), sh(40));
@@ -532,16 +554,25 @@ extern "C" void cultivoUI_tickIdleOverlay(void) {
   // usa lv_snprintf INTERNO que NAO suporta %f no default config; renderiza
   // como "F°C" literal sem o numero (bug visto em produção).
   if (idleTempLbl) {
-    snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
-    lv_label_set_text(idleTempLbl, buf);
+    if (isnan(tempC)) lv_label_set_text(idleTempLbl, "--");
+    else {
+      snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
+      lv_label_set_text(idleTempLbl, buf);
+    }
   }
   if (idleRhLbl) {
-    snprintf(buf, sizeof(buf), "%.0f%%", rh);
-    lv_label_set_text(idleRhLbl, buf);
+    if (isnan(rh)) lv_label_set_text(idleRhLbl, "--");
+    else {
+      snprintf(buf, sizeof(buf), "%.0f%%", rh);
+      lv_label_set_text(idleRhLbl, buf);
+    }
   }
   if (idleVpdLbl) {
-    snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
-    lv_label_set_text(idleVpdLbl, buf);
+    if (isnan(vpd)) lv_label_set_text(idleVpdLbl, "--");
+    else {
+      snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
+      lv_label_set_text(idleVpdLbl, buf);
+    }
   }
 }
 
@@ -850,9 +881,12 @@ static void buildHome(lv_obj_t *tab) {
 
   lv_chart_set_range(sparkRh,  LV_CHART_AXIS_PRIMARY_Y, 0, 100);
   lv_chart_set_range(sparkVpd, LV_CHART_AXIS_PRIMARY_Y, 0, 30);     // VPD * 10 (0-3.0 kPa)
+  // Inicializa sparklines com LV_CHART_POINT_NONE (skip render) ate' chegar
+  // dado real do fetch. Sem isso, NaN cast pra int32_t da' garbage que
+  // renderiza spike maluco no chart.
   for (int i = 0; i < 20; i++) {
-    lv_chart_set_next_value(sparkRh,  serRhS,  (int32_t)rh);
-    lv_chart_set_next_value(sparkVpd, serVpdS, (int32_t)(vpd * 10));
+    lv_chart_set_next_value(sparkRh,  serRhS,  LV_CHART_POINT_NONE);
+    lv_chart_set_next_value(sparkVpd, serVpdS, LV_CHART_POINT_NONE);
   }
 
   // Face B (EC/pH/ciclo) removida — esses dados agora aparecem no arc cycle.
@@ -875,50 +909,86 @@ static void updateArcMode() {
   if (!lblTemp || !arcTemp) return;
   char buf[24];
   uint32_t col = COL_PRIMARY;
+  // Helper inline: mostra valor float ou "--" se NaN. Arc fica em 0 nesses
+  // casos pra nao desenhar a barra com valor estranho.
   switch (arcMode) {
     case 0: { // TEMP
       lv_label_set_text(lblArcHdr, "TEMP");
       lv_label_set_text(lblArcUnit, "\xC2\xB0""C");
-      snprintf(buf, sizeof(buf), "%.1f", tempC);
-      lv_label_set_text(lblTemp, buf);
-      lv_arc_set_range(arcTemp, 0, 40);
-      lv_arc_set_value(arcTemp, (int)tempC);
-      // Cor reflete range termico — feedback visual: azul=frio, verde=ideal,
-      // laranja=morno, vermelho=quente. Mais util que cor fixa pois user
-      // identifica problemas de longe (ex: anel vermelho = estufa esquentou).
-      col = tempColor(tempC);
+      if (isnan(tempC)) {
+        lv_label_set_text(lblTemp, "--");
+        lv_arc_set_range(arcTemp, 0, 40);
+        lv_arc_set_value(arcTemp, 0);
+        col = COL_DIM;
+      } else {
+        snprintf(buf, sizeof(buf), "%.1f", tempC);
+        lv_label_set_text(lblTemp, buf);
+        lv_arc_set_range(arcTemp, 0, 40);
+        lv_arc_set_value(arcTemp, (int)tempC);
+        col = tempColor(tempC);
+      }
       break;
     }
     case 1: { // pH
       lv_label_set_text(lblArcHdr, "pH");
       lv_label_set_text(lblArcUnit, "");
-      snprintf(buf, sizeof(buf), "%.1f", phv);
-      lv_label_set_text(lblTemp, buf);
-      lv_arc_set_range(arcTemp, 0, 140);
-      lv_arc_set_value(arcTemp, (int)(phv * 10));
-      col = COL_PRP;  // roxo claro (DS, igual pill pH no Hist)
+      if (isnan(phv)) {
+        lv_label_set_text(lblTemp, "--");
+        lv_arc_set_range(arcTemp, 0, 140);
+        lv_arc_set_value(arcTemp, 0);
+        col = COL_DIM;
+      } else {
+        snprintf(buf, sizeof(buf), "%.1f", phv);
+        lv_label_set_text(lblTemp, buf);
+        lv_arc_set_range(arcTemp, 0, 140);
+        lv_arc_set_value(arcTemp, (int)(phv * 10));
+        col = COL_PRP;
+      }
       break;
     }
     case 2: { // EC
       lv_label_set_text(lblArcHdr, "EC");
       lv_label_set_text(lblArcUnit, "mS/cm");
-      snprintf(buf, sizeof(buf), "%.1f", ecv);
-      lv_label_set_text(lblTemp, buf);
-      lv_arc_set_range(arcTemp, 0, 40);  // EC * 10 (0-4.0 mS/cm)
-      lv_arc_set_value(arcTemp, (int)(ecv * 10));
-      col = COL_AMBER;  // amber (DS, igual chart Hist EC)
+      if (isnan(ecv)) {
+        lv_label_set_text(lblTemp, "--");
+        lv_arc_set_range(arcTemp, 0, 40);
+        lv_arc_set_value(arcTemp, 0);
+        col = COL_DIM;
+      } else {
+        snprintf(buf, sizeof(buf), "%.1f", ecv);
+        lv_label_set_text(lblTemp, buf);
+        lv_arc_set_range(arcTemp, 0, 40);  // EC * 10 (0-4.0 mS/cm)
+        lv_arc_set_value(arcTemp, (int)(ecv * 10));
+        col = COL_AMBER;
+      }
       break;
     }
     case 3: { // FASE
-      lv_label_set_text(lblArcHdr, FASE);
-      snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
-      lv_label_set_text(lblArcUnit, buf);
-      char vbuf[8]; snprintf(vbuf, sizeof(vbuf), "%d", semana);
-      lv_label_set_text(lblTemp, vbuf);
-      int total = totalSem > 0 ? totalSem : 16;
-      lv_arc_set_range(arcTemp, 0, total);
-      lv_arc_set_value(arcTemp, semana);
-      col = phaseColor(FASE);  // cor do phase token (FLORA=magenta etc)
+      // Sem fase ainda? Mostra placeholder e nao quebra a logica
+      if (FASE[0] == '\0') {
+        lv_label_set_text(lblArcHdr, "FASE");
+        lv_label_set_text(lblArcUnit, "");
+        lv_label_set_text(lblTemp, "--");
+        lv_arc_set_range(arcTemp, 0, 16);
+        lv_arc_set_value(arcTemp, 0);
+        col = COL_DIM;
+      } else {
+        lv_label_set_text(lblArcHdr, FASE);
+        if (semana > 0 && totalSem > 0) {
+          snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
+          lv_label_set_text(lblArcUnit, buf);
+          char vbuf[8]; snprintf(vbuf, sizeof(vbuf), "%d", semana);
+          lv_label_set_text(lblTemp, vbuf);
+          lv_arc_set_range(arcTemp, 0, totalSem);
+          lv_arc_set_value(arcTemp, semana);
+        } else {
+          // Fase sem ciclo numerico (MAINTENANCE/DRYING)
+          lv_label_set_text(lblArcUnit, "");
+          lv_label_set_text(lblTemp, "\xE2\x80\x94");  // em-dash gigante
+          lv_arc_set_value(arcTemp, 0);
+        }
+        col = phaseColor(FASE);
+      }
       break;
     }
   }
@@ -1024,8 +1094,11 @@ extern "C" void refreshHomeValues() {
   cultivoUI_stopItemSpin(-1);
   char buf[64];
 
-  // Header agora SO' tem nome da estufa (semana/fase migrou pro card CICLO).
-  if (lblTitle) lv_label_set_text(lblTitle, TENT_NAME);
+  // Header: nome da estufa OU "—" se ainda nao recebeu fetch (TENT_NAME vazio).
+  // Sem demo data — usuario ve claramente que nao ta conectado.
+  if (lblTitle) {
+    lv_label_set_text(lblTitle, TENT_NAME[0] ? TENT_NAME : "\xE2\x80\x94");  // em-dash
+  }
 
   // Atualiza icone wifi conforme estado atual — sem isso, o icone pegava
   // wifiOk so' no buildHome (boot) e nunca mais mudava. Quando wifi conecta
@@ -1040,45 +1113,57 @@ extern "C" void refreshHomeValues() {
   updateArcMode();
 
   // Mini-cards laterais. Valor fica branco fixo (DS).
-  snprintf(buf, sizeof(buf), "%.0f%%", rh);
-  lv_label_set_text(lblRh, buf);
+  // NaN = sem dado real ainda — mostra "--" pra deixar claro que nao tem
+  // info do servidor (vs valor demo que confundia user offline).
+  if (isnan(rh)) lv_label_set_text(lblRh, "--");
+  else { snprintf(buf, sizeof(buf), "%.0f%%", rh); lv_label_set_text(lblRh, buf); }
 
   if (lblVpd) {
-    snprintf(buf, sizeof(buf), "%.2f", vpd);
-    lv_label_set_text(lblVpd, buf);
+    if (isnan(vpd)) lv_label_set_text(lblVpd, "--");
+    else { snprintf(buf, sizeof(buf), "%.2f", vpd); lv_label_set_text(lblVpd, buf); }
   }
 
   // Card CICLO — "Sem X/Y" + badge fase. Quando semana=0 (estufa de
   // MANUTENCAO/DRYING — sem ciclo VEGA/FLORA), esconde a contagem e mostra
-  // so' o badge da fase. Server fix: PR #13 envia semana=0 pra essas categorias.
+  // so' o badge da fase. Quando FASE vazia (sem fetch ainda), mostra "—".
   if (lblCycleVal) {
     if (semana > 0 && totalSem > 0) {
       snprintf(buf, sizeof(buf), "Sem %d/%d", semana, totalSem);
+    } else if (FASE[0] == '\0') {
+      strcpy(buf, "\xE2\x80\x94");  // em-dash quando nao conectado
     } else {
       buf[0] = '\0';  // sem ciclo — badge fase fica sozinho
     }
     lv_label_set_text(lblCycleVal, buf);
   }
   if (lblCycleBadge) {
-    uint32_t pc = phaseColor(FASE);
-    lv_label_set_text(lblCycleBadge, FASE);
-    lv_obj_set_style_text_color(lblCycleBadge, lv_color_hex(pc), 0);
-    lv_obj_set_style_bg_color(lblCycleBadge, lv_color_hex(pc), 0);
-    // Re-tinta o card inteiro na cor da fase atual (gradient top)
-    if (cardCycle) tintCard(cardCycle, pc, 50);
-    // Barra de progresso: percent da fase concluido. Clamp 0-100.
-    if (cycleProgress) {
-      int pct = 0;
-      if (totalSem > 0 && semana > 0) {
-        pct = (semana * 100) / totalSem;
-        if (pct > 100) pct = 100;
+    // Badge so' aparece se ja' temos FASE (do fetch). Antes ficava
+    // "FLORACAO" hardcoded mesmo offline — agora oculta.
+    if (FASE[0]) {
+      lv_obj_clear_flag(lblCycleBadge, LV_OBJ_FLAG_HIDDEN);
+      uint32_t pc = phaseColor(FASE);
+      lv_label_set_text(lblCycleBadge, FASE);
+      lv_obj_set_style_text_color(lblCycleBadge, lv_color_hex(pc), 0);
+      lv_obj_set_style_bg_color(lblCycleBadge, lv_color_hex(pc), 0);
+      // Re-tinta o card inteiro na cor da fase atual (gradient top)
+      if (cardCycle) tintCard(cardCycle, pc, 50);
+      // Barra de progresso: percent da fase concluido. Clamp 0-100.
+      if (cycleProgress) {
+        int pct = 0;
+        if (totalSem > 0 && semana > 0) {
+          pct = (semana * 100) / totalSem;
+          if (pct > 100) pct = 100;
+        }
+        lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(pc), 0);
+        lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(pc), LV_PART_INDICATOR);
+        lv_bar_set_value(cycleProgress, pct, LV_ANIM_ON);
+        if (semana <= 0 || totalSem <= 0) lv_obj_add_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_clear_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
       }
-      lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(pc), 0);
-      lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(pc), LV_PART_INDICATOR);
-      lv_bar_set_value(cycleProgress, pct, LV_ANIM_ON);
-      // Sem fase ativa (semana=0): esconde a barra
-      if (semana <= 0 || totalSem <= 0) lv_obj_add_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
-      else lv_obj_clear_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      // Sem fase ainda — oculta badge + barra
+      lv_obj_add_flag(lblCycleBadge, LV_OBJ_FLAG_HIDDEN);
+      if (cycleProgress) lv_obj_add_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
     }
   }
 
@@ -1126,11 +1211,14 @@ static void pulseTimerCb(lv_timer_t *t) {
   float wave = sinf(tick * 0.4f);
   float jitter = ((rand() % 100) - 50) / 100.0f;
 
-  if (sparkRh && serRhS) {
+  // Pulse das sparklines so' faz sentido com valor base real — se rh/vpd
+  // sao NaN (sem fetch ainda), pula. Cast NaN -> int32 e' UB; alem disso
+  // ja' inicializamos como LV_CHART_POINT_NONE, entao chart fica vazio.
+  if (sparkRh && serRhS && !isnan(rh)) {
     lv_chart_set_next_value(sparkRh, serRhS, (int32_t)(rh + wave * 1.5f + jitter));
     autoscaleSpark(sparkRh, serRhS);
   }
-  if (sparkVpd && serVpdS) {
+  if (sparkVpd && serVpdS && !isnan(vpd)) {
     lv_chart_set_next_value(sparkVpd, serVpdS, (int32_t)((vpd + wave * 0.03f) * 10));
     autoscaleSpark(sparkVpd, serVpdS);
   }
