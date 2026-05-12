@@ -675,9 +675,11 @@ static lv_obj_t *cfgMakePage(lv_obj_t *parent) {
   return p;
 }
 
-// Helper: cria botao "← Title" no topo da sub-pagina + retorna container
-// pra adicionar o body. Tap no back volta pro menu raiz.
-static lv_obj_t *cfgMakeSubHeader(lv_obj_t *page, const char *title) {
+// Helper: cria botao "← [icone] Title" no topo da sub-pagina + retorna
+// container pra adicionar o body. Tap no back volta pro menu raiz.
+// icon=NULL pra sub-pagina sem icone.
+static lv_obj_t *cfgMakeSubHeader(lv_obj_t *page, const lv_image_dsc_t *icon,
+                                    uint32_t iconColor, const char *title) {
   lv_obj_t *back = lv_label_create(page);
   lv_label_set_text(back, LV_SYMBOL_LEFT);
   lv_obj_set_style_text_color(back, lv_color_hex(COL_TEXT), 0);
@@ -688,7 +690,17 @@ static lv_obj_t *cfgMakeSubHeader(lv_obj_t *page, const char *title) {
   lv_obj_add_event_cb(back, [](lv_event_t *e) {
     cfgShowPage(CFG_PAGE_MENU);
   }, LV_EVENT_CLICKED, NULL);
-  makeLabel(page, title, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(36), sh(2));
+
+  int titleX = sw(36);
+  if (icon) {
+    lv_obj_t *ico = lv_image_create(page);
+    lv_image_set_src(ico, icon);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(iconColor), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, sw(34), sh(0));
+    titleX = sw(70);  // titulo desloca pra direita do icone
+  }
+  makeLabel(page, title, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, titleX, sh(2));
 
   // Body container scrollable (deixa espaco pro header)
   lv_obj_t *body = lv_obj_create(page);
@@ -760,8 +772,9 @@ static void openConfigModal() {
     lv_obj_set_style_pad_row(list, sh(6), 0);
     lv_obj_set_scroll_dir(list, LV_DIR_VER);
 
-    // Helper local pra criar row tipo "Label                      >"
-    auto addMenuItem = [&](const char *label, int targetPage) {
+    // Helper local pra criar row tipo "[icone] Label              >"
+    auto addMenuItem = [&](const lv_image_dsc_t *icon, uint32_t iconColor,
+                            const char *label, int targetPage) {
       lv_obj_t *row = lv_btn_create(list);
       lv_obj_set_width(row, lv_pct(100));
       lv_obj_set_height(row, sh(44));
@@ -772,7 +785,17 @@ static void openConfigModal() {
       lv_obj_set_style_radius(row, RADIUS_LG, 0);
       lv_obj_set_style_shadow_width(row, 0, 0);
       lv_obj_set_style_pad_hor(row, sw(12), 0);
-      makeLabel(row, label, COL_TEXT, FONT_BODY, LV_ALIGN_LEFT_MID, 0, 0);
+
+      // Icone colorido na esquerda (32x32 nativo, recolor via image_recolor)
+      lv_obj_t *ico = lv_image_create(row);
+      lv_image_set_src(ico, icon);
+      lv_obj_set_style_image_recolor(ico, lv_color_hex(iconColor), 0);
+      lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+      lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
+
+      // Label com offset pra direita do icone
+      makeLabel(row, label, COL_TEXT, FONT_BODY, LV_ALIGN_LEFT_MID, sw(36), 0);
+      // Chevron > na direita
       makeLabel(row, LV_SYMBOL_RIGHT, COL_DIM, FONT_BODY, LV_ALIGN_RIGHT_MID, 0, 0);
       lv_obj_add_event_cb(row, [](lv_event_t *e) {
         int tp = (int)(intptr_t)lv_event_get_user_data(e);
@@ -780,11 +803,11 @@ static void openConfigModal() {
       }, LV_EVENT_CLICKED, (void*)(intptr_t)targetPage);
     };
 
-    addMenuItem("Rede / WiFi",       CFG_PAGE_REDE);
-    addMenuItem("Display",           CFG_PAGE_DISPLAY);
-    addMenuItem("Atualizacoes",      CFG_PAGE_UPDATES);
-    addMenuItem("Sistema",           CFG_PAGE_SISTEMA);
-    addMenuItem("Avancado",          CFG_PAGE_AVANCADO);
+    addMenuItem(&ic_wifi,         COL_CYN,            "Rede / WiFi",   CFG_PAGE_REDE);
+    addMenuItem(&ic_clock,        COL_AMBER,          "Display",       CFG_PAGE_DISPLAY);
+    addMenuItem(&ic_refresh,      COL_PRIMARY,        "Atualizacoes",  CFG_PAGE_UPDATES);
+    addMenuItem(&ic_activity,     COL_PRIMARY,        "Sistema",       CFG_PAGE_SISTEMA);
+    addMenuItem(&ic_alert,        COL_RED,            "Avancado",      CFG_PAGE_AVANCADO);
 
     // Botao Fechar abaixo da lista — posicao FIXA (nao flutuante)
     lv_obj_t *btnClose = cfgMakeButton(page, "Fechar", false, [](lv_event_t *e) {
@@ -800,7 +823,7 @@ static void openConfigModal() {
   // ═══════════════════════════════════════════════════════════════════
   cfgPages[CFG_PAGE_REDE] = cfgMakePage(configModal);
   {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_REDE], "Rede");
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_REDE], &ic_wifi, COL_CYN, "Rede");
 
     // Field helper inline (reaproveita logica original)
     auto addField = [&](const char *label, const char *initVal, lv_obj_t **out, bool pwd) {
@@ -839,7 +862,7 @@ static void openConfigModal() {
   // ═══════════════════════════════════════════════════════════════════
   cfgPages[CFG_PAGE_DISPLAY] = cfgMakePage(configModal);
   {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_DISPLAY], "Display");
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_DISPLAY], &ic_clock, COL_AMBER, "Display");
     makeLabel(body, "Apagar tela apos:", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
     ddSleep = lv_dropdown_create(body);
     char optsBuf[128] = {0};
@@ -877,7 +900,7 @@ static void openConfigModal() {
   // ═══════════════════════════════════════════════════════════════════
   cfgPages[CFG_PAGE_UPDATES] = cfgMakePage(configModal);
   {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_UPDATES], "Atualizacoes");
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_UPDATES], &ic_refresh, COL_PRIMARY, "Atualizacoes");
     char verBuf[64];
     snprintf(verBuf, sizeof(verBuf), "Versao atual: " FW_VERSION);
     makeLabel(body, verBuf, COL_TEXT, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
@@ -897,7 +920,7 @@ static void openConfigModal() {
   // ═══════════════════════════════════════════════════════════════════
   cfgPages[CFG_PAGE_SISTEMA] = cfgMakePage(configModal);
   {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_SISTEMA], "Sistema");
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_SISTEMA], &ic_activity, COL_PRIMARY, "Sistema");
     uint8_t mac[6];
     WiFi.macAddress(mac);
     uint32_t uptimeSec = millis() / 1000;
@@ -928,7 +951,7 @@ static void openConfigModal() {
   // ═══════════════════════════════════════════════════════════════════
   cfgPages[CFG_PAGE_AVANCADO] = cfgMakePage(configModal);
   {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_AVANCADO], "Avancado");
+    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_AVANCADO], &ic_alert, COL_RED, "Avancado");
     makeLabel(body,
       "ACOES DESTRUTIVAS — confirmar antes!",
       COL_AMBER, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
