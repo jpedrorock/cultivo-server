@@ -84,6 +84,7 @@ static CultivoOpenConfigFn   onConfigOpen  = nullptr;
 static CultivoRefreshFn      onRefresh     = nullptr;
 static CultivoSceneTriggerFn onSceneTrigger = nullptr;
 static CultivoWifiReconnectFn onWifiReconnect = nullptr;
+static CultivoHistPeriodFn   onHistPeriod  = nullptr;
 
 extern "C" void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb)         { onLuxSave    = cb; }
 extern "C" void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb)       { onPhEcSave   = cb; }
@@ -91,6 +92,9 @@ extern "C" void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb)   { onCon
 extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRefresh    = cb; }
 extern "C" void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb) { onSceneTrigger = cb; }
 extern "C" void cultivoUI_setWifiReconnectHandler(CultivoWifiReconnectFn cb) { onWifiReconnect = cb; }
+extern "C" void cultivoUI_setHistPeriodHandler(CultivoHistPeriodFn cb)   { onHistPeriod = cb; }
+static CultivoQuickLogFn     onQuickLog    = nullptr;
+extern "C" void cultivoUI_setQuickLogHandler(CultivoQuickLogFn cb)       { onQuickLog   = cb; }
 
 // Estado de refresh em andamento + spin do icone refresh top-right.
 // refreshIcon = ponteiro pro ic_refresh do header (setado em buildHome).
@@ -377,6 +381,81 @@ extern "C" void cultivoUI_hideIdleOverlay(void) {
   if (!idleOverlay) return;
   lv_obj_del(idleOverlay);
   idleOverlay = idleClockLbl = idleTempLbl = idleRhLbl = nullptr;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ALERT OVERLAY — modal que cobre tela quando server pushou alerta via SSE
+// ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t *alertOverlay = nullptr;
+static int       alertOverlayId = 0;
+static CultivoAlertAckFn onAlertAck = nullptr;
+
+extern "C" void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb) {
+  onAlertAck = cb;
+}
+
+extern "C" void cultivoUI_showAlert(int alertId, const char *type, const char *metric, const char *message) {
+  if (alertOverlay) lv_obj_del(alertOverlay);
+  alertOverlay = lv_obj_create(lv_layer_top());
+  alertOverlayId = alertId;
+  lv_obj_remove_style_all(alertOverlay);
+  lv_obj_set_size(alertOverlay, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(alertOverlay, 0, 0);
+  // Cor de fundo conforme severidade do alertType
+  uint32_t bgC = COL_RED;
+  if (type && !strcmp(type, "OUT_OF_RANGE")) bgC = COL_YEL;
+  else if (type && !strcmp(type, "TREND"))   bgC = COL_AMBER;
+  lv_obj_set_style_bg_color(alertOverlay, lv_color_hex(bgC), 0);
+  lv_obj_set_style_bg_opa(alertOverlay, LV_OPA_90, 0);
+  lv_obj_clear_flag(alertOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Icone de alerta no topo
+  lv_obj_t *ico = lv_image_create(alertOverlay);
+  lv_image_set_src(ico, &ic_alert);
+  lv_obj_set_style_image_recolor(ico, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+  lv_obj_set_style_transform_zoom(ico, 384, 0);  // 1.5x ~48px visible
+  lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(20));
+
+  // Header com tipo + metrica
+  lv_obj_t *lblHdr = lv_label_create(alertOverlay);
+  char hdrBuf[48];
+  snprintf(hdrBuf, sizeof(hdrBuf), "%s — %s",
+           type ? type : "ALERTA",
+           metric ? metric : "?");
+  lv_label_set_text(lblHdr, hdrBuf);
+  lv_obj_set_style_text_color(lblHdr, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(lblHdr, FONT_BODY, 0);
+  lv_obj_align(lblHdr, LV_ALIGN_CENTER, 0, -sh(20));
+
+  // Mensagem corrida
+  lv_obj_t *lblMsg = lv_label_create(alertOverlay);
+  lv_label_set_text(lblMsg, message ? message : "");
+  lv_label_set_long_mode(lblMsg, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(lblMsg, SCREEN_W - sw(40));
+  lv_obj_set_style_text_align(lblMsg, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(lblMsg, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(lblMsg, FONT_CAPTION, 0);
+  lv_obj_align(lblMsg, LV_ALIGN_CENTER, 0, sh(10));
+
+  // Hint "toque pra dispensar"
+  lv_obj_t *lblHint = lv_label_create(alertOverlay);
+  lv_label_set_text(lblHint, "Toque pra dispensar");
+  lv_obj_set_style_text_color(lblHint, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_opa(lblHint, LV_OPA_70, 0);
+  lv_obj_set_style_text_font(lblHint, FONT_CAPTION, 0);
+  lv_obj_align(lblHint, LV_ALIGN_BOTTOM_MID, 0, -sh(20));
+
+  // Tap em qualquer lugar — dispara ack
+  lv_obj_add_flag(alertOverlay, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(alertOverlay, [](lv_event_t *e) {
+    int id = alertOverlayId;
+    if (alertOverlay) {
+      lv_obj_del(alertOverlay);
+      alertOverlay = nullptr;
+    }
+    if (onAlertAck) onAlertAck(id);
+  }, LV_EVENT_CLICKED, NULL);
 }
 
 extern "C" void cultivoUI_tickIdleOverlay(void) {
@@ -1762,8 +1841,16 @@ extern "C" {
 static lv_obj_t *histChart    = nullptr;
 static lv_obj_t *histStatsLbl = nullptr;  // "Agora X · Min Y · Max Z"
 static lv_obj_t *histXAxisLbl = nullptr;  // "-24h ... agora"
+static lv_obj_t *histPeriodLbl = nullptr; // "ultimas 24h" clicavel
 static lv_chart_series_t *histSer = nullptr;
 static int histMetric = 0;  // 0=temp, 1=rh, 2=ph, 3=ec
+static int histPeriod = 0;  // 0=24h, 1=7d, 2=30d
+static const char *PERIOD_LABELS[3] = { "ultimas 24h", "ultimos 7d", "ultimos 30d" };
+static const char *PERIOD_XAXIS[3]  = {
+  "-24h     -18h     -12h     -6h     agora",
+  "-7d      -5d       -3d       -1d     hoje",
+  "-30d    -23d    -15d    -7d    hoje"
+};
 
 static const struct {
   const char *name;
@@ -1920,7 +2007,22 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
   makeLabel(tab, "HISTORICO", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
-  makeLabel(tab, "ultimas 24h", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+  // Period selector clicavel — cicla 24h -> 7d -> 30d. Tap dispara
+  // onHistPeriod(idx) que refaz fetch. Style: dim como o original mas
+  // clicavel; o tap atualiza o texto + xaxis labels.
+  histPeriodLbl = lv_label_create(tab);
+  lv_label_set_text(histPeriodLbl, PERIOD_LABELS[histPeriod]);
+  lv_obj_set_style_text_color(histPeriodLbl, lv_color_hex(COL_PRIMARY), 0);  // primary pra indicar interatividade
+  lv_obj_set_style_text_font(histPeriodLbl, FONT_CAPTION, 0);
+  lv_obj_align(histPeriodLbl, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+  lv_obj_add_flag(histPeriodLbl, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(histPeriodLbl, sw(8));
+  lv_obj_add_event_cb(histPeriodLbl, [](lv_event_t *e) {
+    histPeriod = (histPeriod + 1) % 3;
+    lv_label_set_text(histPeriodLbl, PERIOD_LABELS[histPeriod]);
+    if (histXAxisLbl) lv_label_set_text(histXAxisLbl, PERIOD_XAXIS[histPeriod]);
+    if (onHistPeriod) onHistPeriod(histPeriod);
+  }, LV_EVENT_CLICKED, NULL);
 
   // Stats header: "Agora X · Min Y · Max Z" na cor da metrica
   histStatsLbl = lv_label_create(tab);
@@ -2154,6 +2256,8 @@ typedef struct {
   int  id;
   char title[64];
   bool done;
+  uint32_t dueDate;   // epoch sec, 0 = sem data
+  bool overdue;
 } TaskStorage;
 static TaskStorage tasks[TASKS_MAX];
 static int taskCount = 0;
@@ -2163,30 +2267,48 @@ static lv_obj_t *tasksEmpty   = nullptr;  // empty state
 static lv_obj_t *taskRows[TASKS_MAX] = {nullptr};
 static lv_obj_t *taskChecks[TASKS_MAX] = {nullptr};
 static lv_obj_t *taskLabels[TASKS_MAX] = {nullptr};
+// Calendar mode: 0=lista (current week), 1=semana (7d ahead com day headers)
+static int tasksRangeMode = 0;
+static lv_obj_t *tasksRangeLbl = nullptr;
 
 static CultivoTaskToggleFn onTaskToggle = nullptr;
 extern "C" void cultivoUI_setTaskToggleHandler(CultivoTaskToggleFn cb) {
   onTaskToggle = cb;
 }
+static CultivoTasksRangeFn onTasksRange = nullptr;
+extern "C" void cultivoUI_setTasksRangeHandler(CultivoTasksRangeFn cb) {
+  onTasksRange = cb;
+}
 
 // Pinta row conforme done: ✓ verde sobre bg primary opa 20 + label dim
 // strikethrough; OFF: ⬜ vazio + label COL_TEXT
+// overdue: border vermelha + check vermelho (chama atencao)
 static void paintTaskRow(int idx) {
   if (idx < 0 || idx >= TASKS_MAX) return;
   if (!taskRows[idx] || !taskChecks[idx] || !taskLabels[idx]) return;
   bool done = tasks[idx].done;
+  bool overdue = tasks[idx].overdue && !done;
   if (done) {
     lv_image_set_src(taskChecks[idx], &ic_check_circle);
     lv_obj_set_style_image_recolor(taskChecks[idx], lv_color_hex(COL_PRIMARY), 0);
     lv_obj_set_style_text_color(taskLabels[idx], lv_color_hex(COL_DIM), 0);
     lv_obj_set_style_text_decor(taskLabels[idx], LV_TEXT_DECOR_STRIKETHROUGH, 0);
     lv_obj_set_style_bg_opa(taskRows[idx], LV_OPA_10, 0);
+    lv_obj_set_style_border_color(taskRows[idx], lv_color_hex(COL_BORDER), 0);
+  } else if (overdue) {
+    lv_image_set_src(taskChecks[idx], &ic_alert);
+    lv_obj_set_style_image_recolor(taskChecks[idx], lv_color_hex(COL_RED), 0);
+    lv_obj_set_style_text_color(taskLabels[idx], lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_decor(taskLabels[idx], LV_TEXT_DECOR_NONE, 0);
+    lv_obj_set_style_bg_opa(taskRows[idx], LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(taskRows[idx], lv_color_hex(COL_RED), 0);
   } else {
     lv_image_set_src(taskChecks[idx], &ic_check_circle);
     lv_obj_set_style_image_recolor(taskChecks[idx], lv_color_hex(COL_DIM), 0);
     lv_obj_set_style_text_color(taskLabels[idx], lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_text_decor(taskLabels[idx], LV_TEXT_DECOR_NONE, 0);
     lv_obj_set_style_bg_opa(taskRows[idx], LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(taskRows[idx], lv_color_hex(COL_BORDER), 0);
   }
 }
 
@@ -2257,7 +2379,30 @@ static void rebuildTasksList() {
     lv_obj_align(chk, LV_ALIGN_LEFT_MID, -sw(4), 0);
 
     lv_obj_t *lbl = lv_label_create(row);
-    lv_label_set_text(lbl, tasks[i].title);
+    // Em modo Semana, prefix com day-of-week ("seg 12/5") ou "ATRASADA"
+    // pra dar contexto temporal. Em modo Lista, so' titulo simples.
+    if (tasksRangeMode == 1 && tasks[i].dueDate > 0) {
+      time_t t = (time_t)tasks[i].dueDate;
+      struct tm tmInfo;
+      char buf[96];
+      if (localtime_r(&t, &tmInfo)) {
+        static const char *DOW[] = {"dom","seg","ter","qua","qui","sex","sab"};
+        if (tasks[i].overdue) {
+          snprintf(buf, sizeof(buf), "[!] %s %d/%d  %s",
+                   DOW[tmInfo.tm_wday], tmInfo.tm_mday, tmInfo.tm_mon + 1,
+                   tasks[i].title);
+        } else {
+          snprintf(buf, sizeof(buf), "%s %d/%d  %s",
+                   DOW[tmInfo.tm_wday], tmInfo.tm_mday, tmInfo.tm_mon + 1,
+                   tasks[i].title);
+        }
+      } else {
+        snprintf(buf, sizeof(buf), "%s", tasks[i].title);
+      }
+      lv_label_set_text(lbl, buf);
+    } else {
+      lv_label_set_text(lbl, tasks[i].title);
+    }
     lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
     lv_obj_set_width(lbl, SCREEN_W - sw(40));
     lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
@@ -2282,12 +2427,15 @@ extern "C" void cultivoUI_applyTasks(const CultivoTask *items, int count) {
     } else {
       tasks[i].title[0] = '\0';
     }
-    tasks[i].done = items[i].done;
+    tasks[i].done    = items[i].done;
+    tasks[i].dueDate = items[i].dueDate;
+    tasks[i].overdue = items[i].overdue;
   }
   for (int i = count; i < TASKS_MAX; i++) {
     tasks[i].id = 0; tasks[i].title[0] = '\0'; tasks[i].done = false;
+    tasks[i].dueDate = 0; tasks[i].overdue = false;
   }
-  printf("[ui] applyTasks count=%d\n", count);
+  printf("[ui] applyTasks count=%d (mode=%s)\n", count, tasksRangeMode ? "semana" : "lista");
   rebuildTasksList();
 }
 
@@ -2314,7 +2462,21 @@ static void buildTasksScreen(lv_obj_t *tab) {
   lv_obj_set_style_image_recolor_opa(hdrIcon, LV_OPA_COVER, 0);
   lv_obj_align(hdrIcon, LV_ALIGN_TOP_LEFT, sw(4), sh(2));
   makeLabel(tab, "TAREFAS", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(38), sh(4));
-  makeLabel(tab, "Da semana", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+
+  // Toggle "lista" / "semana" clicavel na direita do header.
+  // Lista = current week | Semana = current+next week + overdue (com day prefix)
+  tasksRangeLbl = lv_label_create(tab);
+  lv_label_set_text(tasksRangeLbl, tasksRangeMode ? "semana" : "lista");
+  lv_obj_set_style_text_color(tasksRangeLbl, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_text_font(tasksRangeLbl, FONT_CAPTION, 0);
+  lv_obj_align(tasksRangeLbl, LV_ALIGN_TOP_RIGHT, -sw(6), sh(8));
+  lv_obj_add_flag(tasksRangeLbl, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(tasksRangeLbl, sw(8));
+  lv_obj_add_event_cb(tasksRangeLbl, [](lv_event_t *e) {
+    tasksRangeMode = (tasksRangeMode + 1) % 2;
+    lv_label_set_text(tasksRangeLbl, tasksRangeMode ? "semana" : "lista");
+    if (onTasksRange) onTasksRange(tasksRangeMode);
+  }, LV_EVENT_CLICKED, NULL);
 
   tasksTab = tab;
   rebuildTasksList();  // primeira build com count=0 -> empty state
@@ -2372,11 +2534,40 @@ static lv_image_dsc_t plantJpegDsc = {};
 
 static CultivoPlantPhotoRequestFn onPlantPhotoRequest = nullptr;
 static CultivoPlantDetailClosedFn onPlantDetailClosed = nullptr;
+static CultivoPhotoNavFn          onPhotoNav         = nullptr;
 extern "C" void cultivoUI_setPlantPhotoRequestHandler(CultivoPlantPhotoRequestFn cb) {
   onPlantPhotoRequest = cb;
 }
 extern "C" void cultivoUI_setPlantDetailClosedHandler(CultivoPlantDetailClosedFn cb) {
   onPlantDetailClosed = cb;
+}
+extern "C" void cultivoUI_setPhotoNavHandler(CultivoPhotoNavFn cb) {
+  onPhotoNav = cb;
+}
+
+// Timeline state pra mostrar "X/N" + ativar/desativar arrows
+static int photoTimelineIdx   = 0;
+static int photoTimelineTotal = 1;
+static lv_obj_t *photoNavPrev = nullptr;
+static lv_obj_t *photoNavNext = nullptr;
+static lv_obj_t *photoNavInfo = nullptr;
+
+extern "C" void cultivoUI_setPhotoTimelineInfo(int idx, int total) {
+  photoTimelineIdx   = idx;
+  photoTimelineTotal = total < 1 ? 1 : total;
+  if (photoNavInfo) {
+    if (photoTimelineTotal <= 1) {
+      lv_label_set_text(photoNavInfo, "");
+    } else {
+      lv_label_set_text_fmt(photoNavInfo, "%d/%d", photoTimelineIdx + 1, photoTimelineTotal);
+    }
+  }
+  // Esconde/mostra arrows: <- desabilitado se idx=0 (mais recente),
+  // -> desabilitado se idx == total-1 (mais antiga).
+  if (photoNavPrev) lv_obj_set_style_image_recolor(photoNavPrev,
+    lv_color_hex(photoTimelineIdx > 0 ? COL_TEXT : COL_DIM), 0);
+  if (photoNavNext) lv_obj_set_style_image_recolor(photoNavNext,
+    lv_color_hex(photoTimelineIdx + 1 < photoTimelineTotal ? COL_TEXT : COL_DIM), 0);
 }
 
 static uint32_t healthColor(uint8_t status) {
@@ -2588,7 +2779,11 @@ static void openPlantDetail(int idx) {
     plantDetailDate   = nullptr;
     plantDetailName   = nullptr;
     plantDetailLoad   = nullptr;
+    photoNavPrev = photoNavNext = photoNavInfo = nullptr;
   }
+  // Reset timeline state pra nova planta (default: 1/1 ate' lista chegar)
+  photoTimelineIdx = 0;
+  photoTimelineTotal = 1;
   plantDetailScreen = lv_obj_create(lv_layer_top());
   lv_obj_remove_style_all(plantDetailScreen);
   lv_obj_set_size(plantDetailScreen, SCREEN_W, SCREEN_H);
@@ -2614,6 +2809,38 @@ static void openPlantDetail(int idx) {
   lv_obj_set_style_text_color(plantDetailName, lv_color_hex(COL_TEXT), 0);
   lv_obj_set_style_text_font(plantDetailName, FONT_BODY, 0);
   lv_obj_align(plantDetailName, LV_ALIGN_TOP_LEFT, sw(40), sh(10));
+
+  // Photo timeline arrows + counter. Posicionados nas bordas do image
+  // container — < esquerda, > direita, "X/N" centro inferior.
+  // Arrows DESABILITAM (cinza dim) quando nao tem prev/next.
+  photoNavPrev = lv_label_create(plantDetailScreen);
+  lv_label_set_text(photoNavPrev, LV_SYMBOL_LEFT);
+  lv_obj_set_style_text_color(photoNavPrev, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(photoNavPrev, &lv_font_montserrat_24, 0);
+  lv_obj_align(photoNavPrev, LV_ALIGN_LEFT_MID, sw(8), 0);
+  lv_obj_add_flag(photoNavPrev, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(photoNavPrev, sw(16));
+  lv_obj_add_event_cb(photoNavPrev, [](lv_event_t *e) {
+    // Prev = idx menor = foto mais recente. -1 = direcao "anterior" na lista.
+    if (photoTimelineIdx > 0 && onPhotoNav) onPhotoNav(-1);
+  }, LV_EVENT_CLICKED, NULL);
+
+  photoNavNext = lv_label_create(plantDetailScreen);
+  lv_label_set_text(photoNavNext, LV_SYMBOL_RIGHT);
+  lv_obj_set_style_text_color(photoNavNext, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(photoNavNext, &lv_font_montserrat_24, 0);
+  lv_obj_align(photoNavNext, LV_ALIGN_RIGHT_MID, -sw(8), 0);
+  lv_obj_add_flag(photoNavNext, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_ext_click_area(photoNavNext, sw(16));
+  lv_obj_add_event_cb(photoNavNext, [](lv_event_t *e) {
+    if (photoTimelineIdx + 1 < photoTimelineTotal && onPhotoNav) onPhotoNav(+1);
+  }, LV_EVENT_CLICKED, NULL);
+
+  photoNavInfo = lv_label_create(plantDetailScreen);
+  lv_label_set_text(photoNavInfo, "");
+  lv_obj_set_style_text_color(photoNavInfo, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(photoNavInfo, FONT_CAPTION, 0);
+  lv_obj_align(photoNavInfo, LV_ALIGN_BOTTOM_MID, 0, -sh(36));
 
   // Container da foto (centralizado)
   plantDetailImage = lv_image_create(plantDetailScreen);
@@ -2682,6 +2909,7 @@ static void closePlantDetail() {
   if (plantDetailScreen) { lv_obj_del(plantDetailScreen); plantDetailScreen = nullptr; }
   plantDetailImage = plantDetailStatus = plantDetailDate = plantDetailName = nullptr;
   plantDetailLoad  = nullptr;
+  photoNavPrev = photoNavNext = photoNavInfo = nullptr;
   plantDetailId = -1;
   // Libera buffer JPEG da PSRAM — sem isso ficariam ~128KB pinados entre
   // aberturas. PSRAM realloca rapido na proxima foto.
@@ -2795,6 +3023,9 @@ extern "C" void cultivoUI_applyPlantPhoto(int plantId,
          plantId, (unsigned)len, healthStatus);
 }
 
+// Forward declarations dos modais quick-log
+static void openQuickLogMenu();
+
 static void buildPlantsScreen(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
@@ -2811,6 +3042,204 @@ static void buildPlantsScreen(lv_obj_t *tab) {
 
   plantsTab = tab;
   rebuildPlantsList();
+
+  // FAB (floating action button) canto inferior direito — quick log.
+  // Botao circular primary com ic_plus. Tap abre menu Regar/Fertilizar.
+  lv_obj_t *fab = lv_btn_create(tab);
+  lv_obj_set_size(fab, sw(44), sw(44));  // quadrado virando circulo via radius
+  lv_obj_align(fab, LV_ALIGN_BOTTOM_RIGHT, -sw(12), -sh(12));
+  lv_obj_set_style_radius(fab, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(fab, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(fab, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(fab, 0, 0);
+  lv_obj_set_style_shadow_width(fab, 12, 0);
+  lv_obj_set_style_shadow_color(fab, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_shadow_opa(fab, LV_OPA_50, 0);
+  lv_obj_set_style_shadow_ofs_y(fab, 4, 0);
+  lv_obj_t *fabIcon = lv_image_create(fab);
+  lv_image_set_src(fabIcon, &ic_plus);
+  lv_obj_set_style_image_recolor(fabIcon, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_image_recolor_opa(fabIcon, LV_OPA_COVER, 0);
+  lv_obj_center(fabIcon);
+  lv_obj_add_event_cb(fab, [](lv_event_t *e) { openQuickLogMenu(); }, LV_EVENT_CLICKED, NULL);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// QUICK LOG modals — menu inicial + picker numerico (water/feed)
+// FAB na Plantas tap -> menu com 2 botoes -> picker -> POST via onQuickLog
+// ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t *quickLogModal = nullptr;
+static lv_obj_t *qlSpinV1 = nullptr;
+static lv_obj_t *qlSpinV2 = nullptr;
+static const char *qlType = nullptr;  // "water" | "feed"
+
+static void closeQuickLog() {
+  if (quickLogModal) { lv_obj_del(quickLogModal); quickLogModal = nullptr; }
+  qlSpinV1 = qlSpinV2 = nullptr;
+  qlType = nullptr;
+}
+
+// Modal generico: card central com titulo + 1 ou 2 spinboxes + Cancelar/OK
+static void openQuickLogPicker(const char *type, const char *title,
+                                const char *lbl1, float min1, float max1, float step1, float def1,
+                                const char *lbl2 = nullptr, float min2 = 0, float max2 = 0, float step2 = 0, float def2 = 0) {
+  closeQuickLog();
+  qlType = type;
+  quickLogModal = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(quickLogModal);
+  lv_obj_set_size(quickLogModal, SCREEN_W, SCREEN_H);
+  lv_obj_set_style_bg_color(quickLogModal, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(quickLogModal, LV_OPA_70, 0);
+  lv_obj_clear_flag(quickLogModal, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Card central
+  lv_obj_t *card = lv_obj_create(quickLogModal);
+  lv_obj_set_size(card, SCREEN_W - sw(40), sh(180));
+  lv_obj_center(card);
+  lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(card, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(card, 1, 0);
+  lv_obj_set_style_radius(card, RADIUS_LG, 0);
+  lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(card, title, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(6));
+
+  // Spinbox 1 — usa slider porque LVGL lv_spinbox e' chato pra float
+  makeLabel(card, lbl1, COL_DIM, FONT_CAPTION, LV_ALIGN_LEFT_MID, sw(10), -sh(10));
+  qlSpinV1 = lv_slider_create(card);
+  lv_obj_set_size(qlSpinV1, sw(160), sh(14));
+  lv_obj_align(qlSpinV1, LV_ALIGN_LEFT_MID, sw(10), sh(8));
+  lv_slider_set_range(qlSpinV1, (int)(min1 / step1), (int)(max1 / step1));
+  lv_slider_set_value(qlSpinV1, (int)(def1 / step1), LV_ANIM_OFF);
+  lv_obj_set_style_bg_color(qlSpinV1, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(qlSpinV1, lv_color_hex(COL_PRIMARY), LV_PART_KNOB);
+  lv_obj_set_user_data(qlSpinV1, (void*)(intptr_t)(int)(step1 * 100));  // step *100 stored as int
+
+  // Label que mostra o valor selecionado, atualizada via callback
+  lv_obj_t *lblVal1 = lv_label_create(card);
+  lv_label_set_text_fmt(lblVal1, "%.2f", def1);
+  lv_obj_set_style_text_color(lblVal1, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_text_font(lblVal1, FONT_BODY, 0);
+  lv_obj_align(lblVal1, LV_ALIGN_RIGHT_MID, -sw(10), -sh(10));
+  lv_obj_add_event_cb(qlSpinV1, [](lv_event_t *e) {
+    lv_obj_t *s = (lv_obj_t*)lv_event_get_target(e);
+    int stepInt = (int)(intptr_t)lv_obj_get_user_data(s);
+    float step = (float)stepInt / 100.0f;
+    float v = lv_slider_get_value(s) * step;
+    lv_label_set_text_fmt((lv_obj_t*)lv_event_get_user_data(e), "%.2f", v);
+  }, LV_EVENT_VALUE_CHANGED, lblVal1);
+
+  // Spinbox 2 (opcional — feed tem ph + ec)
+  if (lbl2) {
+    makeLabel(card, lbl2, COL_DIM, FONT_CAPTION, LV_ALIGN_LEFT_MID, sw(10), sh(28));
+    qlSpinV2 = lv_slider_create(card);
+    lv_obj_set_size(qlSpinV2, sw(160), sh(14));
+    lv_obj_align(qlSpinV2, LV_ALIGN_LEFT_MID, sw(10), sh(46));
+    lv_slider_set_range(qlSpinV2, (int)(min2 / step2), (int)(max2 / step2));
+    lv_slider_set_value(qlSpinV2, (int)(def2 / step2), LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(qlSpinV2, lv_color_hex(COL_AMBER), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(qlSpinV2, lv_color_hex(COL_AMBER), LV_PART_KNOB);
+    lv_obj_set_user_data(qlSpinV2, (void*)(intptr_t)(int)(step2 * 100));
+
+    lv_obj_t *lblVal2 = lv_label_create(card);
+    lv_label_set_text_fmt(lblVal2, "%.2f", def2);
+    lv_obj_set_style_text_color(lblVal2, lv_color_hex(COL_AMBER), 0);
+    lv_obj_set_style_text_font(lblVal2, FONT_BODY, 0);
+    lv_obj_align(lblVal2, LV_ALIGN_RIGHT_MID, -sw(10), sh(28));
+    lv_obj_add_event_cb(qlSpinV2, [](lv_event_t *e) {
+      lv_obj_t *s = (lv_obj_t*)lv_event_get_target(e);
+      int stepInt = (int)(intptr_t)lv_obj_get_user_data(s);
+      float step = (float)stepInt / 100.0f;
+      float v = lv_slider_get_value(s) * step;
+      lv_label_set_text_fmt((lv_obj_t*)lv_event_get_user_data(e), "%.2f", v);
+    }, LV_EVENT_VALUE_CHANGED, lblVal2);
+  }
+
+  // Botoes Cancelar / OK
+  lv_obj_t *btnCancel = lv_btn_create(card);
+  lv_obj_set_size(btnCancel, sw(80), sh(28));
+  lv_obj_align(btnCancel, LV_ALIGN_BOTTOM_LEFT, sw(10), -sh(6));
+  lv_obj_set_style_bg_opa(btnCancel, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_color(btnCancel, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(btnCancel, 1, 0);
+  lv_obj_set_style_radius(btnCancel, RADIUS_MD, 0);
+  makeLabel(btnCancel, "Cancelar", COL_DIM, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_add_event_cb(btnCancel, [](lv_event_t *e) { closeQuickLog(); }, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_t *btnOk = lv_btn_create(card);
+  lv_obj_set_size(btnOk, sw(80), sh(28));
+  lv_obj_align(btnOk, LV_ALIGN_BOTTOM_RIGHT, -sw(10), -sh(6));
+  lv_obj_set_style_bg_color(btnOk, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_border_width(btnOk, 0, 0);
+  lv_obj_set_style_radius(btnOk, RADIUS_MD, 0);
+  makeLabel(btnOk, "Salvar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_add_event_cb(btnOk, [](lv_event_t *e) {
+    if (!qlSpinV1 || !qlType) { closeQuickLog(); return; }
+    int stepInt1 = (int)(intptr_t)lv_obj_get_user_data(qlSpinV1);
+    float v1 = lv_slider_get_value(qlSpinV1) * ((float)stepInt1 / 100.0f);
+    float v2 = 0;
+    if (qlSpinV2) {
+      int stepInt2 = (int)(intptr_t)lv_obj_get_user_data(qlSpinV2);
+      v2 = lv_slider_get_value(qlSpinV2) * ((float)stepInt2 / 100.0f);
+    }
+    if (onQuickLog) onQuickLog(qlType, v1, v2);
+    showToast("Registrado");
+    closeQuickLog();
+  }, LV_EVENT_CLICKED, NULL);
+}
+
+static void openQuickLogMenu() {
+  closeQuickLog();
+  quickLogModal = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(quickLogModal);
+  lv_obj_set_size(quickLogModal, SCREEN_W, SCREEN_H);
+  lv_obj_set_style_bg_color(quickLogModal, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(quickLogModal, LV_OPA_70, 0);
+  lv_obj_clear_flag(quickLogModal, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Tap fora do card fecha modal
+  lv_obj_add_flag(quickLogModal, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(quickLogModal, [](lv_event_t *e) {
+    // So fecha se o tap foi no overlay (nao bubble dos filhos)
+    if (lv_event_get_target(e) == lv_event_get_current_target(e)) closeQuickLog();
+  }, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_t *card = lv_obj_create(quickLogModal);
+  lv_obj_set_size(card, SCREEN_W - sw(60), sh(140));
+  lv_obj_center(card);
+  lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(card, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(card, 1, 0);
+  lv_obj_set_style_radius(card, RADIUS_LG, 0);
+  lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+
+  makeLabel(card, "Log rapido", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(6));
+
+  // Botao Regar — primary
+  lv_obj_t *btnWater = lv_btn_create(card);
+  lv_obj_set_size(btnWater, sw(220), sh(36));
+  lv_obj_align(btnWater, LV_ALIGN_CENTER, 0, -sh(8));
+  lv_obj_set_style_bg_color(btnWater, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_border_width(btnWater, 0, 0);
+  lv_obj_set_style_radius(btnWater, RADIUS_LG, 0);
+  makeLabel(btnWater, "Reguei", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_add_event_cb(btnWater, [](lv_event_t *e) {
+    openQuickLogPicker("water", "Quanto reguei?", "Litros", 0.1f, 5.0f, 0.1f, 1.0f);
+  }, LV_EVENT_CLICKED, NULL);
+
+  // Botao Fertilizar — amber
+  lv_obj_t *btnFeed = lv_btn_create(card);
+  lv_obj_set_size(btnFeed, sw(220), sh(36));
+  lv_obj_align(btnFeed, LV_ALIGN_CENTER, 0, sh(28));
+  lv_obj_set_style_bg_color(btnFeed, lv_color_hex(COL_AMBER), 0);
+  lv_obj_set_style_border_width(btnFeed, 0, 0);
+  lv_obj_set_style_radius(btnFeed, RADIUS_LG, 0);
+  makeLabel(btnFeed, "Fertilizei", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_add_event_cb(btnFeed, [](lv_event_t *e) {
+    openQuickLogPicker("feed", "Fertilizacao",
+                       "pH",  4.0f, 8.0f, 0.1f, 6.0f,
+                       "EC",  0.5f, 3.0f, 0.1f, 1.4f);
+  }, LV_EVENT_CLICKED, NULL);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════

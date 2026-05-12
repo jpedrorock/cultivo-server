@@ -101,13 +101,22 @@ void cultivoUI_stopItemSpin(int idx);
 // item tem id (pra POST task-complete), titulo curto e flag done. Max 10
 // (display caberia mais, mas server limita LIMIT 10 hoje). UI: lista vertical
 // scrollable com checkbox + label; tap toggla done via onTaskToggle(taskId).
-#define TASKS_MAX 10
+#define TASKS_MAX 25  // bumpado de 10 pra suportar visualizacao 7d (current + next week + overdue)
 typedef struct {
-  int         id;       // id da row em standaloneTasks
+  int         id;       // id da row (taskInstances ou -standaloneTasks)
   const char *title;    // texto exibido
   bool        done;     // status atual
+  // Calendar mode: dueDate epoch sec (0 = sem data). UI agrupa por dia.
+  // overdue: tarefa nao feita E occurrenceDate < startOfWeek (cor vermelha).
+  uint32_t    dueDate;
+  bool        overdue;
 } CultivoTask;
 void cultivoUI_applyTasks(const CultivoTask *items, int count);
+
+// Tap no toggle Lista/Semana da aba Tarefas. mode: 0=lista, 1=semana.
+// App refaz fetchTasks com range=current|7d.
+typedef void (*CultivoTasksRangeFn)(int mode);
+void cultivoUI_setTasksRangeHandler(CultivoTasksRangeFn cb);
 
 // App registra callback chamado quando user tap em uma tarefa — taskId
 // e' o id da row no DB. App faz POST /api/device/task-complete.
@@ -140,6 +149,15 @@ void cultivoUI_applyPlants(const CultivoPlant *items, int count);
 
 typedef void (*CultivoPlantPhotoRequestFn)(int plantId);
 void cultivoUI_setPlantPhotoRequestHandler(CultivoPlantPhotoRequestFn cb);
+
+// Photo timeline navigation. direction: -1=mais recente, +1=mais antiga.
+// App resolve qual photoId baixar via lista interna + dispara fetch.
+typedef void (*CultivoPhotoNavFn)(int direction);
+void cultivoUI_setPhotoNavHandler(CultivoPhotoNavFn cb);
+
+// App seta antes de cada fetch — UI mostra "idx+1/total" + arrows.
+// idx=0 mais recente. total<=1 esconde arrows (so' uma foto).
+void cultivoUI_setPhotoTimelineInfo(int idx, int total);
 
 // Notificado quando user fecha o detalhe — app aproveita pra liberar o
 // buffer de DOWNLOAD HTTP (128KB PSRAM) que ficaria pinado entre views.
@@ -175,6 +193,9 @@ typedef void (*CultivoSceneTriggerFn)(int sceneId);
 // Tap no icone WiFi do header — app forca reconexao WiFi (sai do estado
 // offline sem precisar reboot). UI mostra toast de feedback.
 typedef void (*CultivoWifiReconnectFn)(void);
+// Tap no label de periodo do Historico ("ultimas 24h" -> 7d -> 30d -> 24h).
+// period: 0=24h, 1=7d, 2=30d. App refaz fetchHistoryAll com periodStr.
+typedef void (*CultivoHistPeriodFn)(int period);
 
 void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb);
 void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb);
@@ -182,6 +203,7 @@ void cultivoUI_setConfigOpenHandler(CultivoOpenConfigFn cb);
 void cultivoUI_setRefreshHandler(CultivoRefreshFn cb);
 void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb);
 void cultivoUI_setWifiReconnectHandler(CultivoWifiReconnectFn cb);
+void cultivoUI_setHistPeriodHandler(CultivoHistPeriodFn cb);
 
 // ── Indicacao de refresh em andamento ─────────────────────────────────────────
 // App chama cultivoUI_setRefreshing(true) ao iniciar refresh, false ao terminar.
@@ -195,6 +217,24 @@ void cultivoUI_showIdleOverlay(void);
 void cultivoUI_hideIdleOverlay(void);
 // Atualiza o clock no overlay (chamado pelo firmware a cada 30s).
 void cultivoUI_tickIdleOverlay(void);
+
+// ── Alert overlay (SSE push) ──────────────────────────────────────────────────
+// Modal cobre tela com cor da severidade + mensagem do alerta. Bloqueia ate
+// user tocar pra ack. App registra callback onAlertAck pra fazer POST.
+// type: "OUT_OF_RANGE" | "SAFETY_LIMIT" | "TREND" (do server)
+// metric: "TEMP" | "RH" | "PPFD" | "PH"
+void cultivoUI_showAlert(int alertId, const char *type, const char *metric, const char *message);
+
+typedef void (*CultivoAlertAckFn)(int alertId);
+void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb);
+
+// ── Quick log (FAB na aba Plantas) ────────────────────────────────────────────
+// FAB no canto inferior direito da Plantas abre modal com 2 acoes:
+//   "Reguei"     -> POST /quick-log {type:water, liters: v1}
+//   "Fertilizei" -> POST /quick-log {type:feed,  ph: v1, ec: v2}
+// type: "water" | "feed".
+typedef void (*CultivoQuickLogFn)(const char *type, float v1, float v2);
+void cultivoUI_setQuickLogHandler(CultivoQuickLogFn cb);
 
 #ifdef __cplusplus
 }

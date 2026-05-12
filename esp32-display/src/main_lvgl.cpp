@@ -1951,17 +1951,23 @@ static void formatPhotoDate(const char *iso, char *out, size_t outLen) {
 // Le JPEG binario do stream HTTP em chunks pro buffer PSRAM. Cap em
 // PLANT_JPEG_MAX_BYTES — passou disso, descarta. Retorna bytes lidos
 // (0 se erro). Tambem parseia headers X-Health-Status e X-Log-Date.
-static size_t fetchPlantPhoto(int plantId,
+static size_t fetchPlantPhoto(int plantId, int photoId,
                               uint8_t *outHealth,
                               char *outDateStr, size_t outDateLen) {
   if (!wifiOk) return 0;
   HTTPClient http;
-  char url[192];
+  char url[224];
   // fmt=rgb565: server pre-decoda e envia 320x240x2=153600 bytes raw.
-  // Zero decode no ESP — so' memcpy pro framebuffer LVGL.
-  snprintf(url, sizeof(url),
-           "%s/api/device/plant/%d/photo?w=320&h=240&fmt=rgb565",
-           SERVER_URL, plantId);
+  // photoId=0 = ultima foto (default), >0 = foto especifica (timeline).
+  if (photoId > 0) {
+    snprintf(url, sizeof(url),
+             "%s/api/device/plant/%d/photo?w=320&h=240&fmt=rgb565&photoId=%d",
+             SERVER_URL, plantId, photoId);
+  } else {
+    snprintf(url, sizeof(url),
+             "%s/api/device/plant/%d/photo?w=320&h=240&fmt=rgb565",
+             SERVER_URL, plantId);
+  }
   httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   // Solicita headers extras p/ parsing (HTTPClient ESP32 precisa)
@@ -2107,6 +2113,49 @@ static size_t fetchPlantPhoto(int plantId,
   return total;
 }
 
+// Photo timeline: lista de IDs das fotos da planta atual + indice corrente.
+// Populado por fetchPlantPhotosList; consumido pra navegar com ← →.
+#define PHOTO_LIST_MAX 10
+static int photoListIds[PHOTO_LIST_MAX] = {0};
+static int photoListCount     = 0;
+static int photoListIdx       = 0;  // 0 = mais recente
+static int photoListPlantId   = 0;  // pra invalidar lista quando trocar planta
+static volatile bool photoTimelineNeedsApply = false;
+
+// GET /api/device/plant/:id/photos — lista as ultimas 10 fotos (metadata).
+static bool fetchPlantPhotosList(int plantId) {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/plant/%d/photos", SERVER_URL, plantId);
+  httpBegin(http, url);
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[net] photos list HTTP %d\n", code);
+    http.end();
+    return false;
+  }
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream());
+  http.end();
+  if (err != DeserializationError::Ok) return false;
+  JsonArray arr = doc["photos"].as<JsonArray>();
+  int n = 0;
+  for (JsonObject p : arr) {
+    if (n >= PHOTO_LIST_MAX) break;
+    int id = p["id"] | 0;
+    if (id <= 0) continue;
+    photoListIds[n++] = id;
+  }
+  photoListCount = n;
+  photoListPlantId = plantId;
+  photoListIdx = 0;  // sempre comeca na mais recente
+  Serial.printf("[net] photos list plant=%d count=%d\n", plantId, photoListCount);
+  return true;
+}
+
 // Handler enfileira o request — tapTask processa (HTTP/PSRAM/JPEG decode
 // nao podem rodar no thread LVGL — estouro de stack).
 static void plantPhotoRequestHandler(int plantId) {
@@ -2114,8 +2163,28 @@ static void plantPhotoRequestHandler(int plantId) {
     Serial.println("[plant] outro photo request pending — ignorado");
     return;
   }
+  // Reset timeline state pra nova planta
+  if (plantId != photoListPlantId) {
+    photoListCount = 0;
+    photoListIdx = 0;
+    photoListPlantId = plantId;
+  }
   plantPhotoTapId = plantId;
   plantPhotoTapPending = true;
+}
+
+// Navigation: -1 = mais recente (idx menor), +1 = mais antiga (idx maior).
+// Adjusta photoListIdx + dispara fetch da nova foto.
+static void photoNavHandler(int direction) {
+  if (photoListCount <= 1) return;
+  int newIdx = photoListIdx + direction;
+  if (newIdx < 0 || newIdx >= photoListCount) return;
+  photoListIdx = newIdx;
+  if (plantPhotoTapPending) return;  // ja tem outro fetch em flight
+  plantPhotoTapId = photoListPlantId;
+  plantPhotoTapPending = true;
+  Serial.printf("[plant] timeline nav -> idx=%d (photoId=%d)\n",
+                photoListIdx, photoListIds[photoListIdx]);
 }
 
 // User fechou detalhe — libera buffer de DOWNLOAD (128KB PSRAM). Copia
@@ -2127,42 +2196,59 @@ static void plantDetailClosedHandler() {
     plantPhotoBuf = nullptr;
     Serial.println("[plant] photo buf liberado (128KB)");
   }
+  // Limpa cache de timeline pra proxima abertura comecar fresh
+  photoListCount = 0;
+  photoListIdx = 0;
+  photoListPlantId = 0;
 }
 
 static void processPlantPhotoTap() {
   if (!plantPhotoTapPending) return;
   int id = plantPhotoTapId;
   plantPhotoTapPending = false;
+  // Se nao temos lista ainda, fetcha primeiro (1 request extra mas barato)
+  if (photoListCount == 0 || photoListPlantId != id) {
+    fetchPlantPhotosList(id);
+  }
+  // Resolve photoId atual da timeline (0 = mais recente / param vazio)
+  int photoId = (photoListCount > 0 && photoListIdx < photoListCount)
+              ? photoListIds[photoListIdx] : 0;
   uint8_t health = 0;
   char dateBuf[24] = {0};
-  size_t got = fetchPlantPhoto(id, &health, dateBuf, sizeof(dateBuf));
-  // Sinaliza UI (mesmo se got==0 → mostra "indisponivel")
+  size_t got = fetchPlantPhoto(id, photoId, &health, dateBuf, sizeof(dateBuf));
   plantPhotoPlantId = id;
   plantPhotoLen     = got;
   plantPhotoHealth  = health;
   strncpy(plantPhotoDate, dateBuf, sizeof(plantPhotoDate) - 1);
   plantPhotoDate[sizeof(plantPhotoDate) - 1] = '\0';
   plantPhotoNeedsApply = true;
+  photoTimelineNeedsApply = true;  // sinaliza UI pra atualizar X/N + arrows
 }
 
 // TAREFAS — aba 4 do display. fetchTasks GET /api/device/tasks/<tentId>
 // retorna lista de standaloneTasks ({id, texto, feito}). UI mostra
 // checkbox + label + scroll. Tap dispara POST /api/device/task-complete.
 // ════════════════════════════════════════════════════════════════════════════════
-#define TASKS_LOCAL_MAX 10
-static int  taskIdsLocal   [TASKS_LOCAL_MAX] = {0};
-static char taskTitlesLocal[TASKS_LOCAL_MAX][64] = {{0}};
-static bool taskDoneLocal  [TASKS_LOCAL_MAX] = {false};
-static int  taskCountLocal = 0;
+#define TASKS_LOCAL_MAX 25  // bumpado pra calendar mode (current + next week + overdue)
+static int      taskIdsLocal     [TASKS_LOCAL_MAX] = {0};
+static char     taskTitlesLocal  [TASKS_LOCAL_MAX][64] = {{0}};
+static bool     taskDoneLocal    [TASKS_LOCAL_MAX] = {false};
+static uint32_t taskDueDateLocal [TASKS_LOCAL_MAX] = {0};
+static bool     taskOverdueLocal [TASKS_LOCAL_MAX] = {false};
+static int      taskCountLocal = 0;
 static volatile bool tasksNeedsRefresh = false;
 static unsigned long lastTasksFetch = 0;
 static const unsigned long TASKS_FETCH_INTERVAL = 60UL * 1000UL;  // 1 min
+// Range atual da fetchTasks. UI toggle Lista/Semana chama com mode 0|1.
+static int      tasksRangeIdx = 0;  // 0=current, 1=7d
 
 static bool fetchTasks() {
   if (!wifiOk) return false;
   HTTPClient http;
-  char url[128];
-  snprintf(url, sizeof(url), "%s/api/device/tasks/%d", SERVER_URL, TENT_ID);
+  char url[160];
+  // range=current (default) ou ?range=7d quando user toggle Lista->Semana
+  snprintf(url, sizeof(url), "%s/api/device/tasks/%d?range=%s",
+           SERVER_URL, TENT_ID, tasksRangeIdx == 1 ? "7d" : "current");
   httpBegin(http, url);
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
@@ -2179,7 +2265,7 @@ static bool fetchTasks() {
     Serial.printf("[net] tasks JSON err: %s\n", err.c_str());
     return false;
   }
-  // Response: array de {id, texto, feito} (formato definido no deviceRoutes)
+  // Response: array de {id, texto, feito, dueDate?, overdue?}
   JsonArray arr = doc.as<JsonArray>();
   int n = 0;
   for (JsonObject t : arr) {
@@ -2187,17 +2273,30 @@ static bool fetchTasks() {
     int id = t["id"] | 0;
     const char *texto = t["texto"] | "";
     bool feito = t["feito"] | false;
-    if (id <= 0 || !*texto) continue;
+    if (id == 0 || !*texto) continue;
     taskIdsLocal[n] = id;
     strncpy(taskTitlesLocal[n], texto, sizeof(taskTitlesLocal[n]) - 1);
     taskTitlesLocal[n][sizeof(taskTitlesLocal[n]) - 1] = '\0';
-    taskDoneLocal[n] = feito;
+    taskDoneLocal[n]    = feito;
+    taskDueDateLocal[n] = (uint32_t)(t["dueDate"] | 0);
+    taskOverdueLocal[n] = t["overdue"] | false;
     n++;
   }
   taskCountLocal = n;
-  Serial.printf("[net] tasks: %d carregadas\n", taskCountLocal);
+  Serial.printf("[net] tasks: %d carregadas (range=%s)\n", taskCountLocal,
+                tasksRangeIdx == 1 ? "7d" : "current");
   tasksNeedsRefresh = true;
   return true;
+}
+
+// User tocou no toggle Lista/Semana da aba Tarefas. Atualiza range e
+// refetcha imediato. Rodando na UI thread porque user esta esperando.
+static void tasksRangeHandler(int mode) {
+  tasksRangeIdx = mode;
+  Serial.printf("[ui] tasks range -> %d\n", mode);
+  if (fetchTasks()) {
+    lastTasksFetch = millis();
+  }
 }
 
 // POST /api/device/task-complete — server toggla isDone e retorna novo state.
@@ -2608,6 +2707,147 @@ static void netTaskFn(void *param) {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// SSE TASK — consumer de Server-Sent Events do /api/device/stream/<tentId>
+//
+// Mantem conexao HTTPS long-lived com o server. Recebe eventos:
+//   ": ping <ms>\n\n"            heartbeat (ignora)
+//   "event: alert\ndata: {...}\n\n"   alerta novo
+//
+// Push para alertPending flag + alertBuf. Main loop le e dispara UI overlay.
+// Reconnect com backoff 5s se conexao cair. Usa ?since=<lastAlertId> pra
+// evitar duplicar em reconexao temporaria.
+// ════════════════════════════════════════════════════════════════════════════════
+static TaskHandle_t sseTaskHandle = NULL;
+static volatile bool alertPending = false;
+static int  alertBufId = 0;
+static char alertBufType[16]    = {0};
+static char alertBufMetric[8]   = {0};
+static char alertBufMessage[160]= {0};
+static int  lastAlertId = 0;
+
+static void sseTaskFn(void *param) {
+  static WiFiClientSecure sseClient;
+  sseClient.setInsecure();  // mesma trust model dos outros endpoints
+
+  for (;;) {
+    if (!wifiOk || strlen(DEVICE_TOKEN) == 0) {
+      vTaskDelay(pdMS_TO_TICKS(2000));
+      continue;
+    }
+
+    // Extrai host do SERVER_URL (https://app.cultivo.pro -> app.cultivo.pro)
+    char host[64] = {0};
+    const char *p = strstr(SERVER_URL, "://");
+    if (p) {
+      strncpy(host, p + 3, sizeof(host) - 1);
+      // strip path se houver
+      char *slash = strchr(host, '/');
+      if (slash) *slash = 0;
+    } else {
+      strncpy(host, SERVER_URL, sizeof(host) - 1);
+    }
+
+    Serial.printf("[sse] conectando %s:443 (since=%d)\n", host, lastAlertId);
+    if (!sseClient.connect(host, 443)) {
+      Serial.println("[sse] connect fail");
+      vTaskDelay(pdMS_TO_TICKS(5000));
+      continue;
+    }
+
+    // GET request com Accept: text/event-stream
+    sseClient.printf("GET /api/device/stream/%d?since=%d HTTP/1.1\r\n", TENT_ID, lastAlertId);
+    sseClient.printf("Host: %s\r\n", host);
+    sseClient.printf("X-Device-Token: %s\r\n", DEVICE_TOKEN);
+    sseClient.print("Accept: text/event-stream\r\n");
+    sseClient.print("Cache-Control: no-cache\r\n");
+    sseClient.print("Connection: keep-alive\r\n\r\n");
+
+    // Skip response headers ate' linha vazia
+    bool headersDone = false;
+    unsigned long lastRead = millis();
+    while (sseClient.connected() && !headersDone && millis() - lastRead < 10000) {
+      if (!sseClient.available()) { vTaskDelay(pdMS_TO_TICKS(20)); continue; }
+      String line = sseClient.readStringUntil('\n');
+      lastRead = millis();
+      line.trim();
+      if (line.isEmpty()) headersDone = true;
+      // Aceita 200; se outro status, log e desconecta pra retry
+      if (line.startsWith("HTTP/")) {
+        if (line.indexOf(" 200 ") < 0) {
+          Serial.printf("[sse] resp: %s\n", line.c_str());
+          sseClient.stop();
+          break;
+        }
+      }
+    }
+    if (!headersDone) {
+      sseClient.stop();
+      vTaskDelay(pdMS_TO_TICKS(5000));
+      continue;
+    }
+
+    Serial.println("[sse] conectado, lendo events");
+    // Loop principal de leitura SSE. Eventos sao "key: value\n" terminados
+    // por linha vazia. Heartbeat ": ping\n\n" ignora-se.
+    String eventName, dataLine;
+    lastRead = millis();
+    while (sseClient.connected()) {
+      if (!sseClient.available()) {
+        // Detecta drop: 60s sem dado nenhum (heartbeat e' 25s, dobramos)
+        if (millis() - lastRead > 60000) {
+          Serial.println("[sse] timeout — reconectando");
+          break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));
+        continue;
+      }
+      String line = sseClient.readStringUntil('\n');
+      lastRead = millis();
+      line.trim();
+      if (line.isEmpty()) {
+        // Fim de evento — processa se temos data
+        if (dataLine.length() > 0 && eventName == "alert") {
+          JsonDocument doc;
+          if (deserializeJson(doc, dataLine) == DeserializationError::Ok) {
+            int aid = doc["id"] | 0;
+            const char *atype   = doc["type"]    | "";
+            const char *ametric = doc["metric"]  | "";
+            const char *amsg    = doc["message"] | "";
+            if (aid > lastAlertId) {
+              lastAlertId = aid;
+              alertBufId  = aid;
+              strncpy(alertBufType,    atype,   sizeof(alertBufType)    - 1);
+              strncpy(alertBufMetric,  ametric, sizeof(alertBufMetric)  - 1);
+              strncpy(alertBufMessage, amsg,    sizeof(alertBufMessage) - 1);
+              alertBufType[sizeof(alertBufType)-1]       = 0;
+              alertBufMetric[sizeof(alertBufMetric)-1]   = 0;
+              alertBufMessage[sizeof(alertBufMessage)-1] = 0;
+              alertPending = true;
+              Serial.printf("[sse] alert id=%d type=%s metric=%s: %s\n",
+                            aid, atype, ametric, amsg);
+            }
+          }
+        }
+        eventName = "";
+        dataLine = "";
+        continue;
+      }
+      if (line.startsWith(":")) continue;  // comentario / heartbeat
+      if (line.startsWith("event:")) {
+        eventName = line.substring(6);
+        eventName.trim();
+      } else if (line.startsWith("data:")) {
+        dataLine = line.substring(5);
+        dataLine.trim();
+      }
+    }
+    sseClient.stop();
+    Serial.println("[sse] desconectado, retry em 5s");
+    vTaskDelay(pdMS_TO_TICKS(5000));
+  }
+}
+
 static void startNetTask() {
   if (netTaskHandle) return;
   // Stack 8KB: cobre TLS handshake (~4KB) + JSON parsing (~2KB) com folga
@@ -2616,7 +2856,11 @@ static void startNetTask() {
   // estava apertado — TLS handshake + WiFiClientSecure + JsonDocument
   // estourava em algumas situacoes -> ESP reset).
   xTaskCreatePinnedToCore(tapTaskFn, "tapTask", 12288, NULL, 1, &tapTaskHandle, 0);
-  Serial.println("[net] netTask + tapTask iniciadas no core 0");
+  // sseTask: long-lived HTTPS pra alertas push. Stack 12KB (mantem
+  // WiFiClientSecure alive + readStringUntil buffers). Core 0 separado
+  // do LVGL pra TLS handshake nao travar UI.
+  xTaskCreatePinnedToCore(sseTaskFn, "sseTask", 12288, NULL, 1, &sseTaskHandle, 0);
+  Serial.println("[net] netTask + tapTask + sseTask iniciadas no core 0");
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -2671,6 +2915,65 @@ static void wifiReconnectHandler() {
   wifiReconnectPending = true;
   Serial.println("[ui] WiFi reconnect requested");
 }
+
+// Quick log do FAB da aba Plantas — POST /api/device/quick-log.
+// type=water:  v1=liters, v2 ignorado
+// type=feed:   v1=ph,     v2=ec
+// Rodando direto na UI thread porque user esta esperando (~200ms POST).
+static void quickLogHandler(const char *type, float v1, float v2) {
+  if (!wifiOk || !type) return;
+  HTTPClient http;
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/quick-log", SERVER_URL);
+  httpBegin(http, url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  char body[128];
+  if (!strcmp(type, "water")) {
+    snprintf(body, sizeof(body), "{\"type\":\"water\",\"liters\":%.2f}", v1);
+  } else if (!strcmp(type, "feed")) {
+    snprintf(body, sizeof(body), "{\"type\":\"feed\",\"ph\":%.1f,\"ec\":%.2f}", v1, v2);
+  } else {
+    http.end();
+    return;
+  }
+  int code = http.POST(body);
+  Serial.printf("[net] quick-log %s HTTP %d\n", type, code);
+  http.end();
+}
+
+// User tocou no alert overlay pra dispensar. Marca como SEEN no server
+// via POST /alert-ack. Rodando direto na UI thread porque user esta
+// esperando feedback; HTTPClient.POST e' ~200ms.
+static void alertAckHandler(int alertId) {
+  if (!wifiOk || alertId <= 0) return;
+  HTTPClient http;
+  char url[128];
+  snprintf(url, sizeof(url), "%s/api/device/alert-ack", SERVER_URL);
+  httpBegin(http, url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.setTimeout(5000);
+  char body[48];
+  snprintf(body, sizeof(body), "{\"alertId\":%d}", alertId);
+  int code = http.POST(body);
+  Serial.printf("[net] alert-ack id=%d HTTP %d\n", alertId, code);
+  http.end();
+}
+
+// Tap no label de periodo do Historico ("ultimas 24h" -> 7d -> 30d).
+// Re-fetcha history-all com periodStr correspondente. Rodando direto na UI
+// thread — fetch e' leve (~30 pontos, JSON ~1KB) e user esta esperando.
+static void histPeriodHandler(int period) {
+  const char *periodStr = (period == 1) ? "7d" : (period == 2) ? "30d" : "24h";
+  Serial.printf("[ui] historico period -> %s\n", periodStr);
+  if (fetchHistoryAll(periodStr)) {
+    cultivoUI_applyHistory();
+    lastHistFetch = millis();  // reset timer pra evitar refetch automatico
+  }
+}
+
 // POST /api/device/device-toggle — manda novo state desejado e parseia state
 // REAL retornado (Tuya pode falhar ou tomar caminho diferente). Server
 // resposta esperada: {success:true, deviceId:"...", state:true|false}.
@@ -2874,6 +3177,11 @@ static void buildUI() {
   cultivoUI_setPlantPhotoRequestHandler(plantPhotoRequestHandler);
   cultivoUI_setPlantDetailClosedHandler(plantDetailClosedHandler);
   cultivoUI_setWifiReconnectHandler(wifiReconnectHandler);
+  cultivoUI_setHistPeriodHandler(histPeriodHandler);
+  cultivoUI_setAlertAckHandler(alertAckHandler);
+  cultivoUI_setQuickLogHandler(quickLogHandler);
+  cultivoUI_setTasksRangeHandler(tasksRangeHandler);
+  cultivoUI_setPhotoNavHandler(photoNavHandler);
   buildCultivoUI();
 }
 
@@ -3236,9 +3544,11 @@ void loop() {
     tasksNeedsRefresh = false;
     CultivoTask buf[TASKS_LOCAL_MAX] = {};
     for (int i = 0; i < taskCountLocal; i++) {
-      buf[i].id    = taskIdsLocal[i];
-      buf[i].title = taskTitlesLocal[i];
-      buf[i].done  = taskDoneLocal[i];
+      buf[i].id      = taskIdsLocal[i];
+      buf[i].title   = taskTitlesLocal[i];
+      buf[i].done    = taskDoneLocal[i];
+      buf[i].dueDate = taskDueDateLocal[i];
+      buf[i].overdue = taskOverdueLocal[i];
     }
     cultivoUI_applyTasks(buf, taskCountLocal);
   }
@@ -3275,6 +3585,17 @@ void loop() {
                               plantPhotoLen,
                               plantPhotoHealth,
                               plantPhotoDate);
+  }
+  // Alerta SSE chegou — mostra overlay modal cobrindo tela inteira.
+  // Tap em qualquer lugar do overlay aciona ack via alertAckHandler.
+  if (alertPending) {
+    alertPending = false;
+    cultivoUI_showAlert(alertBufId, alertBufType, alertBufMetric, alertBufMessage);
+  }
+  // Timeline info atualizada — UI mostra "X/N" + ativa/desativa arrows
+  if (photoTimelineNeedsApply) {
+    photoTimelineNeedsApply = false;
+    cultivoUI_setPhotoTimelineInfo(photoListIdx, photoListCount);
   }
 
   // OTA handle: no-op quando nao ha' upload; durante upload bloqueia UI
