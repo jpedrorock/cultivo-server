@@ -1326,7 +1326,7 @@ export const plantPhotosRouter = router({
           throw new Error('Falha ao salvar foto');
         }
         
-        await database.insert(plantPhotos).values({
+        const inserted: any = await database.insert(plantPhotos).values({
           plantId: input.plantId,
           photoUrl,
           photoKey,
@@ -1335,10 +1335,32 @@ export const plantPhotosRouter = router({
           description: input.description,
           photoDate: new Date(),
         });
-        
+        const photoId: number = Number(inserted?.insertId ?? inserted?.[0]?.insertId ?? 0);
+
+        // Push SSE: notifica ESP da estufa onde a planta esta pra prefetch
+        // da foto em background. UX: ao tocar na planta no display, a foto
+        // aparece instantaneo (ja' cacheada) em vez de spinner ~2s.
+        try {
+          const plantRow = await database.select({ currentTentId: plants.currentTentId })
+            .from(plants).where(eq(plants.id, input.plantId)).limit(1);
+          const tentId = plantRow[0]?.currentTentId;
+          if (tentId) {
+            const { deviceEvents } = await import("../_core/deviceEvents");
+            deviceEvents.emitForTent(tentId, {
+              type: "photo",
+              plantId: input.plantId,
+              photoId,
+              photoDate: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          // SSE e' best-effort — falha aqui nao afeta o upload.
+          console.warn("[plantPhotos.upload] SSE emit falhou:", (e as any)?.message);
+        }
+
         return { success: true, photoUrl };
       }),
-    
+
     // Salvar URL de foto já enviada para o storage via /api/upload/image
     saveUrl: protectedProcedure
       .input(z.object({

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "author": "Cultivo",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 96,
+      "left": -158.36,
+      "attrs": { "flash": "8", "psram": "none" }
+    },
+    {
+      "type": "board-ili9341-cap-touch",
+      "id": "lcd1",
+      "top": -4.7,
+      "left": 202.8,
+      "rotate": 90,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "lcd1:GND",  "esp:GND.2", "black",   [ "h0", "v0" ] ],
+    [ "lcd1:VCC",  "esp:5V",    "red",     [ "h0", "v0" ] ],
+    [ "lcd1:CS",   "esp:10",    "violet",  [ "h0", "v0" ] ],
+    [ "lcd1:RST",  "esp:14",    "purple",  [ "h0", "v0" ] ],
+    [ "lcd1:D/C",  "esp:8",     "#8f4814", [ "h0", "v0" ] ],
+    [ "lcd1:MOSI", "esp:11",    "green",   [ "h0", "v0" ] ],
+    [ "lcd1:SCK",  "esp:12",    "gray",    [ "h0", "v0" ] ],
+    [ "lcd1:MISO", "esp:13",    "orange",  [ "h0", "v0" ] ],
+    [ "lcd1:SDA",  "esp:4",     "white",   [ "h0", "v0" ] ],
+    [ "lcd1:SCL",  "esp:5",     "yellow",  [ "h0", "v0" ] ]
+  ],
+  "dependencies": {}
+}

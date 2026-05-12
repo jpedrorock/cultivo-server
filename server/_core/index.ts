@@ -39,6 +39,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 // aqui, cada uma abrindo sua própria conexão TCP.
 import { runMigrations } from "./dbMigrations";
 
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
@@ -118,6 +119,7 @@ async function startServer() {
     console.error('[Startup] ⚠️  Migrations falharam (app continua):', (migErr as Error).message);
   }
 
+
   // Inicializar estrutura de diretórios de uploads
   initializeStorageDirectories();
 
@@ -189,21 +191,6 @@ async function startServer() {
 
   // Cookie parser para autenticação JWT
   app.use(cookieParser());
-
-  // Rate limit global para a API — 200 req/min por IP
-  // Protege contra abuso/scraping; rotas de auth têm limites mais estritos próprios.
-  const { default: rateLimit } = await import("express-rate-limit");
-  app.use("/api/", rateLimit({
-    windowMs: 60 * 1000,             // 1 minuto
-    limit: 200,                      // 200 requisições por minuto
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-    skip: (req) => {
-      // /api/auth/me é chamado em todo render — não conta para o limite global
-      return req.path === '/auth/me';
-    },
-    message: { error: 'Muitas requisições. Aguarde um instante.' },
-  }));
 
   // Servir arquivos estáticos da pasta /uploads
   const uploadsPath = path.join(process.cwd(), 'uploads');

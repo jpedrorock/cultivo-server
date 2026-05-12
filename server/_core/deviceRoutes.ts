@@ -363,7 +363,8 @@ function registerDeviceRoutes(app: express.Application) {
       // Envia alertas pendentes na conexao
       await sendNewAlerts();
 
-      // Poll DB a cada 5s pra novos alertas
+      // Poll DB a cada 5s pra novos alertas (mantido — alerts vem do alertChecker
+      // cron que escreve direto no DB, sem passar pelo EventEmitter).
       const pollTimer = setInterval(() => { sendNewAlerts().catch(() => {}); }, 5000);
       // Heartbeat 25s — keepalive contra timeouts intermediarios (CF, LB).
       // Comment SSE "::" nao gera event no client, so' mantem conexao viva.
@@ -372,11 +373,25 @@ function registerDeviceRoutes(app: express.Application) {
         res.write(`: ping ${Date.now()}\n\n`);
       }, 25000);
 
+      // Subscribe ao EventEmitter pra eventos PUSH em tempo real (event 'photo'
+      // disparado pelo plantPhotos.upload quando user sobe foto nova). ESP
+      // recebe e dispara prefetch pra deixar a foto cacheada antes do tap.
+      const { deviceEvents } = await import('./deviceEvents');
+      const unsubscribe = deviceEvents.onTent(tentId, (evt) => {
+        if (closed) return;
+        try {
+          res.write(`event: ${evt.type}\ndata: ${JSON.stringify(evt)}\n\n`);
+        } catch {
+          // Connection drop — cleanup via close handler abaixo
+        }
+      });
+
       const cleanup = () => {
         if (closed) return;
         closed = true;
         clearInterval(pollTimer);
         clearInterval(heartbeatTimer);
+        unsubscribe();
       };
       req.on('close', cleanup);
       req.on('error', cleanup);

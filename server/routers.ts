@@ -57,6 +57,7 @@ import { dailyLogsRouter } from "./routers/dailyLogs";
 import { alertsRouter, weeklyTargetsRouter } from "./routers/alerts";
 import { tasksRouter, taskTemplatesRouter } from "./routers/tasks";
 import { backupRouter } from "./routers/backup";
+import { deviceRouter } from "./routers/device";
 
 // Helpers compartilhados (validators de ownership) — antes inline aqui,
 // agora em routers/_helpers.ts pra que sub-routers extraídos consigam importar.
@@ -2111,6 +2112,7 @@ export const appRouter = router({
   tasks: tasksRouter,
   taskTemplates: taskTemplatesRouter,
   backup: backupRouter,
+  device: deviceRouter,
 });
 
 export type AppRouter = typeof appRouter;
