@@ -54,6 +54,10 @@ static NetConfig netCfg = {
 #define DEVICE_TOKEN  netCfg.token
 #define TENT_ID       netCfg.tentId
 
+// Sleep timeout do display em ms — configuravel via cfg modal. Salvo em NVS
+// como "sleepSec" (segundos pra storage humano-legivel). 0 = never sleep.
+static uint32_t screenSleepMs = 30000;  // default 30s
+
 static void loadConfigFromNVS() {
   prefs.begin("cultivo", true);
   prefs.getString("ssid",   WIFI_SSID,    sizeof(WIFI_SSID));
@@ -61,8 +65,19 @@ static void loadConfigFromNVS() {
   prefs.getString("server", SERVER_URL,   sizeof(SERVER_URL));
   prefs.getString("token",  DEVICE_TOKEN, sizeof(DEVICE_TOKEN));
   TENT_ID = prefs.getInt("tent", TENT_ID);
+  // Sleep timeout em segundos. Default 30s (legacy hardcoded). 0 = nunca dorme.
+  int sleepSec = prefs.getInt("sleepSec", 30);
+  screenSleepMs = (sleepSec <= 0) ? UINT32_MAX : (uint32_t)sleepSec * 1000UL;
   prefs.end();
-  Serial.printf("[cfg] ssid=%s url=%s tent=%d\n", WIFI_SSID, SERVER_URL, TENT_ID);
+  Serial.printf("[cfg] ssid=%s url=%s tent=%d sleep=%ds\n", WIFI_SSID, SERVER_URL, TENT_ID, sleepSec);
+}
+
+static void saveSleepTimeoutNVS(int sleepSec) {
+  prefs.begin("cultivo", false);
+  prefs.putInt("sleepSec", sleepSec);
+  prefs.end();
+  screenSleepMs = (sleepSec <= 0) ? UINT32_MAX : (uint32_t)sleepSec * 1000UL;
+  Serial.printf("[cfg] sleep timeout: %ds\n", sleepSec);
 }
 
 static void saveConfigToNVS(const char* ssid, const char* pass, const char* url,
@@ -189,6 +204,9 @@ static volatile bool refreshPending = false;
 // User tocou no icone WiFi do header pedindo reconexao manual. netTaskFn
 // processa: forca disconnect + begin sem esperar o retry de 30s.
 static volatile bool wifiReconnectPending = false;
+// User tocou no botao "Verificar atualizacao" do cfg modal. tapTask processa
+// (HTTP + Update.writeStream + reboot — operacao pesada que nao roda na UI).
+static volatile bool otaCheckPending = false;
 
 // Tap em scene/device — handler LVGL nao pode chamar HTTPClient direto:
 // thread UI tem ~8KB stack, nao cobre TLS handshake + JsonDocument; estourava
@@ -275,7 +293,8 @@ static bool ftRead(int &rx, int &ry) {
 // duty 200 (~80%, mesmo valor do hal_display_init). Backlight off NAO desliga
 // LVGL/touch — chip continua respondendo, so' o painel nao emite luz.
 // ════════════════════════════════════════════════════════════════════════════════
-#define SCREEN_SLEEP_MS 30000   // 30s de inatividade -> apaga
+// Sleep timeout dinamico — vem de NVS (loadConfigFromNVS sets screenSleepMs).
+// Default 30s, configuravel no cfg modal. UINT32_MAX = nunca dorme.
 static bool screenAsleep = false;
 static lv_timer_t *sleepTimer = nullptr;
 
@@ -301,7 +320,7 @@ static void screenSleep() {
 
 static void sleepTimerCb(lv_timer_t *) {
   uint32_t inactive = lv_display_get_inactive_time(NULL);
-  if (!screenAsleep && inactive >= SCREEN_SLEEP_MS) {
+  if (!screenAsleep && inactive >= screenSleepMs) {
     screenSleep();
   } else if (screenAsleep) {
     // Tick do overlay a cada 1s — atualiza relogio + temp/umid no screensaver
@@ -487,7 +506,19 @@ static lv_obj_t *configModal = nullptr;
 // Modal config: token+tentId removidos (vem via pareamento RFC 8628 agora).
 // Apenas WiFi + URL — usuario nao toca em token/tent manualmente mais.
 static lv_obj_t *taSsid, *taPass, *taUrl;
+static lv_obj_t *ddSleep;  // dropdown sleep timeout no cfg modal
 static lv_obj_t *kbCfg;
+// Opcoes de sleep timeout (label visivel + valor em segundos).
+// 0 = nunca dorme (display sempre on com ambient idle apos timeout grande).
+static const struct { const char *label; int sec; } SLEEP_OPTS[] = {
+  {"15s",    15},
+  {"30s",    30},
+  {"1 min",  60},
+  {"2 min", 120},
+  {"5 min", 300},
+  {"Nunca",   0},
+};
+static constexpr int SLEEP_OPTS_N = sizeof(SLEEP_OPTS) / sizeof(SLEEP_OPTS[0]);
 static void startApPortal();  // fwd: botao "Setup celular" do modal chama
 
 static void cfgFocusCb(lv_event_t *e) {
@@ -590,6 +621,13 @@ static void cfgSaveCb(lv_event_t *e) {
   // Mantem o que ja' tinha em NVS (DEVICE_TOKEN/TENT_ID em RAM); se vazios
   // o setup() vai entrar em modo pareamento apos conectar WiFi.
   saveConfigToNVS(ssid, pass, url, DEVICE_TOKEN, TENT_ID);
+  // Salva sleep timeout selecionado no dropdown
+  if (ddSleep) {
+    uint16_t selIdx = lv_dropdown_get_selected(ddSleep);
+    if (selIdx < SLEEP_OPTS_N) {
+      saveSleepTimeoutNVS(SLEEP_OPTS[selIdx].sec);
+    }
+  }
   Serial.println("[cfg] salvo, reiniciando...");
   delay(500);
   ESP.restart();
@@ -689,6 +727,75 @@ static void openConfigModal() {
   });
   makeLabel(btnReparear, "Limpar token (re-parear)", COL_TEXT, FONT_BODY,
             LV_ALIGN_CENTER, 0, 0);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SECAO: DISPLAY — sleep timeout configuravel
+  // ═══════════════════════════════════════════════════════════════════
+  makeLabel(list, "DISPLAY", COL_PRIMARY, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(6));
+  makeLabel(list, "Apagar tela apos:", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+  ddSleep = lv_dropdown_create(list);
+  // Monta string "15s\n30s\n1 min\n..." pro dropdown
+  {
+    char optsBuf[128] = {0};
+    for (int i = 0; i < SLEEP_OPTS_N; i++) {
+      strcat(optsBuf, SLEEP_OPTS[i].label);
+      if (i < SLEEP_OPTS_N - 1) strcat(optsBuf, "\n");
+    }
+    lv_dropdown_set_options(ddSleep, optsBuf);
+    // Pre-seleciona o valor salvo em NVS (compara via screenSleepMs)
+    int curSec = (screenSleepMs == UINT32_MAX) ? 0 : (int)(screenSleepMs / 1000);
+    int matchIdx = 1;  // default fallback "30s"
+    for (int i = 0; i < SLEEP_OPTS_N; i++) {
+      if (SLEEP_OPTS[i].sec == curSec) { matchIdx = i; break; }
+    }
+    lv_dropdown_set_selected(ddSleep, matchIdx);
+  }
+  lv_obj_set_width(ddSleep, lv_pct(100));
+  lv_obj_set_height(ddSleep, sh(34));
+  lv_obj_set_style_text_font(ddSleep, FONT_BODY, 0);
+  lv_obj_set_style_bg_color(ddSleep, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(ddSleep, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(ddSleep, 1, 0);
+  lv_obj_set_style_radius(ddSleep, RADIUS_MD, 0);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SECAO: ATUALIZACOES — check via GitHub releases
+  // ═══════════════════════════════════════════════════════════════════
+  makeLabel(list, "ATUALIZACOES", COL_PRIMARY, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(6));
+  lv_obj_t *btnOta = secondaryBtn(list, nullptr, [](lv_event_t *e) {
+    Serial.println("[cfg] OTA check requested");
+    otaCheckPending = true;
+    // Toast informativo — feedback final via log serial (futuro: UI overlay)
+    // Mostrar via cultivoUI_showToast nao funciona daqui (statics de outro
+    // module). User precisa ver via serial OU aguardar reboot apos sucesso.
+  });
+  makeLabel(btnOta, "Verificar atualizacao firmware", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // SECAO: SISTEMA — info read-only (versao, MAC, uptime, heap)
+  // ═══════════════════════════════════════════════════════════════════
+  makeLabel(list, "SISTEMA", COL_PRIMARY, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(6));
+  {
+    uint8_t mac[6];
+    WiFi.macAddress(mac);
+    uint32_t uptimeSec = millis() / 1000;
+    uint32_t freeHeap  = ESP.getFreeHeap() / 1024;
+    uint32_t freePsram = ESP.getFreePsram() / 1024;
+    char infoBuf[160];
+    snprintf(infoBuf, sizeof(infoBuf),
+             "Versao: " FW_VERSION "\n"
+             "MAC: %02X:%02X:%02X:%02X:%02X:%02X\n"
+             "Uptime: %luh %lum\n"
+             "Heap: %luKB / PSRAM: %luKB",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+             uptimeSec / 3600, (uptimeSec / 60) % 60,
+             (unsigned long)freeHeap, (unsigned long)freePsram);
+    lv_obj_t *lblInfo = lv_label_create(list);
+    lv_label_set_text(lblInfo, infoBuf);
+    lv_obj_set_style_text_color(lblInfo, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(lblInfo, FONT_CAPTION, 0);
+    lv_obj_set_style_text_line_space(lblInfo, sh(2), 0);
+  }
 
   // Footer buttons DS — Cancel (ghost), Reset (destrutivo), Salvar (primary)
   lv_obj_t *btnCancel = lv_btn_create(configModal);
@@ -2156,6 +2263,155 @@ static void processTaskTap() {
 }
 
 // fetchScenes: GET /api/device/scenes. Aceita {items:[...]} (formato novo
+// ════════════════════════════════════════════════════════════════════════════════
+// OTA via GitHub Releases — check + download + flash + reboot
+// ════════════════════════════════════════════════════════════════════════════════
+// User toca "Verificar atualizacao" no cfg modal -> otaCheckPending = true.
+// tapTask consome a flag, faz GET https://api.github.com/.../releases/latest,
+// compara tag_name com FW_VERSION. Se newer, baixa o .bin do asset e flasha
+// via Update.writeStream. ESP.restart() em sucesso.
+//
+// Asset name esperado: contem "esp32" ou "firmware" no nome (ex: cultivo-esp32-display-v0.5.0.bin).
+// Pra setup: criar release no GitHub e anexar o .bin (build via `pio run`).
+//
+// Limitacoes:
+// - Sem signature check (qualquer commit malicioso no repo poderia flashar firmware)
+//   Mitigado pq repo e' do owner. Sem TUF/cosign por simplicidade.
+// - HTTPS sem CA pinning (setInsecure no httpBegin). Same trust model do API.
+static const char *GITHUB_RELEASES_URL =
+    "https://api.github.com/repos/jpedrorock/cultivo-server/releases/latest";
+
+// Compara versao semver simples "X.Y.Z" — retorna >0 se latest > current,
+// <0 se latest < current, 0 se igual. "v" prefix removido se presente.
+static int compareVersions(const char *latest, const char *current) {
+  if (latest[0] == 'v' || latest[0] == 'V') latest++;
+  if (current[0] == 'v' || current[0] == 'V') current++;
+  int la, lb, lc, ca, cb, cc;
+  if (sscanf(latest, "%d.%d.%d", &la, &lb, &lc) != 3) return 0;
+  if (sscanf(current, "%d.%d.%d", &ca, &cb, &cc) != 3) return 0;
+  if (la != ca) return la - ca;
+  if (lb != cb) return lb - cb;
+  return lc - cc;
+}
+
+// GET GitHub releases API. Preenche outVer + outUrl se houver release valida.
+static bool fetchLatestRelease(char *outVer, size_t verSz, char *outUrl, size_t urlSz) {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  httpBegin(http, GITHUB_RELEASES_URL);
+  http.addHeader("User-Agent", "Cultivo-ESP32-Display");
+  http.addHeader("Accept", "application/vnd.github+json");
+  http.setTimeout(8000);
+  int code = http.GET();
+  if (code != 200) {
+    Serial.printf("[ota] check HTTP %d\n", code);
+    http.end();
+    return false;
+  }
+  // JSON pode ser grande (full release object); usa filter pra reduzir RAM.
+  JsonDocument filter;
+  filter["tag_name"] = true;
+  filter["assets"][0]["name"] = true;
+  filter["assets"][0]["browser_download_url"] = true;
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, http.getStream(),
+                                             DeserializationOption::Filter(filter));
+  http.end();
+  if (err != DeserializationError::Ok) {
+    Serial.printf("[ota] JSON err: %s\n", err.c_str());
+    return false;
+  }
+  const char *tag = doc["tag_name"] | "";
+  if (!*tag) return false;
+  strncpy(outVer, tag, verSz - 1);
+  outVer[verSz - 1] = '\0';
+  // Procura asset com .bin no nome — usualmente "esp32" ou "firmware"
+  JsonArray assets = doc["assets"].as<JsonArray>();
+  for (JsonObject a : assets) {
+    const char *name = a["name"] | "";
+    if (strstr(name, ".bin")) {
+      const char *url = a["browser_download_url"] | "";
+      strncpy(outUrl, url, urlSz - 1);
+      outUrl[urlSz - 1] = '\0';
+      Serial.printf("[ota] release %s -> %s\n", outVer, name);
+      return true;
+    }
+  }
+  Serial.println("[ota] release sem asset .bin");
+  return false;
+}
+
+// Baixa .bin e flasha via Update.writeStream. Em sucesso, retorna true e
+// caller deve chamar ESP.restart() (nao fazemos aqui pra permitir UI feedback).
+static bool downloadAndFlash(const char *url) {
+  HTTPClient http;
+  httpBegin(http, url);
+  http.addHeader("User-Agent", "Cultivo-ESP32-Display");
+  http.setTimeout(60000);  // 60s — firmware ~1.5MB pode levar tempo
+  int code = http.GET();
+  // GitHub release redirect 302 pra CDN; HTTPClient segue por default
+  if (code != 200) {
+    Serial.printf("[ota] download HTTP %d\n", code);
+    http.end();
+    return false;
+  }
+  int contentLen = http.getSize();
+  if (contentLen <= 0) {
+    Serial.printf("[ota] tamanho desconhecido (CL=%d)\n", contentLen);
+    http.end();
+    return false;
+  }
+  Serial.printf("[ota] baixando %d bytes...\n", contentLen);
+  if (!Update.begin((size_t)contentLen)) {
+    Serial.printf("[ota] Update.begin fail: %s\n", Update.errorString());
+    http.end();
+    return false;
+  }
+  WiFiClient *stream = http.getStreamPtr();
+  size_t written = Update.writeStream(*stream);
+  http.end();
+  if (written != (size_t)contentLen) {
+    Serial.printf("[ota] short write %u/%d\n", (unsigned)written, contentLen);
+    Update.abort();
+    return false;
+  }
+  if (!Update.end(true)) {
+    Serial.printf("[ota] Update.end fail: %s\n", Update.errorString());
+    return false;
+  }
+  Serial.println("[ota] flash OK, reboot pra ativar");
+  return true;
+}
+
+// Roda no tapTask (core 0, stack 12KB). Mostra feedback via showToast.
+static void processOtaCheck() {
+  if (!otaCheckPending) return;
+  otaCheckPending = false;
+  // Aqui chamariamos showToast diretamente, mas e' da UI thread. Usamos
+  // Serial.print e o user ve no display via outras heuristicas (futuro:
+  // adicionar um statusOverlay similar ao idleOverlay pra esses casos).
+  Serial.println("[ota] check started");
+  char ver[32] = {0}, url[256] = {0};
+  if (!fetchLatestRelease(ver, sizeof(ver), url, sizeof(url))) {
+    Serial.println("[ota] sem release valida ou falha de rede");
+    return;
+  }
+  int cmp = compareVersions(ver, FW_VERSION);
+  Serial.printf("[ota] latest=%s current=%s cmp=%d\n", ver, FW_VERSION, cmp);
+  if (cmp <= 0) {
+    Serial.println("[ota] ja na versao mais recente");
+    return;
+  }
+  Serial.printf("[ota] atualizando %s -> %s\n", FW_VERSION, ver);
+  if (downloadAndFlash(url)) {
+    Serial.println("[ota] sucesso, rebootando em 2s");
+    delay(2000);
+    ESP.restart();
+  } else {
+    Serial.println("[ota] falha no update — firmware nao alterado");
+  }
+}
+
 // sprint 1) OU {scenes:[...]} (legacy) — server decide qual mandar baseado
 // em ter vinculos na tentScenes/tentDevices.
 static bool fetchScenes() {
@@ -2228,6 +2484,11 @@ static void tapTaskFn(void *param) {
       uint32_t t0 = millis();
       processPlantPhotoTap();
       logIfSlow("plantPhoto", t0, 16000);  // foto pode demorar
+    }
+    if (otaCheckPending && wifiOk) {
+      uint32_t t0 = millis();
+      processOtaCheck();
+      logIfSlow("otaCheck", t0, 60000);  // download firmware pode levar tempo
     }
     vTaskDelay(pdMS_TO_TICKS(50));
   }
@@ -2924,7 +3185,7 @@ void setup() {
   startNetTask();
 
   // Timer de sleep — checa lv_display_get_inactive_time a cada 1s.
-  // Apaga backlight apos SCREEN_SLEEP_MS sem touch. Wake on touch handled
+  // Apaga backlight apos screenSleepMs sem touch (configuravel via cfg modal,
   // em touchpad_read.
   sleepTimer = lv_timer_create(sleepTimerCb, 1000, NULL);
 
