@@ -269,6 +269,207 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
+  // GET /api/device/stream/:tentId — Server-Sent Events com alertas em tempo real
+  //
+  // Substitui polling de /api/device/alerts pelo ESP. Server mantém conexão
+  // aberta e flusha eventos quando ha' alerta novo. Combo killer com buzzer:
+  // alerta critico chega no display em <5s + beep audivel.
+  //
+  // Protocolo:
+  //   - Initial: ": connected <iso>\n\n" pra ack
+  //   - Per alert: "event: alert\ndata: {...}\n\n"
+  //   - Heartbeat: ": ping\n\n" a cada 25s (Cloudflare idle timeout ~100s)
+  //   - Polling do alerts table a cada 5s — barato com index (status, tentId)
+  //
+  // Client (ESP) reconecta com ?since=<lastSeenId> pra evitar duplicar alertas
+  // ja vistos em desconexao temporaria. Sem since, comeca do 0 (todos NEW).
+  app.get('/api/device/stream/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const tentId = parseInt(req.params.tentId);
+      if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
+
+      // SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      // Hint pra Nginx/Cloudflare nao bufferizar — flush imediato dos chunks
+      res.setHeader('X-Accel-Buffering', 'no');
+      (res as any).flushHeaders?.();
+
+      // Send initial conn ack
+      res.write(`: connected ${new Date().toISOString()}\n\n`);
+
+      let lastSeenId = parseInt(String(req.query.since ?? '0')) || 0;
+      let closed = false;
+
+      const sendNewAlerts = async () => {
+        if (closed) return;
+        try {
+          const [rows]: any = await pool.execute(
+            `SELECT id, alertType, metric, message, value,
+                    UNIX_TIMESTAMP(createdAt) AS t
+             FROM alerts WHERE tentId = ? AND id > ? AND status = 'NEW'
+             ORDER BY id ASC LIMIT 10`,
+            [tentId, lastSeenId]
+          );
+          for (const r of rows as any[]) {
+            if (closed) return;
+            const payload = {
+              id: r.id,
+              type: r.alertType,
+              metric: r.metric,
+              message: r.message,
+              value: r.value != null ? parseFloat(r.value) : null,
+              t: Number(r.t),
+            };
+            res.write(`event: alert\ndata: ${JSON.stringify(payload)}\n\n`);
+            lastSeenId = Math.max(lastSeenId, r.id);
+          }
+        } catch (e: any) {
+          console.warn('[Device] stream poll error:', e?.message);
+          // Nao mata a conexao — tenta de novo no proximo tick
+        }
+      };
+
+      // Envia alertas pendentes na conexao
+      await sendNewAlerts();
+
+      // Poll DB a cada 5s pra novos alertas
+      const pollTimer = setInterval(() => { sendNewAlerts().catch(() => {}); }, 5000);
+      // Heartbeat 25s — keepalive contra timeouts intermediarios (CF, LB).
+      // Comment SSE "::" nao gera event no client, so' mantem conexao viva.
+      const heartbeatTimer = setInterval(() => {
+        if (closed) return;
+        res.write(`: ping ${Date.now()}\n\n`);
+      }, 25000);
+
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        clearInterval(pollTimer);
+        clearInterval(heartbeatTimer);
+      };
+      req.on('close', cleanup);
+      req.on('error', cleanup);
+      res.on('close', cleanup);
+    } catch (err: any) {
+      console.error('[Device] stream error:', err?.message);
+      try { res.status(500).end(); } catch { /* ja respondido */ }
+    }
+  });
+
+  // POST /api/device/alert-ack — marca alerta como visto (status NEW -> SEEN)
+  // ESP chama quando user tocou no toast/banner do alerta no display.
+  app.post('/api/device/alert-ack', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const alertId = parseInt(req.body?.alertId ?? '0');
+      if (!alertId) return res.status(400).json({ error: 'alertId obrigatório' });
+      // Valida ownership via tentId
+      const [r]: any = await pool.execute(
+        `UPDATE alerts SET status = 'SEEN' WHERE id = ? AND tentId = ?`,
+        [alertId, device.tentId]
+      );
+      if (r.affectedRows === 0) return res.status(404).json({ error: 'Alerta não encontrado' });
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[Device] alert-ack error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
+  // POST /api/device/quick-log — log rapido do ESP (FAB na aba Plantas)
+  //
+  // Endpoint multi-uso pra reduzir fricao do user fazer log via display em
+  // vez de abrir o app web. Aceita tipos:
+  //
+  //   - water:   {type, liters}        -> dailyLogs.wateringVolume (ml)
+  //   - feed:    {type, ph, ec}        -> dailyLogs.ph + ec
+  //   - note:    {type, plantId, text} -> plantHealthLogs.notes (precisa plant)
+  //
+  // Todos os tipos respeitam multi-tenancy via device.groupId.
+  // dailyLogs usa UPSERT por tentId+date+turn (preserva outros campos da hora).
+  app.post('/api/device/quick-log', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const type = String(req.body?.type ?? '').toLowerCase();
+      const now = new Date();
+      const turn = now.getHours() < 14 ? 'AM' : 'PM';
+      const dateOnly = new Date(now);
+      dateOnly.setHours(0, 0, 0, 0);
+
+      if (type === 'water') {
+        const liters = parseFloat(req.body?.liters ?? '0');
+        if (!isFinite(liters) || liters <= 0 || liters > 100) {
+          return res.status(400).json({ error: 'liters inválido (0-100)' });
+        }
+        const volumeMl = Math.round(liters * 1000);
+        await pool.execute(
+          `INSERT INTO dailyLogs (tentId, logDate, turn, wateringVolume, source, createdAt)
+           VALUES (?, ?, ?, ?, 'ESP32', NOW())
+           ON DUPLICATE KEY UPDATE wateringVolume=VALUES(wateringVolume), source='ESP32'`,
+          [device.tentId, dateOnly, turn, volumeMl]
+        );
+        return res.json({ success: true, type: 'water', liters, turn });
+      }
+
+      if (type === 'feed') {
+        const ph = parseFloat(req.body?.ph ?? '');
+        const ec = parseFloat(req.body?.ec ?? '');
+        if (!isFinite(ph) && !isFinite(ec)) {
+          return res.status(400).json({ error: 'ph ou ec obrigatório' });
+        }
+        // Valida ranges sanos pra evitar typo destruidor
+        if (isFinite(ph) && (ph < 0 || ph > 14)) return res.status(400).json({ error: 'ph fora do range' });
+        if (isFinite(ec) && (ec < 0 || ec > 10)) return res.status(400).json({ error: 'ec fora do range' });
+        await pool.execute(
+          `INSERT INTO dailyLogs (tentId, logDate, turn, ph, ec, source, createdAt)
+           VALUES (?, ?, ?, ?, ?, 'ESP32', NOW())
+           ON DUPLICATE KEY UPDATE
+             ph = COALESCE(VALUES(ph), ph),
+             ec = COALESCE(VALUES(ec), ec),
+             source = 'ESP32'`,
+          [device.tentId, dateOnly, turn,
+           isFinite(ph) ? ph : null,
+           isFinite(ec) ? ec : null]
+        );
+        return res.json({ success: true, type: 'feed', ph, ec, turn });
+      }
+
+      if (type === 'note') {
+        const plantId = parseInt(req.body?.plantId ?? '0');
+        const text = String(req.body?.text ?? '').trim();
+        if (!plantId || !text) {
+          return res.status(400).json({ error: 'plantId + text obrigatórios' });
+        }
+        if (text.length > 500) {
+          return res.status(400).json({ error: 'text muito longo (max 500)' });
+        }
+        // Valida ownership: plant tem que ser da tent + group do device
+        const [pRows]: any = await pool.execute(
+          `SELECT id FROM plants WHERE id = ? AND currentTentId = ? AND groupId = ? LIMIT 1`,
+          [plantId, device.tentId, device.groupId]
+        );
+        if (pRows.length === 0) return res.status(404).json({ error: 'Planta não encontrada na estufa' });
+        await pool.execute(
+          `INSERT INTO plantHealthLogs (plantId, logDate, healthStatus, notes, createdAt)
+           VALUES (?, NOW(), 'HEALTHY', ?, NOW())`,
+          [plantId, text]
+        );
+        return res.json({ success: true, type: 'note', plantId });
+      }
+
+      return res.status(400).json({ error: 'type inválido (water/feed/note)' });
+    } catch (err: any) {
+      console.error('[Device] quick-log error:', err?.message);
+      res.status(500).json({ error: 'Erro interno' });
+    }
+  });
+
   // POST /api/device/watering — registra rega
   app.post('/api/device/watering', async (req, res) => {
     try {
@@ -313,6 +514,10 @@ function registerDeviceRoutes(app: express.Application) {
       const tentId = parseInt(req.params.tentId);
       if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
 
+      // range=current (default) -> semana atual so'
+      // range=7d                -> semana atual + proxima + atrasadas (calendar view)
+      const range = String(req.query.range ?? 'current');
+
       // 1) Busca estufa + ciclo ativo
       const [tentRows]: any = await pool.execute(
         `SELECT id, category FROM tents WHERE id = ? AND groupId = ? LIMIT 1`,
@@ -328,7 +533,9 @@ function registerDeviceRoutes(app: express.Application) {
         [tentId]
       );
 
-      const results: { id: number; texto: string; feito: boolean }[] = [];
+      // Result item agora inclui dueDate (epoch sec) pra ESP agrupar por dia.
+      type TaskOut = { id: number; texto: string; feito: boolean; dueDate?: number; overdue?: boolean };
+      const results: TaskOut[] = [];
 
       // 2) Se ha ciclo ativo, calcula fase + week + materializa instances
       if (cycleRows.length > 0) {
@@ -338,83 +545,127 @@ function registerDeviceRoutes(app: express.Application) {
         const floraStartDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
 
         let phase: string;
-        let weekNumber: number | null;
         let context: string;
         const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+        // Calcula weekNumber pra fase atual e proxima (range=7d)
+        let currentWeek: number | null = null;
+        const calcWeek = (refDate: Date) => Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / WEEK_MS) + 1);
+
         if (tentCategory === 'MAINTENANCE') {
-          phase = 'MAINTENANCE'; weekNumber = null; context = 'TENT_A';
+          phase = 'MAINTENANCE'; context = 'TENT_A';
         } else if (tentCategory === 'DRYING') {
-          phase = 'DRYING'; weekNumber = null; context = 'TENT_BC';
+          phase = 'DRYING'; context = 'TENT_BC';
         } else if (tentCategory === 'FLORA') {
-          phase = 'FLORA';
-          const ws = floraStartDate ?? startDate;
-          weekNumber = Math.max(1, Math.floor((now.getTime() - ws.getTime()) / WEEK_MS) + 1);
-          context = 'TENT_BC';
+          phase = 'FLORA'; context = 'TENT_BC';
+          currentWeek = calcWeek(floraStartDate ?? startDate);
         } else if (tentCategory === 'VEGA') {
-          phase = 'VEGA';
-          weekNumber = Math.max(1, Math.floor((now.getTime() - startDate.getTime()) / WEEK_MS) + 1);
-          context = 'TENT_BC';
+          phase = 'VEGA'; context = 'TENT_BC';
+          currentWeek = calcWeek(startDate);
         } else {
-          phase = 'MAINTENANCE'; weekNumber = null; context = 'TENT_A';
+          phase = 'MAINTENANCE'; context = 'TENT_A';
         }
 
-        // Busca templates da fase/semana
-        const templateQuery = weekNumber == null
-          ? `SELECT id, title FROM taskTemplates WHERE context = ? AND phase = ? AND (groupId IS NULL OR groupId = ?)`
-          : `SELECT id, title FROM taskTemplates WHERE context = ? AND phase = ? AND weekNumber = ? AND (groupId IS NULL OR groupId = ?)`;
-        const templateParams = weekNumber == null
-          ? [context, phase, device.groupId]
-          : [context, phase, weekNumber, device.groupId];
-        const [templates]: any = await pool.execute(templateQuery, templateParams);
+        // Lista de semanas pra incluir: [current] (range=current) ou [current, next] (range=7d)
+        const weeksToInclude = (range === '7d' && currentWeek != null)
+          ? [currentWeek, currentWeek + 1]
+          : [currentWeek];
 
-        // Start of current week (domingo 00:00 — igual ao tRPC)
+        // Start of current week (domingo 00:00)
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
 
-        // Lazy-materialize: INSERT IGNORE pra cada template (idempotente
-        // graças ao unique tentTaskDateUnique)
-        for (const t of templates as any[]) {
-          await pool.execute(
-            `INSERT IGNORE INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone)
-             VALUES (?, ?, ?, 0)`,
-            [tentId, t.id, startOfWeek]
+        for (let wi = 0; wi < weeksToInclude.length; wi++) {
+          const wNumber = weeksToInclude[wi];
+          const wDate = new Date(startOfWeek.getTime() + wi * WEEK_MS);
+
+          // Busca templates da fase/semana
+          const templateQuery = wNumber == null
+            ? `SELECT id, title FROM taskTemplates WHERE context = ? AND phase = ? AND (groupId IS NULL OR groupId = ?)`
+            : `SELECT id, title FROM taskTemplates WHERE context = ? AND phase = ? AND weekNumber = ? AND (groupId IS NULL OR groupId = ?)`;
+          const templateParams = wNumber == null
+            ? [context, phase, device.groupId]
+            : [context, phase, wNumber, device.groupId];
+          const [templates]: any = await pool.execute(templateQuery, templateParams);
+
+          // Lazy-materialize na semana especifica
+          for (const t of templates as any[]) {
+            await pool.execute(
+              `INSERT IGNORE INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone)
+               VALUES (?, ?, ?, 0)`,
+              [tentId, t.id, wDate]
+            );
+          }
+
+          // Le instances dessa semana
+          const [instances]: any = await pool.execute(
+            `SELECT i.id, tt.title, i.isDone, UNIX_TIMESTAMP(i.occurrenceDate) AS dueDate
+             FROM taskInstances i
+             INNER JOIN taskTemplates tt ON tt.id = i.taskTemplateId
+             WHERE i.tentId = ? AND i.occurrenceDate = ?
+             ORDER BY i.isDone ASC, tt.title ASC`,
+            [tentId, wDate]
           );
+          for (const r of instances as any[]) {
+            results.push({
+              id: r.id,
+              texto: r.title,
+              feito: !!r.isDone,
+              dueDate: Number(r.dueDate),
+            });
+          }
         }
 
-        // Le instances ja' existentes (incluindo as recem-criadas)
-        const [instances]: any = await pool.execute(
-          `SELECT i.id, tt.title, i.isDone
-           FROM taskInstances i
-           INNER JOIN taskTemplates tt ON tt.id = i.taskTemplateId
-           WHERE i.tentId = ? AND i.occurrenceDate = ?
-           ORDER BY i.isDone ASC, tt.title ASC`,
-          [tentId, startOfWeek]
-        );
-        for (const r of instances as any[]) {
-          results.push({ id: r.id, texto: r.title, feito: !!r.isDone });
+        // range=7d tambem inclui tarefas ATRASADAS (occurrenceDate < startOfWeek
+        // E ainda nao feitas). Limita a 5 mais recentes pra nao explodir payload.
+        if (range === '7d') {
+          const [overdue]: any = await pool.execute(
+            `SELECT i.id, tt.title, UNIX_TIMESTAMP(i.occurrenceDate) AS dueDate
+             FROM taskInstances i
+             INNER JOIN taskTemplates tt ON tt.id = i.taskTemplateId
+             WHERE i.tentId = ? AND i.occurrenceDate < ? AND i.isDone = 0
+             ORDER BY i.occurrenceDate DESC
+             LIMIT 5`,
+            [tentId, startOfWeek]
+          );
+          for (const r of overdue as any[]) {
+            results.push({
+              id: r.id,
+              texto: r.title,
+              feito: false,
+              dueDate: Number(r.dueDate),
+              overdue: true,
+            });
+          }
         }
       }
 
       // 3) Tambem inclui standaloneTasks (lembretes) — id negativo pra
       // diferenciar de taskInstance no toggle (-id == standaloneId)
+      const standaloneLimit = range === '7d' ? 10 : 5;
       const [standalone]: any = await pool.execute(
-        `SELECT t.id, t.title, t.isDone
+        `SELECT t.id, t.title, t.isDone, UNIX_TIMESTAMP(t.dueDate) AS dueDate
          FROM standaloneTasks t
          INNER JOIN users u ON u.id = t.userId
          WHERE u.groupId = ?
            AND (t.tentId = ? OR t.tentId IS NULL)
          ORDER BY t.isDone ASC, t.createdAt DESC
-         LIMIT 5`,
-        [device.groupId, tentId]
+         LIMIT ?`,
+        [device.groupId, tentId, standaloneLimit]
       );
       for (const r of standalone as any[]) {
-        results.push({ id: -r.id, texto: r.title, feito: !!r.isDone });
+        results.push({
+          id: -r.id,
+          texto: r.title,
+          feito: !!r.isDone,
+          dueDate: r.dueDate ? Number(r.dueDate) : undefined,
+        });
       }
 
-      // Limita a 10 total — display da' scroll mas evita payload grande
-      res.json(results.slice(0, 10));
+      // range=current limita a 10 (display compacto), range=7d limita a 25 (calendar)
+      const cap = range === '7d' ? 25 : 10;
+      res.json(results.slice(0, cap));
     } catch (err: any) {
       console.error('[Device] tasks error:', err?.message);
       res.status(500).json({ error: 'Erro interno' });
@@ -1104,7 +1355,16 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
-  // GET /api/device/history/:tentId?metric=temp&period=24h — historico p/ graficos
+  // GET /api/device/history/:tentId?metric=temp&period=24h
+  //
+  // Periods:
+  //   - 24h: raw hourly points (~24-48 pontos com {t, v})
+  //   - 7d/30d: DAILY aggregates com {t, v (avg), min, max}
+  //     Sem agregacao, 30d = 720 pontos -> chart fica ilegivel.
+  //
+  // Format unificado: array de {t: epoch, v: avg-or-raw, min?, max?}.
+  // min/max so' presentes em 7d/30d. ESP renderiza banda colorida entre
+  // min/max + linha em v (avg) pra leitura rapida da variacao.
   app.get('/api/device/history/:tentId', async (req, res) => {
     try {
       const device = await validateDeviceToken(req);
@@ -1121,20 +1381,45 @@ function registerDeviceRoutes(app: express.Application) {
       const col = colMap[metric];
       if (!col) return res.status(400).json({ error: 'metric inválido' });
 
-      // Janela de tempo + limite de pontos
       const hoursMap: Record<string, number> = { '24h': 24, '7d': 168, '30d': 720 };
-      const hours = hoursMap[period] ?? 24;
-      const limit = period === '24h' ? 48 : period === '7d' ? 56 : 60;
+      const hours = hoursMap[period];
+      if (hours == null) return res.status(400).json({ error: 'period inválido' });
 
+      if (period === '24h') {
+        // Raw hourly points — comportamento original
+        const [rows]: any = await pool.execute(
+          `SELECT UNIX_TIMESTAMP(logDate) AS t, ${col} AS v
+           FROM dailyLogs
+           WHERE tentId = ? AND logDate >= NOW() - INTERVAL ? HOUR AND ${col} IS NOT NULL
+           ORDER BY logDate ASC
+           LIMIT 48`,
+          [tentId, hours]
+        );
+        return res.json(rows.map((r: any) => ({
+          t: Number(r.t),
+          v: r.v != null ? parseFloat(r.v) : null,
+        })));
+      }
+
+      // 7d/30d: agregado por dia (GROUP BY DATE). Cada ponto vira a "barriga"
+      // do dia (min..max) + ponto central (avg). Reduz 720 pontos pra 30.
       const [rows]: any = await pool.execute(
-        `SELECT UNIX_TIMESTAMP(logDate) AS t, ${col} AS v
+        `SELECT UNIX_TIMESTAMP(DATE(logDate)) AS t,
+                AVG(${col}) AS v,
+                MIN(${col}) AS minV,
+                MAX(${col}) AS maxV
          FROM dailyLogs
          WHERE tentId = ? AND logDate >= NOW() - INTERVAL ? HOUR AND ${col} IS NOT NULL
-         ORDER BY logDate ASC
-         LIMIT ?`,
-        [tentId, hours, limit]
+         GROUP BY DATE(logDate)
+         ORDER BY DATE(logDate) ASC`,
+        [tentId, hours]
       );
-      res.json(rows.map((r: any) => ({ t: Number(r.t), v: r.v != null ? parseFloat(r.v) : null })));
+      res.json(rows.map((r: any) => ({
+        t:   Number(r.t),
+        v:   r.v    != null ? parseFloat(r.v)    : null,
+        min: r.minV != null ? parseFloat(r.minV) : null,
+        max: r.maxV != null ? parseFloat(r.maxV) : null,
+      })));
     } catch (err: any) {
       console.error('[Device] history error:', err?.message);
       res.status(500).json({ error: 'Erro interno' });
