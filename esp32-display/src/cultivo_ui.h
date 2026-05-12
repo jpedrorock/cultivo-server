@@ -33,6 +33,10 @@ extern char  FASE[20];
 extern float tempC, rh, vpd, phv, ecv;
 extern int   semana, totalSem;
 extern bool  wifiOk;
+// Idade em segundos do ultimo dado do sensor (Tuya poll) e da ultima
+// entrada em dailyLogs (inclui readings manuais). -1 = sem dado.
+// UI usa pra renderizar badge de freshness verde/amarelo/vermelho.
+extern int   sensorAgeSec, dailyLogAgeSec;
 
 // LUX/PPFD: targetPpfd e o valor ajustado pelo usuario (que vai pro POST);
 // currentPpfd/currentLux sao a leitura mais recente do sensor (vem do GET).
@@ -126,6 +130,11 @@ typedef struct {
   uint8_t     healthStatus;  // 0=NULL, 1=HEALTHY, 2=STRESSED, 3=SICK, 4=RECOVERING
   bool        hasPhoto;
   const char *lastPhotoDate; // ISO 8601 ou NULL
+  // Strain info opcional — exibido no detalhe da planta.
+  const char *strainName;        // NULL = sem strain (deletada/missing)
+  uint8_t     strainVegaWeeks;   // 0 = sem dado
+  uint8_t     strainFloraWeeks;  // 0 = sem dado
+  const char *strainOrigin;      // "FEMINIZED" / "AUTOFLOWER" / "CLONE" / NULL
 } CultivoPlant;
 void cultivoUI_applyPlants(const CultivoPlant *items, int count);
 
@@ -178,6 +187,14 @@ void cultivoUI_setWifiReconnectHandler(CultivoWifiReconnectFn cb);
 // App chama cultivoUI_setRefreshing(true) ao iniciar refresh, false ao terminar.
 // UI mostra spinner/pulse no card de TEMP+UMID enquanto rodando.
 void cultivoUI_setRefreshing(bool active);
+
+// ── Ambient idle overlay ──────────────────────────────────────────────────────
+// Screensaver minimalista: relogio gigante + TEMP/UMID grandes em brilho
+// reduzido. Chamado pelo firmware quando sleep timer expira; remove em wake.
+void cultivoUI_showIdleOverlay(void);
+void cultivoUI_hideIdleOverlay(void);
+// Atualiza o clock no overlay (chamado pelo firmware a cada 30s).
+void cultivoUI_tickIdleOverlay(void);
 
 #ifdef __cplusplus
 }

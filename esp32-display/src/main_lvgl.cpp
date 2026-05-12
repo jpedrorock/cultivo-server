@@ -281,22 +281,31 @@ static lv_timer_t *sleepTimer = nullptr;
 
 static void screenWake() {
   if (!screenAsleep) return;
-  ledcWrite(0, 200);
+  ledcWrite(0, 200);             // brilho cheio (~80%)
+  cultivoUI_hideIdleOverlay();   // remove screensaver
   screenAsleep = false;
   Serial.println("[backlight] wake");
 }
 
 static void screenSleep() {
   if (screenAsleep) return;
-  ledcWrite(0, 0);
+  // Ambient mode: brilho reduzido (5% = duty ~12/255) + overlay screensaver
+  // (clock + TEMP/UMID grandes em preto). Antes: backlight 100% off.
+  // Beneficios: continua util a noite, reduz burn-in IPS, alguma informacao
+  // sempre visivel sem precisar tocar.
+  ledcWrite(0, 12);
+  cultivoUI_showIdleOverlay();
   screenAsleep = true;
-  Serial.println("[backlight] sleep");
+  Serial.println("[backlight] dim + ambient overlay");
 }
 
 static void sleepTimerCb(lv_timer_t *) {
   uint32_t inactive = lv_display_get_inactive_time(NULL);
   if (!screenAsleep && inactive >= SCREEN_SLEEP_MS) {
     screenSleep();
+  } else if (screenAsleep) {
+    // Tick do overlay a cada 1s — atualiza relogio + temp/umid no screensaver
+    cultivoUI_tickIdleOverlay();
   }
 }
 
@@ -1241,6 +1250,13 @@ static void connectWifi() {
   for (int i = 0; i < 20 && WiFi.status() != WL_CONNECTED; i++) { delay(500); Serial.print('.'); }
   wifiOk = (WiFi.status() == WL_CONNECTED);
   Serial.println(wifiOk ? " OK" : " FALHOU");
+  // NTP — configura horario BRT (UTC-3, sem DST). Necessario pro ambient
+  // clock idle (screensaver). configTime e' nao-bloqueante; pode levar
+  // alguns segundos pro time ser sincronizado em background.
+  if (wifiOk) {
+    configTime(-3 * 3600, 0, "pool.ntp.org", "br.pool.ntp.org", "time.google.com");
+    Serial.println("[ntp] BRT3 configurado");
+  }
 }
 
 // Certificados raiz ISRG (Let's Encrypt) — bundle X1 (RSA, cobre R3/R10/R11)
@@ -1475,6 +1491,11 @@ static bool fetchDisplayData() {
     // Sincroniza targetPpfd com o ultimo valor salvo (pra o usuario ver "como deixou")
     if (currentPpfd > 0) targetPpfd = currentPpfd;
   }
+  // Idades dos sensores — usados pelo UI pra badge de freshness (verde/yellow/red).
+  // Server retorna sec; -1 ou null aqui significa "sem dado" (sensor offline ou
+  // sem mapping). UI trata.
+  sensorAgeSec   = doc["sensorAgeSec"].isNull()   ? -1 : doc["sensorAgeSec"].as<int>();
+  dailyLogAgeSec = doc["dailyLogAgeSec"].isNull() ? -1 : doc["dailyLogAgeSec"].as<int>();
   const char* f = doc["fase"];     if (f) { strncpy(FASE, f, sizeof(FASE)-1); FASE[sizeof(FASE)-1]='\0'; }
   const char* t = doc["tentName"]; if (t) { strncpy(TENT_NAME, t, sizeof(TENT_NAME)-1); TENT_NAME[sizeof(TENT_NAME)-1]='\0'; }
   return true;
@@ -1699,6 +1720,11 @@ struct PlantSlot {
   uint8_t healthStatus;   // 0..4
   bool    hasPhoto;
   char    lastPhotoDate[32];
+  // Strain info — preenchido pelo /plants. Vazio = strain deletada/missing.
+  char    strainName[48];
+  uint8_t strainVegaWeeks;     // 0 = sem dado
+  uint8_t strainFloraWeeks;
+  char    strainOrigin[16];    // "FEMINIZED" / "AUTOFLOWER" / "CLONE"
 };
 static PlantSlot plantsLocal[PLANTS_LOCAL_MAX];
 static int       plantCountLocal = 0;
@@ -1777,6 +1803,23 @@ static bool fetchPlants() {
     strncpy(plantsLocal[n].lastPhotoDate, lpd,
             sizeof(plantsLocal[n].lastPhotoDate) - 1);
     plantsLocal[n].lastPhotoDate[sizeof(plantsLocal[n].lastPhotoDate) - 1] = '\0';
+    // Strain (objeto aninhado — pode ser null se strain deletada).
+    JsonObject st = p["strain"];
+    if (!st.isNull()) {
+      const char *sname = st["name"] | "";
+      strncpy(plantsLocal[n].strainName, sname, sizeof(plantsLocal[n].strainName) - 1);
+      plantsLocal[n].strainName[sizeof(plantsLocal[n].strainName) - 1] = '\0';
+      plantsLocal[n].strainVegaWeeks  = (uint8_t)(st["vegaWeeks"]  | 0);
+      plantsLocal[n].strainFloraWeeks = (uint8_t)(st["floraWeeks"] | 0);
+      const char *sorigin = st["origin"] | "";
+      strncpy(plantsLocal[n].strainOrigin, sorigin, sizeof(plantsLocal[n].strainOrigin) - 1);
+      plantsLocal[n].strainOrigin[sizeof(plantsLocal[n].strainOrigin) - 1] = '\0';
+    } else {
+      plantsLocal[n].strainName[0] = '\0';
+      plantsLocal[n].strainVegaWeeks = 0;
+      plantsLocal[n].strainFloraWeeks = 0;
+      plantsLocal[n].strainOrigin[0] = '\0';
+    }
     n++;
   }
   plantCountLocal = n;
@@ -2956,6 +2999,10 @@ void loop() {
       buf[i].healthStatus  = plantsLocal[i].healthStatus;
       buf[i].hasPhoto      = plantsLocal[i].hasPhoto;
       buf[i].lastPhotoDate = plantsLocal[i].lastPhotoDate[0] ? plantsLocal[i].lastPhotoDate : nullptr;
+      buf[i].strainName       = plantsLocal[i].strainName[0]   ? plantsLocal[i].strainName   : nullptr;
+      buf[i].strainVegaWeeks  = plantsLocal[i].strainVegaWeeks;
+      buf[i].strainFloraWeeks = plantsLocal[i].strainFloraWeeks;
+      buf[i].strainOrigin     = plantsLocal[i].strainOrigin[0] ? plantsLocal[i].strainOrigin : nullptr;
     }
     cultivoUI_applyPlants(buf, plantCountLocal);
   }

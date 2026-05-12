@@ -25,6 +25,7 @@
 #include <cstring>
 #include <cmath>
 #include <cstdlib>
+#include <ctime>      // pra localtime_r no ambient idle overlay
 
 // PSRAM alloc (firmware) ou stub stdlib (sim)
 #ifdef REAL_HARDWARE
@@ -65,6 +66,8 @@ char  FASE[20]      = "FLORACAO";
 float tempC = 24.5f, rh = 62.0f, vpd = 1.1f, phv = 6.2f, ecv = 1.8f;
 int   semana = 4, totalSem = 16;
 bool  wifiOk = false;        // firmware: setado pelo connectWifi(); sim: forcado p/ true em sim_main.cpp
+int   sensorAgeSec   = -1;   // -1 = sem dado; updated em fetchDisplayData
+int   dailyLogAgeSec = -1;   // idem
 int   currentLux = 0;
 int   currentPpfd = 430;
 int   targetPpfd  = 450;
@@ -168,6 +171,9 @@ static lv_obj_t *lblCycleBadge = nullptr;
 // Container do card ciclo — guardamos pra re-tintar o gradient quando a
 // fase mudar (refreshHomeValues). Sem isso, o tint ficava fixo na fase do boot.
 static lv_obj_t *cardCycle     = nullptr;
+// Barra de progresso da fase atual no card ciclo (semana/totalSem).
+// Cor da barra = phaseColor(FASE). Atualizada em refreshHomeValues.
+static lv_obj_t *cycleProgress = nullptr;
 // lblTemp = numero grande do arc; lblEcHome/lblPhHome legacy.
 static lv_obj_t *lblEcHome = nullptr, *lblPhHome = nullptr;  // legacy
 static lv_obj_t *lblCiclo = nullptr, *ciclBar = nullptr;     // legacy
@@ -301,6 +307,92 @@ static uint32_t cRH(float h) {
   if (h < 40 || h > 75) return COL_RED;
   if (h < 50 || h > 70) return COL_YEL;
   return COL_CYN;
+}
+
+// Badges de freshness dos sensores (apontam pro mini-icone topo-right de
+// cada card UMID/VPD). Atualizados em refreshHomeValues conforme idade
+// dos sensores (sensorAgeSec do server).
+static lv_obj_t *badgeRh  = nullptr;
+static lv_obj_t *badgeVpd = nullptr;
+
+// Cor do badge de freshness:
+//   verde    < 2min  (sensor live)
+//   amarelo  < 15min (sensor lento — Tuya rate-limit / rede ruim)
+//   vermelho >=15min OU -1 (sensor offline / sem dado)
+static uint32_t freshnessColor(int ageSec) {
+  if (ageSec < 0)   return COL_RED;
+  if (ageSec < 120) return COL_PRIMARY;  // verde live
+  if (ageSec < 900) return COL_YEL;
+  return COL_RED;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// AMBIENT IDLE OVERLAY — screensaver minimalista
+// Mostrado quando display fica idle (firmware chama show/hide via API publica).
+// Layout:
+//        HH:MM
+//      24.5°C
+//      62% UMID
+// ════════════════════════════════════════════════════════════════════════════════
+static lv_obj_t *idleOverlay = nullptr;
+static lv_obj_t *idleClockLbl = nullptr;
+static lv_obj_t *idleTempLbl  = nullptr;
+static lv_obj_t *idleRhLbl    = nullptr;
+
+extern "C" void cultivoUI_showIdleOverlay(void) {
+  if (idleOverlay) return;  // ja mostrando
+  idleOverlay = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(idleOverlay);
+  lv_obj_set_size(idleOverlay, SCREEN_W, SCREEN_H);
+  lv_obj_set_pos(idleOverlay, 0, 0);
+  lv_obj_set_style_bg_color(idleOverlay, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(idleOverlay, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(idleOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Clock gigante centro-superior (FONT_VALUE = 40px no real hw)
+  idleClockLbl = lv_label_create(idleOverlay);
+  lv_label_set_text(idleClockLbl, "--:--");
+  lv_obj_set_style_text_color(idleClockLbl, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(idleClockLbl, FONT_VALUE, 0);
+  lv_obj_align(idleClockLbl, LV_ALIGN_CENTER, 0, -sh(40));
+
+  // Temp grande (esquerda)
+  idleTempLbl = lv_label_create(idleOverlay);
+  lv_label_set_text_fmt(idleTempLbl, "%.1f\xC2\xB0""C", tempC);
+  lv_obj_set_style_text_color(idleTempLbl, lv_color_hex(COL_PHASE_HARVEST), 0);
+  lv_obj_set_style_text_font(idleTempLbl, FONT_TITLE, 0);
+  lv_obj_align(idleTempLbl, LV_ALIGN_CENTER, -sw(60), sh(40));
+
+  // Umid grande (direita)
+  idleRhLbl = lv_label_create(idleOverlay);
+  lv_label_set_text_fmt(idleRhLbl, "%.0f%%", rh);
+  lv_obj_set_style_text_color(idleRhLbl, lv_color_hex(COL_CYN), 0);
+  lv_obj_set_style_text_font(idleRhLbl, FONT_TITLE, 0);
+  lv_obj_align(idleRhLbl, LV_ALIGN_CENTER, sw(60), sh(40));
+
+  cultivoUI_tickIdleOverlay();  // update inicial do clock
+}
+
+extern "C" void cultivoUI_hideIdleOverlay(void) {
+  if (!idleOverlay) return;
+  lv_obj_del(idleOverlay);
+  idleOverlay = idleClockLbl = idleTempLbl = idleRhLbl = nullptr;
+}
+
+extern "C" void cultivoUI_tickIdleOverlay(void) {
+  if (!idleOverlay || !idleClockLbl) return;
+  // Le time corrente. configTime no firmware seta TZ BRT-3.
+  // localtime_r e thread-safe; usado pra evitar buffer estatico.
+  time_t now = time(nullptr);
+  struct tm tmInfo;
+  if (now > 1700000000 && localtime_r(&now, &tmInfo)) {  // sanity: time pos-2023
+    lv_label_set_text_fmt(idleClockLbl, "%02d:%02d", tmInfo.tm_hour, tmInfo.tm_min);
+  } else {
+    lv_label_set_text(idleClockLbl, "--:--");  // NTP ainda nao sincronizou
+  }
+  // Refresh tambem dos valores ambientais
+  if (idleTempLbl) lv_label_set_text_fmt(idleTempLbl, "%.1f\xC2\xB0""C", tempC);
+  if (idleRhLbl)   lv_label_set_text_fmt(idleRhLbl,   "%.0f%%", rh);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -472,7 +564,8 @@ static void buildHome(lv_obj_t *tab) {
   // em COL_TEXT branco (cor da metrica fica so' no icone + linha do chart).
   auto makeMiniCard = [&](lv_obj_t *parent, int yOffset, const char *label, const char *initVal,
                           uint32_t color, const lv_image_dsc_t *icon,
-                          lv_obj_t **sparkOut, lv_chart_series_t **serOut) -> lv_obj_t* {
+                          lv_obj_t **sparkOut, lv_chart_series_t **serOut,
+                          lv_obj_t **badgeOut = nullptr) -> lv_obj_t* {
     lv_obj_t *c = makeCard(parent, 0, yOffset, cardW, cardH);
     lv_obj_set_style_pad_all(c, sw(4), 0);
     // Tint do gradient na cor da metrica — UMID ciano, VPD verde (COL_PRIMARY).
@@ -497,15 +590,16 @@ static void buildHome(lv_obj_t *tab) {
     lv_obj_set_style_text_font(lb, FONT_CAPTION, 0);
     lv_obj_align(lb, LV_ALIGN_TOP_LEFT, iconW, sh(4));
 
-    // Mini wifi top-right — verde quando dado fresh, dim quando offline.
-    // Reduzido a ~50% (transform_zoom 128) pra nao competir com o icone
-    // principal da metrica. Igual indicadores do app mobile.
+    // Badge de freshness top-right — usa ic_wifi como dot indicator. Cor
+    // muda conforme idade do sensor (verde live, amarelo lento, vermelho
+    // offline). Atualizado em refreshHomeValues a cada fetch.
     lv_obj_t *wifi = lv_image_create(c);
     lv_image_set_src(wifi, &ic_wifi);
     lv_obj_set_style_image_recolor(wifi, lv_color_hex(wifiOk ? COL_PRIMARY : COL_DIM), 0);
     lv_obj_set_style_image_recolor_opa(wifi, LV_OPA_COVER, 0);
     lv_obj_set_style_transform_zoom(wifi, 128, 0);   // ~50% (16->8px)
     lv_obj_align(wifi, LV_ALIGN_TOP_RIGHT, 0, sh(2));
+    if (badgeOut) *badgeOut = wifi;
     (void)wifiW;  // reservado pra alignment futuro
 
     // Valor: branco fixo (DS hierarchy). Cor da metrica fica so' no icone
@@ -540,8 +634,8 @@ static void buildHome(lv_obj_t *tab) {
   // Face A — slot 0+1: sensores de ambiente. Cores DS:
   //   UMIDADE  ciano  + ic_droplet
   //   VPD      verde  + ic_activity (wave/wind)
-  lblRh   = makeMiniCard(homeFaceA, 0,                     "UMIDADE", "--", COL_CYN,     &ic_droplet,   &sparkRh,   &serRhS);
-  lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_PRIMARY, &ic_activity,  &sparkVpd,  &serVpdS);
+  lblRh   = makeMiniCard(homeFaceA, 0,                     "UMIDADE", "--", COL_CYN,     &ic_droplet,   &sparkRh,   &serRhS,  &badgeRh);
+  lblVpd  = makeMiniCard(homeFaceA, cardH + cardGap,       "VPD",     "--", COL_PRIMARY, &ic_activity,  &sparkVpd,  &serVpdS, &badgeVpd);
 
   // Slot 3 — CARD CICLO compacto (1 linha so'). Layout horizontal:
   //   Sem 4/16                                       [FLORACAO]
@@ -575,6 +669,20 @@ static void buildHome(lv_obj_t *tab) {
     lv_obj_set_style_pad_bottom(lblCycleBadge, sh(1), 0);
     lv_obj_set_style_radius(lblCycleBadge, RADIUS_SM, 0);
     lv_obj_align(lblCycleBadge, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    // Barra de progresso da fase — finissima (3px) no rodape do card. Mostra
+    // semana atual / totalSem visualmente em adicao ao texto "Sem X/Y".
+    // Cor = phase. Bar bg = mesma cor com OPA_30 (track dim).
+    cycleProgress = lv_bar_create(c);
+    lv_obj_set_size(cycleProgress, cardW - sw(16), sh(3));
+    lv_obj_align(cycleProgress, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_bar_set_range(cycleProgress, 0, 100);
+    lv_bar_set_value(cycleProgress, 0, LV_ANIM_OFF);
+    lv_obj_set_style_radius(cycleProgress, sh(2), 0);
+    lv_obj_set_style_radius(cycleProgress, sh(2), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(phaseColor(FASE)), 0);
+    lv_obj_set_style_bg_opa(cycleProgress, LV_OPA_30, 0);
+    lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(phaseColor(FASE)), LV_PART_INDICATOR);
   }
 
   // Tap no card UMIDADE -> refresh-only (sem ciclar o arc), util pra
@@ -808,7 +916,27 @@ extern "C" void refreshHomeValues() {
     lv_obj_set_style_bg_color(lblCycleBadge, lv_color_hex(pc), 0);
     // Re-tinta o card inteiro na cor da fase atual (gradient top)
     if (cardCycle) tintCard(cardCycle, pc, 50);
+    // Barra de progresso: percent da fase concluido. Clamp 0-100.
+    if (cycleProgress) {
+      int pct = 0;
+      if (totalSem > 0 && semana > 0) {
+        pct = (semana * 100) / totalSem;
+        if (pct > 100) pct = 100;
+      }
+      lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(pc), 0);
+      lv_obj_set_style_bg_color(cycleProgress, lv_color_hex(pc), LV_PART_INDICATOR);
+      lv_bar_set_value(cycleProgress, pct, LV_ANIM_ON);
+      // Sem fase ativa (semana=0): esconde a barra
+      if (semana <= 0 || totalSem <= 0) lv_obj_add_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
+      else lv_obj_clear_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
+    }
   }
+
+  // Badges de freshness dos cards UMID/VPD — colore conforme idade do
+  // sensor Tuya. Se WiFi offline, fica DIM cinza (sem dado novo possivel).
+  uint32_t freshC = wifiOk ? freshnessColor(sensorAgeSec) : COL_DIM;
+  if (badgeRh)  lv_obj_set_style_image_recolor(badgeRh,  lv_color_hex(freshC), 0);
+  if (badgeVpd) lv_obj_set_style_image_recolor(badgeVpd, lv_color_hex(freshC), 0);
 }
 
 // Auto-scale do sparkline: olha os ultimos 20 pontos e ajusta range pra
@@ -2216,6 +2344,11 @@ typedef struct {
   uint8_t healthStatus;
   bool hasPhoto;
   char lastPhotoDate[32];
+  // Strain info (vazio = sem strain). Exibido no detalhe da planta.
+  char strainName[48];
+  uint8_t strainVegaWeeks;
+  uint8_t strainFloraWeeks;
+  char strainOrigin[16];
 } PlantStorage;
 static PlantStorage plants[PLANTS_MAX];
 static int plantCount = 0;
@@ -2411,6 +2544,17 @@ extern "C" void cultivoUI_applyPlants(const CultivoPlant *items, int count) {
               sizeof(plants[i].lastPhotoDate) - 1);
       plants[i].lastPhotoDate[sizeof(plants[i].lastPhotoDate) - 1] = '\0';
     } else { plants[i].lastPhotoDate[0] = '\0'; }
+    // Strain info — copy pra storage interno
+    if (items[i].strainName) {
+      strncpy(plants[i].strainName, items[i].strainName, sizeof(plants[i].strainName) - 1);
+      plants[i].strainName[sizeof(plants[i].strainName) - 1] = '\0';
+    } else { plants[i].strainName[0] = '\0'; }
+    plants[i].strainVegaWeeks  = items[i].strainVegaWeeks;
+    plants[i].strainFloraWeeks = items[i].strainFloraWeeks;
+    if (items[i].strainOrigin) {
+      strncpy(plants[i].strainOrigin, items[i].strainOrigin, sizeof(plants[i].strainOrigin) - 1);
+      plants[i].strainOrigin[sizeof(plants[i].strainOrigin) - 1] = '\0';
+    } else { plants[i].strainOrigin[0] = '\0'; }
   }
   for (int i = count; i < PLANTS_MAX; i++) {
     plants[i].id = 0;
@@ -2503,6 +2647,30 @@ static void openPlantDetail(int idx) {
   lv_obj_set_style_text_color(plantDetailDate, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_text_font(plantDetailDate, FONT_CAPTION, 0);
   lv_obj_align(plantDetailDate, LV_ALIGN_BOTTOM_LEFT, sw(12), -sh(8));
+
+  // Strain info — canto direito-baixo. Ex: "Northern Lights · 4/8sem · FEMINIZED"
+  // Compacto (FONT_CAPTION) e cinza pra nao competir com status/data.
+  if (plants[idx].strainName[0]) {
+    lv_obj_t *lblStrain = lv_label_create(plantDetailScreen);
+    char sbuf[96];
+    if (plants[idx].strainVegaWeeks > 0 && plants[idx].strainFloraWeeks > 0) {
+      snprintf(sbuf, sizeof(sbuf), "%s  %d/%dsem  %s",
+               plants[idx].strainName,
+               plants[idx].strainVegaWeeks, plants[idx].strainFloraWeeks,
+               plants[idx].strainOrigin[0] ? plants[idx].strainOrigin : "");
+    } else {
+      snprintf(sbuf, sizeof(sbuf), "%s  %s",
+               plants[idx].strainName,
+               plants[idx].strainOrigin[0] ? plants[idx].strainOrigin : "");
+    }
+    lv_label_set_text(lblStrain, sbuf);
+    lv_label_set_long_mode(lblStrain, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(lblStrain, sw(280));
+    lv_obj_set_style_text_align(lblStrain, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_color(lblStrain, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(lblStrain, FONT_CAPTION, 0);
+    lv_obj_align(lblStrain, LV_ALIGN_BOTTOM_RIGHT, -sw(12), -sh(8));
+  }
 
   // Pede a foto ao app (so' se hasPhoto)
   if (plants[idx].hasPhoto && onPlantPhotoRequest) {
