@@ -803,9 +803,11 @@ function registerDeviceRoutes(app: express.Application) {
       const [rows]: any = await pool.execute(
         `SELECT
            p.id, p.name, p.code, p.plantStage AS stage,
+           s.name AS strainName, s.vegaWeeks, s.floraWeeks, s.origin AS strainOrigin,
            (SELECT healthStatus FROM plantHealthLogs WHERE plantId = p.id ORDER BY id DESC LIMIT 1) AS healthStatus,
            (SELECT logDate FROM plantHealthLogs WHERE plantId = p.id AND photoUrl IS NOT NULL ORDER BY id DESC LIMIT 1) AS lastPhotoDate
          FROM plants p
+         LEFT JOIN strains s ON s.id = p.strainId
          WHERE p.currentTentId = ?
            AND p.status = 'ACTIVE'
            AND p.deletedAt IS NULL
@@ -821,6 +823,15 @@ function registerDeviceRoutes(app: express.Application) {
         healthStatus: (r.healthStatus as string | null) ?? null,
         lastPhotoDate: r.lastPhotoDate ? new Date(r.lastPhotoDate).toISOString() : null,
         hasPhoto: r.lastPhotoDate != null,
+        // Strain info — usado pelo display no detalhe da planta pra
+        // mostrar nome + semanas esperadas + tipo. Campos null quando
+        // strain foi deletada (mas plant.strainId nao zera por integrity).
+        strain: r.strainName ? {
+          name: r.strainName as string,
+          vegaWeeks: r.vegaWeeks as number,
+          floraWeeks: r.floraWeeks as number,
+          origin: (r.strainOrigin as string | null) ?? null,
+        } : null,
       }));
 
       res.json({ plants });
