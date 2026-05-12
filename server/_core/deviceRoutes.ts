@@ -261,7 +261,15 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
-  // GET /api/device/tasks/:tentId — lista tarefas da estufa
+  // GET /api/device/tasks/:tentId — lista tarefas relevantes pra estufa
+  //
+  // Retorna:
+  //   - Tarefas explicitamente marcadas pra esta estufa (tentId = X)
+  //   - Tarefas SEM estufa especifica (tentId IS NULL) — "lembretes gerais"
+  //     do usuario que devem aparecer em qualquer display do grupo
+  //
+  // Filtra por groupId (via JOIN com users) pra multi-tenancy: nao mostra
+  // tarefas de outro grupo. Tarefas pendentes vem primeiro, depois feitas.
   app.get('/api/device/tasks/:tentId', async (req, res) => {
     try {
       const device = await validateDeviceToken(req);
@@ -269,8 +277,14 @@ function registerDeviceRoutes(app: express.Application) {
       const tentId = parseInt(req.params.tentId);
       if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
       const [rows]: any = await pool.execute(
-        `SELECT id, title, isDone FROM standaloneTasks WHERE tentId = ? ORDER BY createdAt DESC LIMIT 10`,
-        [tentId]
+        `SELECT t.id, t.title, t.isDone
+         FROM standaloneTasks t
+         INNER JOIN users u ON u.id = t.userId
+         WHERE u.groupId = ?
+           AND (t.tentId = ? OR t.tentId IS NULL)
+         ORDER BY t.isDone ASC, t.createdAt DESC
+         LIMIT 10`,
+        [device.groupId, tentId]
       );
       res.json(rows.map((r: any) => ({ id: r.id, texto: r.title, feito: !!r.isDone })));
     } catch (err: any) {
@@ -280,6 +294,11 @@ function registerDeviceRoutes(app: express.Application) {
   });
 
   // POST /api/device/task-complete — alterna estado de conclusão de tarefa
+  //
+  // Aceita tarefas:
+  //   - Tagged pra device.tentId
+  //   - Sem tent (tentId IS NULL) criadas por user no grupo
+  // Multi-tenancy via JOIN com users pra checar groupId.
   app.post('/api/device/task-complete', async (req, res) => {
     try {
       const device = await validateDeviceToken(req);
@@ -287,8 +306,13 @@ function registerDeviceRoutes(app: express.Application) {
       const { taskId } = req.body;
       if (!taskId) return res.status(400).json({ error: 'taskId obrigatório' });
       const [rows]: any = await pool.execute(
-        `SELECT id, isDone FROM standaloneTasks WHERE id = ? AND tentId = ?`,
-        [taskId, device.tentId]
+        `SELECT t.id, t.isDone
+         FROM standaloneTasks t
+         INNER JOIN users u ON u.id = t.userId
+         WHERE t.id = ?
+           AND u.groupId = ?
+           AND (t.tentId = ? OR t.tentId IS NULL)`,
+        [taskId, device.groupId, device.tentId]
       );
       if (rows.length === 0) return res.status(404).json({ error: 'Tarefa não encontrada' });
       const newState = rows[0].isDone ? 0 : 1;
