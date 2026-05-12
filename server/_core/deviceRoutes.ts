@@ -261,66 +261,186 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
-  // GET /api/device/tasks/:tentId — lista tarefas relevantes pra estufa
+  // GET /api/device/tasks/:tentId — tarefas da semana atual do ciclo ativo
   //
-  // Retorna:
-  //   - Tarefas explicitamente marcadas pra esta estufa (tentId = X)
-  //   - Tarefas SEM estufa especifica (tentId IS NULL) — "lembretes gerais"
-  //     do usuario que devem aparecer em qualquer display do grupo
+  // Tarefas reais do app vem de `taskInstances` (tabela ligada a `cycles`),
+  // NAO de `standaloneTasks`. Cada ciclo tem fase (CLONING/VEGA/FLORA/
+  // MAINTENANCE/DRYING) + week number, e templates em `taskTemplates`
+  // sao materializados como `taskInstances` por semana.
   //
-  // Filtra por groupId (via JOIN com users) pra multi-tenancy: nao mostra
-  // tarefas de outro grupo. Tarefas pendentes vem primeiro, depois feitas.
+  // Endpoint reproduz a logica do getCurrentWeekTasks do tRPC:
+  //  1. Acha ciclo ACTIVE da estufa
+  //  2. Calcula fase + weekNumber baseado em tent.category + cycle dates
+  //  3. Lazy-materializa instances pra semana atual via INSERT IGNORE
+  //  4. Retorna instances (id + title + isDone)
+  //
+  // Tambem inclui standaloneTasks tagged pra estufa ou sem tent (lembretes).
   app.get('/api/device/tasks/:tentId', async (req, res) => {
     try {
       const device = await validateDeviceToken(req);
       if (!device) return res.status(401).json({ error: 'Token inválido' });
       const tentId = parseInt(req.params.tentId);
       if (device.tentId !== tentId) return res.status(403).json({ error: 'Não autorizado' });
-      const [rows]: any = await pool.execute(
+
+      // 1) Busca estufa + ciclo ativo
+      const [tentRows]: any = await pool.execute(
+        `SELECT id, category FROM tents WHERE id = ? AND groupId = ? LIMIT 1`,
+        [tentId, device.groupId]
+      );
+      if (tentRows.length === 0) return res.status(404).json({ error: 'Estufa nao encontrada' });
+      const tentCategory: string = tentRows[0].category;
+
+      const [cycleRows]: any = await pool.execute(
+        `SELECT id, startDate, floraStartDate FROM cycles
+         WHERE tentId = ? AND status = 'ACTIVE'
+         ORDER BY id DESC LIMIT 1`,
+        [tentId]
+      );
+
+      const results: { id: number; texto: string; feito: boolean }[] = [];
+
+      // 2) Se ha ciclo ativo, calcula fase + week + materializa instances
+      if (cycleRows.length > 0) {
+        const cycle = cycleRows[0];
+        const now = new Date();
+        const startDate = new Date(cycle.startDate);
+        const floraStartDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
+
+        let phase: string;
+        let weekNumber: number | null;
+        let context: string;
+        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+        if (tentCategory === 'MAINTENANCE') {
+          phase = 'MAINTENANCE'; weekNumber = null; context = 'TENT_A';
+        } else if (tentCategory === 'DRYING') {
+          phase = 'DRYING'; weekNumber = null; context = 'TENT_BC';
+        } else if (tentCategory === 'FLORA') {
+          phase = 'FLORA';
+          const ws = floraStartDate ?? startDate;
+          weekNumber = Math.max(1, Math.floor((now.getTime() - ws.getTime()) / WEEK_MS) + 1);
+          context = 'TENT_BC';
+        } else if (tentCategory === 'VEGA') {
+          phase = 'VEGA';
+          weekNumber = Math.max(1, Math.floor((now.getTime() - startDate.getTime()) / WEEK_MS) + 1);
+          context = 'TENT_BC';
+        } else {
+          phase = 'MAINTENANCE'; weekNumber = null; context = 'TENT_A';
+        }
+
+        // Busca templates da fase/semana
+        const templateQuery = weekNumber == null
+          ? `SELECT id, title FROM taskTemplates WHERE context = ? AND phase = ? AND (groupId IS NULL OR groupId = ?)`
+          : `SELECT id, title FROM taskTemplates WHERE context = ? AND phase = ? AND weekNumber = ? AND (groupId IS NULL OR groupId = ?)`;
+        const templateParams = weekNumber == null
+          ? [context, phase, device.groupId]
+          : [context, phase, weekNumber, device.groupId];
+        const [templates]: any = await pool.execute(templateQuery, templateParams);
+
+        // Start of current week (domingo 00:00 — igual ao tRPC)
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        // Lazy-materialize: INSERT IGNORE pra cada template (idempotente
+        // graças ao unique tentTaskDateUnique)
+        for (const t of templates as any[]) {
+          await pool.execute(
+            `INSERT IGNORE INTO taskInstances (tentId, taskTemplateId, occurrenceDate, isDone)
+             VALUES (?, ?, ?, 0)`,
+            [tentId, t.id, startOfWeek]
+          );
+        }
+
+        // Le instances ja' existentes (incluindo as recem-criadas)
+        const [instances]: any = await pool.execute(
+          `SELECT i.id, tt.title, i.isDone
+           FROM taskInstances i
+           INNER JOIN taskTemplates tt ON tt.id = i.taskTemplateId
+           WHERE i.tentId = ? AND i.occurrenceDate = ?
+           ORDER BY i.isDone ASC, tt.title ASC`,
+          [tentId, startOfWeek]
+        );
+        for (const r of instances as any[]) {
+          results.push({ id: r.id, texto: r.title, feito: !!r.isDone });
+        }
+      }
+
+      // 3) Tambem inclui standaloneTasks (lembretes) — id negativo pra
+      // diferenciar de taskInstance no toggle (-id == standaloneId)
+      const [standalone]: any = await pool.execute(
         `SELECT t.id, t.title, t.isDone
          FROM standaloneTasks t
          INNER JOIN users u ON u.id = t.userId
          WHERE u.groupId = ?
            AND (t.tentId = ? OR t.tentId IS NULL)
          ORDER BY t.isDone ASC, t.createdAt DESC
-         LIMIT 10`,
+         LIMIT 5`,
         [device.groupId, tentId]
       );
-      res.json(rows.map((r: any) => ({ id: r.id, texto: r.title, feito: !!r.isDone })));
+      for (const r of standalone as any[]) {
+        results.push({ id: -r.id, texto: r.title, feito: !!r.isDone });
+      }
+
+      // Limita a 10 total — display da' scroll mas evita payload grande
+      res.json(results.slice(0, 10));
     } catch (err: any) {
       console.error('[Device] tasks error:', err?.message);
       res.status(500).json({ error: 'Erro interno' });
     }
   });
 
-  // POST /api/device/task-complete — alterna estado de conclusão de tarefa
+  // POST /api/device/task-complete — alterna estado de conclusão
   //
-  // Aceita tarefas:
-  //   - Tagged pra device.tentId
-  //   - Sem tent (tentId IS NULL) criadas por user no grupo
-  // Multi-tenancy via JOIN com users pra checar groupId.
+  // taskId:
+  //   - Positivo: id de taskInstances (tarefa de ciclo)
+  //   - Negativo: id de standaloneTasks (lembrete; usa abs)
+  // Multi-tenancy via groupId em ambos os casos.
   app.post('/api/device/task-complete', async (req, res) => {
     try {
       const device = await validateDeviceToken(req);
       if (!device) return res.status(401).json({ error: 'Token inválido' });
-      const { taskId } = req.body;
-      if (!taskId) return res.status(400).json({ error: 'taskId obrigatório' });
-      const [rows]: any = await pool.execute(
-        `SELECT t.id, t.isDone
-         FROM standaloneTasks t
-         INNER JOIN users u ON u.id = t.userId
-         WHERE t.id = ?
-           AND u.groupId = ?
-           AND (t.tentId = ? OR t.tentId IS NULL)`,
-        [taskId, device.groupId, device.tentId]
-      );
-      if (rows.length === 0) return res.status(404).json({ error: 'Tarefa não encontrada' });
-      const newState = rows[0].isDone ? 0 : 1;
-      await pool.execute(
-        `UPDATE standaloneTasks SET isDone = ?, completedAt = ? WHERE id = ?`,
-        [newState, newState ? new Date() : null, taskId]
-      );
-      res.json({ success: true, feito: !!newState });
+      const rawId = req.body?.taskId;
+      if (typeof rawId !== 'number' || rawId === 0) {
+        return res.status(400).json({ error: 'taskId obrigatório' });
+      }
+
+      if (rawId > 0) {
+        // taskInstances: valida via tent.groupId
+        const [rows]: any = await pool.execute(
+          `SELECT i.id, i.isDone
+           FROM taskInstances i
+           INNER JOIN tents te ON te.id = i.tentId
+           WHERE i.id = ? AND te.groupId = ? AND i.tentId = ?`,
+          [rawId, device.groupId, device.tentId]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Tarefa não encontrada' });
+        const newState = rows[0].isDone ? 0 : 1;
+        await pool.execute(
+          `UPDATE taskInstances SET isDone = ?, completedAt = ? WHERE id = ?`,
+          [newState, newState ? new Date() : null, rawId]
+        );
+        return res.json({ success: true, feito: !!newState });
+      } else {
+        // standaloneTasks: rawId negativo → usa abs
+        const id = -rawId;
+        const [rows]: any = await pool.execute(
+          `SELECT t.id, t.isDone
+           FROM standaloneTasks t
+           INNER JOIN users u ON u.id = t.userId
+           WHERE t.id = ?
+             AND u.groupId = ?
+             AND (t.tentId = ? OR t.tentId IS NULL)`,
+          [id, device.groupId, device.tentId]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Tarefa não encontrada' });
+        const newState = rows[0].isDone ? 0 : 1;
+        await pool.execute(
+          `UPDATE standaloneTasks SET isDone = ?, completedAt = ? WHERE id = ?`,
+          [newState, newState ? new Date() : null, id]
+        );
+        return res.json({ success: true, feito: !!newState });
+      }
     } catch (err: any) {
       console.error('[Device] task-complete error:', err?.message);
       res.status(500).json({ error: 'Erro interno' });
