@@ -1631,7 +1631,16 @@ export const plantTrichomesRouter = router({
             console.error('[PlantTrichomes] Base64 fallback upload failed:', error.message);
           }
         }
-        
+
+        // Garante photoKey preenchido pra fotos locais (`/uploads/<key>`),
+        // mesmo no caminho moderno onde so vem photoUrl. Mesmo fix do
+        // plantHealth.create — previne queries que filtram por photoKey
+        // de perder esses uploads. Trichomes ainda nao tem endpoint
+        // device, mas mantem consistencia.
+        if (!photoKey && resolvedPhotoUrl?.startsWith('/uploads/')) {
+          photoKey = resolvedPhotoUrl.replace(/^\/uploads\//, '');
+        }
+
         // Nota: weekNumber não é persistido (schema não tem essa coluna).
         // Pode ser derivado de logDate vs cycle.startDate quando precisar.
         await database.insert(plantTrichomeLogs).values({
