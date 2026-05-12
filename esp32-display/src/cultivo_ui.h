@@ -37,6 +37,9 @@ extern bool  wifiOk;
 // entrada em dailyLogs (inclui readings manuais). -1 = sem dado.
 // UI usa pra renderizar badge de freshness verde/amarelo/vermelho.
 extern int   sensorAgeSec, dailyLogAgeSec;
+// Horario da luz da estufa (0-23). ambos==0: sempre on (MAINTENANCE);
+// ambos==24: sempre off (DRYING). ESP usa pra dormir auto no escuro.
+extern int   lightOnHour, lightOffHour;
 
 // LUX/PPFD: targetPpfd e o valor ajustado pelo usuario (que vai pro POST);
 // currentPpfd/currentLux sao a leitura mais recente do sensor (vem do GET).

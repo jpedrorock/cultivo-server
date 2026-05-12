@@ -68,6 +68,8 @@ int   semana = 4, totalSem = 16;
 bool  wifiOk = false;        // firmware: setado pelo connectWifi(); sim: forcado p/ true em sim_main.cpp
 int   sensorAgeSec   = -1;   // -1 = sem dado; updated em fetchDisplayData
 int   dailyLogAgeSec = -1;   // idem
+int   lightOnHour    = 6;    // default 18/6 (VEGA) ate' fetchDisplay preencher
+int   lightOffHour   = 24;
 int   currentLux = 0;
 int   currentPpfd = 430;
 int   targetPpfd  = 450;

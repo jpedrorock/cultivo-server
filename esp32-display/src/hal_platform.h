@@ -36,6 +36,14 @@
   #define LCD_D2    40
   #define LCD_D3    39
 
+  // Buzzer opcional — solder piezo passivo entre GPIO 38 e GND. Default
+  // pin escolhido pq nao tem strap function nem conflito com display/touch.
+  // Driver: LEDC channel 1 (channel 0 = backlight). ledcWriteTone gera
+  // a frequencia via PWM — qualquer piezo passivo aceita. Se preferir
+  // outro pin, basta trocar aqui (e re-flash). Sem buzzer hardware = no-op
+  // graças ao toggle "Som de alerta" no cfg modal.
+  #define BUZZER_PIN  38
+
   // Touch: AXS15231B integra display QSPI + touch I2C no mesmo chip.
   // Protocolo de touch e' proprietario (nao FT/CST padrao): comando 11 bytes
   // pra enderecar registro, depois leitura de 8 bytes com event/x/y.

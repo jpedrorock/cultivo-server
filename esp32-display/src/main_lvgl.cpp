@@ -58,6 +58,10 @@ static NetConfig netCfg = {
 // como "sleepSec" (segundos pra storage humano-legivel). 0 = never sleep.
 static uint32_t screenSleepMs = 30000;  // default 30s
 
+// Buzzer (piezo passivo opcional no GPIO BUZZER_PIN). Default OFF — user
+// habilita via cfg modal Display. Sem hardware solderdo, no-op silencioso.
+static bool buzzerEnabled = false;
+
 static void loadConfigFromNVS() {
   prefs.begin("cultivo", true);
   prefs.getString("ssid",   WIFI_SSID,    sizeof(WIFI_SSID));
@@ -68,8 +72,11 @@ static void loadConfigFromNVS() {
   // Sleep timeout em segundos. Default 30s (legacy hardcoded). 0 = nunca dorme.
   int sleepSec = prefs.getInt("sleepSec", 30);
   screenSleepMs = (sleepSec <= 0) ? UINT32_MAX : (uint32_t)sleepSec * 1000UL;
+  buzzerEnabled = prefs.getBool("buzzer", false);  // default OFF (opt-in)
   prefs.end();
-  Serial.printf("[cfg] ssid=%s url=%s tent=%d sleep=%ds\n", WIFI_SSID, SERVER_URL, TENT_ID, sleepSec);
+  Serial.printf("[cfg] ssid=%s url=%s tent=%d sleep=%ds buzzer=%s\n",
+                WIFI_SSID, SERVER_URL, TENT_ID, sleepSec,
+                buzzerEnabled ? "on" : "off");
 }
 
 static void saveSleepTimeoutNVS(int sleepSec) {
@@ -78,6 +85,14 @@ static void saveSleepTimeoutNVS(int sleepSec) {
   prefs.end();
   screenSleepMs = (sleepSec <= 0) ? UINT32_MAX : (uint32_t)sleepSec * 1000UL;
   Serial.printf("[cfg] sleep timeout: %ds\n", sleepSec);
+}
+
+static void saveBuzzerEnabledNVS(bool enabled) {
+  prefs.begin("cultivo", false);
+  prefs.putBool("buzzer", enabled);
+  prefs.end();
+  buzzerEnabled = enabled;
+  Serial.printf("[cfg] buzzer: %s\n", enabled ? "on" : "off");
 }
 
 static void saveConfigToNVS(const char* ssid, const char* pass, const char* url,
@@ -298,6 +313,49 @@ static bool ftRead(int &rx, int &ry) {
 static bool screenAsleep = false;
 static lv_timer_t *sleepTimer = nullptr;
 
+// ════════════════════════════════════════════════════════════════════════════════
+// BUZZER — piezo passivo opcional no GPIO BUZZER_PIN
+// LEDC channel 1 (channel 0 = backlight). Tom gerado por ledcWriteTone que
+// programa o PWM no freq desejado; duty 128/255 (~50%) max amplitude.
+// ════════════════════════════════════════════════════════════════════════════════
+#define BUZZER_CH 1
+
+static void buzzerInit() {
+  ledcSetup(BUZZER_CH, 2000, 8);    // 2kHz inicial, 8-bit duty
+  ledcAttachPin(BUZZER_PIN, BUZZER_CH);
+  ledcWrite(BUZZER_CH, 0);          // silent
+}
+
+// Single beep — frequencia em Hz, duracao em ms. No-op se buzzerEnabled=false.
+// Bloqueante (delay) — usar apenas em contexto que aceita ~100-500ms blocking.
+static void buzzerBeep(int freq, int durMs) {
+  if (!buzzerEnabled) return;
+  ledcWriteTone(BUZZER_CH, freq);
+  ledcWrite(BUZZER_CH, 128);        // 50% duty (max amplitude pra piezo)
+  delay(durMs);
+  ledcWrite(BUZZER_CH, 0);
+}
+
+// Padroes pre-definidos por severidade do alerta. severity:
+//   "SAFETY_LIMIT" -> 3 beeps curtos altos (CRITICO)
+//   "OUT_OF_RANGE" -> 2 beeps medios       (WARNING)
+//   "TREND" / outro -> 1 beep curto baixo  (INFO)
+static void buzzerAlertPattern(const char *severity) {
+  if (!buzzerEnabled) return;
+  if (severity && !strcmp(severity, "SAFETY_LIMIT")) {
+    for (int i = 0; i < 3; i++) {
+      buzzerBeep(3000, 80);
+      delay(60);
+    }
+  } else if (severity && !strcmp(severity, "OUT_OF_RANGE")) {
+    buzzerBeep(2000, 100);
+    delay(80);
+    buzzerBeep(2000, 100);
+  } else {
+    buzzerBeep(1500, 60);
+  }
+}
+
 static void screenWake() {
   if (!screenAsleep) return;
   ledcWrite(0, 200);             // brilho cheio (~80%)
@@ -318,9 +376,42 @@ static void screenSleep() {
   Serial.println("[backlight] dim + ambient overlay");
 }
 
+// Verdadeiro se hora atual esta no periodo "escuro" (luz off) do cultivo.
+// lightOnHour/lightOffHour vem do server (/display). Cases:
+//   on==off==0   -> sempre on (MAINTENANCE) -> nunca dark
+//   on==off==24  -> sempre off (DRYING)     -> sempre dark
+//   on < off     -> normal (ex: 6h-18h FLORA): dark se hora<on ou hora>=off
+//   on > off     -> overnight (ex: 22h-6h):    dark se hora<on E hora>=off
+static bool isCurrentlyInDarkPeriod() {
+  if (lightOnHour == lightOffHour) {
+    if (lightOnHour == 0)  return false;  // sempre on
+    if (lightOnHour == 24) return true;   // sempre off
+    return false;  // fallback safety
+  }
+  time_t now = time(nullptr);
+  if (now < 1700000000) return false;  // NTP nao sync — nao confia no horario
+  struct tm tmInfo;
+  if (!localtime_r(&now, &tmInfo)) return false;
+  int h = tmInfo.tm_hour;
+  if (lightOnHour < lightOffHour) {
+    // normal: luz on [lightOnHour, lightOffHour)
+    return (h < lightOnHour) || (h >= lightOffHour);
+  } else {
+    // overnight: luz on [lightOnHour, 24) U [0, lightOffHour)
+    return (h < lightOnHour) && (h >= lightOffHour);
+  }
+}
+
 static void sleepTimerCb(lv_timer_t *) {
   uint32_t inactive = lv_display_get_inactive_time(NULL);
-  if (!screenAsleep && inactive >= screenSleepMs) {
+  // No periodo escuro do cultivo, dorme depois de inatividade curta (5s)
+  // pra nao deixar tela acesa poluindo luz no escuro da estufa. Em
+  // periodo claro, usa screenSleepMs configurado pelo user.
+  uint32_t effectiveSleepMs = screenSleepMs;
+  if (isCurrentlyInDarkPeriod() && screenSleepMs > 5000) {
+    effectiveSleepMs = 5000;
+  }
+  if (!screenAsleep && inactive >= effectiveSleepMs) {
     screenSleep();
   } else if (screenAsleep) {
     // Tick do overlay a cada 1s — atualiza relogio + temp/umid no screensaver
@@ -898,7 +989,25 @@ static void openConfigModal() {
         saveSleepTimeoutNVS(SLEEP_OPTS[selIdx].sec);
       }
     }, LV_EVENT_VALUE_CHANGED, NULL);
-    makeLabel(body, "Salva automaticamente ao mudar.", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    // Toggle "Som de alerta" — beep no buzzer (piezo opcional no GPIO 38).
+    // Sem hardware soldado, nada toca — toggle existe pra usuario controlar
+    // depois de instalar o piezo.
+    makeLabel(body, "Som de alerta (buzzer):", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
+    lv_obj_t *swBuzzer = lv_switch_create(body);
+    if (buzzerEnabled) lv_obj_add_state(swBuzzer, LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(swBuzzer, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_add_event_cb(swBuzzer, [](lv_event_t *e) {
+      lv_obj_t *sw = (lv_obj_t*)lv_event_get_target(e);
+      bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
+      saveBuzzerEnabledNVS(on);
+      // Mini beep de feedback ao ligar (so' se piezo soldado)
+      if (on) { ledcWriteTone(BUZZER_CH, 1500); ledcWrite(BUZZER_CH, 128); delay(80); ledcWrite(BUZZER_CH, 0); }
+    }, LV_EVENT_VALUE_CHANGED, NULL);
+
+    makeLabel(body, "Salva automaticamente ao mudar.", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
+    makeLabel(body, "Buzzer: solder piezo em GPIO 38 + GND.",
+              COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1758,6 +1867,9 @@ static bool fetchDisplayData() {
   // sem mapping). UI trata.
   sensorAgeSec   = doc["sensorAgeSec"].isNull()   ? -1 : doc["sensorAgeSec"].as<int>();
   dailyLogAgeSec = doc["dailyLogAgeSec"].isNull() ? -1 : doc["dailyLogAgeSec"].as<int>();
+  // Light schedule pra auto-sleep no periodo escuro do cultivo
+  if (!doc["lightOnHour"].isNull())  lightOnHour  = doc["lightOnHour"].as<int>();
+  if (!doc["lightOffHour"].isNull()) lightOffHour = doc["lightOffHour"].as<int>();
   const char* f = doc["fase"];     if (f) { strncpy(FASE, f, sizeof(FASE)-1); FASE[sizeof(FASE)-1]='\0'; }
   const char* t = doc["tentName"]; if (t) { strncpy(TENT_NAME, t, sizeof(TENT_NAME)-1); TENT_NAME[sizeof(TENT_NAME)-1]='\0'; }
   return true;
@@ -3532,6 +3644,10 @@ void setup() {
   // de tempo p/ a parte touch I2C ficar ativa.
   delay(500);
 
+  // Buzzer LEDC setup — pin BUZZER_PIN (GPIO 38), channel 1. No-op se
+  // user nao soldou piezo; ledcWriteTone num pin solto e' silencioso.
+  buzzerInit();
+
   Serial.println("[boot] touch I2C init (IDF i2c_master peripheral 1)"); Serial.flush();
 #ifdef REAL_HARDWARE
   if (!hal_touch_init()) Serial.println("[boot] hal_touch_init FAILED");
@@ -3741,11 +3857,12 @@ void loop() {
                               plantPhotoHealth,
                               plantPhotoDate);
   }
-  // Alerta SSE chegou — mostra overlay modal cobrindo tela inteira.
-  // Tap em qualquer lugar do overlay aciona ack via alertAckHandler.
+  // Alerta SSE chegou — mostra banner top + toca buzzer pattern conforme
+  // severidade (se piezo soldado e enabled na config).
   if (alertPending) {
     alertPending = false;
     cultivoUI_showAlert(alertBufId, alertBufType, alertBufMetric, alertBufMessage);
+    buzzerAlertPattern(alertBufType);  // no-op se buzzer off
   }
   // Timeline info atualizada — UI mostra "X/N" + ativa/desativa arrows
   if (photoTimelineNeedsApply) {
