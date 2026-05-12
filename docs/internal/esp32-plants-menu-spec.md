@@ -90,12 +90,13 @@ GET /api/device/plant/:plantId/photo?w=320&h=240&q=70
 > O servidor faz resize com `fit: 'inside'` — mantém proporção. Resultado pode ser menor que `w x h` se a foto original tiver outra proporção.
 
 **Resposta 200:**
-- Body: **bytes do JPEG** (não JSON!)
+- Body: **bytes do JPEG** (sempre **baseline JPEG**, nunca progressive — TJPGD não decoda progressive)
 - Headers úteis:
   - `Content-Type: image/jpeg`
   - `Content-Length: <bytes>`
   - `X-Health-Status: HEALTHY` — status registrado junto com a foto (pode diferir do `healthStatus` do `/plants` se houver log mais recente sem foto)
   - `X-Log-Date: 2026-05-08T12:30:00Z` — data da foto
+  - `X-ESP-Variant: pre-generated` — **só aparece** quando o fast path foi usado (variant 320×240 já existia em disco). Sem esse header → fallback Sharp on-demand. Útil pra debug.
 
 **Erros (JSON):**
 - `401` — token inválido
@@ -109,6 +110,20 @@ GET /api/device/plant/:plantId/photo?w=320&h=240&q=70
 
 **Tamanho típico de resposta** (com defaults 320x240 q=70):
 - ~8–25 KB por foto. Cabe na RAM/PSRAM tranquilamente.
+
+### Performance — fast path vs on-demand
+
+O servidor **pré-gera uma variant otimizada** (320×240, qualidade 70, baseline JPEG) **na hora do upload** da foto no app web. Essa variant fica salva ao lado da foto original com sufixo `.esp.jpg`.
+
+| Cenário | Path no servidor | Latência |
+|---|---|---|
+| Foto recente + request com defaults (`?w=320&h=240&q=70` ou sem query) | Fast path: `fsp.readFile` + `res.end` (variant pré-gerada) | **<500ms** |
+| Foto antiga (uploadada antes do feature) | Sharp on-demand resize | ~2–5s |
+| Request com resolução custom (`?w=800` etc.) | Sharp on-demand resize | ~2–5s |
+
+**Recomendação pro firmware:** sempre pedir com **defaults** (sem query params, ou explicitamente `?w=320&h=240&q=70`). Isso garante o fast path sempre que possível. Se quiser conferir em runtime que tá no fast path, parsear o header `X-ESP-Variant` (ver acima).
+
+> ⚠️ **Importante: baseline JPEG only**. O servidor está configurado pra **nunca** emitir progressive JPEG (validado: `mozjpeg` foi removido porque ignorava o `progressive: false` flag e forçava progressive). TJPGD do LVGL não decoda progressive — se aparecer tela preta, o primeiro check é confirmar que o JPEG vindo no wire é baseline (`file foto.jpg` deve dizer "baseline" e não "progressive").
 
 ---
 
