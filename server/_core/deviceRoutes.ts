@@ -732,6 +732,34 @@ function registerDeviceRoutes(app: express.Application) {
         return res.status(400).json({ error: 'fileKey inválido' });
       }
 
+      // FAST PATH: tenta servir o variant ESP pre-gerado no upload
+      // (320x240 baseline JPEG q70, ~10KB). Pula Sharp resize na request
+      // → response em <500ms vs ~16s on-demand observado no display.
+      //
+      // Variant existe so' pra uploads via /api/upload/image apos esse
+      // commit. Uploads antigos caem no fallback Sharp on-demand abaixo.
+      //
+      // Tambem so' aplica se cliente pediu defaults (w=320, h=240, q=70).
+      // Curl com tamanhos diferentes (?w=800&h=600&q=90) ainda vai pelo
+      // path Sharp pra honrar os params.
+      const isDefaultSize = (w === 320 && h === 240 && q === 70);
+      if (isDefaultSize) {
+        const espKey = fileKey.replace(/\.[^.]+$/, '.esp.jpg');
+        const espPath = path.join(UPLOADS_DIR, espKey);
+        try {
+          const espBuffer = await fsp.readFile(espPath);
+          res.setHeader('Content-Type', 'image/jpeg');
+          res.setHeader('Cache-Control', 'public, max-age=30');
+          res.setHeader('Content-Length', String(espBuffer.length));
+          res.setHeader('X-Health-Status', String(row.healthStatus ?? ''));
+          res.setHeader('X-Log-Date', new Date(row.logDate).toISOString());
+          res.setHeader('X-ESP-Variant', 'pre-generated');
+          return res.status(200).end(espBuffer);
+        } catch {
+          // Variant nao existe — cai no fallback Sharp on-demand
+        }
+      }
+
       let inputBuffer: Buffer;
       try {
         inputBuffer = await fsp.readFile(filePath);
