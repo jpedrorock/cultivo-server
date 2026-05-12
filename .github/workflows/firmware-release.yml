@@ -1,0 +1,122 @@
+name: Firmware Release (ESP32 display)
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Builda o firmware ESP32 + publica como GitHub Release quando uma tag `v*` for
+# pushed. ESPs no mundo pegam esse release pelo botão "Verificar atualização"
+# do display (lógica em esp32-display/src/main_lvgl.cpp, função fetchLatestRelease).
+#
+# COMO USAR:
+#
+#   1) Bumpe `FW_VERSION` em esp32-display/src/main_lvgl.cpp:31
+#      Ex: "0.4.0" -> "0.4.1"
+#   2) Commita + push pra main (ou via PR)
+#   3) Cria + push da tag:
+#        git tag v0.4.1
+#        git push --tags
+#   4) Este workflow builda, valida a versão e cria o release com o .bin
+#
+# REGRAS:
+#
+#   - Tag DEVE ser semver no formato `vX.Y.Z` (sem sufixos)
+#   - Tag DEVE bater com `FW_VERSION` no código (validação automática) — sem
+#     isso, ESPs flashariam um .bin que se anuncia como versão antiga e
+#     ofereceriam OTA de novo no próximo boot.
+#   - Asset name termina em `cultivo-esp32-display-<tag>.bin` (firmware espera
+#     `.bin` no nome — code grep'a `strstr(name, ".bin")`).
+# ════════════════════════════════════════════════════════════════════════════════
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Permissões mínimas: precisa de `contents: write` pra criar release.
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build firmware + publicar release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Valida formato da tag (vX.Y.Z)
+        id: tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' não é semver puro (esperado: vX.Y.Z)"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "✅ Tag válida: $TAG (versão $VERSION)"
+
+      - name: Valida que FW_VERSION no código bate com a tag
+        run: |
+          FW_VERSION=$(grep -E '^#define FW_VERSION' esp32-display/src/main_lvgl.cpp \
+                        | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          echo "FW_VERSION no código: $FW_VERSION"
+          echo "Tag (sem 'v'):        $TAG_VERSION"
+          if [ "$FW_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Mismatch! Bumpe FW_VERSION em esp32-display/src/main_lvgl.cpp pra '$TAG_VERSION' antes de tagear."
+            exit 1
+          fi
+          echo "✅ Versão consistente"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # PlatformIO core + platforms ocupam ~500MB e demoram ~2min pra baixar.
+      # Cache evita re-download em builds subsequentes.
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+            esp32-display/.pio/libdeps
+          key: ${{ runner.os }}-pio-${{ hashFiles('esp32-display/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build firmware (env=real)
+        working-directory: esp32-display
+        run: pio run -e real
+
+      - name: Renomeia binário
+        id: artifact
+        run: |
+          SRC="esp32-display/.pio/build/real/firmware.bin"
+          DEST="cultivo-esp32-display-${{ steps.tag.outputs.tag }}.bin"
+          if [ ! -f "$SRC" ]; then
+            echo "::error::firmware.bin não encontrado em $SRC"
+            exit 1
+          fi
+          cp "$SRC" "$DEST"
+          SIZE=$(stat -c%s "$DEST")
+          echo "Binário: $DEST ($SIZE bytes)"
+          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          # Gera body automaticamente listando commits desde a release anterior
+          generate_release_notes: true
+          files: ${{ steps.artifact.outputs.path }}
+          # Sem `prerelease: true` → marca como latest, e o firmware OTA
+          # consome `/releases/latest` direto.
+          make_latest: 'true'
+          fail_on_unmatched_files: true
