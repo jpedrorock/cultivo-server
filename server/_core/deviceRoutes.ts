@@ -749,7 +749,12 @@ function registerDeviceRoutes(app: express.Application) {
         try {
           const espBuffer = await fsp.readFile(espPath);
           res.setHeader('Content-Type', 'image/jpeg');
-          res.setHeader('Cache-Control', 'public, max-age=30');
+          // no-transform: instrui proxies (Cloudflare) a NAO modificar
+          // a response — sem isso, CF adiciona chunked transfer encoding
+          // mesmo com Content-Length explicito. ESP HTTPClient.getStreamPtr()
+          // retorna o socket raw com chunks markers, TJPGD le bytes errados
+          // e falha (tela preta). max-age curto pq foto pode mudar.
+          res.setHeader('Cache-Control', 'public, max-age=30, no-transform');
           res.setHeader('Content-Length', String(espBuffer.length));
           res.setHeader('X-Health-Status', String(row.healthStatus ?? ''));
           res.setHeader('X-Log-Date', new Date(row.logDate).toISOString());
