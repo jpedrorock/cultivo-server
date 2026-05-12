@@ -237,6 +237,15 @@ static volatile bool deviceTogglePendingUI = false;
 static int           deviceToggleResIdx    = -1;
 static bool          deviceToggleResState  = false;
 
+// Alert ack / hist period — handlers LVGL nao podem chamar HTTPClient direto
+// (TLS handshake + JsonDocument estouram stack UI). Handler enfileira flag +
+// payload; tapTask consome e dispara POST.
+static volatile bool alertAckPending   = false;
+static int           alertAckId        = 0;
+
+static volatile bool histPeriodPending = false;
+static int           histPeriodVal     = 0;
+
 // Tarefas: removido na limpeza pos-fase-2. UI nova substituiu Tarefas por
 // Cenas (atalhos Tuya) — registro de rega/tasks fica no app web, nao no ESP.
 
@@ -250,6 +259,10 @@ static const unsigned long FETCH_INTERVAL = 30000;
 // netTask → loop: seta quando ha' dados novos. loop() chama refreshHomeValues()
 // no thread principal (LVGL nao e thread-safe). atomic volatile basta, flag simples.
 static volatile bool uiNeedsRefresh = false;
+
+// tapTask → loop: seta quando histPeriodHandler refetcha. loop() chama
+// cultivoUI_applyHistory no thread principal (LVGL nao e thread-safe).
+static volatile bool histApplyPending = false;
 
 // ════════════════════════════════════════════════════════════════════════════════
 // Display + touch callbacks (LVGL v9 API)
@@ -594,11 +607,23 @@ static void splashFinish() {
 // Salva em NVS e reboota. Usado tambem como tela de setup inicial se NVS vazio.
 // ════════════════════════════════════════════════════════════════════════════════
 static lv_obj_t *configModal = nullptr;
+// Flag pra DEFERIR openConfigModal pro loop() — antes era chamado direto
+// do event_cb do gear icon (stack LVGL ~8KB) e criar 6 paginas + ~60
+// widgets explodia o stack -> reboot. Agora flag, loop() executa com
+// stack cheio do Arduino main task (~16KB).
+static volatile bool configModalPending = false;
+static void requestOpenConfigModal() {
+  Serial.println("[ui] Config tap");
+  configModalPending = true;
+}
 // Modal config: token+tentId removidos (vem via pareamento RFC 8628 agora).
 // Apenas WiFi + URL — usuario nao toca em token/tent manualmente mais.
-static lv_obj_t *taSsid, *taPass, *taUrl;
-static lv_obj_t *ddSleep;  // dropdown sleep timeout no cfg modal
-static lv_obj_t *kbCfg;
+// IMPORTANTE: zerar TODOS ao fechar (cfg cancel/close/reset/restart) pra
+// nao deixar pointers dangling — lambdas de event_cb leem statics sem
+// validar e iam tocar memoria deletada.
+static lv_obj_t *taSsid = nullptr, *taPass = nullptr, *taUrl = nullptr;
+static lv_obj_t *ddSleep = nullptr;  // dropdown sleep timeout no cfg modal
+static lv_obj_t *kbCfg = nullptr;
 // Opcoes de sleep timeout (label visivel + valor em segundos).
 // 0 = nunca dorme (display sempre on com ambient idle apos timeout grande).
 static const struct { const char *label; int sec; } SLEEP_OPTS[] = {
@@ -612,7 +637,16 @@ static const struct { const char *label; int sec; } SLEEP_OPTS[] = {
 static constexpr int SLEEP_OPTS_N = sizeof(SLEEP_OPTS) / sizeof(SLEEP_OPTS[0]);
 static void startApPortal();  // fwd: botao "Setup celular" do modal chama
 
+// Forward declaration — ensureKeyboard definido depois.
+static void ensureKeyboard();
+
 static void cfgFocusCb(lv_event_t *e) {
+  Serial.println("[cfg] focusCb");
+  // Lazy: cria keyboard na primeira vez que user toca em textarea.
+  // configModal precisa existir (senao keyboard fica orfao).
+  if (!configModal) return;
+  ensureKeyboard();
+  if (!kbCfg) return;
   lv_obj_t *ta = (lv_obj_t*)lv_event_get_target(e);
   lv_keyboard_set_textarea(kbCfg, ta);
   lv_obj_remove_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
@@ -635,8 +669,9 @@ static void scanClose(lv_event_t *ev) {
 
 static void scanPickRow(lv_event_t *ev) {
   const char *picked = (const char*)lv_event_get_user_data(ev);
-  lv_textarea_set_text(taSsid, picked);
-  Serial.printf("[cfg] scan pick: %s\n", picked);
+  // Modal pai pode ter fechado durante scan async — taSsid fica dangling.
+  if (taSsid && picked) lv_textarea_set_text(taSsid, picked);
+  Serial.printf("[cfg] scan pick: %s\n", picked ? picked : "(null)");
   scanClose(ev);
 }
 
@@ -704,10 +739,16 @@ static void scanStartCb(lv_event_t *e) {
 }
 
 static void cfgSaveCb(lv_event_t *e) {
+  // Defensive: se modal foi fechado / re-aberto entre clicks, os ponteiros
+  // ficam dangling. Sem esses guards lv_textarea_get_text crasha.
+  if (!taSsid || !taPass || !taUrl) {
+    Serial.println("[cfg] save abortado: pointers nulos");
+    return;
+  }
   const char *ssid  = lv_textarea_get_text(taSsid);
   const char *pass  = lv_textarea_get_text(taPass);
   const char *url   = lv_textarea_get_text(taUrl);
-  if (strlen(ssid) == 0) { Serial.println("[cfg] ssid vazio, abortando"); return; }
+  if (!ssid || strlen(ssid) == 0) { Serial.println("[cfg] ssid vazio, abortando"); return; }
   // Token + tent vem do pareamento RFC 8628 — nao sao mais editaveis aqui.
   // Mantem o que ja' tinha em NVS (DEVICE_TOKEN/TENT_ID em RAM); se vazios
   // o setup() vai entrar em modo pareamento apos conectar WiFi.
@@ -724,9 +765,10 @@ static void cfgSaveCb(lv_event_t *e) {
   ESP.restart();
 }
 
-static void cfgCancelCb(lv_event_t *e) {
-  if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
-}
+// closeConfigModal definida apos cfgPages — forward declaration aqui pra
+// cfgCancelCb e outros callbacks poderem chamar.
+static void closeConfigModal();
+static void cfgCancelCb(lv_event_t *e) { closeConfigModal(); }
 
 // Pages do config modal — submenu navigation:
 //   0 = menu raiz (lista de categorias)
@@ -741,6 +783,18 @@ enum {
   CFG_PAGES_N
 };
 static lv_obj_t *cfgPages[CFG_PAGES_N] = {nullptr};
+
+// Cleanup completo — deleta widget LV + zera TODOS os pointers globais
+// dos seus filhos. Antes deixava taSsid/taPass/taUrl/ddSleep/kbCfg/cfgPages
+// dangling apontando pra memoria deletada — callbacks orfaos (lv_event_t
+// processado depois) crashavam tocando esses pointers.
+static void closeConfigModal() {
+  if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
+  taSsid = taPass = taUrl = nullptr;
+  ddSleep = nullptr;
+  kbCfg = nullptr;
+  for (int i = 0; i < CFG_PAGES_N; i++) cfgPages[i] = nullptr;
+}
 
 static void cfgShowPage(int idx) {
   for (int i = 0; i < CFG_PAGES_N; i++) {
@@ -830,8 +884,216 @@ static lv_obj_t *cfgMakeButton(lv_obj_t *parent, const char *label,
   return btn;
 }
 
+// ════════════════════════════════════════════════════════════════════════════════
+// PAGE BUILDERS (lazy-loaded) — cada sub-pagina e' criada apenas quando user
+// toca no item de menu correspondente. Antes tudo era criado de uma vez em
+// openConfigModal — ~60 widgets em sequencia bloqueava o thread por ~1.5s e
+// fazia ESP travar/resetar. Agora openConfigModal cria so' PAGE_MENU (~10
+// widgets, ~200ms) e cada sub-pagina e' build on-demand.
+// ════════════════════════════════════════════════════════════════════════════════
+
+// Forward declarations
+static void buildPageRede(lv_obj_t *page);
+static void buildPageDisplay(lv_obj_t *page);
+static void buildPageUpdates(lv_obj_t *page);
+static void buildPageSistema(lv_obj_t *page);
+static void buildPageAvancado(lv_obj_t *page);
+
+// Cria sub-pagina on-demand. Idempotente — se ja' existe, no-op.
+static void cfgEnsurePage(int idx) {
+  if (!configModal) return;
+  if (idx < 0 || idx >= CFG_PAGES_N) return;
+  if (cfgPages[idx]) return;  // ja construida
+  Serial.printf("[cfg] lazy build page %d. heap_before=%u\n",
+                idx, (unsigned)ESP.getFreeHeap());
+  cfgPages[idx] = cfgMakePage(configModal);
+  switch (idx) {
+    case CFG_PAGE_REDE:     buildPageRede    (cfgPages[idx]); break;
+    case CFG_PAGE_DISPLAY:  buildPageDisplay (cfgPages[idx]); break;
+    case CFG_PAGE_UPDATES:  buildPageUpdates (cfgPages[idx]); break;
+    case CFG_PAGE_SISTEMA:  buildPageSistema (cfgPages[idx]); break;
+    case CFG_PAGE_AVANCADO: buildPageAvancado(cfgPages[idx]); break;
+  }
+  Serial.printf("[cfg] page %d ok. heap_after=%u\n",
+                idx, (unsigned)ESP.getFreeHeap());
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAGE 1 — REDE (WiFi SSID/senha + Server URL + AP portal + Salvar)
+// ═══════════════════════════════════════════════════════════════════
+static void buildPageRede(lv_obj_t *page) {
+  lv_obj_t *body = cfgMakeSubHeader(page, &ic_wifi, COL_CYN, "Rede");
+
+  auto addField = [&](const char *label, const char *initVal, lv_obj_t **out, bool pwd) {
+    makeLabel(body, label, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_t *ta = lv_textarea_create(body);
+    lv_obj_set_width(ta, lv_pct(100));
+    lv_obj_set_height(ta, sh(34));
+    lv_textarea_set_one_line(ta, true);
+    lv_textarea_set_text(ta, initVal ? initVal : "");
+    if (pwd) lv_textarea_set_password_mode(ta, true);
+    lv_obj_set_style_text_font(ta, FONT_BODY, 0);
+    lv_obj_set_style_bg_color(ta, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(ta, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(ta, 1, 0);
+    lv_obj_set_style_radius(ta, RADIUS_MD, 0);
+    lv_obj_set_style_pad_left(ta, sw(6), 0);
+    lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
+    *out = ta;
+  };
+
+  addField("WiFi SSID", WIFI_SSID, &taSsid, false);
+  cfgMakeButton(body, "Buscar redes WiFi", false, scanStartCb);
+  addField("WiFi Senha", WIFI_PASS, &taPass, true);
+  addField("Server URL", SERVER_URL, &taUrl, false);
+  cfgMakeButton(body, "Setup via celular (AP)", false, [](lv_event_t *e) {
+    Serial.println("[cfg] abrindo AP portal");
+    closeConfigModal();
+    startApPortal();
+  });
+  cfgMakeButton(body, "Salvar e reiniciar", true, cfgSaveCb);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAGE 2 — DISPLAY (sleep timeout dropdown + buzzer)
+// ═══════════════════════════════════════════════════════════════════
+static void buildPageDisplay(lv_obj_t *page) {
+  lv_obj_t *body = cfgMakeSubHeader(page, &ic_clock, COL_AMBER, "Display");
+  makeLabel(body, "Apagar tela apos:", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+  ddSleep = lv_dropdown_create(body);
+  char optsBuf[128] = {0};
+  for (int i = 0; i < SLEEP_OPTS_N; i++) {
+    strcat(optsBuf, SLEEP_OPTS[i].label);
+    if (i < SLEEP_OPTS_N - 1) strcat(optsBuf, "\n");
+  }
+  lv_dropdown_set_options(ddSleep, optsBuf);
+  int curSec = (screenSleepMs == UINT32_MAX) ? 0 : (int)(screenSleepMs / 1000);
+  int matchIdx = 1;
+  for (int i = 0; i < SLEEP_OPTS_N; i++) {
+    if (SLEEP_OPTS[i].sec == curSec) { matchIdx = i; break; }
+  }
+  lv_dropdown_set_selected(ddSleep, matchIdx);
+  lv_obj_set_width(ddSleep, lv_pct(100));
+  lv_obj_set_height(ddSleep, sh(34));
+  lv_obj_set_style_text_font(ddSleep, FONT_BODY, 0);
+  lv_obj_set_style_bg_color(ddSleep, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_border_color(ddSleep, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(ddSleep, 1, 0);
+  lv_obj_set_style_radius(ddSleep, RADIUS_MD, 0);
+  lv_obj_add_event_cb(ddSleep, [](lv_event_t *e) {
+    if (!ddSleep) return;
+    uint16_t selIdx = lv_dropdown_get_selected(ddSleep);
+    if (selIdx < SLEEP_OPTS_N) {
+      saveSleepTimeoutNVS(SLEEP_OPTS[selIdx].sec);
+    }
+  }, LV_EVENT_VALUE_CHANGED, NULL);
+
+  makeLabel(body, "Som de alerta (buzzer):", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
+  lv_obj_t *swBuzzer = lv_switch_create(body);
+  if (buzzerEnabled) lv_obj_add_state(swBuzzer, LV_STATE_CHECKED);
+  lv_obj_set_style_bg_color(swBuzzer, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR | LV_STATE_CHECKED);
+  lv_obj_add_event_cb(swBuzzer, [](lv_event_t *e) {
+    lv_obj_t *sw = (lv_obj_t*)lv_event_get_target(e);
+    bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    saveBuzzerEnabledNVS(on);
+    if (on) { ledcWriteTone(BUZZER_CH, 1500); ledcWrite(BUZZER_CH, 128); delay(80); ledcWrite(BUZZER_CH, 0); }
+  }, LV_EVENT_VALUE_CHANGED, NULL);
+
+  makeLabel(body, "Salva automaticamente ao mudar.", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
+  makeLabel(body, "Buzzer: solder piezo em GPIO 38 + GND.",
+            COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAGE 3 — ATUALIZACOES (OTA GitHub)
+// ═══════════════════════════════════════════════════════════════════
+static void buildPageUpdates(lv_obj_t *page) {
+  lv_obj_t *body = cfgMakeSubHeader(page, &ic_refresh, COL_PRIMARY, "Atualizacoes");
+  char verBuf[64];
+  snprintf(verBuf, sizeof(verBuf), "Versao atual: " FW_VERSION);
+  makeLabel(body, verBuf, COL_TEXT, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
+  makeLabel(body,
+    "Verifica releases no GitHub:\n"
+    "jpedrorock/cultivo-server.\nSe houver versao newer + asset .bin,\n"
+    "baixa e reinicia automaticamente.",
+    COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+  cfgMakeButton(body, "Verificar atualizacao", true, [](lv_event_t *e) {
+    Serial.println("[cfg] OTA check requested");
+    otaCheckPending = true;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAGE 4 — SISTEMA (info read-only)
+// ═══════════════════════════════════════════════════════════════════
+static void buildPageSistema(lv_obj_t *page) {
+  lv_obj_t *body = cfgMakeSubHeader(page, &ic_activity, COL_PRIMARY, "Sistema");
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  uint32_t uptimeSec = millis() / 1000;
+  uint32_t freeHeap  = ESP.getFreeHeap() / 1024;
+  uint32_t freePsram = ESP.getFreePsram() / 1024;
+  char infoBuf[256];
+  snprintf(infoBuf, sizeof(infoBuf),
+           "Versao firmware: " FW_VERSION "\n"
+           "MAC: %02X:%02X:%02X:%02X:%02X:%02X\n"
+           "Uptime: %luh %lum\n"
+           "Heap livre: %lu KB\n"
+           "PSRAM livre: %lu KB\n"
+           "Tent ID: %d\n"
+           "Server: %s",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+           uptimeSec / 3600, (uptimeSec / 60) % 60,
+           (unsigned long)freeHeap, (unsigned long)freePsram,
+           TENT_ID, SERVER_URL);
+  lv_obj_t *lblInfo = lv_label_create(body);
+  lv_label_set_text(lblInfo, infoBuf);
+  lv_obj_set_style_text_color(lblInfo, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(lblInfo, FONT_CAPTION, 0);
+  lv_obj_set_style_text_line_space(lblInfo, sh(4), 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PAGE 5 — AVANCADO (re-parear, reset full)
+// ═══════════════════════════════════════════════════════════════════
+static void buildPageAvancado(lv_obj_t *page) {
+  lv_obj_t *body = cfgMakeSubHeader(page, &ic_alert, COL_RED, "Avancado");
+  makeLabel(body,
+    "ACOES DESTRUTIVAS — confirmar antes!",
+    COL_AMBER, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+
+  cfgMakeButton(body, "Limpar token (re-parear)", false, [](lv_event_t *e) {
+    Serial.println("[cfg] limpar token -> reboot p/ pareamento");
+    clearTokenOnlyNVS();
+    delay(300);
+    ESP.restart();
+  });
+  makeLabel(body, "Pareia display de novo no app web.",
+            COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+
+  lv_obj_t *btnReset = lv_btn_create(body);
+  lv_obj_set_width(btnReset, lv_pct(100));
+  lv_obj_set_height(btnReset, sh(34));
+  lv_obj_set_style_bg_opa(btnReset, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_RED), 0);
+  lv_obj_set_style_border_width(btnReset, 1, 0);
+  lv_obj_set_style_radius(btnReset, RADIUS_LG, 0);
+  lv_obj_set_style_shadow_width(btnReset, 0, 0);
+  lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
+    Serial.println("[cfg] reset full -> AP portal");
+    clearConfigNVS();
+    delay(300);
+    ESP.restart();
+  }, LV_EVENT_CLICKED, NULL);
+  makeLabel(btnReset, "Reset total (apaga WiFi+token)", COL_RED, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
+  makeLabel(body, "Volta pro AP portal de setup inicial.",
+            COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
+}
+
 static void openConfigModal() {
   if (configModal) return;  // ja aberto
+  Serial.printf("[cfg] openModal heap_before=%u psram_before=%u\n",
+                (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getFreePsram());
   configModal = lv_obj_create(lv_scr_act());
   lv_obj_set_size(configModal, SCREEN_W, SCREEN_H);
   lv_obj_set_pos(configModal, 0, 0);
@@ -852,9 +1114,11 @@ static void openConfigModal() {
     makeLabel(page, "CONFIGURACAO", COL_PRIMARY, FONT_TITLE, LV_ALIGN_TOP_LEFT, 0, sh(2));
     makeLabel(page, "fw " FW_VERSION, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_RIGHT, 0, sh(4));
 
-    // Container scrollavel da lista de categorias
+    // Container scrollavel da lista de categorias. Reserva sh(80) pra header
+    // (~28px) + botao Fechar (~45px) + gap (~10px). Antes era sh(58) e o
+    // ultimo item ficava por baixo do botao Fechar.
     lv_obj_t *list = lv_obj_create(page);
-    lv_obj_set_size(list, SCREEN_W - sw(12), SCREEN_H - sh(58));  // -58 deixa espaco header + Fechar
+    lv_obj_set_size(list, SCREEN_W - sw(12), SCREEN_H - sh(80));
     lv_obj_align(list, LV_ALIGN_TOP_MID, 0, sh(28));
     lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(list, 0, 0);
@@ -896,6 +1160,8 @@ static void openConfigModal() {
       lv_obj_align(chev, LV_ALIGN_RIGHT_MID, 0, 0);
       lv_obj_add_event_cb(row, [](lv_event_t *e) {
         int tp = (int)(intptr_t)lv_event_get_user_data(e);
+        Serial.printf("[cfg] menu tap idx=%d\n", tp);
+        cfgEnsurePage(tp);  // lazy: cria a page se ainda nao existe
         cfgShowPage(tp);
       }, LV_EVENT_CLICKED, (void*)(intptr_t)targetPage);
     };
@@ -908,213 +1174,41 @@ static void openConfigModal() {
 
     // Botao Fechar abaixo da lista — posicao FIXA (nao flutuante)
     lv_obj_t *btnClose = cfgMakeButton(page, "Fechar", false, [](lv_event_t *e) {
-      if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
-      for (int i = 0; i < CFG_PAGES_N; i++) cfgPages[i] = nullptr;
+      closeConfigModal();
     });
     lv_obj_align(btnClose, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
     lv_obj_set_width(btnClose, sw(140));
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // PAGE 1 — REDE (WiFi SSID/senha + Server URL + AP portal + Salvar)
-  // ═══════════════════════════════════════════════════════════════════
-  cfgPages[CFG_PAGE_REDE] = cfgMakePage(configModal);
-  {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_REDE], &ic_wifi, COL_CYN, "Rede");
+  // Sub-pages NAO sao criadas aqui — lazy via cfgEnsurePage no menu tap.
+  // Antes: openConfigModal criava ~60 widgets de uma vez (~1.5s blocking) e
+  // travava o thread (causa do "reinicia ao tocar em Config"). Agora: so' ~10
+  // widgets (~200ms). Keyboard tambem lazy via ensureKeyboard().
 
-    // Field helper inline (reaproveita logica original)
-    auto addField = [&](const char *label, const char *initVal, lv_obj_t **out, bool pwd) {
-      makeLabel(body, label, COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-      lv_obj_t *ta = lv_textarea_create(body);
-      lv_obj_set_width(ta, lv_pct(100));
-      lv_obj_set_height(ta, sh(34));
-      lv_textarea_set_one_line(ta, true);
-      lv_textarea_set_text(ta, initVal ? initVal : "");
-      if (pwd) lv_textarea_set_password_mode(ta, true);
-      lv_obj_set_style_text_font(ta, FONT_BODY, 0);
-      lv_obj_set_style_bg_color(ta, lv_color_hex(COL_CARD), 0);
-      lv_obj_set_style_border_color(ta, lv_color_hex(COL_BORDER), 0);
-      lv_obj_set_style_border_width(ta, 1, 0);
-      lv_obj_set_style_radius(ta, RADIUS_MD, 0);
-      lv_obj_set_style_pad_left(ta, sw(6), 0);
-      lv_obj_add_event_cb(ta, cfgFocusCb, LV_EVENT_CLICKED, NULL);
-      *out = ta;
-    };
-
-    addField("WiFi SSID", WIFI_SSID, &taSsid, false);
-    cfgMakeButton(body, "Buscar redes WiFi", false, scanStartCb);
-    addField("WiFi Senha", WIFI_PASS, &taPass, true);
-    addField("Server URL", SERVER_URL, &taUrl, false);
-    cfgMakeButton(body, "Setup via celular (AP)", false, [](lv_event_t *e) {
-      Serial.println("[cfg] abrindo AP portal");
-      if (configModal) { lv_obj_del(configModal); configModal = nullptr; }
-      for (int i = 0; i < CFG_PAGES_N; i++) cfgPages[i] = nullptr;
-      startApPortal();
-    });
-    cfgMakeButton(body, "Salvar e reiniciar", true, cfgSaveCb);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // PAGE 2 — DISPLAY (sleep timeout dropdown)
-  // ═══════════════════════════════════════════════════════════════════
-  cfgPages[CFG_PAGE_DISPLAY] = cfgMakePage(configModal);
-  {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_DISPLAY], &ic_clock, COL_AMBER, "Display");
-    makeLabel(body, "Apagar tela apos:", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-    ddSleep = lv_dropdown_create(body);
-    char optsBuf[128] = {0};
-    for (int i = 0; i < SLEEP_OPTS_N; i++) {
-      strcat(optsBuf, SLEEP_OPTS[i].label);
-      if (i < SLEEP_OPTS_N - 1) strcat(optsBuf, "\n");
-    }
-    lv_dropdown_set_options(ddSleep, optsBuf);
-    int curSec = (screenSleepMs == UINT32_MAX) ? 0 : (int)(screenSleepMs / 1000);
-    int matchIdx = 1;
-    for (int i = 0; i < SLEEP_OPTS_N; i++) {
-      if (SLEEP_OPTS[i].sec == curSec) { matchIdx = i; break; }
-    }
-    lv_dropdown_set_selected(ddSleep, matchIdx);
-    lv_obj_set_width(ddSleep, lv_pct(100));
-    lv_obj_set_height(ddSleep, sh(34));
-    lv_obj_set_style_text_font(ddSleep, FONT_BODY, 0);
-    lv_obj_set_style_bg_color(ddSleep, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_border_color(ddSleep, lv_color_hex(COL_BORDER), 0);
-    lv_obj_set_style_border_width(ddSleep, 1, 0);
-    lv_obj_set_style_radius(ddSleep, RADIUS_MD, 0);
-    // Salva direto ao mudar — sem precisar tap em "Salvar"
-    lv_obj_add_event_cb(ddSleep, [](lv_event_t *e) {
-      if (!ddSleep) return;
-      uint16_t selIdx = lv_dropdown_get_selected(ddSleep);
-      if (selIdx < SLEEP_OPTS_N) {
-        saveSleepTimeoutNVS(SLEEP_OPTS[selIdx].sec);
-      }
-    }, LV_EVENT_VALUE_CHANGED, NULL);
-
-    // Toggle "Som de alerta" — beep no buzzer (piezo opcional no GPIO 38).
-    // Sem hardware soldado, nada toca — toggle existe pra usuario controlar
-    // depois de instalar o piezo.
-    makeLabel(body, "Som de alerta (buzzer):", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
-    lv_obj_t *swBuzzer = lv_switch_create(body);
-    if (buzzerEnabled) lv_obj_add_state(swBuzzer, LV_STATE_CHECKED);
-    lv_obj_set_style_bg_color(swBuzzer, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_add_event_cb(swBuzzer, [](lv_event_t *e) {
-      lv_obj_t *sw = (lv_obj_t*)lv_event_get_target(e);
-      bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
-      saveBuzzerEnabledNVS(on);
-      // Mini beep de feedback ao ligar (so' se piezo soldado)
-      if (on) { ledcWriteTone(BUZZER_CH, 1500); ledcWrite(BUZZER_CH, 128); delay(80); ledcWrite(BUZZER_CH, 0); }
-    }, LV_EVENT_VALUE_CHANGED, NULL);
-
-    makeLabel(body, "Salva automaticamente ao mudar.", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
-    makeLabel(body, "Buzzer: solder piezo em GPIO 38 + GND.",
-              COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // PAGE 3 — ATUALIZACOES (OTA GitHub)
-  // ═══════════════════════════════════════════════════════════════════
-  cfgPages[CFG_PAGE_UPDATES] = cfgMakePage(configModal);
-  {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_UPDATES], &ic_refresh, COL_PRIMARY, "Atualizacoes");
-    char verBuf[64];
-    snprintf(verBuf, sizeof(verBuf), "Versao atual: " FW_VERSION);
-    makeLabel(body, verBuf, COL_TEXT, FONT_BODY, LV_ALIGN_TOP_LEFT, 0, 0);
-    makeLabel(body,
-      "Verifica releases no GitHub:\n"
-      "jpedrorock/cultivo-server.\nSe houver versao newer + asset .bin,\n"
-      "baixa e reinicia automaticamente.",
-      COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-    cfgMakeButton(body, "Verificar atualizacao", true, [](lv_event_t *e) {
-      Serial.println("[cfg] OTA check requested");
-      otaCheckPending = true;
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // PAGE 4 — SISTEMA (info read-only)
-  // ═══════════════════════════════════════════════════════════════════
-  cfgPages[CFG_PAGE_SISTEMA] = cfgMakePage(configModal);
-  {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_SISTEMA], &ic_activity, COL_PRIMARY, "Sistema");
-    uint8_t mac[6];
-    WiFi.macAddress(mac);
-    uint32_t uptimeSec = millis() / 1000;
-    uint32_t freeHeap  = ESP.getFreeHeap() / 1024;
-    uint32_t freePsram = ESP.getFreePsram() / 1024;
-    char infoBuf[256];
-    snprintf(infoBuf, sizeof(infoBuf),
-             "Versao firmware: " FW_VERSION "\n"
-             "MAC: %02X:%02X:%02X:%02X:%02X:%02X\n"
-             "Uptime: %luh %lum\n"
-             "Heap livre: %lu KB\n"
-             "PSRAM livre: %lu KB\n"
-             "Tent ID: %d\n"
-             "Server: %s",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-             uptimeSec / 3600, (uptimeSec / 60) % 60,
-             (unsigned long)freeHeap, (unsigned long)freePsram,
-             TENT_ID, SERVER_URL);
-    lv_obj_t *lblInfo = lv_label_create(body);
-    lv_label_set_text(lblInfo, infoBuf);
-    lv_obj_set_style_text_color(lblInfo, lv_color_hex(COL_TEXT), 0);
-    lv_obj_set_style_text_font(lblInfo, FONT_CAPTION, 0);
-    lv_obj_set_style_text_line_space(lblInfo, sh(4), 0);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // PAGE 5 — AVANCADO (re-parear, reset full)
-  // ═══════════════════════════════════════════════════════════════════
-  cfgPages[CFG_PAGE_AVANCADO] = cfgMakePage(configModal);
-  {
-    lv_obj_t *body = cfgMakeSubHeader(cfgPages[CFG_PAGE_AVANCADO], &ic_alert, COL_RED, "Avancado");
-    makeLabel(body,
-      "ACOES DESTRUTIVAS — confirmar antes!",
-      COL_AMBER, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-
-    cfgMakeButton(body, "Limpar token (re-parear)", false, [](lv_event_t *e) {
-      Serial.println("[cfg] limpar token -> reboot p/ pareamento");
-      clearTokenOnlyNVS();
-      delay(300);
-      ESP.restart();
-    });
-    makeLabel(body, "Pareia display de novo no app web.",
-              COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-
-    // Botao reset com cor RED pra denotar destrutivo
-    lv_obj_t *btnReset = lv_btn_create(body);
-    lv_obj_set_width(btnReset, lv_pct(100));
-    lv_obj_set_height(btnReset, sh(34));
-    lv_obj_set_style_bg_opa(btnReset, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_color(btnReset, lv_color_hex(COL_RED), 0);
-    lv_obj_set_style_border_width(btnReset, 1, 0);
-    lv_obj_set_style_radius(btnReset, RADIUS_LG, 0);
-    lv_obj_set_style_shadow_width(btnReset, 0, 0);
-    lv_obj_add_event_cb(btnReset, [](lv_event_t *e) {
-      Serial.println("[cfg] reset full -> AP portal");
-      clearConfigNVS();
-      delay(300);
-      ESP.restart();
-    }, LV_EVENT_CLICKED, NULL);
-    makeLabel(btnReset, "Reset total (apaga WiFi+token)", COL_RED, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-    makeLabel(body, "Volta pro AP portal de setup inicial.",
-              COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
-  }
-
-  // Keyboard compartilhado — fica em layer_top pra cobrir tudo quando aparece
-  kbCfg = lv_keyboard_create(configModal);
-  lv_obj_set_size(kbCfg, SCREEN_W, sh(110));
-  lv_obj_align(kbCfg, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_text_font(kbCfg, &lv_font_montserrat_14, 0);
-  lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
-    lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
-  }, LV_EVENT_READY, NULL);
-  lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
-    lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
-  }, LV_EVENT_CANCEL, NULL);
+  Serial.printf("[cfg] modal pronto. heap=%u psram=%u\n",
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getFreePsram());
 
   // Mostra menu raiz inicialmente
   cfgShowPage(CFG_PAGE_MENU);
+}
+
+// Cria keyboard on-demand. Chamada do cfgFocusCb na primeira vez que user
+// toca num textarea. Idempotente — se ja' existe, no-op.
+static void ensureKeyboard() {
+  if (kbCfg) return;
+  Serial.println("[cfg] criando keyboard (lazy)");
+  kbCfg = lv_keyboard_create(configModal);
+  lv_obj_set_size(kbCfg, SCREEN_W, sh(110));
+  lv_obj_align(kbCfg, LV_ALIGN_BOTTOM_MID, 0, 0);
+  lv_obj_set_style_text_font(kbCfg, &lv_font_montserrat_14, 0);
+  lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
+    if (kbCfg) lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
+  }, LV_EVENT_READY, NULL);
+  lv_obj_add_event_cb(kbCfg, [](lv_event_t *e) {
+    if (kbCfg) lv_obj_add_flag(kbCfg, LV_OBJ_FLAG_HIDDEN);
+  }, LV_EVENT_CANCEL, NULL);
+  Serial.printf("[cfg] keyboard ok. heap=%u\n", (unsigned)ESP.getFreeHeap());
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -2120,6 +2214,13 @@ static volatile bool plantPhotoNeedsApply = false;
 static volatile bool plantPhotoTapPending = false;
 static int           plantPhotoTapId      = 0;
 
+// Cache da ultima foto baixada — preenchido em processPlantPhotoTap. Se user
+// toca em planta cujo (plantId, photoId) bate com o cache, skip download
+// e aplica direto (UX: foto aparece instantaneo). Atualizado tambem por
+// prefetch via SSE event 'photo'.
+static int lastFetchedPlantId  = 0;
+static int lastFetchedPhotoId  = 0;
+
 static uint8_t parseHealthStatus(const char *s) {
   if (!s) return 0;
   if (!strcmp(s, "HEALTHY"))    return 1;
@@ -2473,6 +2574,12 @@ static void processPlantPhotoTap() {
   if (!plantPhotoTapPending) return;
   int id = plantPhotoTapId;
   plantPhotoTapPending = false;
+  // Log heap/psram antes do fetch — debug OOM / fragmentacao.
+  Serial.printf("[plant] photo tap id=%d heap=%u psram=%u stack=%u\n",
+                id,
+                (unsigned)ESP.getFreeHeap(),
+                (unsigned)ESP.getFreePsram(),
+                (unsigned)uxTaskGetStackHighWaterMark(NULL));
   // Se nao temos lista ainda, fetcha primeiro (1 request extra mas barato)
   if (photoListCount == 0 || photoListPlantId != id) {
     fetchPlantPhotosList(id);
@@ -2480,14 +2587,35 @@ static void processPlantPhotoTap() {
   // Resolve photoId atual da timeline (0 = mais recente / param vazio)
   int photoId = (photoListCount > 0 && photoListIdx < photoListCount)
               ? photoListIds[photoListIdx] : 0;
+
+  // CACHE HIT: foto identica ja' baixada (via SSE prefetch ou tap anterior).
+  // Skip o download de 153KB e aplica direto. UX: aparece instantaneo.
+  if (id == lastFetchedPlantId && photoId == lastFetchedPhotoId &&
+      plantPhotoBuf && plantPhotoLen > 0) {
+    Serial.printf("[plant] CACHE HIT plant=%d photoId=%d — skip download\n",
+                  id, photoId);
+    plantPhotoPlantId = id;
+    plantPhotoNeedsApply = true;
+    photoTimelineNeedsApply = true;
+    return;
+  }
+
   uint8_t health = 0;
   char dateBuf[24] = {0};
   size_t got = fetchPlantPhoto(id, photoId, &health, dateBuf, sizeof(dateBuf));
+  Serial.printf("[plant] photo done got=%u stack_after=%u\n",
+                (unsigned)got,
+                (unsigned)uxTaskGetStackHighWaterMark(NULL));
   plantPhotoPlantId = id;
   plantPhotoLen     = got;
   plantPhotoHealth  = health;
   strncpy(plantPhotoDate, dateBuf, sizeof(plantPhotoDate) - 1);
   plantPhotoDate[sizeof(plantPhotoDate) - 1] = '\0';
+  // Atualiza cache pra proximo tap reaproveitar (incluindo o prefetch via SSE).
+  if (got > 0) {
+    lastFetchedPlantId = id;
+    lastFetchedPhotoId = photoId;
+  }
   plantPhotoNeedsApply = true;
   photoTimelineNeedsApply = true;  // sinaliza UI pra atualizar X/N + arrows
 }
@@ -2829,6 +2957,9 @@ static bool fetchScenes() {
 
 // Forward declaration — definido logo abaixo (depois do netTaskFn)
 static void processSceneTap();
+// Forward declarations dos workers de HTTP (definidos depois do tapTaskFn).
+static void doAlertAck();
+static void doHistPeriod();
 
 // Task dedicada de tap — wake quando sceneTapPending=true. Stack 8KB cobre
 // TLS handshake + JsonDocument com folga. Roda em paralelo com netTask
@@ -2855,6 +2986,18 @@ static void tapTaskFn(void *param) {
       uint32_t t0 = millis();
       processOtaCheck();
       logIfSlow("otaCheck", t0, 60000);  // download firmware pode levar tempo
+    }
+    if (alertAckPending) {
+      alertAckPending = false;
+      uint32_t t0 = millis();
+      doAlertAck();
+      logIfSlow("alertAck", t0, 6000);
+    }
+    if (histPeriodPending) {
+      histPeriodPending = false;
+      uint32_t t0 = millis();
+      doHistPeriod();
+      logIfSlow("histPeriod", t0, 6000);
     }
     vTaskDelay(pdMS_TO_TICKS(50));
   }
@@ -3096,6 +3239,24 @@ static void sseTaskFn(void *param) {
             }
           }
         }
+        // event: photo — user subiu foto nova de uma planta da estufa.
+        // Enfileira prefetch p/ tapTask baixar em background. Quando user
+        // tocar na planta, foto ja' esta no plantPhotoBuf (instantaneo).
+        else if (dataLine.length() > 0 && eventName == "photo") {
+          JsonDocument doc;
+          if (deserializeJson(doc, dataLine) == DeserializationError::Ok) {
+            int pid = doc["plantId"] | 0;
+            int phid = doc["photoId"] | 0;
+            if (pid > 0 && !plantPhotoTapPending) {
+              // Reusa o mesmo fluxo do tap manual — tapTask vai fetchar a
+              // lista atual de fotos e baixar a mais recente. Se ja' for a
+              // mesma cached, skip via lastFetchedPhotoId check.
+              plantPhotoTapId = pid;
+              plantPhotoTapPending = true;
+              Serial.printf("[sse] photo event plant=%d photoId=%d -> prefetch enfileirado\n", pid, phid);
+            }
+          }
+        }
         eventName = "";
         dataLine = "";
         continue;
@@ -3119,10 +3280,13 @@ static void startNetTask() {
   if (netTaskHandle) return;
   // Stack 8KB: cobre TLS handshake (~4KB) + JSON parsing (~2KB) com folga
   xTaskCreatePinnedToCore(netTaskFn, "netTask", 8192, NULL, 1, &netTaskHandle, 0);
-  // tapTask: dedicada pra processar taps em paralelo. Stack 12KB (8KB
-  // estava apertado — TLS handshake + WiFiClientSecure + JsonDocument
-  // estourava em algumas situacoes -> ESP reset).
-  xTaskCreatePinnedToCore(tapTaskFn, "tapTask", 12288, NULL, 1, &tapTaskHandle, 0);
+  // tapTask: dedicada pra processar taps em paralelo. Stack 24KB.
+  // Bumpada de 12KB porque processPlantPhotoTap chama 2 HTTPS em sequencia
+  // (fetchPlantPhotosList + fetchPlantPhoto), e o segundo faz download de
+  // 153KB com parser chunked manual. Soma de TLS handshake + WiFiClientSecure
+  // + JsonDocument + frames intermediarios estourava 12KB -> ESP RESETAVA
+  // ao carregar foto. 24KB cobre o pior caso (TLS+JSON+chunked+headers).
+  xTaskCreatePinnedToCore(tapTaskFn, "tapTask", 24576, NULL, 1, &tapTaskHandle, 0);
   // sseTask: long-lived HTTPS pra alertas push. Stack 12KB (mantem
   // WiFiClientSecure alive + readStringUntil buffers). Core 0 separado
   // do LVGL pra TLS handshake nao travar UI.
@@ -3183,38 +3347,20 @@ static void wifiReconnectHandler() {
   Serial.println("[ui] WiFi reconnect requested");
 }
 
-// Quick log do FAB da aba Plantas — POST /api/device/quick-log.
-// type=water:  v1=liters, v2 ignorado
-// type=feed:   v1=ph,     v2=ec
-// Rodando direto na UI thread porque user esta esperando (~200ms POST).
-static void quickLogHandler(const char *type, float v1, float v2) {
-  if (!wifiOk || !type) return;
-  HTTPClient http;
-  char url[128];
-  snprintf(url, sizeof(url), "%s/api/device/quick-log", SERVER_URL);
-  httpBegin(http, url);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Device-Token", DEVICE_TOKEN);
-  http.setTimeout(5000);
-  char body[128];
-  if (!strcmp(type, "water")) {
-    snprintf(body, sizeof(body), "{\"type\":\"water\",\"liters\":%.2f}", v1);
-  } else if (!strcmp(type, "feed")) {
-    snprintf(body, sizeof(body), "{\"type\":\"feed\",\"ph\":%.1f,\"ec\":%.2f}", v1, v2);
-  } else {
-    http.end();
-    return;
-  }
-  int code = http.POST(body);
-  Serial.printf("[net] quick-log %s HTTP %d\n", type, code);
-  http.end();
-}
+// Quick log removido — FAB da aba Plantas saiu. Registros agora SO' no app
+// web/mobile. Display fica read-only nessa parte (visualizacao).
 
 // User tocou no alert overlay pra dispensar. Marca como SEEN no server
-// via POST /alert-ack. Rodando direto na UI thread porque user esta
-// esperando feedback; HTTPClient.POST e' ~200ms.
+// via POST /alert-ack. Handler enfileira; tapTask faz POST.
 static void alertAckHandler(int alertId) {
-  if (!wifiOk || alertId <= 0) return;
+  if (alertId <= 0) return;
+  alertAckId = alertId;
+  alertAckPending = true;
+}
+
+// Roda no tapTask (core 0, stack 12KB).
+static void doAlertAck() {
+  if (!wifiOk || alertAckId <= 0) return;
   HTTPClient http;
   char url[128];
   snprintf(url, sizeof(url), "%s/api/device/alert-ack", SERVER_URL);
@@ -3223,20 +3369,27 @@ static void alertAckHandler(int alertId) {
   http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.setTimeout(5000);
   char body[48];
-  snprintf(body, sizeof(body), "{\"alertId\":%d}", alertId);
+  snprintf(body, sizeof(body), "{\"alertId\":%d}", alertAckId);
   int code = http.POST(body);
-  Serial.printf("[net] alert-ack id=%d HTTP %d\n", alertId, code);
+  Serial.printf("[net] alert-ack id=%d HTTP %d\n", alertAckId, code);
   http.end();
 }
 
 // Tap no label de periodo do Historico ("ultimas 24h" -> 7d -> 30d).
-// Re-fetcha history-all com periodStr correspondente. Rodando direto na UI
-// thread — fetch e' leve (~30 pontos, JSON ~1KB) e user esta esperando.
+// Re-fetcha history-all com periodStr correspondente. Handler enfileira;
+// tapTask faz fetch + setUiNeedsRefresh.
 static void histPeriodHandler(int period) {
-  const char *periodStr = (period == 1) ? "7d" : (period == 2) ? "30d" : "24h";
+  histPeriodVal = period;
+  histPeriodPending = true;
+}
+
+// Roda no tapTask (core 0, stack 12KB).
+static void doHistPeriod() {
+  const char *periodStr = (histPeriodVal == 1) ? "7d" : (histPeriodVal == 2) ? "30d" : "24h";
   Serial.printf("[ui] historico period -> %s\n", periodStr);
   if (fetchHistoryAll(periodStr)) {
-    cultivoUI_applyHistory();
+    // applyHistory toca em LVGL — flag p/ loop() chamar do thread principal.
+    histApplyPending = true;
     lastHistFetch = millis();  // reset timer pra evitar refetch automatico
   }
 }
@@ -3437,7 +3590,7 @@ static void buildUI() {
   // assinaturas que ja batem com os typedef de cultivo_ui.h.
   cultivoUI_setLuxSaveHandler(luxSaveHandler);
   cultivoUI_setPhEcSaveHandler(postReading);
-  cultivoUI_setConfigOpenHandler(openConfigModal);
+  cultivoUI_setConfigOpenHandler(requestOpenConfigModal);  // defer pra loop()
   cultivoUI_setRefreshHandler(refreshHandler);
   cultivoUI_setSceneTriggerHandler(sceneTriggerHandler);
   cultivoUI_setTaskToggleHandler(taskToggleHandler);
@@ -3446,7 +3599,6 @@ static void buildUI() {
   cultivoUI_setWifiReconnectHandler(wifiReconnectHandler);
   cultivoUI_setHistPeriodHandler(histPeriodHandler);
   cultivoUI_setAlertAckHandler(alertAckHandler);
-  cultivoUI_setQuickLogHandler(quickLogHandler);
   cultivoUI_setTasksRangeHandler(tasksRangeHandler);
   cultivoUI_setPhotoNavHandler(photoNavHandler);
   buildCultivoUI();
@@ -3863,6 +4015,17 @@ void loop() {
     alertPending = false;
     cultivoUI_showAlert(alertBufId, alertBufType, alertBufMetric, alertBufMessage);
     buzzerAlertPattern(alertBufType);  // no-op se buzzer off
+  }
+  // Config modal request — deferido pra rodar com stack do loop() (~16KB),
+  // nao do event_cb (~8KB). Criar 6 paginas + ~60 widgets era pesado demais.
+  if (configModalPending) {
+    configModalPending = false;
+    openConfigModal();
+  }
+  // Hist period mudou — tapTask fetcho dados, loop() aplica em LVGL.
+  if (histApplyPending) {
+    histApplyPending = false;
+    cultivoUI_applyHistory();
   }
   // Timeline info atualizada — UI mostra "X/N" + ativa/desativa arrows
   if (photoTimelineNeedsApply) {

@@ -231,14 +231,6 @@ void cultivoUI_showAlert(int alertId, const char *type, const char *metric, cons
 typedef void (*CultivoAlertAckFn)(int alertId);
 void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb);
 
-// ── Quick log (FAB na aba Plantas) ────────────────────────────────────────────
-// FAB no canto inferior direito da Plantas abre modal com 2 acoes:
-//   "Reguei"     -> POST /quick-log {type:water, liters: v1}
-//   "Fertilizei" -> POST /quick-log {type:feed,  ph: v1, ec: v2}
-// type: "water" | "feed".
-typedef void (*CultivoQuickLogFn)(const char *type, float v1, float v2);
-void cultivoUI_setQuickLogHandler(CultivoQuickLogFn cb);
-
 #ifdef __cplusplus
 }
 #endif

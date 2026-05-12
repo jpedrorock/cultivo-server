@@ -771,6 +771,73 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
+  // GET /api/device/stream/:tentId?since=<lastAlertId> — Server-Sent Events
+  // Conexão long-lived que empurra eventos em tempo real pro ESP. Atual:
+  //  - event: alert  → alerta novo (id, type, metric, message)
+  //  - event: photo  → foto nova de planta (plantId, photoId, photoDate)
+  // ESP usa o evento 'photo' pra prefetch a foto em background, deixando-a
+  // em cache pra exibição instantânea quando user clicar.
+  //
+  // Heartbeat ": ping\n\n" a cada 25s pra manter Cloudflare/keep-alive vivos.
+  // Sem isso, proxies cortam conexão idle aos 60s.
+  app.get('/api/device/stream/:tentId', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+      const tentId = parseInt(req.params.tentId);
+      if (device.tentId !== tentId) return res.status(403).json({ error: 'Token não autorizado para esta estufa' });
+
+      // SSE headers — text/event-stream + flush imediato (sem buffering)
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');  // Nginx/Cloudflare: disable buffering
+      res.flushHeaders();
+
+      // Replay alertas perdidos (since=<lastId>) — cobre reconexão temporária.
+      const since = parseInt((req.query.since as string) ?? '0') || 0;
+      if (since > 0) {
+        const [missed]: any = await pool.execute(
+          `SELECT id, metric, message, createdAt FROM alertHistory
+           WHERE tentId = ? AND id > ? ORDER BY id ASC LIMIT 20`,
+          [tentId, since]
+        );
+        for (const a of missed) {
+          const payload = {
+            id: a.id,
+            type: 'ENVIRONMENT',
+            metric: a.metric,
+            message: a.message,
+          };
+          res.write(`event: alert\ndata: ${JSON.stringify(payload)}\n\n`);
+        }
+      }
+
+      // Subscribe a eventos do tent. Cleanup garantido via req.on('close').
+      const { deviceEvents } = await import('./deviceEvents');
+      const unsubscribe = deviceEvents.onTent(tentId, (evt) => {
+        try {
+          res.write(`event: ${evt.type}\ndata: ${JSON.stringify(evt)}\n\n`);
+        } catch (e) {
+          // Connection drop — ignora, cleanup pelo close handler
+        }
+      });
+
+      // Heartbeat — 25s mantém conexão viva sob proxies (Cloudflare cuts 60s idle).
+      const hb = setInterval(() => {
+        try { res.write(': ping\n\n'); } catch (e) {}
+      }, 25000);
+
+      req.on('close', () => {
+        clearInterval(hb);
+        unsubscribe();
+      });
+    } catch (err: any) {
+      console.error('[Device] stream error:', err?.message);
+      try { res.status(500).json({ error: 'Erro interno' }); } catch {}
+    }
+  });
+
   // GET /api/device/tokens — lista tokens (admin via app, protegido por cookie JWT)
   // Esta rota é usada apenas internamente; gestão real via tRPC device.*
   app.post('/api/device/generate-token', async (req, res) => {

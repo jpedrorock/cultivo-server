@@ -108,8 +108,6 @@ extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRef
 extern "C" void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb) { onSceneTrigger = cb; }
 extern "C" void cultivoUI_setWifiReconnectHandler(CultivoWifiReconnectFn cb) { onWifiReconnect = cb; }
 extern "C" void cultivoUI_setHistPeriodHandler(CultivoHistPeriodFn cb)   { onHistPeriod = cb; }
-static CultivoQuickLogFn     onQuickLog    = nullptr;
-extern "C" void cultivoUI_setQuickLogHandler(CultivoQuickLogFn cb)       { onQuickLog   = cb; }
 
 // Estado de refresh em andamento + spin do icone refresh top-right.
 // refreshIcon = ponteiro pro ic_refresh do header (setado em buildHome).
@@ -982,10 +980,15 @@ static void updateArcMode() {
           lv_arc_set_range(arcTemp, 0, totalSem);
           lv_arc_set_value(arcTemp, semana);
         } else {
-          // Fase sem ciclo numerico (MAINTENANCE/DRYING)
-          lv_label_set_text(lblArcUnit, "");
-          lv_label_set_text(lblTemp, "\xE2\x80\x94");  // em-dash gigante
-          lv_arc_set_value(arcTemp, 0);
+          // Fase sem ciclo numerico (MAINTENANCE/DRYING/CURING) — em vez de
+          // em-dash "—" gigante que parecia tela quebrada, mostra um icone
+          // descritivo + texto explicativo. User claramente reportou "fica
+          // sem nada" — agora comunica "fase ativa sem ciclo numerico".
+          lv_label_set_text(lblArcUnit, "sem semanas");
+          // Checkmark unicode (U+2713) = fase ativa, esta tudo OK
+          lv_label_set_text(lblTemp, "\xE2\x9C\x93");
+          lv_arc_set_range(arcTemp, 0, 100);
+          lv_arc_set_value(arcTemp, 100);  // anel cheio = fase em andamento
         }
         col = phaseColor(FASE);
       }
@@ -3182,9 +3185,6 @@ extern "C" void cultivoUI_applyPlantPhoto(int plantId,
          plantId, (unsigned)len, healthStatus);
 }
 
-// Forward declarations dos modais quick-log
-static void openQuickLogMenu();
-
 static void buildPlantsScreen(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
@@ -3202,213 +3202,8 @@ static void buildPlantsScreen(lv_obj_t *tab) {
   plantsTab = tab;
   rebuildPlantsList();
 
-  // FAB (floating action button) canto inferior direito — quick log.
-  // Botao circular primary com ic_plus. Tap abre menu Regar/Fertilizar.
-  lv_obj_t *fab = lv_btn_create(tab);
-  lv_obj_set_size(fab, sw(44), sw(44));  // quadrado virando circulo via radius
-  lv_obj_align(fab, LV_ALIGN_BOTTOM_RIGHT, -sw(12), -sh(12));
-  lv_obj_set_style_radius(fab, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(fab, lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_bg_opa(fab, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(fab, 0, 0);
-  lv_obj_set_style_shadow_width(fab, 12, 0);
-  lv_obj_set_style_shadow_color(fab, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_shadow_opa(fab, LV_OPA_50, 0);
-  lv_obj_set_style_shadow_ofs_y(fab, 4, 0);
-  lv_obj_t *fabIcon = lv_image_create(fab);
-  lv_image_set_src(fabIcon, &ic_plus);
-  lv_obj_set_style_image_recolor(fabIcon, lv_color_hex(COL_TEXT), 0);
-  lv_obj_set_style_image_recolor_opa(fabIcon, LV_OPA_COVER, 0);
-  lv_obj_center(fabIcon);
-  lv_obj_add_event_cb(fab, [](lv_event_t *e) { openQuickLogMenu(); }, LV_EVENT_CLICKED, NULL);
-}
-
-// ════════════════════════════════════════════════════════════════════════════════
-// QUICK LOG modals — menu inicial + picker numerico (water/feed)
-// FAB na Plantas tap -> menu com 2 botoes -> picker -> POST via onQuickLog
-// ════════════════════════════════════════════════════════════════════════════════
-static lv_obj_t *quickLogModal = nullptr;
-static lv_obj_t *qlSpinV1 = nullptr;
-static lv_obj_t *qlSpinV2 = nullptr;
-static const char *qlType = nullptr;  // "water" | "feed"
-
-static void closeQuickLog() {
-  if (quickLogModal) { lv_obj_del(quickLogModal); quickLogModal = nullptr; }
-  qlSpinV1 = qlSpinV2 = nullptr;
-  qlType = nullptr;
-}
-
-// Modal generico: card central com titulo + 1 ou 2 spinboxes + Cancelar/OK
-static void openQuickLogPicker(const char *type, const char *title,
-                                const char *lbl1, float min1, float max1, float step1, float def1,
-                                const char *lbl2 = nullptr, float min2 = 0, float max2 = 0, float step2 = 0, float def2 = 0) {
-  closeQuickLog();
-  qlType = type;
-  quickLogModal = lv_obj_create(lv_layer_top());
-  lv_obj_remove_style_all(quickLogModal);
-  lv_obj_set_size(quickLogModal, SCREEN_W, SCREEN_H);
-  lv_obj_set_style_bg_color(quickLogModal, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_opa(quickLogModal, LV_OPA_70, 0);
-  lv_obj_clear_flag(quickLogModal, LV_OBJ_FLAG_SCROLLABLE);
-
-  // Card central
-  lv_obj_t *card = lv_obj_create(quickLogModal);
-  lv_obj_set_size(card, SCREEN_W - sw(40), sh(180));
-  lv_obj_center(card);
-  lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(card, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(card, 1, 0);
-  lv_obj_set_style_radius(card, RADIUS_LG, 0);
-  lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-
-  makeLabel(card, title, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(6));
-
-  // Spinbox 1 — usa slider porque LVGL lv_spinbox e' chato pra float
-  makeLabel(card, lbl1, COL_DIM, FONT_CAPTION, LV_ALIGN_LEFT_MID, sw(10), -sh(10));
-  qlSpinV1 = lv_slider_create(card);
-  lv_obj_set_size(qlSpinV1, sw(160), sh(14));
-  lv_obj_align(qlSpinV1, LV_ALIGN_LEFT_MID, sw(10), sh(8));
-  lv_slider_set_range(qlSpinV1, (int)(min1 / step1), (int)(max1 / step1));
-  lv_slider_set_value(qlSpinV1, (int)(def1 / step1), LV_ANIM_OFF);
-  lv_obj_set_style_bg_color(qlSpinV1, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
-  lv_obj_set_style_bg_color(qlSpinV1, lv_color_hex(COL_PRIMARY), LV_PART_KNOB);
-  lv_obj_set_user_data(qlSpinV1, (void*)(intptr_t)(int)(step1 * 100));  // step *100 stored as int
-
-  // Label que mostra o valor selecionado, atualizada via callback.
-  // NAO usar lv_label_set_text_fmt com %f — lv_snprintf interno NAO
-  // suporta float. snprintf padrao + set_text e' o caminho seguro.
-  lv_obj_t *lblVal1 = lv_label_create(card);
-  {
-    char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", def1);
-    lv_label_set_text(lblVal1, vbuf);
-  }
-  lv_obj_set_style_text_color(lblVal1, lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_text_font(lblVal1, FONT_BODY, 0);
-  lv_obj_align(lblVal1, LV_ALIGN_RIGHT_MID, -sw(10), -sh(10));
-  lv_obj_add_event_cb(qlSpinV1, [](lv_event_t *e) {
-    lv_obj_t *s = (lv_obj_t*)lv_event_get_target(e);
-    int stepInt = (int)(intptr_t)lv_obj_get_user_data(s);
-    float step = (float)stepInt / 100.0f;
-    float v = lv_slider_get_value(s) * step;
-    char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", v);
-    lv_label_set_text((lv_obj_t*)lv_event_get_user_data(e), vbuf);
-  }, LV_EVENT_VALUE_CHANGED, lblVal1);
-
-  // Spinbox 2 (opcional — feed tem ph + ec)
-  if (lbl2) {
-    makeLabel(card, lbl2, COL_DIM, FONT_CAPTION, LV_ALIGN_LEFT_MID, sw(10), sh(28));
-    qlSpinV2 = lv_slider_create(card);
-    lv_obj_set_size(qlSpinV2, sw(160), sh(14));
-    lv_obj_align(qlSpinV2, LV_ALIGN_LEFT_MID, sw(10), sh(46));
-    lv_slider_set_range(qlSpinV2, (int)(min2 / step2), (int)(max2 / step2));
-    lv_slider_set_value(qlSpinV2, (int)(def2 / step2), LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(qlSpinV2, lv_color_hex(COL_AMBER), LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(qlSpinV2, lv_color_hex(COL_AMBER), LV_PART_KNOB);
-    lv_obj_set_user_data(qlSpinV2, (void*)(intptr_t)(int)(step2 * 100));
-
-    lv_obj_t *lblVal2 = lv_label_create(card);
-    {
-      char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", def2);
-      lv_label_set_text(lblVal2, vbuf);
-    }
-    lv_obj_set_style_text_color(lblVal2, lv_color_hex(COL_AMBER), 0);
-    lv_obj_set_style_text_font(lblVal2, FONT_BODY, 0);
-    lv_obj_align(lblVal2, LV_ALIGN_RIGHT_MID, -sw(10), sh(28));
-    lv_obj_add_event_cb(qlSpinV2, [](lv_event_t *e) {
-      lv_obj_t *s = (lv_obj_t*)lv_event_get_target(e);
-      int stepInt = (int)(intptr_t)lv_obj_get_user_data(s);
-      float step = (float)stepInt / 100.0f;
-      float v = lv_slider_get_value(s) * step;
-      char vbuf[16]; snprintf(vbuf, sizeof(vbuf), "%.2f", v);
-      lv_label_set_text((lv_obj_t*)lv_event_get_user_data(e), vbuf);
-    }, LV_EVENT_VALUE_CHANGED, lblVal2);
-  }
-
-  // Botoes Cancelar / OK
-  lv_obj_t *btnCancel = lv_btn_create(card);
-  lv_obj_set_size(btnCancel, sw(80), sh(28));
-  lv_obj_align(btnCancel, LV_ALIGN_BOTTOM_LEFT, sw(10), -sh(6));
-  lv_obj_set_style_bg_opa(btnCancel, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_color(btnCancel, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(btnCancel, 1, 0);
-  lv_obj_set_style_radius(btnCancel, RADIUS_MD, 0);
-  makeLabel(btnCancel, "Cancelar", COL_DIM, FONT_CAPTION, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_add_event_cb(btnCancel, [](lv_event_t *e) { closeQuickLog(); }, LV_EVENT_CLICKED, NULL);
-
-  lv_obj_t *btnOk = lv_btn_create(card);
-  lv_obj_set_size(btnOk, sw(80), sh(28));
-  lv_obj_align(btnOk, LV_ALIGN_BOTTOM_RIGHT, -sw(10), -sh(6));
-  lv_obj_set_style_bg_color(btnOk, lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_border_width(btnOk, 0, 0);
-  lv_obj_set_style_radius(btnOk, RADIUS_MD, 0);
-  makeLabel(btnOk, "Salvar", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_add_event_cb(btnOk, [](lv_event_t *e) {
-    if (!qlSpinV1 || !qlType) { closeQuickLog(); return; }
-    int stepInt1 = (int)(intptr_t)lv_obj_get_user_data(qlSpinV1);
-    float v1 = lv_slider_get_value(qlSpinV1) * ((float)stepInt1 / 100.0f);
-    float v2 = 0;
-    if (qlSpinV2) {
-      int stepInt2 = (int)(intptr_t)lv_obj_get_user_data(qlSpinV2);
-      v2 = lv_slider_get_value(qlSpinV2) * ((float)stepInt2 / 100.0f);
-    }
-    if (onQuickLog) onQuickLog(qlType, v1, v2);
-    showToast("Registrado");
-    closeQuickLog();
-  }, LV_EVENT_CLICKED, NULL);
-}
-
-static void openQuickLogMenu() {
-  closeQuickLog();
-  quickLogModal = lv_obj_create(lv_layer_top());
-  lv_obj_remove_style_all(quickLogModal);
-  lv_obj_set_size(quickLogModal, SCREEN_W, SCREEN_H);
-  lv_obj_set_style_bg_color(quickLogModal, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_bg_opa(quickLogModal, LV_OPA_70, 0);
-  lv_obj_clear_flag(quickLogModal, LV_OBJ_FLAG_SCROLLABLE);
-
-  // Tap fora do card fecha modal
-  lv_obj_add_flag(quickLogModal, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(quickLogModal, [](lv_event_t *e) {
-    // So fecha se o tap foi no overlay (nao bubble dos filhos)
-    if (lv_event_get_target(e) == lv_event_get_current_target(e)) closeQuickLog();
-  }, LV_EVENT_CLICKED, NULL);
-
-  lv_obj_t *card = lv_obj_create(quickLogModal);
-  lv_obj_set_size(card, SCREEN_W - sw(60), sh(140));
-  lv_obj_center(card);
-  lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_border_color(card, lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_border_width(card, 1, 0);
-  lv_obj_set_style_radius(card, RADIUS_LG, 0);
-  lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-
-  makeLabel(card, "Log rapido", COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_MID, 0, sh(6));
-
-  // Botao Regar — primary
-  lv_obj_t *btnWater = lv_btn_create(card);
-  lv_obj_set_size(btnWater, sw(220), sh(36));
-  lv_obj_align(btnWater, LV_ALIGN_CENTER, 0, -sh(8));
-  lv_obj_set_style_bg_color(btnWater, lv_color_hex(COL_CYN), 0);
-  lv_obj_set_style_border_width(btnWater, 0, 0);
-  lv_obj_set_style_radius(btnWater, RADIUS_LG, 0);
-  makeLabel(btnWater, "Reguei", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_add_event_cb(btnWater, [](lv_event_t *e) {
-    openQuickLogPicker("water", "Quanto reguei?", "Litros", 0.1f, 5.0f, 0.1f, 1.0f);
-  }, LV_EVENT_CLICKED, NULL);
-
-  // Botao Fertilizar — amber
-  lv_obj_t *btnFeed = lv_btn_create(card);
-  lv_obj_set_size(btnFeed, sw(220), sh(36));
-  lv_obj_align(btnFeed, LV_ALIGN_CENTER, 0, sh(28));
-  lv_obj_set_style_bg_color(btnFeed, lv_color_hex(COL_AMBER), 0);
-  lv_obj_set_style_border_width(btnFeed, 0, 0);
-  lv_obj_set_style_radius(btnFeed, RADIUS_LG, 0);
-  makeLabel(btnFeed, "Fertilizei", COL_TEXT, FONT_BODY, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_add_event_cb(btnFeed, [](lv_event_t *e) {
-    openQuickLogPicker("feed", "Fertilizacao",
-                       "pH",  4.0f, 8.0f, 0.1f, 6.0f,
-                       "EC",  0.5f, 3.0f, 0.1f, 1.4f);
-  }, LV_EVENT_CLICKED, NULL);
+  // FAB quick-log removido: registros de rega/fertilizacao agora SO' via app
+  // web/mobile. Display e' read-only — mais simples e foco no monitoramento.
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
