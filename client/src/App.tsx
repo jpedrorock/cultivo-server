@@ -119,6 +119,7 @@ function Router() {
         <Route path="/chat/:plantId" component={PlantChat} />
         <Route path="/chat" component={PlantChat} />
         <Route path={"/admin/users"} component={AdminUsers} />
+        <Route path={"/help/:section"} component={Help} />
         <Route path={"/help"} component={Help} />
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
