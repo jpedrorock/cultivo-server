@@ -172,9 +172,8 @@ const VIDEOS: VideoCard[] = [
 
 /**
  * Placeholder de imagem. Mostra um retângulo com borda tracejada e o tamanho
- * sugerido. Quando o user enviar a imagem, substitui por:
- *
- *   <img src="/help/setup-1.png" alt="..." className="w-full rounded-xl border border-border/30" />
+ * sugerido. Quando user fornecer screenshot, basta passar `imageSrc` no <Step/>
+ * que ele renderiza <img> automaticamente em vez do placeholder.
  */
 function ImagePlaceholder({
   width,
@@ -206,6 +205,8 @@ function Step({
   imageWidth = 1200,
   imageHeight = 700,
   imageCaption,
+  imageSrc,
+  imageAlt,
   accent,
 }: {
   n: number;
@@ -213,7 +214,12 @@ function Step({
   description: React.ReactNode;
   imageWidth?: number;
   imageHeight?: number;
+  /** Texto descritivo da imagem (renderiza placeholder se imageSrc não vier) */
   imageCaption?: string;
+  /** URL da screenshot real. Quando passada, renderiza <img> em vez do placeholder. */
+  imageSrc?: string;
+  /** Alt text da <img>. Se omitido, usa imageCaption. */
+  imageAlt?: string;
   accent: string;
 }) {
   return (
@@ -228,9 +234,17 @@ function Step({
       </div>
       <h3 className="text-base font-semibold text-foreground mb-1.5 leading-snug">{title}</h3>
       <div className="text-sm text-muted-foreground leading-relaxed space-y-2 mb-3">{description}</div>
-      {imageCaption && (
+      {imageSrc ? (
+        <img
+          src={imageSrc}
+          alt={imageAlt ?? imageCaption ?? ""}
+          loading="lazy"
+          className="w-full rounded-xl border border-border/30"
+          style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}
+        />
+      ) : imageCaption ? (
         <ImagePlaceholder width={imageWidth} height={imageHeight} caption={imageCaption} />
-      )}
+      ) : null}
     </div>
   );
 }
