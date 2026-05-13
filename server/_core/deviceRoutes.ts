@@ -1689,6 +1689,26 @@ function registerDeviceRoutes(app: express.Application) {
       // ownerUserId = user que pareou (usado pelo /device-toggle pra pegar
       // a config Tuya CERTA, alinha com o web).
       const deviceToken = crypto.randomBytes(32).toString('hex');
+
+      // 1 token por estufa: se a estufa já tem display pareado, invalida o
+      // anterior. Cobre o caso real de "troquei o ESP fisicamente, quero
+      // que o novo funcione e o velho pare". Se a pessoa tem 2 ESPs e quer
+      // que ambos mostrem a mesma estufa, ela tem que usar o caminho
+      // "Dispositivos" (avançado) que permite múltiplos tokens por tent.
+      const [existing]: any = await pool.execute(
+        `SELECT id, name FROM deviceTokens WHERE tentId = ? AND groupId = ?`,
+        [tentId, user.groupId ?? 0]
+      );
+      let replacedCount = 0;
+      if (existing.length > 0) {
+        await pool.execute(
+          `DELETE FROM deviceTokens WHERE tentId = ? AND groupId = ?`,
+          [tentId, user.groupId ?? 0]
+        );
+        replacedCount = existing.length;
+        console.log(`[Device] pair-claim substituiu ${replacedCount} token(s) anterior(es) da estufa ${tentId}`);
+      }
+
       await pool.execute(
         `INSERT INTO deviceTokens (token, name, tentId, groupId, ownerUserId) VALUES (?, ?, ?, ?, ?)`,
         [deviceToken, codeRow.deviceName, tentId, user.groupId ?? 0, user.id]
@@ -1698,8 +1718,8 @@ function registerDeviceRoutes(app: express.Application) {
         [user.id, tentId, deviceToken, code]
       );
 
-      console.log(`[Device] pair-claim code=${code} userId=${user.id} tentId=${tentId}`);
-      res.json({ success: true, deviceName: codeRow.deviceName });
+      console.log(`[Device] pair-claim code=${code} userId=${user.id} tentId=${tentId} replaced=${replacedCount}`);
+      res.json({ success: true, deviceName: codeRow.deviceName, replacedPrevious: replacedCount });
     } catch (err: any) {
       console.error('[Device] pair-claim error:', err?.message);
       res.status(500).json({ error: 'Erro interno' });

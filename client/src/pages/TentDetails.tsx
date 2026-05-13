@@ -1310,7 +1310,13 @@ function PairDisplayCard({ tentId }: { tentId: number }) {
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || `Erro ${r.status}`);
       setSuccess(true);
-      toast.success(`Display "${data.deviceName}" conectado!`);
+      // Backend retorna replacedPrevious > 0 quando substituiu display anterior da mesma estufa.
+      // Avisa user pra ele saber que o ESP antigo deixou de funcionar.
+      if (data.replacedPrevious > 0) {
+        toast.success(`Display "${data.deviceName}" conectado! (display anterior desconectado)`);
+      } else {
+        toast.success(`Display "${data.deviceName}" conectado!`);
+      }
       setTimeout(() => { setOpen(false); setCode(''); setSuccess(false); }, 1500);
     } catch (e: any) {
       setError(e.message || 'Falha ao parear');

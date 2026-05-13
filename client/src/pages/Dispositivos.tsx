@@ -103,6 +103,22 @@ export default function Dispositivos() {
         <PageHeader backHref="/settings" title="Dispositivos ESP32" />
 
         <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl space-y-6">
+          {/*
+            Aviso pra evitar uso "errado" desta página caso ela seja wireada
+            no router algum dia. Caminho recomendado é o pair-claim por código
+            dentro da página da estufa (UX zero-friction, tentId implícito).
+            Esta página é só pra debug / power user / scripts externos.
+          */}
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-1">
+            <p className="text-sm font-semibold text-amber-200">⚠️ Caminho avançado</p>
+            <p className="text-xs text-amber-100/80">
+              Pra parear um ESP novo, prefira:{" "}
+              <strong>Estufa específica → SmartLife → Conectar Display</strong>.
+              Lá você cola o código que o ESP mostra na tela, sem precisar selecionar
+              estufa manualmente. Esta página é pra power users / debug.
+            </p>
+          </div>
+
           <div className="bg-card border border-border rounded-2xl p-4 space-y-2">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
