@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle, KeyRound, Check } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui/dialog';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,6 +14,41 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
   const { isAuthenticated, loading: authLoading, refresh } = useAuth();
+
+  // Forgot password modal state
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
+
+  async function handleForgotSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setForgotLoading(true);
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+      // Sempre mostra sucesso (anti-enumeration — backend nunca confirma se email existe)
+      setForgotSuccess(true);
+    } catch {
+      // Mesmo em erro de rede, não vaza info — finge sucesso
+      setForgotSuccess(true);
+    } finally {
+      setForgotLoading(false);
+    }
+  }
+
+  function closeForgot() {
+    setForgotOpen(false);
+    // Reset state após animação fechar
+    setTimeout(() => {
+      setForgotEmail('');
+      setForgotSuccess(false);
+    }, 200);
+  }
 
   // Se já está autenticado, redirecionar para home
   useEffect(() => {
@@ -138,12 +176,17 @@ export default function Login() {
               <label htmlFor="login-password" className="block text-sm font-medium text-foreground">
                 Senha
               </label>
-              <a
-                href="mailto:suporte@cultivo.app?subject=Reset%20de%20senha&body=Olá%2C%20esqueci%20minha%20senha%20do%20App%20Cultivo.%20Meu%20email%20cadastrado%20é%3A%20"
+              <button
+                type="button"
+                onClick={() => {
+                  // Pré-preenche email se já tiver digitado
+                  if (email) setForgotEmail(email);
+                  setForgotOpen(true);
+                }}
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Esqueci minha senha
-              </a>
+              </button>
             </div>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
@@ -188,6 +231,92 @@ export default function Login() {
           </button>
         </p>
       </div>
+
+      {/* Modal de recuperar senha — UX padrao SaaS, anti-enumeration:
+          backend retorna sempre o mesmo response independente do email existir.
+          Implementacao atual e' MVP — admin ve pedidos no log e processa
+          manualmente. Email automatico (Resend/nodemailer) plugavel depois. */}
+      <Dialog open={forgotOpen} onOpenChange={(o) => (o ? setForgotOpen(true) : closeForgot())}>
+        <DialogContent className="sm:max-w-md">
+          {!forgotSuccess ? (
+            <form onSubmit={handleForgotSubmit}>
+              <DialogHeader>
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center mb-3">
+                  <KeyRound className="w-5 h-5 text-primary" />
+                </div>
+                <DialogTitle>Recuperar senha</DialogTitle>
+                <DialogDescription>
+                  Informe o email cadastrado. Vamos enviar um link de redefinição
+                  caso a conta exista.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="py-4">
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    required
+                    autoFocus
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closeForgot} disabled={forgotLoading}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={forgotLoading || !forgotEmail.trim()}>
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar link'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <>
+              <DialogHeader>
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center mb-3">
+                  <Check className="w-6 h-6 text-primary" />
+                </div>
+                <DialogTitle>Pedido enviado</DialogTitle>
+                <DialogDescription>
+                  Se <strong>{forgotEmail}</strong> tiver uma conta cadastrada, em alguns
+                  minutos chegará um link de redefinição na caixa de entrada.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="py-3">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Não recebeu? Verifique o spam, ou aguarde alguns minutos. Se o problema
+                  persistir, entre em contato pelo email{" "}
+                  <a href="mailto:suporte@cultivo.app" className="text-foreground underline underline-offset-2">
+                    suporte@cultivo.app
+                  </a>.
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button onClick={closeForgot} className="w-full sm:w-auto">
+                  Entendi
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
