@@ -897,6 +897,40 @@ html.vision {
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  /* ───────────────────────────────────────────────────────────────────
+   * Focus-visible fallback global pra elementos clicáveis
+   *
+   * Componentes próprios (Button, Input, etc) já trazem suas próprias
+   * classes focus-visible:* (border-ring, ring-ring/50, etc). Esta
+   * regra cobre <button> cru, <a> cru, [role="button"] e [tabindex]
+   * que NÃO definiram seu próprio focus styling — garante que
+   * navegação por teclado (Tab) sempre mostra indicador visível.
+   *
+   * Selector :not([class*="focus-visible:"]) evita conflito com
+   * componentes que já controlam seu focus via Tailwind.
+   *
+   * Acessibilidade: WCAG 2.1 AA exige indicador visível em todos
+   * elementos focáveis.
+   * ─────────────────────────────────────────────────────────────────── */
+  button:not([class*="focus-visible:"]):focus-visible,
+  a:not([class*="focus-visible:"]):focus-visible,
+  [role="button"]:not([class*="focus-visible:"]):focus-visible,
+  [tabindex]:not(input):not(textarea):not(select):not([class*="focus-visible:"]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Inputs/textareas/selects: usa box-shadow ring (em vez de outline)
+     pra não brigar com border + padding interno. */
+  input:not([class*="focus-visible:"]):focus-visible,
+  textarea:not([class*="focus-visible:"]):focus-visible,
+  select:not([class*="focus-visible:"]):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--ring);
+    border-color: var(--ring);
+  }
+
   /* Disable transitions for elements that should change instantly */
   input[type="range"],
   input[type="checkbox"],
