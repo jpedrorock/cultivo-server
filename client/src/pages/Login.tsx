@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -82,7 +82,7 @@ export default function Login() {
         {/* Botão Google */}
         <a
           href="/api/auth/google"
-          className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground font-medium hover:bg-muted transition-colors mb-6"
+          className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground font-medium hover:bg-muted transition-colors mb-6"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -105,29 +105,39 @@ export default function Login() {
         {/* Formulário email/senha */}
         <form onSubmit={handleLogin} className="space-y-4">
           {error && (
-            <div className="px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-              {error}
+            <div className="flex items-start gap-2 px-3.5 py-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="flex-1">{error}</span>
             </div>
           )}
 
+          {/* Email com ícone esquerdo */}
           <div>
-            <label htmlFor="login-email" className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-            <input
-              id="login-email"
-              type="email"
-              autoComplete="username"
-              inputMode="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              required
-              className="w-full px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
-            />
+            <label htmlFor="login-email" className="block text-sm font-medium text-foreground mb-1.5">
+              Email
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
+              <input
+                id="login-email"
+                type="email"
+                autoComplete="username"
+                inputMode="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                required
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all"
+              />
+            </div>
           </div>
 
+          {/* Senha com ícone esquerdo */}
           <div>
             <div className="flex items-baseline justify-between mb-1.5">
-              <label htmlFor="login-password" className="block text-sm font-medium text-foreground">Senha</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-foreground">
+                Senha
+              </label>
               <a
                 href="mailto:suporte@cultivo.app?subject=Reset%20de%20senha&body=Olá%2C%20esqueci%20minha%20senha%20do%20App%20Cultivo.%20Meu%20email%20cadastrado%20é%3A%20"
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -135,16 +145,19 @@ export default function Login() {
                 Esqueci minha senha
               </a>
             </div>
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              className="w-full px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
-            />
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
+              <input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all"
+              />
+            </div>
           </div>
 
           <Button
