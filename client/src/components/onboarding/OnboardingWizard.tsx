@@ -20,7 +20,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
+import { cultivoToast } from "@/lib/cultivoToast";
 import {
   Sprout, Leaf, Home, ChevronRight, ChevronLeft, X, Check,
   Loader2, AlertCircle, Sparkles,
@@ -117,7 +117,7 @@ export default function OnboardingWizard() {
   /** Submete passo atual e avança */
   async function handleStep1Submit() {
     if (!tentDraft.name.trim()) {
-      toast.error("Dá um nome pra estufa");
+      cultivoToast.error("Informe o nome da estufa");
       return;
     }
     try {
@@ -126,13 +126,13 @@ export default function OnboardingWizard() {
       utils.tents.list.invalidate();
       setStep(2);
     } catch (e: any) {
-      toast.error(`Erro ao criar estufa: ${e.message}`);
+      cultivoToast.error("Erro ao criar estufa", e.message);
     }
   }
 
   async function handleStep2Submit() {
     if (!strainDraft.name.trim()) {
-      toast.error("Escolhe uma strain ou digita um nome");
+      cultivoToast.error("Selecione ou informe uma strain");
       return;
     }
     try {
@@ -149,17 +149,17 @@ export default function OnboardingWizard() {
       utils.strains.list.invalidate();
       setStep(3);
     } catch (e: any) {
-      toast.error(`Erro ao criar strain: ${e.message}`);
+      cultivoToast.error("Erro ao criar strain", e.message);
     }
   }
 
   async function handleStep3Submit() {
     if (!plantDraft.name.trim()) {
-      toast.error("Dá um nome pra planta");
+      cultivoToast.error("Informe o nome da planta");
       return;
     }
     if (!createdTentId || !createdStrainId) {
-      toast.error("Estado inválido — recomeça o wizard");
+      cultivoToast.error("Estado inválido — reinicie o wizard");
       return;
     }
     try {
@@ -172,7 +172,7 @@ export default function OnboardingWizard() {
       utils.plants.list?.invalidate?.();
       setStep("done");
     } catch (e: any) {
-      toast.error(`Erro ao criar planta: ${e.message}`);
+      cultivoToast.error("Erro ao criar planta", e.message);
     }
   }
 
@@ -184,14 +184,14 @@ export default function OnboardingWizard() {
   function skipStep2() {
     // Pular strain: wizard termina (não dá pra criar planta sem strain)
     markWizardDone();
-    toast.info("Tudo bem! Você pode criar strains e plantas depois em Estufas → Plantas");
+    cultivoToast.info("Você pode criar strains e plantas depois em Estufas → Plantas");
     setLocation("/");
   }
 
   function skipStep3() {
     // Pular planta: estufa + strain criadas, só faltou planta
     markWizardDone();
-    toast.success("Você pode adicionar plantas depois pelo botão + da estufa");
+    cultivoToast.info("Você pode adicionar plantas depois pelo botão + da estufa");
     setLocation("/");
   }
 
