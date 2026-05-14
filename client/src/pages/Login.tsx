@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/_core/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -145,18 +147,27 @@ export default function Login() {
             />
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+            size="lg"
+            className="w-full"
           >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Entrando...
+              </>
+            ) : (
+              'Entrar'
+            )}
+          </Button>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           Não tem conta?{' '}
           <button
+            type="button"
             onClick={() => setLocation('/register')}
             className="text-foreground font-medium underline underline-offset-2 decoration-muted-foreground/40 hover:decoration-foreground"
           >

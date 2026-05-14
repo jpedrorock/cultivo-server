@@ -1,4 +1,5 @@
 import { Sprout } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Step {
   /** "1" | "2" | "3" — vira o badge circular à esquerda */
@@ -100,13 +101,14 @@ export function EmptyOnboarding({ onCreateTent }: { onCreateTent: () => void }) 
       </div>
 
       {/* CTA */}
-      <button
+      <Button
         onClick={onCreateTent}
-        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-semibold py-4 text-sm active:scale-[0.98] transition-transform shadow-lg shadow-primary/20"
+        size="lg"
+        className="w-full"
       >
         <Sprout className="w-5 h-5" />
         Criar primeira estufa
-      </button>
+      </Button>
     </div>
   );
 }
