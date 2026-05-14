@@ -119,7 +119,7 @@ export default function Login() {
               onChange={e => setEmail(e.target.value)}
               placeholder="seu@email.com"
               required
-              className="w-full px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500 transition-colors"
+              className="w-full px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
             />
           </div>
 
@@ -128,7 +128,7 @@ export default function Login() {
               <label htmlFor="login-password" className="block text-sm font-medium text-foreground">Senha</label>
               <a
                 href="mailto:suporte@cultivo.app?subject=Reset%20de%20senha&body=Olá%2C%20esqueci%20minha%20senha%20do%20App%20Cultivo.%20Meu%20email%20cadastrado%20é%3A%20"
-                className="text-xs text-muted-foreground hover:text-emerald-600 transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Esqueci minha senha
               </a>
@@ -141,7 +141,7 @@ export default function Login() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500 transition-colors"
+              className="w-full px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring transition-colors"
             />
           </div>
 
@@ -158,7 +158,7 @@ export default function Login() {
           Não tem conta?{' '}
           <button
             onClick={() => setLocation('/register')}
-            className="text-emerald-600 font-medium hover:underline"
+            className="text-foreground font-medium underline underline-offset-2 decoration-muted-foreground/40 hover:decoration-foreground"
           >
             Registrar
           </button>

@@ -123,7 +123,7 @@ function ChatPlantPicker({
         <button
           key={group.key}
           onClick={() => setSelectedGroup(group.key)}
-          className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-emerald-500/30 hover:bg-muted/50 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
+          className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 hover:border-border hover:bg-muted/50 active:scale-[0.98] transition-[color,background-color,border-color,transform] text-left"
         >
           <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
             <TentIcon className="w-6 h-6 text-muted-foreground" />
@@ -356,7 +356,7 @@ export function BottomNav() {
                 {/* Treinamento — abre picker de planta */}
                 <button
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setTrainingPickerOpen(true); }}
-                  className="flex items-center gap-4 px-5 py-4 hover:bg-green-500/8 active:bg-green-500/15 transition-colors border-b border-border/30 w-full text-left"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-muted/40 active:bg-muted/60 transition-colors border-b border-border/30 w-full text-left"
                 >
                   <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0 shadow-sm">
                     <Scissors className="w-5 h-5 text-primary-foreground" />
@@ -401,9 +401,9 @@ export function BottomNav() {
                     {activePlants.map((plant: any) => (
                       <div
                         key={plant.id}
-                        className="flex items-center gap-2 p-3 rounded-xl border border-border/40 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors"
+                        className="flex items-center gap-2 p-3 rounded-xl border border-border/40 hover:border-border hover:bg-muted/40 transition-colors"
                       >
-                        <span className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 text-sm font-bold text-emerald-500">
+                        <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0 text-sm font-bold text-muted-foreground">
                           {(plant.name ?? '?')[0].toUpperCase()}
                         </span>
                         <div className="flex-1 min-w-0">
