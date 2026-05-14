@@ -305,20 +305,26 @@ export function TentCard({
             <p className="text-xs text-muted-foreground mt-0.5">{tent.width}×{tent.depth}×{tent.height}cm</p>
           </div>
 
-          {/* Monitor — acesso rápido ao display da estufa */}
+          {/* Monitor — acesso rápido ao display da estufa.
+              Touch target 44x44 pra HIG iOS — antes era 32x32 (frustrante mobile). */}
           <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
             <button
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
               title="Modo Display"
+              aria-label="Abrir modo display"
             >
               <Monitor className="w-4 h-4" />
             </button>
           </Link>
 
-          {/* ··· dropdown menu */}
+          {/* ··· dropdown menu — leads to destructive actions (Excluir).
+              Touch target 44x44 pra evitar tap acidental ou frustração. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <button
+                className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label="Menu de ações da estufa"
+              >
                 <MoreVertical className="w-4 h-4" />
               </button>
             </DropdownMenuTrigger>
