@@ -418,7 +418,7 @@ export function BottomNav() {
                             setTrainingPickerOpen(false);
                             navigate(`/plants/${plant.id}/training?sandbox=1&view=top`);
                           }}
-                          className="px-2.5 h-7 rounded-md text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          className="px-2.5 h-7 rounded-lg text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
                           title="Editar em 2D (vista de cima)"
                         >
                           2D
@@ -429,7 +429,7 @@ export function BottomNav() {
                             setTrainingPickerOpen(false);
                             navigate(`/plants/${plant.id}/training?sandbox=1&view=3d`);
                           }}
-                          className="px-2.5 h-7 rounded-md text-xs font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          className="px-2.5 h-7 rounded-lg text-xs font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
                           title="Editar em 3D"
                         >
                           3D

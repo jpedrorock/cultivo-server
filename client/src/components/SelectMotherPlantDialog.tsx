@@ -88,10 +88,10 @@ export function SelectMotherPlantDialog({
                     <img
                       src={plant.lastHealthPhotoUrl}
                       alt={plant.name || plant.code}
-                      className="w-full h-32 object-cover rounded-md mb-2"
+                      className="w-full h-32 object-cover rounded-lg mb-2"
                     />
                   ) : (
-                    <div className="w-full h-32 bg-muted rounded-md mb-2 flex items-center justify-center">
+                    <div className="w-full h-32 bg-muted rounded-lg mb-2 flex items-center justify-center">
                       <Sprout className="h-8 w-8 text-muted-foreground" />
                     </div>
                   )}

@@ -467,7 +467,7 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
                         {/* Status + data */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium border ${status.color}`}>
+                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg font-medium border ${status.color}`}>
                               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dot}`}/>{status.label}
                             </span>
                             <span className="text-xs text-muted-foreground/60">

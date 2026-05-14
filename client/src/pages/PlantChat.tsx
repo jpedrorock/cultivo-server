@@ -761,7 +761,7 @@ export default function PlantChat() {
             <div className="flex flex-col items-center justify-center h-full gap-5 pb-10">
               {/* Icon */}
               <div className="relative">
-                <div className="w-20 h-20 rounded-3xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
                   <Bot className="w-10 h-10 text-white" />
                 </div>
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">

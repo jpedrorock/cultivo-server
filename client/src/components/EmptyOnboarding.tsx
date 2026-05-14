@@ -38,7 +38,7 @@ export function EmptyOnboarding({ onCreateTent }: { onCreateTent: () => void }) 
   return (
     <div className="flex flex-col items-center py-10 px-4 max-w-md mx-auto">
       {/* Ícone central */}
-      <div className="w-20 h-20 rounded-3xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center mb-6">
+      <div className="w-20 h-20 rounded-2xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center mb-6">
         <Sprout className="w-10 h-10 text-primary" />
       </div>
 

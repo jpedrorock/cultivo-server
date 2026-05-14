@@ -106,7 +106,7 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
                 <div key={entry.id} className="relative flex items-start gap-3">
                   {/* Dot da timeline */}
                   <div className="absolute -left-2.5 mt-1 w-2 h-2 rounded-full bg-primary border-2 border-background" />
-                  <div className="bg-muted/40 rounded-md p-2.5 text-sm flex-1 ml-1">
+                  <div className="bg-muted/40 rounded-lg p-2.5 text-sm flex-1 ml-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {entry.fromTentName ? (
                         <>
@@ -146,7 +146,7 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
           </div>
           <div className="space-y-2">
             {observations.slice(0, 5).map((obs: any) => (
-              <div key={obs.id} className="bg-muted/40 rounded-md p-2.5 text-sm">
+              <div key={obs.id} className="bg-muted/40 rounded-lg p-2.5 text-sm">
                 <p className="text-foreground">{obs.content}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {obs.observationDate
@@ -173,7 +173,7 @@ function PlantHistorySection({ plantId }: { plantId: number }) {
           </div>
           <div className="space-y-2">
             {healthLogs.slice(0, 5).map((log: any) => (
-              <div key={log.id} className="bg-muted/40 rounded-md p-2.5 text-sm">
+              <div key={log.id} className="bg-muted/40 rounded-lg p-2.5 text-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <Heart className={`w-3.5 h-3.5 ${getHealthColor(log.healthStatus)}`} />
                   <span className={`font-medium text-xs ${getHealthColor(log.healthStatus)}`}>
@@ -489,7 +489,7 @@ export default function PlantArchivePage() {
                             ? `/api/upload/thumbnail?url=${encodeURIComponent(plant.lastHealthPhotoUrl)}&w=400&h=135&q=75`
                             : plant.lastHealthPhotoUrl}
                           alt={plant.name}
-                          className="w-full h-32 object-cover rounded-md"
+                          className="w-full h-32 object-cover rounded-lg"
                           loading="lazy"
                           decoding="async"
                         />

@@ -113,7 +113,7 @@ export function TentFilterSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="border rounded-md px-3 py-3 space-y-2">
+        <div key={i} className="border rounded-lg px-3 py-3 space-y-2">
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-3 w-28" />
         </div>

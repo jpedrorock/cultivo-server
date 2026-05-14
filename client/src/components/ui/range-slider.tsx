@@ -90,7 +90,7 @@ export function RangeSlider({
             <div
               className={cn(
                 "absolute left-1/2 -translate-x-1/2 pointer-events-none",
-                "bg-foreground text-background font-bold rounded-md shadow-lg whitespace-nowrap",
+                "bg-foreground text-background font-bold rounded-lg shadow-lg whitespace-nowrap",
                 isLg ? "text-sm px-2.5 py-1" : "text-xs px-2 py-0.5",
               )}
               style={{ bottom: isLg ? "calc(100% + 14px)" : "calc(100% + 8px)" }}

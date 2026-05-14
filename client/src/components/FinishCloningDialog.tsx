@@ -100,7 +100,7 @@ export function FinishCloningDialog({
               inputMode="numeric"
               value={seedlingCount}
               onChange={(e) => setSeedlingCount(parseInt(e.target.value.replace(/\D/g, '')) || 1)}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border rounded-lg"
             />
             <p className="text-xs text-muted-foreground">
               Quantas mudas você deseja gerar (1-50)

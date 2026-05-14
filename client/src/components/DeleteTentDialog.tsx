@@ -121,7 +121,7 @@ export function DeleteTentDialog({
           <div className="space-y-3 py-3">
             {/* Blockers */}
             {!deletePreview.canDelete && (
-              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                 <p className="text-sm font-medium text-destructive mb-2 flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4" />
                   Não é possível excluir:
@@ -139,7 +139,7 @@ export function DeleteTentDialog({
 
             {/* Preview do que será deletado */}
             {deletePreview.totalRecords > 0 && (
-              <div className="p-3 bg-muted/50 rounded-md">
+              <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm font-medium mb-2">Serão excluídos permanentemente:</p>
                 <ul className="text-sm space-y-1 text-muted-foreground">
                   {deletePreview.willDelete.cycles > 0 && (
@@ -174,7 +174,7 @@ export function DeleteTentDialog({
             )}
 
             {deletePreview.totalRecords === 0 && deletePreview.canDelete && (
-              <div className="p-3 bg-muted/30 rounded-md">
+              <div className="p-3 bg-muted/30 rounded-lg">
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
                   Estufa vazia, sem dados relacionados.

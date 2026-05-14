@@ -37,7 +37,7 @@ export default function PlantHarvestModal({ open, onOpenChange, plantName, onCon
         <div className="py-4">
           <label className="text-sm font-medium text-foreground mb-2 block">Notas da colheita (ex: peso, qualidade)</label>
           <textarea
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
             rows={3}
             placeholder="Ex: 45g, qualidade excelente, terpenos intensos..."
             value={notes}

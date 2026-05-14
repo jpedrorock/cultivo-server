@@ -266,7 +266,7 @@ export default function PlantTrainingPage() {
                     min="0.5" step="0.5" max="100"
                     value={potSizeL}
                     onChange={(e) => handlePotSizeChange(Math.max(0.5, parseFloat(e.target.value) || 5))}
-                    className="w-12 h-7 px-1.5 text-xs font-medium bg-muted/50 border border-border/40 rounded-md text-center focus:outline-none focus:border-primary"
+                    className="w-12 h-7 px-1.5 text-xs font-medium bg-muted/50 border border-border/40 rounded-lg text-center focus:outline-none focus:border-primary"
                     title="Tamanho do vaso (litros)"
                   />
                   <span className="text-xs text-muted-foreground">L</span>

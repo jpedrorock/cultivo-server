@@ -281,7 +281,7 @@ export default function Backup() {
               </>
             )}
           </Button>
-          <div className="flex items-start gap-2 mt-3 p-3 bg-destructive/10 rounded-md">
+          <div className="flex items-start gap-2 mt-3 p-3 bg-destructive/10 rounded-lg">
             <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
             <p className="text-sm text-destructive">
               <strong>Atenção:</strong> Esta ação irá substituir todos os dados atuais e não pode ser desfeita. 

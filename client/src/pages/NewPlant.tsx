@@ -134,7 +134,7 @@ export default function NewPlant() {
                   </Label>
                   <select
                     id="strain"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                     value={strainId || ""}
                     onChange={(e) => setStrainId(e.target.value ? Number(e.target.value) : undefined)}
                     required
@@ -160,7 +160,7 @@ export default function NewPlant() {
                   </Label>
                   <select
                     id="tent"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                     value={tentId || ""}
                     onChange={(e) => setTentId(e.target.value ? Number(e.target.value) : undefined)}
                     required

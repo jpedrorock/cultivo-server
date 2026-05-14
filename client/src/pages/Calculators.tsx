@@ -679,7 +679,7 @@ function WateringRunoffCalculator() {
                 <Label htmlFor="history-tent-filter">Estufa</Label>
                 <select
                   id="history-tent-filter"
-                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  className="w-full px-3 py-2 border rounded-lg bg-background"
                   value={historyTentFilter}
                   onChange={(e) => setHistoryTentFilter(e.target.value)}
                 >
@@ -798,7 +798,7 @@ function LuxPPFDCalculator() {
 
       {/* Main panel */}
       <div
-        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        className="rounded-2xl border border-border/60 p-6 relative overflow-hidden"
         style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--color-kpi-ppfd) 5%, var(--card)), var(--card))" }}
       >
         <CalcRunning />
@@ -947,7 +947,7 @@ function PPMECConverter() {
 
       {/* Main panel */}
       <div
-        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        className="rounded-2xl border border-border/60 p-6 relative overflow-hidden"
         style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--primary) 5%, var(--card)), var(--card))" }}
       >
         <CalcRunning />
@@ -1116,7 +1116,7 @@ function PHAdjustCalculator() {
 
       {/* Main panel */}
       <div
-        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        className="rounded-2xl border border-border/60 p-6 relative overflow-hidden"
         style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--primary) 5%, var(--card)), var(--card))" }}
       >
         <CalcRunning />
@@ -1258,7 +1258,7 @@ function VPDCalculator() {
 
       {/* Main panel — sliders + result side by side */}
       <div
-        className="rounded-3xl border border-border/60 p-6 relative overflow-hidden"
+        className="rounded-2xl border border-border/60 p-6 relative overflow-hidden"
         style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--primary) 5%, var(--card)), var(--card))" }}
       >
         <CalcRunning />

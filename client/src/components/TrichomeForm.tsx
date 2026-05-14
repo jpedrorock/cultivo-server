@@ -83,7 +83,7 @@ export function TrichomeForm({
           <span className="text-xs text-muted-foreground/60 font-medium">
             Planta {currentIndex + 1} de {totalPlants}
           </span>
-          <span className="text-xs px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold">
+          <span className="text-xs px-1.5 py-0.5 rounded-lg bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold">
             Tricomas
           </span>
         </div>
