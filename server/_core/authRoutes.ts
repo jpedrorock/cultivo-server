@@ -41,6 +41,14 @@ const registerLimiter = rateLimit({
   message: { error: 'Muitas tentativas de registro. Tente novamente em 1 hora.' },
 });
 
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,           // 1 hora
+  limit: 3,                           // 3 pedidos por hora por IP
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Muitos pedidos de recuperação. Tente novamente em 1 hora.' },
+});
+
 // ---------------------------------------------------------------------------
 
 /**
@@ -175,6 +183,63 @@ export function registerAuthRoutes(app: Express) {
     } catch (error) {
       console.error('[Auth] Login failed', error);
       res.status(500).json({ error: 'Falha ao fazer login' });
+    }
+  });
+
+  /**
+   * POST /api/auth/forgot-password
+   * Pede reset de senha. Por design (anti-enumeration), retorna 200 mesmo
+   * se email não existe — atacante não consegue descobrir emails válidos
+   * fazendo POST com diferentes endereços.
+   *
+   * STATE ATUAL (MVP): endpoint registra o pedido em log + console pra
+   * admin processar manualmente. Email service real (nodemailer/Resend)
+   * não está integrado — substituir os TODOs abaixo quando plugar.
+   *
+   * FLUXO COMPLETO (futuro):
+   *  1. User submete email
+   *  2. Backend gera reset_token (32 bytes hex), expira em 24h, salva no DB
+   *  3. Email enviado: "Clique aqui pra resetar: <link>?token=<X>"
+   *  4. User abre link → /reset-password/:token
+   *  5. Página valida token + permite definir nova senha
+   *  6. Backend valida token + atualiza passwordHash + invalida token
+   *
+   * ATÉ LÁ:
+   *  - User submete pedido
+   *  - Admin vê notificação no log do servidor
+   *  - Admin manualmente atualiza senha do user via DB ou painel admin
+   *  - Admin avisa user (whatsapp/etc) com a senha temporária
+   */
+  app.post('/api/auth/forgot-password', forgotPasswordLimiter, async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body as { email: string };
+      if (!email || typeof email !== 'string') {
+        res.status(400).json({ error: 'Email obrigatório' });
+        return;
+      }
+      // Limpa email pra logging (não confia no input do user)
+      const cleanEmail = email.trim().toLowerCase().slice(0, 200);
+
+      // Tenta achar o user — se não existir, comportamento idêntico (anti-enum)
+      const user = await getUserByEmail(cleanEmail);
+      if (user) {
+        // TODO: substituir por email service real quando plugar
+        // const token = randomBytes(32).toString('hex');
+        // await savePasswordResetToken(user.id, token, expiresAt);
+        // await sendPasswordResetEmail(user.email, token);
+        console.log(`[Auth] Reset pedido pra user ${user.id} (${cleanEmail}) — processar manualmente`);
+      } else {
+        console.log(`[Auth] Reset pedido pra email não encontrado (${cleanEmail}) — ignorar`);
+      }
+
+      // Resposta sempre igual pra não vazar enumeração
+      res.json({
+        success: true,
+        message: 'Se o email existir, em alguns minutos chegará um link de redefinição.',
+      });
+    } catch (error) {
+      console.error('[Auth] forgot-password failed', error);
+      res.status(500).json({ error: 'Falha ao processar pedido' });
     }
   });
 
