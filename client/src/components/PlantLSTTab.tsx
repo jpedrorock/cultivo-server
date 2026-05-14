@@ -304,7 +304,7 @@ export default function PlantLSTTab({ plantId }: PlantLSTTabProps) {
               id="response"
               value={response}
               onChange={(e) => setResponse(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+              className="w-full px-3 py-2 border rounded-lg bg-background text-sm"
             >
               <option value="">Selecione...</option>
               <option value="Excelente">Excelente</option>

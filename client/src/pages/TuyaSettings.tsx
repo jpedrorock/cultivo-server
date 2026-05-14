@@ -159,7 +159,7 @@ export default function TuyaSettings() {
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                     tab === t ? 'bg-card shadow text-foreground' : 'text-muted-foreground'
                   }`}
                 >

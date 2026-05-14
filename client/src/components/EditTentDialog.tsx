@@ -212,7 +212,7 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
             </div>
 
             {width && depth && height && (
-              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
                 <strong>Volume calculado:</strong> {((parseInt(width) * parseInt(depth) * parseInt(height)) / 1000).toFixed(3)} litros
               </div>
             )}

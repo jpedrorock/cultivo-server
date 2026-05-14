@@ -274,19 +274,19 @@ export default function HarvestQueue() {
                   Ciclo Perpétuo
                 </p>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-                  <span className="px-2 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                  <span className="px-2 py-1 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
                     Flora colhida
                   </span>
                   <ArrowRight className="w-3 h-3 shrink-0" />
-                  <span className="px-2 py-1 rounded-md bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-medium">
+                  <span className="px-2 py-1 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-medium">
                     Aguardando Secagem
                   </span>
                   <ArrowRight className="w-3 h-3 shrink-0" />
-                  <span className="px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium">
+                  <span className="px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium">
                     Flora recebe Vega
                   </span>
                   <ArrowRight className="w-3 h-3 shrink-0" />
-                  <span className="px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-medium">
+                  <span className="px-2 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-medium">
                     Vega vira Secagem
                   </span>
                 </div>

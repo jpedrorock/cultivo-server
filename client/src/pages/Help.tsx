@@ -282,7 +282,7 @@ function HubView() {
   return (
     <div className="space-y-8">
       {/* Hero */}
-      <div className="relative rounded-3xl overflow-hidden border border-primary/20 bg-gradient-to-br from-primary/10 via-emerald-500/5 to-transparent p-6 sm:p-8">
+      <div className="relative rounded-2xl overflow-hidden border border-primary/20 bg-gradient-to-br from-primary/10 via-emerald-500/5 to-transparent p-6 sm:p-8">
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/10 blur-3xl rounded-full pointer-events-none" />
         <div className="relative">
           <p className="text-xs uppercase tracking-[0.2em] text-primary/70 font-semibold mb-2">
@@ -1040,7 +1040,7 @@ function DetailLayout({
     <div className="space-y-6">
       {/* Hero da categoria */}
       <div
-        className={`relative rounded-3xl overflow-hidden border ${category.color.border} p-6`}
+        className={`relative rounded-2xl overflow-hidden border ${category.color.border} p-6`}
         style={{
           background: `linear-gradient(150deg, ${category.color.glow} 0%, var(--card) 65%)`,
         }}

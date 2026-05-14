@@ -374,7 +374,7 @@ export default function PlantsList() {
                   )}
                 </div>
                 <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
                   value={filterStatus || ""}
                   onChange={(e) => setFilterStatus(e.target.value as any || undefined)}
                 >
@@ -386,7 +386,7 @@ export default function PlantsList() {
                   <option value="DISCARDED">Descartada</option>
                 </select>
                 <select
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm sm:col-span-2"
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 text-sm sm:col-span-2"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
                 >
@@ -867,7 +867,7 @@ export default function PlantsList() {
               <Label htmlFor="targetTent">Estufa de Destino</Label>
               <select
                 id="targetTent"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                 value={dialog?.type === 'movePlant' ? (dialog.targetTentId ?? '') : ''}
                 onChange={(e) => {
                   if (dialog?.type !== 'movePlant') return;

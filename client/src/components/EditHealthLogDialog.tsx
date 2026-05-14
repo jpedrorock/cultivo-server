@@ -163,7 +163,7 @@ export default function EditHealthLogDialog({
               id="edit-status"
               value={healthStatus}
               onChange={(e) => setHealthStatus(e.target.value as any)}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="HEALTHY">● Saudável</option>
               <option value="STRESSED">● Estressada</option>

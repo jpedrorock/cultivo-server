@@ -35,7 +35,7 @@ export const PlantCardSkeleton: React.FC = () => {
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s ease-in-out infinite"
               }} />
-              <div className="h-5 w-16 bg-muted rounded-md animate-pulse" style={{
+              <div className="h-5 w-16 bg-muted rounded-lg animate-pulse" style={{
                 background: `linear-gradient(
                   90deg,
                   var(--muted) 0%,
@@ -61,7 +61,7 @@ export const PlantCardSkeleton: React.FC = () => {
           </div>
           
           {/* Status badge */}
-          <div className="h-6 w-20 bg-muted rounded-md animate-pulse" style={{
+          <div className="h-6 w-20 bg-muted rounded-lg animate-pulse" style={{
             background: `linear-gradient(
               90deg,
               var(--muted) 0%,
@@ -91,7 +91,7 @@ export const PlantCardSkeleton: React.FC = () => {
         
         {/* Indicators */}
         <div className="flex flex-wrap gap-2">
-          <div className="h-6 w-28 bg-muted rounded-md animate-pulse" style={{
+          <div className="h-6 w-28 bg-muted rounded-lg animate-pulse" style={{
             background: `linear-gradient(
               90deg,
               var(--muted) 0%,
@@ -101,7 +101,7 @@ export const PlantCardSkeleton: React.FC = () => {
             backgroundSize: "200% 100%",
             animation: "shimmer 1.5s ease-in-out infinite"
           }} />
-          <div className="h-6 w-24 bg-muted rounded-md animate-pulse" style={{
+          <div className="h-6 w-24 bg-muted rounded-lg animate-pulse" style={{
             background: `linear-gradient(
               90deg,
               var(--muted) 0%,

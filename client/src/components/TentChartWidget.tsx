@@ -178,7 +178,7 @@ export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWi
       <div className="mb-3 flex items-center gap-2">
         <button
           onClick={() => setSelectedParam("all")}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
             selectedParam === "all"
               ? "bg-primary text-primary-foreground"
               : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -194,7 +194,7 @@ export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWi
               <button
                 key={key}
                 onClick={() => setSelectedParam(key as Parameter)}
-                className={`p-1.5 rounded-md transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors ${
                   selectedParam === key
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"

@@ -150,7 +150,7 @@ export default function AlertHistory() {
               <CardContent>
                 <p className="text-sm text-muted-foreground">{alert.message}</p>
                 {alert.metadata && (
-                  <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                  <div className="mt-3 p-3 bg-muted/50 rounded-lg">
                     <p className="text-xs font-mono text-muted-foreground">
                       {JSON.stringify(alert.metadata, null, 2)}
                     </p>

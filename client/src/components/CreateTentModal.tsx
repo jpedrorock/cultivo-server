@@ -190,7 +190,7 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
 
             {/* Info calculada */}
             {formData.width && formData.depth && formData.height && (
-              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
                 <strong>Volume calculado:</strong>{" "}
                 {((parseInt(formData.width) * parseInt(formData.depth) * parseInt(formData.height)) / 1000).toFixed(1)} litros
               </div>
