@@ -12,6 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { EmptyState } from "@/components/EmptyState";
 
 // Haptic feedback helper
 const triggerHapticFeedback = () => {
@@ -395,7 +396,17 @@ export function BottomNav() {
                   </SheetTitle>
                 </SheetHeader>
                 {activePlants.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma planta ativa encontrada</p>
+                  <EmptyState
+                    variant="compact"
+                    icon={Leaf}
+                    title="Nenhuma planta ativa"
+                    description="Crie uma planta numa estufa pra usar técnicas de treinamento."
+                    action={{
+                      label: "Adicionar planta",
+                      href: "/plants/new",
+                      onClick: () => { setTrainingPickerOpen(false); },
+                    }}
+                  />
                 ) : (
                   <div className="space-y-2 max-h-72 overflow-y-auto pb-2">
                     {activePlants.map((plant: any) => (
@@ -457,7 +468,17 @@ export function BottomNav() {
 
                 {activePlants.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">Nenhuma planta ativa encontrada</p>
+                    <EmptyState
+                      variant="compact"
+                      icon={Bot}
+                      title="Nenhuma planta pra conversar"
+                      description="Crie uma planta primeiro pra a IA ter contexto sobre fase, ambiente e saúde."
+                      action={{
+                        label: "Adicionar planta",
+                        href: "/plants/new",
+                        onClick: () => { setChatPickerOpen(false); },
+                      }}
+                    />
                   </div>
                 ) : (
                   <div className="flex-1 overflow-y-auto -mx-1 px-1">

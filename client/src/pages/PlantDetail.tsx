@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -161,16 +162,15 @@ export default function PlantDetail() {
 
   if (!plant) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-medium text-foreground mb-2">Planta não encontrada</p>
-          <Button variant="outline" asChild>
-            <Link href="/plants">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Link>
-          </Button>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <EmptyState
+          icon={Sprout}
+          title="Planta não encontrada"
+          description="Esta planta pode ter sido excluída ou movida pra lixeira. Volte pra ver as plantas ativas."
+          action={{ label: "Ver minhas plantas", href: "/plants", variant: "outline" }}
+          accent="neutral"
+          className="w-full max-w-md"
+        />
       </div>
     );
   }
