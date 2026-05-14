@@ -422,27 +422,31 @@ export default function Home() {
                   Registro Rápido
                 </Button>
               </Link>
+              {/* Botão de pausar/retomar sistema — visualmente assimétrico:
+                  - ATIVO (caso comum): ícone discreto, sem texto, sem
+                    animação. Não compete com outros elementos da UI.
+                  - PAUSADO (excepcional): pill completa amber com texto
+                    "Sistema Pausado". Demanda atenção pq estado anormal.
+                  Mesma ação de toggle nos dois casos.
+                  Antes: pulsava 24/7 com bola verde "Sistema Ativo" — noise
+                  permanente pra info redundante. */}
               <button
                 onClick={() => toggleSystemPaused.mutate()}
                 disabled={toggleSystemPaused.isPending}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 ${
-                  systemPaused
-                    ? "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                    : "border-primary/40 bg-primary/5 text-primary"
-                }`}
-                title={systemPaused ? "Sistema pausado — clique para retomar" : "Sistema ativo — clique para pausar"}
+                className={
+                  systemPaused || toggleSystemPaused.isPending
+                    ? "flex items-center gap-2 px-3 py-1.5 rounded-full border border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+                    : "flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                }
+                title={systemPaused ? "Sistema pausado — clique para retomar" : "Pausar alertas"}
+                aria-label={systemPaused ? "Retomar sistema" : "Pausar sistema"}
               >
                 {toggleSystemPaused.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
-                ) : systemPaused ? (
-                  <PauseCircle className="w-4 h-4" />
                 ) : (
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-                  </span>
+                  <PauseCircle className="w-4 h-4" />
                 )}
-                {systemPaused ? "Sistema Pausado" : "Sistema Ativo"}
+                {systemPaused && "Sistema Pausado"}
               </button>
             </div>
           </div>
