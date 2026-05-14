@@ -365,7 +365,11 @@ function Step1Tent({
             ))}
           </div>
           <p className="text-xs text-muted-foreground/70">
-            Volume calculado automaticamente. Usado pra cálculo de PPFD ideal.
+            Volume calculado automaticamente.{" "}
+            <span title="PPFD = intensidade de luz em µmol/m²/s. O app calcula o ideal pela área da estufa.">
+              Usado pra calcular o PPFD ideal
+            </span>
+            <span className="text-muted-foreground/50"> (intensidade de luz).</span>
           </p>
         </div>
       </div>
@@ -421,8 +425,8 @@ function Step2Strain({
         </div>
         <h1 className="text-2xl font-bold">Cadastre uma strain</h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Strain é a variedade genética. Toca em uma das famosas pra preencher tempos
-          automáticos, ou digita o nome da sua.
+          Strain é a variedade genética. Selecione uma das populares pra preencher tempos
+          automaticamente, ou customize abaixo.
         </p>
       </div>
 
@@ -666,9 +670,9 @@ function DoneView({ onFinish }: { onFinish: () => void }) {
         <Check className="w-10 h-10 text-primary" />
       </div>
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Tudo pronto! 🌱</h1>
+        <h1 className="text-2xl font-bold">Tudo pronto</h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Sua estufa, strain e primeira planta estão configuradas. Agora é começar a registrar
+          Sua estufa, strain e primeira planta estão configuradas. Agora é só começar a registrar
           dados diários pelo botão <strong>+</strong> da navegação.
         </p>
       </div>
@@ -681,19 +685,19 @@ function DoneView({ onFinish }: { onFinish: () => void }) {
             <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
               1
             </span>
-            <span>Inicia um ciclo na estufa pra começar contagem de semanas</span>
+            <span>Inicie um ciclo na estufa pra começar a contagem de semanas</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
               2
             </span>
-            <span>Faz primeiro registro com botão + → Status da estufa</span>
+            <span>Faça o primeiro registro pelo botão + → Status da estufa</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
               3
             </span>
-            <span>(Opcional) Conecta SmartLife pra leituras automáticas de sensores</span>
+            <span>(Opcional) Conecte o SmartLife pra leituras automáticas de sensores</span>
           </div>
         </div>
       </div>
