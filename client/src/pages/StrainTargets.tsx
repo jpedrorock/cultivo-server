@@ -26,6 +26,7 @@ import {
   Flower2,
   Scissors,
   Copy,
+  Sprout,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/PageTransition";
@@ -497,6 +498,39 @@ export default function StrainTargets() {
               </div>
             );
           })()}
+
+          {/* Banner explicativo quando a strain ainda nao tem targets customizados.
+              Targets nao sao bloqueadores — sistema usa defaults internos pra calcular
+              alerts e overlays em graficos. Mas o user pode customizar pra resultados
+              mais precisos. Banner some assim que user salva pelo menos 1 target. */}
+          {targets.length === 0 && (
+            <div className="rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/8 to-transparent p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
+                  <Sprout className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground mb-1">
+                    Targets ainda não configurados
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    O sistema usa <strong>valores padrão</strong> enquanto isso — alertas e
+                    overlays nos gráficos funcionam normalmente. Personalize abaixo pra
+                    refletir o ambiente ideal específico desta strain.
+                  </p>
+                </div>
+              </div>
+              {allStrains.filter((s: any) => s.id !== strainId).length > 0 && (
+                <button
+                  onClick={() => setCopyDialogOpen(true)}
+                  className="w-full text-xs font-medium text-primary hover:text-primary/90 bg-primary/8 hover:bg-primary/12 border border-primary/20 rounded-lg px-3 py-2 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copiar de outra strain (atalho)
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Week cards */}
           {Array.from({ length: weekCount }, (_, i) => i + 1).map((week) =>

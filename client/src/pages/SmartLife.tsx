@@ -37,6 +37,52 @@ const POLL_OPTIONS: { value: PollInterval; label: string; sub: string }[] = [
   { value: 720, label: '2× ao dia',      sub: 'manhã e noite' },
 ];
 
+// ─── Empty state compartilhado quando Tuya não está configurado ──────────────
+//
+// Antes cada tab tinha sua própria mensagem genérica sem CTA. Agora todas
+// chamam esse componente que tem:
+//   1. Ícone visual
+//   2. Texto curto explicando o que é + opcionalidade
+//   3. Botão "Configurar agora" → onConfigureClick (vai pra aba Config)
+//   4. Link "Como funciona?" → /help/smartlife (detalhes na seção do guia)
+function NotConfiguredCard({
+  icon: Icon,
+  message,
+  onConfigureClick,
+}: {
+  icon: React.ElementType;
+  message: string;
+  onConfigureClick: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-6 gap-5 text-center max-w-md mx-auto">
+      <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+        <Icon className="w-8 h-8 text-cyan-400" />
+      </div>
+      <div className="space-y-1.5">
+        <h3 className="text-base font-semibold text-foreground">Conecte sua conta SmartLife</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{message}</p>
+        <p className="text-xs text-muted-foreground/70 leading-relaxed">
+          É <strong>opcional</strong> — o app funciona sem isso, mas sensores e controles
+          automáticos só aparecem com a integração ativa.
+        </p>
+      </div>
+      <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+        <Button onClick={onConfigureClick} size="lg" className="w-full sm:w-auto">
+          <Settings className="w-4 h-4 mr-1.5" />
+          Configurar agora
+        </Button>
+        <a
+          href="/help/smartlife"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-2"
+        >
+          Como funciona? →
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ─── CredentialField ──────────────────────────────────────────────────────────
 
 function CredentialField({ label, value, onChange, placeholder, mono, secret }: {
@@ -321,7 +367,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
 
 // ─── SensoresTab ──────────────────────────────────────────────────────────────
 
-function SensoresTab() {
+function SensoresTab({ onConfigureClick }: { onConfigureClick: () => void }) {
   const [mappings, setMappings] = useState<Record<number, { deviceId: string; deviceName: string; enabled: boolean }>>({});
   const [openPicker, setOpenPicker] = useState<number | null>(null);
   const [manualDraft, setManualDraft] = useState<Record<number, { deviceId: string; deviceName: string }>>({});
@@ -387,13 +433,11 @@ function SensoresTab() {
 
   if (!config) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center px-6">
-        <WifiOff className="w-12 h-12 text-muted-foreground/30" />
-        <div>
-          <p className="font-medium text-foreground">API não configurada</p>
-          <p className="text-sm text-muted-foreground mt-1">Configure as credenciais Tuya primeiro</p>
-        </div>
-      </div>
+      <NotConfiguredCard
+        icon={WifiOff}
+        message="Cadastre suas credenciais Tuya/SmartLife pra ver sensores ambientais (temp, RH, pH, EC) automaticamente no painel."
+        onConfigureClick={onConfigureClick}
+      />
     );
   }
 
@@ -723,7 +767,7 @@ function DeviceToggle({ mapping, onRemove }: { mapping: DeviceMapping; onRemove:
 
 // ─── DevicesTab ───────────────────────────────────────────────────────────────
 
-function DevicesTab() {
+function DevicesTab({ onConfigureClick }: { onConfigureClick: () => void }) {
   // modal state: null = fechado | 'tent' = escolher estufa | 'device' = escolher dispositivo
   const [modalStep, setModalStep] = useState<null | 'tent' | 'device'>(null);
   const [addingTentId, setAddingTentId] = useState<number | null>(null);
@@ -788,13 +832,11 @@ function DevicesTab() {
 
   if (!config) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center px-6">
-        <Power className="w-12 h-12 text-muted-foreground/30" />
-        <div>
-          <p className="font-medium text-foreground">API não configurada</p>
-          <p className="text-sm text-muted-foreground mt-1">Configure suas credenciais Tuya primeiro</p>
-        </div>
-      </div>
+      <NotConfiguredCard
+        icon={Power}
+        message="Conecte SmartLife pra controlar lâmpadas, ventiladores e outros dispositivos direto do app."
+        onConfigureClick={onConfigureClick}
+      />
     );
   }
 
@@ -1265,7 +1307,7 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
   );
 }
 
-function ScenesTab() {
+function ScenesTab({ onConfigureClick }: { onConfigureClick: () => void }) {
   const [triggeringId, setTriggeringId] = useState<string | null>(null);
   const [view, setView] = useState<'mine' | 'import'>('mine');
   const [expandedHomes, setExpandedHomes] = useState<Set<string>>(new Set());
@@ -1330,13 +1372,11 @@ function ScenesTab() {
 
   if (!config) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center px-6">
-        <Zap className="w-12 h-12 text-muted-foreground/30" />
-        <div>
-          <p className="font-medium text-foreground">API não configurada</p>
-          <p className="text-sm text-muted-foreground mt-1">Configure suas credenciais Tuya primeiro</p>
-        </div>
-      </div>
+      <NotConfiguredCard
+        icon={Zap}
+        message="Conecte SmartLife pra disparar cenas (Tap-to-Run) do seu app, como 'Modo rega' ou 'Apagar tudo'."
+        onConfigureClick={onConfigureClick}
+      />
     );
   }
 
@@ -1651,9 +1691,9 @@ export default function SmartLife() {
         >
           <AnimatePresence mode="wait" initial={false}>
             <TabContent key={tab}>
-              {tab === 'devices' && <DevicesTab />}
-              {tab === 'scenes'  && <ScenesTab />}
-              {tab === 'sensors' && <SensoresTab />}
+              {tab === 'devices' && <DevicesTab onConfigureClick={() => setTab('config')} />}
+              {tab === 'scenes'  && <ScenesTab onConfigureClick={() => setTab('config')} />}
+              {tab === 'sensors' && <SensoresTab onConfigureClick={() => setTab('config')} />}
               {tab === 'config'  && <ConfigTab onSaved={() => setTab('sensors')} />}
             </TabContent>
           </AnimatePresence>

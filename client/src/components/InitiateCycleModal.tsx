@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Sprout, Flower2, Scissors, Wrench, ChevronLeft, ChevronRight, Leaf } from "lucide-react";
+import { Sprout, Flower2, Scissors, Wrench, ChevronLeft, ChevronRight, Leaf, AlertTriangle } from "lucide-react";
+import { Link } from "wouter";
 
 interface InitiateCycleModalProps {
   open: boolean;
@@ -89,6 +90,14 @@ export function InitiateCycleModal({
 
   const utils = trpc.useUtils();
   const { data: strains } = trpc.strains.list.useQuery();
+  // Plantas dessa estufa pra avisar user se estiver vazia. Ciclo sem plantas
+  // funciona tecnicamente (tarefas sao geradas), mas o user provavelmente
+  // esqueceu de adicionar plantas. Aviso nao-bloqueador no topo do modal.
+  const { data: plantsInTent } = trpc.plants.list.useQuery(
+    { tentId, status: "ACTIVE" },
+    { enabled: open, staleTime: 30_000 }
+  );
+  const hasNoPlants = open && plantsInTent && plantsInTent.length === 0;
   const initiate = trpc.cycles.initiate.useMutation({
     onSuccess: () => {
       toast.success("Ciclo iniciado com sucesso!");
@@ -152,6 +161,29 @@ export function InitiateCycleModal({
 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-5 space-y-6">
+
+            {/* Aviso de estufa sem plantas — ciclo cria ok, mas user provavelmente esqueceu.
+                Não bloqueia (alguns workflows são válidos: setup ciclo antes da clonagem),
+                mas deixa claro. */}
+            {hasNoPlants && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-3 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex-1 text-sm space-y-2">
+                  <p className="text-amber-100/95 leading-relaxed">
+                    Esta estufa ainda não tem plantas ativas. O ciclo vai iniciar normalmente,
+                    mas as tarefas semanais só fazem sentido com plantas cadastradas.
+                  </p>
+                  <Link href={`/tent/${tentId}?tab=plantas`}>
+                    <a
+                      onClick={() => onOpenChange(false)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2"
+                    >
+                      Adicionar plantas primeiro →
+                    </a>
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Seletor de fase — cards clicáveis */}
             <div className="space-y-2">
