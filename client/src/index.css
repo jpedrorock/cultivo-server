@@ -40,6 +40,37 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ─── Phase semantic tokens ─────────────────────────────────────────────
+   * Cores semânticas das fases de cultivo. Use SEMPRE essas em vez de
+   * cores arbitrárias (`amber-500`, `#fbbf24`, etc) pra garantir
+   * consistência cross-app.
+   *
+   * Tailwind v4: declaração no @theme gera utilities automaticamente:
+   *   bg-phase-vega, text-phase-flora, border-phase-drying/30, etc.
+   *
+   * Antes: mesma "secagem" usava 3 cores diferentes (yellow-800, #fbbf24,
+   * orange-500, amber-500) em arquivos diferentes.
+   *
+   * Cada token tem variante light (sólida pra texto/border) e dark
+   * (vivenciada via :root vs .dark).
+   * ─────────────────────────────────────────────────────────────────── */
+  --color-phase-vega:        oklch(0.55 0.18 145);   /* verde — crescimento */
+  --color-phase-flora:       oklch(0.58 0.20 305);   /* violeta — produção */
+  --color-phase-drying:      oklch(0.70 0.16 75);    /* amber — pós-colheita */
+  --color-phase-maintenance: oklch(0.58 0.17 245);   /* azul — mães/clones */
+  --color-phase-cloning:     oklch(0.65 0.13 195);   /* teal — clonagem */
+
+  /* ─── Semantic state tokens ─────────────────────────────────────────────
+   * Aliases pra estados (success/warning/info/danger). Compartilham cor
+   * com as fases pra coerência (success=vega, warning=drying, info=maint).
+   *
+   * Use bg-state-success/10, text-state-warning, etc.
+   * ─────────────────────────────────────────────────────────────────── */
+  --color-state-success:  oklch(0.55 0.18 145);
+  --color-state-warning:  oklch(0.70 0.16 75);
+  --color-state-info:     oklch(0.58 0.17 245);
+  --color-state-danger:   oklch(0.55 0.20 27);
 }
 
 :root {
@@ -440,6 +471,21 @@ html.aurora .kpi-ppfd {
   --phase-drying:     #e0a32e;
   --phase-curing:     #b07e3a;
   --phase-maintenance:#93c5fd;
+
+  /* ─── Phase semantic tokens override pra dark mode ─────────────────────
+   * Versão mais vibrante porque fundo escuro absorve cor.
+   * Override dos tokens definidos no @theme inline pra :root (light).
+   * ─────────────────────────────────────────────────────────────────── */
+  --color-phase-vega:        oklch(0.68 0.20 145);
+  --color-phase-flora:       oklch(0.68 0.22 305);
+  --color-phase-drying:      oklch(0.78 0.16 75);
+  --color-phase-maintenance: oklch(0.70 0.17 245);
+  --color-phase-cloning:     oklch(0.75 0.13 195);
+
+  --color-state-success:  oklch(0.68 0.20 145);
+  --color-state-warning:  oklch(0.78 0.16 75);
+  --color-state-info:     oklch(0.70 0.17 245);
+  --color-state-danger:   oklch(0.65 0.22 27);
 }
 
 .forest {
