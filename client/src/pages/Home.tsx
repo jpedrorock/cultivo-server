@@ -535,16 +535,19 @@ export default function Home() {
           </StaggerList>
         )}
 
-        {/* Botão nova estufa — abaixo dos cards em todas as telas (só quando já há estufas) */}
+        {/* Botão nova estufa — abaixo dos cards em todas as telas (só quando já há estufas).
+            Usa Button variant=outline com override pra dashed border (estilo "add new" típico). */}
         {!isLoading && tents && tents.length > 0 && (
-          <button
+          <Button
             onClick={() => setCreateTentModalOpen(true)}
-            className="w-full mt-4 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200 py-4"
+            variant="outline"
+            size="lg"
+            className="w-full mt-4 border-2 border-dashed text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary py-7"
             data-tour="create-tent-button"
           >
             <Sprout className="w-5 h-5" />
-            <span className="text-sm font-medium">Nova Estufa</span>
-          </button>
+            Nova Estufa
+          </Button>
         )}
 
 
