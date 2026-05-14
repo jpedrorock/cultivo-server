@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -168,20 +169,11 @@ export default function HarvestQueue() {
 
         {/* Empty state */}
         {plantCount === 0 && (
-          <Card className="border-dashed border-2 border-muted">
-            <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
-              <PackageOpen className="w-12 h-12 text-muted-foreground/40" />
-              <div className="text-center">
-                <p className="font-medium text-muted-foreground">
-                  Nenhuma planta aguardando secagem
-                </p>
-                <p className="text-sm text-muted-foreground/70 mt-1">
-                  Quando você colher plantas de uma estufa em Floração, elas
-                  aparecerão aqui.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={PackageOpen}
+            title="Nenhuma planta aguardando secagem"
+            description="Quando você colher plantas de uma estufa em Floração, elas aparecerão aqui pra organizar a transferência pra estufa de secagem."
+          />
         )}
 
         {/* Plantas na fila */}
