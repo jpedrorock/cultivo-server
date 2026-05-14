@@ -22,6 +22,7 @@ import {
   ClipboardList,
   Clock,
   Droplets,
+  Flame,
   Flower2,
   Leaf,
   Monitor,
@@ -291,10 +292,12 @@ export function TentCard({
                   </span>
                 );
               })()}
-              {/* Streak badge */}
+              {/* Streak badge — Flame em vez de Leaf, amber em vez de verde:
+                  - convenção visual de "streak = fogo/calor" (Duolingo, Snapchat, etc)
+                  - desafoga o verde da marca de uso decorativo */}
               {streak && streak.current > 0 && (
                 <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'pill-streak-done' : 'pill-streak-pending'}`}>
-                  <Leaf className="w-2.5 h-2.5" />{streak.current}d
+                  <Flame className="w-2.5 h-2.5" />{streak.current}d
                 </span>
               )}
             </div>
