@@ -498,7 +498,7 @@ export function IrrigationScheduleCalculator() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Configuração da Bomba</p>
-            <p className="text-[11px] text-muted-foreground">Vazão, saídas e ciclos</p>
+            <p className="text-xs text-muted-foreground">Vazão, saídas e ciclos</p>
           </div>
         </div>
         <div className="p-4 space-y-4">
@@ -574,12 +574,12 @@ export function IrrigationScheduleCalculator() {
           {/* Lista de presets */}
           {presetsList.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Bombas salvas</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bombas salvas</p>
               {presetsList.map((preset: any) => (
                 <div key={preset.id} className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/30 transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{preset.name}</p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {parseFloat(preset.totalFlowMlPerMin).toFixed(0)} ml/min · {preset.numOutlets} saídas · máx {parseFloat(preset.maxRuntimeMin).toFixed(1)} min · descanso {parseFloat(preset.restTimeBetweenCyclesMin).toFixed(0)} min
                     </p>
                   </div>
@@ -603,7 +603,7 @@ export function IrrigationScheduleCalculator() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Configuração da Planta</p>
-            <p className="text-[11px] text-muted-foreground">Vaso, fase e volume alvo</p>
+            <p className="text-xs text-muted-foreground">Vaso, fase e volume alvo</p>
           </div>
         </div>
         <div className="p-4 space-y-4">
@@ -705,7 +705,7 @@ export function IrrigationScheduleCalculator() {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Janela de Luz</p>
-              <p className="text-[11px] text-muted-foreground">Fotoperíodo e horários</p>
+              <p className="text-xs text-muted-foreground">Fotoperíodo e horários</p>
             </div>
           </div>
           {/* Toggle modo */}
@@ -837,7 +837,7 @@ export function IrrigationScheduleCalculator() {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Cronograma de Rega</p>
-              <p className="text-[11px] text-muted-foreground">Resultado calculado</p>
+              <p className="text-xs text-muted-foreground">Resultado calculado</p>
             </div>
           </div>
           <div className="p-4 space-y-5">
@@ -866,8 +866,8 @@ export function IrrigationScheduleCalculator() {
               ].map((stat) => (
                 <div key={stat.label} className="p-2.5 rounded-xl bg-muted/30 border border-border/40 text-center">
                   <p className="text-base font-black text-cyan-300 leading-tight" style={{ textShadow: '0 0 10px rgba(34,211,238,0.4)' }}>{stat.value}</p>
-                  {stat.sub && <p className="text-[10px] text-muted-foreground leading-tight">{stat.sub}</p>}
-                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{stat.label}</p>
+                  {stat.sub && <p className="text-xs text-muted-foreground leading-tight">{stat.sub}</p>}
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -925,7 +925,7 @@ export function IrrigationScheduleCalculator() {
                               className={`flex items-center justify-between px-3 py-2 ${sidx % 2 === 0 ? "bg-background/60" : "bg-muted/10"}`}
                             >
                               <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} shrink-0`}>
+                                <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} shrink-0`}>
                                   #{sub.subNumber}
                                 </span>
                                 <span className="font-mono font-bold text-foreground">{sub.startTimeFormatted}</span>
@@ -942,10 +942,10 @@ export function IrrigationScheduleCalculator() {
                           ))}
                           {/* Linha de total da sessão */}
                           <div className={`flex items-center justify-between px-3 py-1.5 ${c.bg}`}>
-                            <span className={`text-[11px] font-semibold ${c.text}`}>
+                            <span className={`text-xs font-semibold ${c.text}`}>
                               Total sessão: ~{master.totalSessionMinutes.toFixed(0)} min
                             </span>
-                            <span className={`text-[11px] font-bold ${c.text}`}>
+                            <span className={`text-xs font-bold ${c.text}`}>
                               {master.totalMlPerPlant} ml/planta
                             </span>
                           </div>

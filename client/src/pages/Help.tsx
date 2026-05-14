@@ -190,7 +190,7 @@ function ImagePlaceholder({
       style={{ aspectRatio: `${width} / ${height}` }}
     >
       <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/50 font-mono">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground/50 font-mono">
         {width} × {height}
       </div>
       <div className="text-xs text-muted-foreground/70 max-w-[80%]">{caption}</div>
@@ -332,11 +332,11 @@ function HubView() {
                       <h3 className="text-sm font-semibold text-foreground leading-snug mb-1">
                         {cat.title}
                       </h3>
-                      <p className="text-[11px] text-muted-foreground/80 leading-relaxed line-clamp-2">
+                      <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
                         {cat.subtitle}
                       </p>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground/60">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" /> {cat.estimatedMin} min
                       </span>
@@ -364,12 +364,12 @@ function HubView() {
             >
               <div className="aspect-video rounded-xl bg-muted/30 border border-dashed border-border/40 flex flex-col items-center justify-center text-muted-foreground/50 gap-1">
                 <Play className="w-6 h-6" />
-                <span className="text-[10px] font-mono">Em breve</span>
+                <span className="text-xs font-mono">Em breve</span>
               </div>
               <div>
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   {v.title}
-                  <span className="text-[10px] text-muted-foreground/60 bg-muted/30 px-1.5 py-0.5 rounded">
+                  <span className="text-xs text-muted-foreground/60 bg-muted/30 px-1.5 py-0.5 rounded">
                     {v.durationLabel}
                   </span>
                 </h3>
@@ -1056,7 +1056,7 @@ function DetailLayout({
               {category.title}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">{category.subtitle}</p>
-            <div className="flex items-center gap-2 mt-3 text-[10px] text-muted-foreground/70">
+            <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground/70">
               <Clock className="w-3 h-3" />
               <span>{category.estimatedMin} min de leitura</span>
             </div>
@@ -1095,7 +1095,7 @@ function RelatedLinks({ current }: { current: string }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{cat.title}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{cat.subtitle}</p>
+                  <p className="text-xs text-muted-foreground truncate">{cat.subtitle}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:translate-x-0.5 transition-transform shrink-0" />
               </a>

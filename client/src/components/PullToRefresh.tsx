@@ -183,7 +183,7 @@ export function PullToRefresh({ children, onRefresh }: PullToRefreshProps) {
               {/* Label — appears when pill is wide enough */}
               {pillW > 80 && (
                 <span
-                  className="text-[11px] font-semibold whitespace-nowrap leading-none"
+                  className="text-xs font-semibold whitespace-nowrap leading-none"
                   style={{
                     color: phase === "success"
                       ? "#10b981"

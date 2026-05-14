@@ -57,7 +57,7 @@ export default function PlantQrDialog({ open, onOpenChange, plantId, plantName, 
           <div className="text-center">
             <p className="text-sm font-semibold text-foreground">{plantName}</p>
             {plantCode && <p className="text-xs text-muted-foreground">{plantCode}</p>}
-            <p className="text-[10px] text-muted-foreground/60 mt-1">/scan/plant/{plantId}</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">/scan/plant/{plantId}</p>
           </div>
         </div>
         <DialogFooter>

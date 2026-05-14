@@ -109,7 +109,7 @@ export default function PlantTimeline({ plantId }: Props) {
               {tab.icon}
               {tab.label}
               {tab.count > 0 && (
-                <span className={`text-[10px] px-1 rounded-full ${
+                <span className={`text-xs px-1 rounded-full ${
                   filter === tab.key ? "bg-white/20" : "bg-muted-foreground/20"
                 }`}>
                   {tab.count}

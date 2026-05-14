@@ -93,7 +93,7 @@ export default function AdminUsers() {
             >
               Aguardando
               {pendingUsers.length > 0 && (
-                <span className="bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="bg-amber-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
                   {pendingUsers.length}
                 </span>
               )}

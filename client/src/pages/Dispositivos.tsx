@@ -199,13 +199,13 @@ export default function Dispositivos() {
                     <p className="text-sm font-medium truncate">{t.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {t.tentName ?? `Estufa ${t.tentId}`}
-                      <span className="ml-1 px-1.5 py-0.5 rounded bg-muted font-mono text-[10px]">
+                      <span className="ml-1 px-1.5 py-0.5 rounded bg-muted font-mono text-xs">
                         ID: {t.tentId}
                       </span>{" "}
                       · criado{" "}
                       {format(new Date(t.createdAt), "dd MMM yyyy", { locale: ptBR })}
                     </p>
-                    <p className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                    <p className="text-xs font-mono text-muted-foreground mt-0.5">
                       {t.token.slice(0, 12)}…{t.token.slice(-4)}
                     </p>
                   </div>

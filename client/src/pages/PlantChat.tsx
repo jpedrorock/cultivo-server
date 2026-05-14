@@ -125,7 +125,7 @@ function ChatBubble({ msg }: { msg: Message }) {
         {!isUser && (
           <button
             onClick={handleCopy}
-            className="mt-1 ml-1 flex items-center gap-1 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors opacity-0 group-hover:opacity-100"
+            className="mt-1 ml-1 flex items-center gap-1 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors opacity-0 group-hover:opacity-100"
           >
             {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             {copied ? 'Copiado!' : 'Copiar'}
@@ -202,18 +202,18 @@ function PlantContextBar({
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-1.5">
             <p className="text-sm font-semibold text-foreground truncate">{plant.name}</p>
-            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/20">
+            <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/20">
               {stage}
             </span>
           </div>
-          <p className="text-[11px] text-emerald-600/70 dark:text-emerald-400/60 mt-0.5">
+          <p className="text-xs text-emerald-600/70 dark:text-emerald-400/60 mt-0.5">
             Contexto enviado automaticamente para a IA
           </p>
         </div>
 
         {/* Trocar */}
         <div className="shrink-0 flex items-center gap-1 text-emerald-600/60 dark:text-emerald-400/60">
-          <span className="text-[11px] font-medium">Trocar</span>
+          <span className="text-xs font-medium">Trocar</span>
           <ChevronRight className="w-3.5 h-3.5" />
         </div>
       </button>
@@ -231,7 +231,7 @@ function PlantContextBar({
       </div>
       <div className="flex-1 text-left">
         <p className="text-sm font-medium text-foreground">Selecionar planta</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">A IA receberá dados de ambiente, saúde e fase</p>
+        <p className="text-xs text-muted-foreground mt-0.5">A IA receberá dados de ambiente, saúde e fase</p>
       </div>
       <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
     </button>
@@ -321,7 +321,7 @@ function PlantGallerySheet({
                     </div>
                   )}
                   {photo.source === 'health' && (
-                    <span className="absolute bottom-1 left-1 text-[9px] px-1 py-0.5 rounded bg-amber-500/80 text-white font-medium">saúde</span>
+                    <span className="absolute bottom-1 left-1 text-xs px-1 py-0.5 rounded bg-amber-500/80 text-white font-medium">saúde</span>
                   )}
                 </button>
               ))}
@@ -446,7 +446,7 @@ function PlantPickerSheet({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-muted-foreground/40 shrink-0" />
                 </button>
@@ -474,10 +474,10 @@ function PlantPickerSheet({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}{p.strain?.name ? ` · ${p.strain.name}` : ''}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}{p.strain?.name ? ` · ${p.strain.name}` : ''}</p>
                     </div>
                     {isCurrent
-                      ? <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold">ATUAL</span>
+                      ? <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold">ATUAL</span>
                       : <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
                   </button>
                 );
@@ -699,7 +699,7 @@ export default function PlantChat() {
               return (
                 <span
                   title={`~${est.tokens.toLocaleString()} tokens nesta sessão`}
-                  className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground/60 border border-border/40 shrink-0 select-none"
+                  className="hidden sm:inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground/60 border border-border/40 shrink-0 select-none"
                 >
                   {formatCost(est.costUSD)}
                 </span>

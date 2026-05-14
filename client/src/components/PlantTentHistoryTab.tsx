@@ -59,7 +59,7 @@ export default function PlantTentHistoryTab({ plantId }: PlantTentHistoryTabProp
 
             <div className="rounded-2xl border border-border/40 bg-card px-4 py-3">
               {/* Date */}
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider mb-2">
+              <p className="text-xs text-muted-foreground/60 uppercase tracking-wider mb-2">
                 {new Date(entry.movedAt).toLocaleDateString("pt-BR", {
                   day: "2-digit",
                   month: "short",

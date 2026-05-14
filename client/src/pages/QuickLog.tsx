@@ -778,7 +778,7 @@ export default function QuickLog() {
                     <button
                       onClick={() => readNow.mutate({ tentId: tentId! })}
                       disabled={readNow.isPending}
-                      className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40"
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 transition-colors font-medium disabled:opacity-40"
                     >
                       {readNow.isPending ? '...' : 'Atualizar'}
                     </button>
@@ -1002,7 +1002,7 @@ export default function QuickLog() {
                     <div className="text-sm text-muted-foreground">Temperatura</div>
                     <div className="text-2xl font-semibold mono text-foreground flex items-center gap-1.5">
                       {tempC}°C
-                      {sensorReading?.isFresh && <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
+                      {sensorReading?.isFresh && <span className="text-xs font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
                     </div>
                   </div>
                 )}
@@ -1011,7 +1011,7 @@ export default function QuickLog() {
                     <div className="text-sm text-muted-foreground">Umidade</div>
                     <div className="text-2xl font-semibold mono text-foreground flex items-center gap-1.5">
                       {rhPct}%
-                      {sensorReading?.isFresh && <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
+                      {sensorReading?.isFresh && <span className="text-xs font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-1">AUTO</span>}
                     </div>
                   </div>
                 )}

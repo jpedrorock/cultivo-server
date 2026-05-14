@@ -537,7 +537,7 @@ export default function TentLog() {
                     <span className="text-xs text-muted-foreground">ml</span>
                   </div>
                   {runoffInvalid && (
-                    <p className="text-[10px] text-red-400 text-center font-medium">
+                    <p className="text-xs text-red-400 text-center font-medium">
                       Runoff maior que o volume regado
                     </p>
                   )}
@@ -554,7 +554,7 @@ export default function TentLog() {
                       {runoffInvalid ? 'inválido' : runoffPercentage ? "%" : "auto"}
                     </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground text-center">Ideal: 10–20%</p>
+                  <p className="text-xs text-muted-foreground text-center">Ideal: 10–20%</p>
                 </div>
               </div>
 

@@ -181,22 +181,22 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
         <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Como configurar</p>
 
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold text-foreground">① Access ID e Access Secret</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-xs font-semibold text-foreground">① Access ID e Access Secret</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
             <span className="font-mono text-foreground">iot.tuya.com</span> → Cloud → seu projeto → aba <strong>Overview</strong> → campo <strong>Access ID/Client ID</strong> e <strong>Access Secret</strong>
           </p>
         </div>
 
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold text-foreground">② Região</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-xs font-semibold text-foreground">② Região</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
             Veja no canto superior direito do portal. <strong>Western America</strong> = América · <strong>Western Europe</strong> = Europa · <strong>China</strong> = China
           </p>
         </div>
 
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold text-foreground">③ Vincular SmartLife (para sensores e dispositivos)</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
+          <p className="text-xs font-semibold text-foreground">③ Vincular SmartLife (para sensores e dispositivos)</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
             Aba <strong>Devices → Link App Account</strong> → clique em <strong>Add App Account</strong> → escaneie o QR code no SmartLife. Após vincular, o UID do usuário aparece na coluna <strong>UID</strong> e os Device IDs aparecem em <strong>All Devices</strong>.
           </p>
         </div>
@@ -251,7 +251,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
           </p>
 
           {/* Busca pelo UID SmartLife */}
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+          <p className="text-xs text-muted-foreground mb-1.5 font-medium">
             UID do usuário SmartLife{' '}
             <span className="font-normal text-muted-foreground/60">
               (API Explorer → Smart Home User Management → Query User List → campo <span className="font-mono">uid</span>)
@@ -293,7 +293,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
                   <Home className="w-4 h-4 text-muted-foreground/60 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{h.name}</p>
-                    <p className="text-[10px] font-mono text-muted-foreground">{h.homeId}</p>
+                    <p className="text-xs font-mono text-muted-foreground">{h.homeId}</p>
                   </div>
                   {homeId === h.homeId && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
                 </button>
@@ -302,7 +302,7 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
           )}
 
           {/* Home ID manual (fallback) */}
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+          <p className="text-xs text-muted-foreground mb-1.5 font-medium">
             Home ID <span className="font-normal text-muted-foreground/60">(preenchido automaticamente acima, ou insira manualmente)</span>
           </p>
           <input
@@ -490,12 +490,12 @@ function SensoresTab({ onConfigureClick }: { onConfigureClick: () => void }) {
                   <p className="text-sm font-semibold text-foreground">{tent.name}</p>
                   {m ? (
                     <>
-                      <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
                         <Wifi className="w-3 h-3 shrink-0 text-emerald-500" />
                         {m.deviceName}
                       </p>
                       {reading && (
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                           {reading.tempC != null && <span className="text-amber-500 font-medium">{reading.tempC.toFixed(1)}°C</span>}
                           {reading.rhPct != null && <span className="text-blue-500 font-medium">{reading.rhPct.toFixed(0)}%</span>}
                           <span className="text-muted-foreground/60">
@@ -505,7 +505,7 @@ function SensoresTab({ onConfigureClick }: { onConfigureClick: () => void }) {
                       )}
                     </>
                   ) : (
-                    <p className="text-[11px] text-muted-foreground italic">Sem sensor</p>
+                    <p className="text-xs text-muted-foreground italic">Sem sensor</p>
                   )}
                 </div>
                 {m && (
@@ -566,7 +566,7 @@ function SensoresTab({ onConfigureClick }: { onConfigureClick: () => void }) {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-foreground truncate">{dev.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
+                              <p className="text-xs text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
                             </div>
                             {selected && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
                           </button>
@@ -577,7 +577,7 @@ function SensoresTab({ onConfigureClick }: { onConfigureClick: () => void }) {
                   {useManualEntry && (
                     <div className="px-4 py-4 space-y-3">
                       <div>
-                        <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Device ID <span className="text-muted-foreground/60">(do portal iot.tuya.com)</span></p>
+                        <p className="text-xs text-muted-foreground mb-1.5 font-medium">Device ID <span className="text-muted-foreground/60">(do portal iot.tuya.com)</span></p>
                         <input
                           type="text"
                           value={draft.deviceId}
@@ -587,7 +587,7 @@ function SensoresTab({ onConfigureClick }: { onConfigureClick: () => void }) {
                         />
                       </div>
                       <div>
-                        <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Nome do sensor</p>
+                        <p className="text-xs text-muted-foreground mb-1.5 font-medium">Nome do sensor</p>
                         <input
                           type="text"
                           value={draft.deviceName}
@@ -711,7 +711,7 @@ function DeviceToggle({ mapping, onRemove }: { mapping: DeviceMapping; onRemove:
           className="w-full h-full flex flex-col items-center justify-center gap-1"
         >
           <Trash2 className="w-5 h-5 text-white" />
-          <span className="text-[10px] font-semibold text-white">Excluir</span>
+          <span className="text-xs font-semibold text-white">Excluir</span>
         </button>
       </div>
 
@@ -739,7 +739,7 @@ function DeviceToggle({ mapping, onRemove }: { mapping: DeviceMapping; onRemove:
         {/* Name + status */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{mapping.deviceName}</p>
-          <p className="text-[11px] text-muted-foreground/60">
+          <p className="text-xs text-muted-foreground/60">
             {isLoading ? 'Verificando...' : isOnline
               ? (status?.switchOn === null ? 'Online · sem controle' : isOn ? 'Ligado' : 'Desligado')
               : 'Offline'}
@@ -943,7 +943,7 @@ function DevicesTab({ onConfigureClick }: { onConfigureClick: () => void }) {
                       <span className={`w-2 h-2 rounded-full shrink-0 ${device.online ? 'bg-green-400' : 'bg-muted-foreground/30'}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{device.name}</p>
-                        <p className="text-[11px] text-muted-foreground/60">{device.online ? 'Online' : 'Offline'}</p>
+                        <p className="text-xs text-muted-foreground/60">{device.online ? 'Online' : 'Offline'}</p>
                       </div>
                       {saveDeviceMappings.isPending
                         ? <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
@@ -953,7 +953,7 @@ function DevicesTab({ onConfigureClick }: { onConfigureClick: () => void }) {
                 ) : (
                   /* Entrada manual */
                   <div className="px-5 py-5 space-y-3">
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       Cole o <strong>Device ID</strong> do portal{' '}
                       <span className="font-mono text-foreground">iot.tuya.com</span> → Devices → All Devices.
                     </p>
@@ -1043,7 +1043,7 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
         <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center bg-red-500" style={{ width: SCENE_SWIPE_WIDTH }}>
           <button onClick={() => { closeSwipe(); onDelete(); }} className="w-full h-full flex flex-col items-center justify-center gap-1">
             <Trash2 className="w-5 h-5 text-white" />
-            <span className="text-[10px] font-semibold text-white">Excluir</span>
+            <span className="text-xs font-semibold text-white">Excluir</span>
           </button>
         </div>
 
@@ -1071,10 +1071,10 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{scene.name}</p>
             {isAuto && !expanded && schedules.length > 0 && (
-              <p className="text-[11px] text-muted-foreground">{schedules.map(s => s.time).join(' · ')}</p>
+              <p className="text-xs text-muted-foreground">{schedules.map(s => s.time).join(' · ')}</p>
             )}
             {isAuto && !expanded && schedules.length === 0 && (
-              <p className="text-[11px] text-muted-foreground">Toque para ver horários</p>
+              <p className="text-xs text-muted-foreground">Toque para ver horários</p>
             )}
           </div>
           {isAuto
@@ -1100,7 +1100,7 @@ function ManualSceneRow({ scene, isTriggering, onTrigger, onDelete, triggerDisab
         <div className="px-4 pb-4 space-y-2 bg-muted/20">
           {schedules.length > 0 ? (
             <>
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide pt-1">Horários</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Horários</p>
               <div className="space-y-1.5">
                 {schedules.map((s, i) => (
                   <div key={i} className="flex items-center gap-2.5">
@@ -1178,7 +1178,7 @@ function AutomationCard({ automation }: { automation: { sceneId: string; name: s
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground truncate">{automation.name}</p>
           {!expanded && schedules.length > 0 && (
-            <p className="text-[11px] text-muted-foreground truncate">
+            <p className="text-xs text-muted-foreground truncate">
               {schedules.map(s => s.time).join(' · ')}
             </p>
           )}
@@ -1192,7 +1192,7 @@ function AutomationCard({ automation }: { automation: { sceneId: string; name: s
         <div className="px-4 pb-4 space-y-2 bg-muted/20">
           {schedules.length > 0 ? (
             <>
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide pt-1">Horários</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Horários</p>
               <div className="space-y-1.5">
                 {schedules.map((s, i) => (
                   <div key={i} className="flex items-center gap-2.5">
@@ -1232,15 +1232,15 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <div className="px-4 py-3 border-b border-border/40 bg-muted/20">
         <p className="text-sm font-semibold text-foreground">Adicionar cena manualmente</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">
+        <p className="text-xs text-muted-foreground mt-0.5">
           Você precisa apenas do <strong>Scene ID</strong>. O Home ID é opcional.
         </p>
       </div>
       <div className="px-4 py-4 space-y-3">
         {/* Como encontrar o Scene ID */}
         <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 p-3 space-y-1.5">
-          <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">Como encontrar o Scene ID</p>
-          <ol className="text-[11px] text-muted-foreground space-y-0.5 list-decimal list-inside leading-relaxed">
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Como encontrar o Scene ID</p>
+          <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside leading-relaxed">
             <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto</li>
             <li>Menu lateral → <strong>API Explorer</strong></li>
             <li>Busque <span className="font-mono">Get Scene List</span> ou <span className="font-mono">scenes</span></li>
@@ -1249,7 +1249,7 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
         </div>
 
         <div>
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+          <p className="text-xs text-muted-foreground mb-1.5 font-medium">
             Scene ID <span className="text-red-400">*</span>
           </p>
           <input type="text" value={sceneId} onChange={e => setSceneId(e.target.value.trim())}
@@ -1257,14 +1257,14 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
             className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm font-mono text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
         </div>
         <div>
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Nome da cena</p>
+          <p className="text-xs text-muted-foreground mb-1.5 font-medium">Nome da cena</p>
           <input type="text" value={name} onChange={e => setName(e.target.value)}
             placeholder="ex: Ligar tudo"
             className="w-full bg-muted rounded-xl px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-1 focus:ring-emerald-500/50" />
         </div>
         {/* Tipo da cena */}
         <div>
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Tipo</p>
+          <p className="text-xs text-muted-foreground mb-1.5 font-medium">Tipo</p>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -1284,12 +1284,12 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
             </button>
           </div>
           {type === 'automation' && (
-            <p className="text-[10px] text-muted-foreground mt-1.5">Automações são disparadas por horário — sem botão Disparar.</p>
+            <p className="text-xs text-muted-foreground mt-1.5">Automações são disparadas por horário — sem botão Disparar.</p>
           )}
         </div>
 
         <div>
-          <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">
+          <p className="text-xs text-muted-foreground mb-1.5 font-medium">
             Home ID <span className="font-normal text-muted-foreground/50">(opcional)</span>
           </p>
           <input type="text" value={homeId} onChange={e => setHomeId(e.target.value.trim())}
@@ -1658,7 +1658,7 @@ export default function SmartLife() {
                 <h1 className="text-base font-bold text-foreground leading-none">SmartLife</h1>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-400' : 'bg-muted-foreground/40'}`} />
-                  <span className="text-[11px] text-muted-foreground">{isConnected ? 'Conectado' : 'Não configurado'}</span>
+                  <span className="text-xs text-muted-foreground">{isConnected ? 'Conectado' : 'Não configurado'}</span>
                 </div>
               </div>
             </div>

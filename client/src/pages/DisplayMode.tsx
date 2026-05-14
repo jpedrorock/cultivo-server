@@ -143,7 +143,7 @@ export default function DisplayMode() {
               {/* PPFD */}
               <div className="bg-white/5 rounded-xl px-4 py-2 flex items-center justify-between">
                 <div>
-                  <p className="text-white/35 text-[9px] font-semibold uppercase tracking-widest mb-0.5">PPFD</p>
+                  <p className="text-white/35 text-xs font-semibold uppercase tracking-widest mb-0.5">PPFD</p>
                   <p className="font-black tabular-nums leading-none"
                     style={{ fontSize: "clamp(1.6rem, 6vh, 2.5rem)", color: ppfd !== null ? ppfdColor(ppfd) : "#ffffff30" }}>
                     {ppfd ?? "—"}
@@ -157,11 +157,11 @@ export default function DisplayMode() {
               {cycleInfo ? (
                 <div className="bg-white/5 rounded-xl px-4 py-2 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase"
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded-full uppercase"
                       style={{ background: cycleInfo.phaseColor + "20", color: cycleInfo.phaseColor }}>
                       {cycleInfo.phase}
                     </span>
-                    <span className="text-white/40 text-[10px]">
+                    <span className="text-white/40 text-xs">
                       Sem <b className="text-white">{cycleInfo.week}</b>/{cycleInfo.totalEst}
                       {" · "}~{cycleInfo.left} restantes
                     </span>
@@ -178,7 +178,7 @@ export default function DisplayMode() {
             </div>
 
             {/* Last update */}
-            <p className="text-white/15 text-[9px] text-center shrink-0">
+            <p className="text-white/15 text-xs text-center shrink-0">
               Atualizado: {log.logDate ? new Date(log.logDate).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
             </p>
           </div>
@@ -200,7 +200,7 @@ export default function DisplayMode() {
             {/* PPFD */}
             <div className="flex items-center justify-between bg-white/5 rounded-2xl px-5 py-3 mb-2">
               <div>
-                <p className="text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-0.5">PPFD</p>
+                <p className="text-white/35 text-xs font-semibold uppercase tracking-widest mb-0.5">PPFD</p>
                 <p className="font-black tabular-nums leading-none"
                   style={{ fontSize: "clamp(2rem, 9vw, 3.5rem)", color: ppfd !== null ? ppfdColor(ppfd) : "#ffffff30" }}>
                   {ppfd ?? "—"}
@@ -215,7 +215,7 @@ export default function DisplayMode() {
               <div className="bg-white/5 rounded-2xl px-5 py-3 space-y-2 mb-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full uppercase"
                       style={{ background: cycleInfo.phaseColor + "22", color: cycleInfo.phaseColor }}>
                       {cycleInfo.phase}
                     </span>
@@ -229,7 +229,7 @@ export default function DisplayMode() {
               </div>
             )}
 
-            <p className="text-white/15 text-[10px] text-center">
+            <p className="text-white/15 text-xs text-center">
               Atualizado: {log.logDate ? new Date(log.logDate).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
             </p>
           </div>

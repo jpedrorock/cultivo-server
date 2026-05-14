@@ -234,7 +234,7 @@ export default function PlantTrainingPage() {
         {/* ── Mapa de nós da planta ──────────────────────────────────────── */}
         <div className="rounded-2xl border border-border/40 bg-card overflow-visible">
           <div className="px-3 pt-3 pb-1 flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
               Mapa da planta
             </p>
             <div className="flex items-center gap-1">
@@ -251,7 +251,7 @@ export default function PlantTrainingPage() {
                   <button
                     type="button"
                     onClick={() => setViewMode(next.id)}
-                    className="h-7 px-2 rounded-lg flex items-center gap-1.5 text-[11px] font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+                    className="h-7 px-2 rounded-lg flex items-center gap-1.5 text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
                     title={`Trocar para ${next.label}`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -266,10 +266,10 @@ export default function PlantTrainingPage() {
                     min="0.5" step="0.5" max="100"
                     value={potSizeL}
                     onChange={(e) => handlePotSizeChange(Math.max(0.5, parseFloat(e.target.value) || 5))}
-                    className="w-12 h-7 px-1.5 text-[11px] font-medium bg-muted/50 border border-border/40 rounded-md text-center focus:outline-none focus:border-primary"
+                    className="w-12 h-7 px-1.5 text-xs font-medium bg-muted/50 border border-border/40 rounded-md text-center focus:outline-none focus:border-primary"
                     title="Tamanho do vaso (litros)"
                   />
-                  <span className="text-[10px] text-muted-foreground">L</span>
+                  <span className="text-xs text-muted-foreground">L</span>
                 </div>
               )}
               <button
@@ -357,7 +357,7 @@ export default function PlantTrainingPage() {
               </button>
               {/* Badge de técnicas aplicadas na sessão */}
               {sessionTechniques.length > 0 && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                   {sessionTechniques.length} ação{sessionTechniques.length > 1 ? 'ões' : ''}
                 </span>
               )}
@@ -558,7 +558,7 @@ export default function PlantTrainingPage() {
                   return (
                     <span
                       key={tech}
-                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                      className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                       style={{ background: cfg?.color + "28", color: cfg?.color ?? "#666" }}
                     >
                       {tech} ×{count}

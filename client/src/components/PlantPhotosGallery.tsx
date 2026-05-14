@@ -475,7 +475,7 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
       {/* Photo grid grouped by month */}
       {grouped.map(({ label, items }) => (
         <div key={label} className="mb-6">
-          <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 capitalize">
+          <p className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 capitalize">
             {label}
           </p>
           <div className="grid grid-cols-3 gap-1.5">
@@ -502,13 +502,13 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
                   />
                   {/* Week badge */}
                   {photo.weekNumber && (
-                    <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] font-bold px-1 py-px rounded">
+                    <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs font-bold px-1 py-px rounded">
                       S{photo.weekNumber}
                     </div>
                   )}
                   {/* Health log badge */}
                   {photo.source === "health" && (
-                    <div className="absolute top-1 left-1 bg-emerald-500/80 text-white text-[8px] font-bold px-1 py-px rounded leading-tight">
+                    <div className="absolute top-1 left-1 bg-emerald-500/80 text-white text-xs font-bold px-1 py-px rounded leading-tight">
                       saúde
                     </div>
                   )}
@@ -649,7 +649,7 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
             {/* Scrub hint label */}
             {!isScrubbing && typedPhotos.length > 2 && (
               <div className="absolute bottom-[90px] left-1/2 -translate-x-1/2 pointer-events-none">
-                <span className="text-[9px] text-white/20 tracking-widest uppercase">← arrastar →</span>
+                <span className="text-xs text-white/20 tracking-widest uppercase">← arrastar →</span>
               </div>
             )}
             {typedPhotos.map((p, i) => (
@@ -681,12 +681,12 @@ export default function PlantPhotosGallery({ plantId, plantName }: Props) {
                 {format(new Date(currentPhoto.photoDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
               </p>
               {currentPhoto.weekNumber && (
-                <span className="bg-white/10 text-white/70 text-[10px] font-bold px-2 py-px rounded-full">
+                <span className="bg-white/10 text-white/70 text-xs font-bold px-2 py-px rounded-full">
                   S{currentPhoto.weekNumber}
                 </span>
               )}
               {currentPhoto.source === "health" && (
-                <span className="bg-emerald-500/30 text-emerald-300 text-[10px] font-bold px-2 py-px rounded-full">
+                <span className="bg-emerald-500/30 text-emerald-300 text-xs font-bold px-2 py-px rounded-full">
                   registro de saúde
                 </span>
               )}

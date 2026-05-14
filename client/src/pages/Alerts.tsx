@@ -119,7 +119,7 @@ export default function Alerts() {
               <Bell className="w-5 h-5 text-primary shrink-0" />
               <span className="truncate">Histórico de Alertas</span>
               {newCount > 0 && (
-                <Badge variant="destructive" className="text-[10px] px-2 py-0 h-5 animate-pulse shrink-0">
+                <Badge variant="destructive" className="text-xs px-2 py-0 h-5 animate-pulse shrink-0">
                   {newCount} novo{newCount !== 1 ? "s" : ""}
                 </Badge>
               )}
