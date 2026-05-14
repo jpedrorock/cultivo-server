@@ -13,6 +13,8 @@ import { SplashScreen } from "./components/SplashScreen";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
+import { isWizardDone } from "./components/onboarding/OnboardingWizard";
+import { trpc } from "./lib/trpc";
 
 import { prefetchRoutes } from "./lib/prefetchRoutes";
 
@@ -47,6 +49,7 @@ const PlantsList           = lazy(() => import("./pages/PlantsList"));
 const PlantDetail          = lazy(() => import("./pages/PlantDetail"));
 const PlantTrainingPage    = lazy(() => import("./pages/PlantTrainingPage"));
 const NewPlant             = lazy(() => import("./pages/NewPlant"));
+const OnboardingWizard     = lazy(() => import("./components/onboarding/OnboardingWizard"));
 const PlantArchivePage     = lazy(() => import("./pages/PlantArchivePage"));
 const HarvestQueue         = lazy(() => import("./pages/HarvestQueue"));
 const Nutrients            = lazy(() => import("./pages/Nutrients"));
@@ -121,6 +124,7 @@ function Router() {
         <Route path={"/admin/users"} component={AdminUsers} />
         <Route path={"/help/:section"} component={Help} />
         <Route path={"/help"} component={Help} />
+        <Route path={"/onboarding"} component={OnboardingWizard} />
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
       </Switch>
@@ -133,9 +137,25 @@ function AuthenticatedAppInner() {
   const [location, setLocation] = useLocation();
   const { collapsed } = useSidebar();
   const isDisplayMode = location.endsWith("/display");
+  const isOnboarding = location === "/onboarding";
   const [showSplash, setShowSplash] = useState(() => {
     return !sessionStorage.getItem('hasSeenSplash');
   });
+
+  // Detecta cold start: user autenticado + grupo OK + ZERO estufas + wizard não foi feito.
+  // Query só roda se user tá pronto (enabled), pra não travar fluxo de login.
+  // Nota: query desabilitada quando user tá em /onboarding pra não criar loop
+  // (wizard cria estufa, refetch traria length=1, mas user ainda não saiu).
+  const tentsQuery = trpc.tents.list.useQuery(undefined, {
+    enabled: !!isAuthenticated && !!user?.approved && !!user?.groupId && !isOnboarding,
+    staleTime: 60_000,
+  });
+  const shouldRedirectToOnboarding =
+    !!user?.approved &&
+    !!user?.groupId &&
+    tentsQuery.isSuccess &&
+    (tentsQuery.data?.length ?? 0) === 0 &&
+    !isWizardDone();
 
   useEffect(() => {
     if (!loading) {
@@ -145,12 +165,16 @@ function AuthenticatedAppInner() {
         setLocation('/pending-approval');
       } else if (user && user.groupId === null) {
         setLocation('/setup');
+      } else if (shouldRedirectToOnboarding && location !== "/onboarding") {
+        // Cold-start: zero estufas + nunca pulou wizard → vai pro tutorial.
+        // Verificação `location !== "/onboarding"` evita loop se já estiver lá.
+        setLocation('/onboarding');
       } else if (isAuthenticated) {
         // Usuário autenticado e no app — precarregar outras páginas em background
         prefetchRoutes();
       }
     }
-  }, [loading, isAuthenticated, user, setLocation]);
+  }, [loading, isAuthenticated, user, shouldRedirectToOnboarding, location, setLocation]);
 
   if (loading) {
     return (
@@ -172,18 +196,21 @@ function AuthenticatedAppInner() {
           }}
         />
       )}
-      {!isDisplayMode && <Sidebar />}
+      {/* Onboarding e display mode são "fullscreen" — sem Sidebar/BottomNav */}
+      {!isDisplayMode && !isOnboarding && <Sidebar />}
       <div
         className={cn(
-          isDisplayMode ? "" : "pb-20 md:pb-0 transition-[padding-left] duration-200 ease-in-out",
-          !isDisplayMode && (collapsed ? "lg:pl-16" : "lg:pl-64"),
+          isDisplayMode || isOnboarding
+            ? ""
+            : "pb-20 md:pb-0 transition-[padding-left] duration-200 ease-in-out",
+          !isDisplayMode && !isOnboarding && (collapsed ? "lg:pl-16" : "lg:pl-64"),
         )}
       >
         <PullToRefresh>
           <Router />
         </PullToRefresh>
       </div>
-      {!isDisplayMode && <BottomNav />}
+      {!isDisplayMode && !isOnboarding && <BottomNav />}
       <InstallPWA />
       <AddToHomeScreenPrompt />
     </>
