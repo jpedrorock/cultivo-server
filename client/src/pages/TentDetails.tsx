@@ -1072,23 +1072,26 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
               const isAutomation = isScene && item.sceneType === 'automation';
               return (
                 <div key={`${item.type}-${item.id}`} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-muted/40">
-                  {/* Setas ↑↓ */}
-                  <div className="flex flex-col -space-y-0.5 shrink-0">
+                  {/* Setas ↑↓ — touch targets ampliados (8x8 ao inves de 5x4)
+                      Mantém ícone visualmente pequeno (3x3) mas hit area maior pra mobile. */}
+                  <div className="flex flex-col gap-0.5 shrink-0">
                     <button
                       onClick={() => handleMove(idx, -1)}
                       disabled={idx === 0 || reorder.isPending}
                       title="Mover pra cima"
-                      className="w-5 h-4 rounded hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="Mover item pra cima"
+                      className="w-8 h-8 rounded-lg hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronUp className="w-3 h-3" />
+                      <ChevronUp className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleMove(idx, 1)}
                       disabled={idx === items.length - 1 || reorder.isPending}
                       title="Mover pra baixo"
-                      className="w-5 h-4 rounded hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="Mover item pra baixo"
+                      className="w-8 h-8 rounded-lg hover:bg-muted-foreground/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronDown className="w-3 h-3" />
+                      <ChevronDown className="w-4 h-4" />
                     </button>
                   </div>
 
