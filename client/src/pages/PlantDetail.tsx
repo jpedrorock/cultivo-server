@@ -377,21 +377,21 @@ export default function PlantDetail() {
           <Tabs defaultValue="health" className="w-full">
             <div className="overflow-x-auto -mx-4 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mb-3">
               <TabsList className="inline-flex w-max min-w-full h-auto p-1 gap-0.5">
-                <TabsTrigger value="health" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                <TabsTrigger value="health" className="flex flex-col items-center gap-0.5 py-2 px-4 text-xs">
                   <Heart className="w-3.5 h-3.5" />
                   Saúde
                 </TabsTrigger>
-                <TabsTrigger value="environment" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                <TabsTrigger value="environment" className="flex flex-col items-center gap-0.5 py-2 px-4 text-xs">
                   <Thermometer className="w-3.5 h-3.5" />
                   Ambiente
                 </TabsTrigger>
                 {isPlant && (
-                  <TabsTrigger value="cultivation" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                  <TabsTrigger value="cultivation" className="flex flex-col items-center gap-0.5 py-2 px-4 text-xs">
                     <Sprout className="w-3.5 h-3.5" />
                     Cultivo
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="archive" className="flex flex-col items-center gap-0.5 py-2 px-4 text-[11px]">
+                <TabsTrigger value="archive" className="flex flex-col items-center gap-0.5 py-2 px-4 text-xs">
                   <History className="w-3.5 h-3.5" />
                   Arquivo
                 </TabsTrigger>
@@ -418,15 +418,15 @@ export default function PlantDetail() {
               <TabsContent value="cultivation">
                 <Tabs defaultValue="observations" className="w-full">
                   <TabsList className="grid w-full grid-cols-3 mb-3 h-auto p-1">
-                    <TabsTrigger value="observations" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                    <TabsTrigger value="observations" className="flex flex-col items-center gap-0.5 py-2 text-xs">
                       <FileText className="w-3.5 h-3.5" />
                       Obs.
                     </TabsTrigger>
-                    <TabsTrigger value="lst" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                    <TabsTrigger value="lst" className="flex flex-col items-center gap-0.5 py-2 text-xs">
                       <Scissors className="w-3.5 h-3.5" />
                       Treino
                     </TabsTrigger>
-                    <TabsTrigger value="trichomes" className="flex flex-col items-center gap-0.5 py-2 text-[11px]">
+                    <TabsTrigger value="trichomes" className="flex flex-col items-center gap-0.5 py-2 text-xs">
                       <Sparkles className="w-3.5 h-3.5" />
                       Tricomas
                     </TabsTrigger>

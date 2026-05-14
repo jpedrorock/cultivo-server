@@ -69,7 +69,7 @@ function TentMorningCard({
               <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
             </div>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${phaseColor}`}>{phaseLabel}</span>
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${phaseColor}`}>{phaseLabel}</span>
               <span className="text-xs text-muted-foreground">{tent.width}×{tent.depth}×{tent.height}cm</span>
             </div>
           </div>
@@ -90,7 +90,7 @@ function TentMorningCard({
               <span className={`text-lg font-black tabular-nums leading-none ${temp !== null ? tempColor(temp) : "text-muted-foreground"}`}>
                 {temp !== null ? `${temp.toFixed(1)}°` : "—"}
               </span>
-              <span className="text-[9px] text-muted-foreground">Temp</span>
+              <span className="text-xs text-muted-foreground">Temp</span>
             </div>
 
             {/* RH */}
@@ -99,16 +99,16 @@ function TentMorningCard({
               <span className={`text-lg font-black tabular-nums leading-none ${rh !== null ? rhColor(rh) : "text-muted-foreground"}`}>
                 {rh !== null ? `${rh.toFixed(0)}%` : "—"}
               </span>
-              <span className="text-[9px] text-muted-foreground">UR</span>
+              <span className="text-xs text-muted-foreground">UR</span>
             </div>
 
             {/* VPD */}
             <div className="flex flex-col items-center gap-0.5">
-              <span className="text-[10px] font-bold text-muted-foreground opacity-70">VPD</span>
+              <span className="text-xs font-bold text-muted-foreground opacity-70">VPD</span>
               <span className={`text-lg font-black tabular-nums leading-none ${vpd !== null ? vpdColor(vpd) : "text-muted-foreground"}`}>
                 {vpd !== null ? vpd : "—"}
               </span>
-              <span className="text-[9px] text-muted-foreground">kPa</span>
+              <span className="text-xs text-muted-foreground">kPa</span>
             </div>
 
             {/* PPFD */}
@@ -117,7 +117,7 @@ function TentMorningCard({
               <span className={`text-lg font-black tabular-nums leading-none ${ppfd !== null ? ppfdColor(ppfd) : "text-muted-foreground"}`}>
                 {ppfd !== null ? ppfd : "—"}
               </span>
-              <span className="text-[9px] text-muted-foreground">µmol</span>
+              <span className="text-xs text-muted-foreground">µmol</span>
             </div>
           </div>
         ) : (

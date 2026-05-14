@@ -118,7 +118,7 @@ export default function PlantTrainingSummary({ plantId }: Props) {
               <h2 className="font-semibold text-base leading-tight">Editor de treinamento</h2>
             </div>
             {sessionTechniques.length > 0 && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                 {sessionTechniques.length} ação{sessionTechniques.length > 1 ? 'ões' : ''}
               </span>
             )}

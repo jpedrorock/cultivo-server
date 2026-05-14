@@ -168,7 +168,7 @@ function ProfileCard() {
                       <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= pwScore ? pwStrengthColor : 'bg-muted'}`} />
                     ))}
                   </div>
-                  <span className={`text-[10px] font-medium w-14 text-right ${pwScore <= 1 ? 'text-destructive' : pwScore <= 2 ? 'text-amber-500' : pwScore <= 3 ? 'text-yellow-500' : 'text-emerald-500'}`}>
+                  <span className={`text-xs font-medium w-14 text-right ${pwScore <= 1 ? 'text-destructive' : pwScore <= 2 ? 'text-amber-500' : pwScore <= 3 ? 'text-yellow-500' : 'text-emerald-500'}`}>
                     {pwStrengthLabel}
                   </span>
                 </div>
@@ -181,7 +181,7 @@ function ProfileCard() {
                     ['digit',   'Número (0-9)'],
                     ['special', 'Símbolo (!@#…)'],
                   ] as [keyof typeof pwReqs, string][]).map(([key, label]) => (
-                    <span key={key} className={`flex items-center gap-1 text-[10px] ${pwReqs[key] ? 'text-emerald-500' : 'text-muted-foreground/60'}`}>
+                    <span key={key} className={`flex items-center gap-1 text-xs ${pwReqs[key] ? 'text-emerald-500' : 'text-muted-foreground/60'}`}>
                       {pwReqs[key] ? '✓' : '·'} {label}
                     </span>
                   ))}
@@ -491,7 +491,7 @@ function AiSettingsCard() {
                     <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-700 dark:text-emerald-400' : 'text-foreground'}`}>
                       {PROVIDER_MODELS[p].label}
                     </span>
-                    <span className="text-[10px] leading-tight opacity-70 truncate w-full">
+                    <span className="text-xs leading-tight opacity-70 truncate w-full">
                       {PROVIDER_MODELS[p].hint}
                     </span>
                   </button>
@@ -504,8 +504,8 @@ function AiSettingsCard() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs text-muted-foreground">Modelo</p>
-              {modelsLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Carregando modelos…</span>}
-              {!modelsLoading && liveModels?.models?.length ? <span className="text-[10px] text-emerald-600">{liveModels.models.length} disponíveis</span> : null}
+              {modelsLoading && <span className="text-xs text-muted-foreground animate-pulse">Carregando modelos…</span>}
+              {!modelsLoading && liveModels?.models?.length ? <span className="text-xs text-emerald-600">{liveModels.models.length} disponíveis</span> : null}
             </div>
             <select
               value={model}

@@ -1038,7 +1038,7 @@ export default function PlantNodeMap({
 
             {/* ── Dica ── */}
             <div className="absolute bottom-4 left-4 pointer-events-none select-none">
-              <span className="text-[9px] text-muted-foreground/30">
+              <span className="text-xs text-muted-foreground/30">
                 {selectedEdgeId && !edgeMenuOpen ? 'Arraste os handles azuis · Clique fora p/ desselecionar' : 'Toque numa linha p/ curvar · Toque num nó p/ treinar'}
               </span>
             </div>

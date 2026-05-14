@@ -16,7 +16,7 @@ export default function PlantStatsStrip({ daysOld, phaseLabel, cycleWeek, tentNa
           <span className="text-3xl font-bold text-foreground tabular-nums leading-none">{daysOld}</span>
           <span className="text-sm text-muted-foreground">dias</span>
         </div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">IDADE</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">IDADE</p>
       </div>
 
       {/* Fase */}
@@ -25,7 +25,7 @@ export default function PlantStatsStrip({ daysOld, phaseLabel, cycleWeek, tentNa
           <p className="text-xl font-bold text-foreground leading-none">
             {phaseLabel}{cycleWeek ? ` · S${cycleWeek}` : ''}
           </p>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">FASE</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">FASE</p>
         </div>
       )}
 
@@ -33,7 +33,7 @@ export default function PlantStatsStrip({ daysOld, phaseLabel, cycleWeek, tentNa
       {tentName && (
         <div className="px-5 py-3.5">
           <p className="text-xl font-bold text-foreground leading-none">{tentName}</p>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50 mt-1">
             ESTUFA{plantCode ? ` · #${plantCode}` : ''}
           </p>
         </div>

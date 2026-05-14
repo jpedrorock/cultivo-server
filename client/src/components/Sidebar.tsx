@@ -118,11 +118,11 @@ export function Sidebar() {
         } : undefined}
       >
         <Icon className={cn("w-6 h-6 shrink-0", isActive ? "text-primary stroke-[2.5]" : "stroke-[1.75]")} />
-        {!isIconOnly && <span className="flex-1 text-[15px]">{label}</span>}
+        {!isIconOnly && <span className="flex-1 text-base">{label}</span>}
         {!isIconOnly && badge > 0 && (
           <Badge
             variant="destructive"
-            className={cn("h-5 min-w-5 px-1.5 text-[10px] font-bold rounded-full", isAlerts && badgeShaking && "animate-badge-shake")}
+            className={cn("h-5 min-w-5 px-1.5 text-xs font-bold rounded-full", isAlerts && badgeShaking && "animate-badge-shake")}
           >
             {badge > 99 ? "99+" : badge}
           </Badge>
@@ -141,7 +141,7 @@ export function Sidebar() {
           <TooltipContent side="right" className="flex items-center gap-2">
             {label}
             {badge > 0 && (
-              <Badge variant="destructive" className="h-4 px-1 text-[10px]">{badge > 99 ? "99+" : badge}</Badge>
+              <Badge variant="destructive" className="h-4 px-1 text-xs">{badge > 99 ? "99+" : badge}</Badge>
             )}
           </TooltipContent>
         </Tooltip>
@@ -240,7 +240,7 @@ export function Sidebar() {
           ) : (
             <Link
               href="/quick-log"
-              className="flex items-center justify-center gap-2 w-full px-3 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-[15px] hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 shadow-sm shadow-primary/20 cursor-pointer"
+              className="flex items-center justify-center gap-2 w-full px-3 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 active:scale-[0.98] transition-all duration-150 shadow-sm shadow-primary/20 cursor-pointer"
             >
               <Plus className="w-6 h-6 shrink-0" />
               Registro Rápido
@@ -320,7 +320,7 @@ export function Sidebar() {
                 <UserAvatar name={user.name} email={user.email} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-sidebar-foreground truncate leading-tight">{user.name || "Sem nome"}</p>
-                  <p className="text-[11px] text-sidebar-foreground/50 truncate leading-tight">{user.email}</p>
+                  <p className="text-xs text-sidebar-foreground/50 truncate leading-tight">{user.email}</p>
                 </div>
               </Link>
             )
@@ -339,13 +339,13 @@ export function Sidebar() {
                 <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
                 <p className="text-xs text-primary font-semibold">Sistema Ativo</p>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5 pl-3.5">
+              <p className="text-xs text-muted-foreground mt-0.5 pl-3.5">
                 {tents ? tentLabel : "Carregando..."}
               </p>
               {unreadAlerts > 0 && (
                 <div className={cn("flex items-center gap-1.5 mt-1.5 pl-3.5", pillShaking && "animate-badge-shake")}>
                   <AlertTriangle className="w-3 h-3 text-destructive shrink-0" />
-                  <p className="text-[11px] text-destructive font-semibold">
+                  <p className="text-xs text-destructive font-semibold">
                     {unreadAlerts === 1 ? "1 alerta não lido" : `${unreadAlerts} alertas não lidos`}
                   </p>
                 </div>

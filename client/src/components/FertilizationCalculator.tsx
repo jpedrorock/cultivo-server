@@ -223,7 +223,7 @@ export function FertilizationCalculator() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Calculadora de Fertilização</p>
-            <p className="text-[11px] text-muted-foreground">Calcule a dosagem de reagentes NPK necessária para atingir o EC desejado</p>
+            <p className="text-xs text-muted-foreground">Calcule a dosagem de reagentes NPK necessária para atingir o EC desejado</p>
           </div>
         </div>
 

@@ -372,7 +372,7 @@ function CompareTab() {
         </CardHeader>
         <CardContent className="px-0 pb-4">
           {/* Header */}
-          <div className="grid grid-cols-[1fr,auto,auto,auto] gap-0 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-4 pb-1 border-b border-border/40">
+          <div className="grid grid-cols-[1fr,auto,auto,auto] gap-0 text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 pb-1 border-b border-border/40">
             <span>Produto</span>
             <span className="w-14 text-right text-emerald-400">{PHASE_NAMES[leftPhase].slice(0,4)} S{leftWeek}</span>
             <span className="w-14 text-right text-purple-400">{PHASE_NAMES[rightPhase].slice(0,4)} S{rightWeek}</span>
@@ -427,11 +427,11 @@ function CompareTab() {
             return (
               <div className="mx-4 mt-3 grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 px-3 py-2 text-center">
-                  <p className="text-[10px] text-emerald-400 font-semibold uppercase">EC Receita A</p>
+                  <p className="text-xs text-emerald-400 font-semibold uppercase">EC Receita A</p>
                   <p className="text-lg font-bold text-emerald-300">{ecL} <span className="text-xs font-normal">mS/cm</span></p>
                 </div>
                 <div className="rounded-lg bg-purple-500/8 border border-purple-500/20 px-3 py-2 text-center">
-                  <p className="text-[10px] text-purple-400 font-semibold uppercase">EC Receita B</p>
+                  <p className="text-xs text-purple-400 font-semibold uppercase">EC Receita B</p>
                   <p className="text-lg font-bold text-purple-300">{ecR} <span className="text-xs font-normal">mS/cm</span></p>
                 </div>
               </div>
@@ -638,7 +638,7 @@ export default function Nutrients() {
                   <div className="flex items-center gap-2">
                     <CardTitle>1. Fase e Semana</CardTitle>
                     {activeCycles?.length ? (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">auto-detectado</span>
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">auto-detectado</span>
                     ) : null}
                   </div>
                   <CardDescription>O sistema calculará automaticamente os produtos e quantidades</CardDescription>
@@ -738,7 +738,7 @@ export default function Nutrients() {
                       <Zap className="w-4 h-4 text-amber-400" />
                     </div>
                     <div>
-                      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">EC Estimado</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">EC Estimado</p>
                       <p className="text-xl font-bold text-amber-300">{ecEstimated} <span className="text-xs font-normal">mS/cm</span></p>
                     </div>
                   </div>
@@ -747,7 +747,7 @@ export default function Nutrients() {
                       <Droplets className="w-4 h-4 text-sky-400" />
                     </div>
                     <div>
-                      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">PPM Aprox.</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">PPM Aprox.</p>
                       <p className="text-xl font-bold text-sky-300">{ppmApprox} <span className="text-xs font-normal">ppm</span></p>
                     </div>
                   </div>
@@ -803,18 +803,18 @@ export default function Nutrients() {
                   });
                   return (
                     <div className="rounded-xl border border-border/30 bg-muted/20 p-3 mt-1">
-                      <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide mb-2">NPK Total (ppm)</p>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-2">NPK Total (ppm)</p>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-2 py-1.5">
-                          <p className="text-[10px] text-green-400 font-semibold uppercase">N</p>
+                          <p className="text-xs text-green-400 font-semibold uppercase">N</p>
                           <p className="text-base font-bold text-green-300">{totalN.toFixed(0)}</p>
                         </div>
                         <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1.5">
-                          <p className="text-[10px] text-orange-400 font-semibold uppercase">P</p>
+                          <p className="text-xs text-orange-400 font-semibold uppercase">P</p>
                           <p className="text-base font-bold text-orange-300">{totalP.toFixed(0)}</p>
                         </div>
                         <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg px-2 py-1.5">
-                          <p className="text-[10px] text-violet-400 font-semibold uppercase">K</p>
+                          <p className="text-xs text-violet-400 font-semibold uppercase">K</p>
                           <p className="text-base font-bold text-violet-300">{totalK.toFixed(0)}</p>
                         </div>
                       </div>
@@ -948,7 +948,7 @@ export default function Nutrients() {
                               const colors = PRODUCT_COLORS[prod.name] ?? DEFAULT_COLOR;
                               return (
                                 <div key={idx} className={`flex items-center gap-3 rounded-xl border p-2.5 ${colors.bg} ${colors.border}`}>
-                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0 ${colors.dot}`}>{idx + 1}</div>
+                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${colors.dot}`}>{idx + 1}</div>
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-semibold truncate">{prod.name}</p>
                                   </div>

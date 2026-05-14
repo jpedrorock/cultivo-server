@@ -170,7 +170,7 @@ export function MoveToHarvestQueueDialog({
                   );
                 })}
               </div>
-              <p className="text-[11px] text-muted-foreground/50 mt-2 text-center">Opcional — apenas lembretes</p>
+              <p className="text-xs text-muted-foreground/50 mt-2 text-center">Opcional — apenas lembretes</p>
             </div>
 
             <Button

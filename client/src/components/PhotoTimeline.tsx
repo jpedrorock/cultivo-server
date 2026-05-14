@@ -93,7 +93,7 @@ export default function PhotoTimeline({ plantId }: { plantId: number }) {
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-4 pb-4 pt-10">
           <div className="flex items-end justify-between gap-2">
             <div className="space-y-1">
-              <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusStyle.cls}`}>
+              <span className={`inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full border ${statusStyle.cls}`}>
                 {statusStyle.label}
               </span>
               <p className="text-white text-sm font-semibold">
@@ -169,7 +169,7 @@ export default function PhotoTimeline({ plantId }: { plantId: number }) {
             />
             {/* data label */}
             <div className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5">
-              <p className="text-white text-[9px] font-semibold text-center tabular-nums leading-tight">
+              <p className="text-white text-xs font-semibold text-center tabular-nums leading-tight">
                 {format(new Date(log.logDate), "dd/MM", { locale: ptBR })}
               </p>
             </div>

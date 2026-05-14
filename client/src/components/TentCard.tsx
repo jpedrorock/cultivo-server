@@ -277,7 +277,7 @@ export function TentCard({
               <CardTitle className="text-xl font-bold tracking-tight">{tent.name}</CardTitle>
               {(() => {
                 if (!tent.lastReadingAt) return (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground">
                     <Clock className="w-3 h-3" /> Sem registros
                   </span>
                 );
@@ -287,7 +287,7 @@ export function TentCard({
                 const timeText = diffH === 0 ? `há ${diffMin}min` : `há ${diffH}h`;
                 const pill = diffH < 24 ? "pill-fresh" : diffH < 48 ? "pill-warning" : "pill-danger";
                 return (
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${pill}`}>
+                  <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${pill}`}>
                     <Clock className="w-3 h-3" />{timeText}
                   </span>
                 );
@@ -296,7 +296,7 @@ export function TentCard({
                   - convenção visual de "streak = fogo/calor" (Duolingo, Snapchat, etc)
                   - desafoga o verde da marca de uso decorativo */}
               {streak && streak.current > 0 && (
-                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'pill-streak-done' : 'pill-streak-pending'}`}>
+                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${streak.todayDone ? 'pill-streak-done' : 'pill-streak-pending'}`}>
                   <Flame className="w-2.5 h-2.5" />{streak.current}d
                 </span>
               )}
@@ -493,7 +493,7 @@ export function TentCard({
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <ThermometerSun className="w-4 h-4 text-orange-500 dark:text-orange-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Temp</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Temp</p>
               <div className="flex items-center gap-0.5">
                 <p className="text-base font-bold tracking-tight leading-none text-foreground">
                   {readNow.isPending
@@ -518,7 +518,7 @@ export function TentCard({
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <Droplets className="w-4 h-4 text-cyan-500 dark:text-cyan-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">RH</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">RH</p>
               <div className="flex items-center gap-0.5">
                 <p className="text-base font-bold tracking-tight leading-none text-foreground">
                   {readNow.isPending
@@ -543,7 +543,7 @@ export function TentCard({
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <Wind className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mb-0.5" />
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">VPD</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">VPD</p>
               <div className="flex items-center gap-0.5">
                 <p className="text-base font-bold tracking-tight leading-none text-foreground">
                   {readNow.isPending
@@ -637,7 +637,7 @@ export function TentCard({
           <ClipboardList className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs font-medium text-muted-foreground">Tarefas</span>
           {pendingCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-primary text-primary-foreground rounded-full text-[9px] font-bold flex items-center justify-center">
+            <span className="absolute top-1 right-1 w-4 h-4 bg-primary text-primary-foreground rounded-full text-xs font-bold flex items-center justify-center">
               {pendingCount}
             </span>
           )}

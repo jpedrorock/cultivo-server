@@ -620,7 +620,7 @@ export default function PlantsList() {
                                 {/* Nome + fase sobrepostos */}
                                 <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
                                   <p className="text-white font-bold text-sm leading-tight truncate drop-shadow">{plant.name}</p>
-                                  <p className="text-white/70 text-[11px] mt-0.5 uppercase tracking-wider truncate drop-shadow">{phaseLabel}</p>
+                                  <p className="text-white/70 text-xs mt-0.5 uppercase tracking-wider truncate drop-shadow">{phaseLabel}</p>
                                 </div>
                               </Link>
 
@@ -680,7 +680,7 @@ export default function PlantsList() {
                 <Trash2 className="w-4 h-4 text-red-400" />
               </div>
               {(deletedPlants?.length ?? 0) > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold text-white flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-xs font-bold text-white flex items-center justify-center">
                   {deletedPlants!.length > 9 ? '9+' : deletedPlants!.length}
                 </span>
               )}
@@ -748,12 +748,12 @@ export default function PlantsList() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2">
                               <p className="text-sm font-bold text-foreground/60 truncate">{plant.name}</p>
-                              {plant.code && <span className="text-[10px] font-mono text-muted-foreground/40 shrink-0">{plant.code}</span>}
+                              {plant.code && <span className="text-xs font-mono text-muted-foreground/40 shrink-0">{plant.code}</span>}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[11px] text-muted-foreground/50 truncate">{getStrainName(plant.strainId) || 'Sem strain'}</span>
-                              <span className="text-muted-foreground/25 text-[11px]">·</span>
-                              <span className="text-[11px] text-muted-foreground/40 shrink-0">{deletedLabel}</span>
+                              <span className="text-xs text-muted-foreground/50 truncate">{getStrainName(plant.strainId) || 'Sem strain'}</span>
+                              <span className="text-muted-foreground/25 text-xs">·</span>
+                              <span className="text-xs text-muted-foreground/40 shrink-0">{deletedLabel}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
@@ -774,8 +774,8 @@ export default function PlantsList() {
                         </div>
                         <div className="px-3 pb-2.5">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wide font-medium">Expira em</span>
-                            <span className="text-[10px] font-bold" style={{ color: barColor }}>{timeLabel}</span>
+                            <span className="text-xs text-muted-foreground/40 uppercase tracking-wide font-medium">Expira em</span>
+                            <span className="text-xs font-bold" style={{ color: barColor }}>{timeLabel}</span>
                           </div>
                           <div className="h-0.5 rounded-full bg-white/5 overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${expiryPct}%`, background: barColor, boxShadow: `0 0 4px ${barColor}88` }} />
@@ -1020,7 +1020,7 @@ export default function PlantsList() {
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
                   {bulkPromote.isPending ? <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" /> : <Sprout className="w-4 h-4 text-emerald-400" />}
-                  <span className="text-[10px] font-medium text-white/45 leading-none">Promover</span>
+                  <span className="text-xs font-medium text-white/45 leading-none">Promover</span>
                 </button>
               )}
 
@@ -1033,7 +1033,7 @@ export default function PlantsList() {
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 <MoveRight className="w-4 h-4 text-blue-400" />
-                <span className="text-[10px] font-medium text-white/45 leading-none">Mover</span>
+                <span className="text-xs font-medium text-white/45 leading-none">Mover</span>
               </button>
 
               {/* Colher */}
@@ -1046,7 +1046,7 @@ export default function PlantsList() {
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 {bulkHarvest.isPending ? <Loader2 className="w-4 h-4 text-amber-400 animate-spin" /> : <Leaf className="w-4 h-4 text-amber-400" />}
-                <span className="text-[10px] font-medium text-white/45 leading-none">Colher</span>
+                <span className="text-xs font-medium text-white/45 leading-none">Colher</span>
               </button>
 
               {/* Descartar */}
@@ -1059,7 +1059,7 @@ export default function PlantsList() {
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 {bulkDiscard.isPending ? <Loader2 className="w-4 h-4 text-orange-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-orange-400/80" />}
-                <span className="text-[10px] font-medium text-white/45 leading-none">Descartar</span>
+                <span className="text-xs font-medium text-white/45 leading-none">Descartar</span>
               </button>
 
               {/* Excluir */}
@@ -1071,7 +1071,7 @@ export default function PlantsList() {
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
                 {bulkDelete.isPending ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-400" />}
-                <span className="text-[10px] font-medium text-white/45 leading-none">Excluir</span>
+                <span className="text-xs font-medium text-white/45 leading-none">Excluir</span>
               </button>
             </div>
           </div>

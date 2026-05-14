@@ -39,7 +39,7 @@ function Cell({
 }) {
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">
+      <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">
         {label}
       </span>
       {children ?? (
@@ -87,7 +87,7 @@ function LogRow({
       {/* Header — data full width */}
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
         <span className="text-xs font-semibold text-foreground/70 capitalize">{dateStr}</span>
-        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded leading-none ${
+        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded leading-none ${
           isAM
             ? "bg-amber-500/10 text-amber-400/70"
             : "bg-indigo-500/10 text-indigo-400/70"
@@ -95,7 +95,7 @@ function LogRow({
           {isAM ? "AM" : "PM"}
         </span>
         {log.notes && (
-          <span className="text-[11px] text-muted-foreground/35 italic truncate flex-1 ml-1">
+          <span className="text-xs text-muted-foreground/35 italic truncate flex-1 ml-1">
             {log.notes}
           </span>
         )}
@@ -265,7 +265,7 @@ function PeriodCard({
             <Home className={`w-3.5 h-3.5 shrink-0 ${color.header}`} />
             <p className={`text-sm font-semibold truncate ${color.header}`}>{period.tentName}</p>
           </div>
-          <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+          <p className="text-xs text-muted-foreground/60 mt-0.5">
             {startStr} → {endStr}
             <span className="mx-1.5">·</span>
             {period.daysInTent} dia{period.daysInTent !== 1 ? "s" : ""}
@@ -277,18 +277,18 @@ function PeriodCard({
           {tempValues.length >= 2 ? (
             <div className="flex flex-col items-end gap-0.5">
               <Sparkline values={tempValues} color="#f97316" width={72} height={20} />
-              {avgTemp && <span className="text-[10px] text-orange-400/70 font-medium tabular-nums">⌀ {avgTemp}°C</span>}
+              {avgTemp && <span className="text-xs text-orange-400/70 font-medium tabular-nums">⌀ {avgTemp}°C</span>}
             </div>
           ) : avgTemp ? (
-            <span className="text-[11px] text-orange-400/70">{avgTemp}°C</span>
+            <span className="text-xs text-orange-400/70">{avgTemp}°C</span>
           ) : null}
           {rhValues.length >= 2 ? (
             <div className="flex flex-col items-end gap-0.5">
               <Sparkline values={rhValues} color="#60a5fa" width={72} height={20} />
-              {avgRh && <span className="text-[10px] text-blue-400/70 font-medium tabular-nums">⌀ {avgRh}%</span>}
+              {avgRh && <span className="text-xs text-blue-400/70 font-medium tabular-nums">⌀ {avgRh}%</span>}
             </div>
           ) : avgRh ? (
-            <span className="text-[11px] text-blue-400/70">{avgRh}%</span>
+            <span className="text-xs text-blue-400/70">{avgRh}%</span>
           ) : null}
         </div>
         {open

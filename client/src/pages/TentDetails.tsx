@@ -98,7 +98,7 @@ function TentSensorCard({ tentId }: { tentId: number }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground">Sensor de ambiente</p>
-          <p className="text-[11px] text-muted-foreground">Configure as credenciais SmartLife para ativar</p>
+          <p className="text-xs text-muted-foreground">Configure as credenciais SmartLife para ativar</p>
         </div>
         <Link href="/settings/sensors">
           <button className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground font-medium transition-colors flex items-center gap-1">
@@ -123,7 +123,7 @@ function TentSensorCard({ tentId }: { tentId: number }) {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground">Vincular sensor SmartLife</p>
-              <p className="text-[11px] text-muted-foreground">Temperatura e umidade automáticos</p>
+              <p className="text-xs text-muted-foreground">Temperatura e umidade automáticos</p>
             </div>
             <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
           </button>
@@ -153,7 +153,7 @@ function TentSensorCard({ tentId }: { tentId: number }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{dev.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
+                      <p className="text-xs text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
                     </div>
                   </button>
                 ))}
@@ -189,7 +189,7 @@ function TentSensorCard({ tentId }: { tentId: number }) {
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-foreground truncate">{tentMapping.deviceName}</p>
           {isEnabled && hasReading && reading.isFresh && (
-            <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold">AO VIVO</span>
+            <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-bold">AO VIVO</span>
           )}
         </div>
         {isEnabled && hasReading ? (
@@ -202,10 +202,10 @@ function TentSensorCard({ tentId }: { tentId: number }) {
               <Droplets className="w-3 h-3 text-blue-400" />
               {reading.rhPct}%
             </span>
-            <span className="text-[10px] text-muted-foreground">{timeAgo(reading.readAt)}</span>
+            <span className="text-xs text-muted-foreground">{timeAgo(reading.readAt)}</span>
           </div>
         ) : (
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {!isEnabled ? 'Leitura automática desativada' : 'Aguardando primeira leitura...'}
           </p>
         )}
@@ -527,7 +527,7 @@ function CameraStreamDialog({
           />
         </div>
 
-        <div className="px-4 py-2 flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="px-4 py-2 flex items-center justify-between text-xs text-muted-foreground">
           <span>URL renova a cada 8min</span>
           <div className="flex items-center gap-3">
             <button
@@ -758,7 +758,7 @@ function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
       ) : (
         <Icon className={`w-4 h-4 ${isOn ? 'text-blue-400' : iconColorClass}`} />
       )}
-      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+      <p className="text-xs text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
     </button>
   );
 }
@@ -791,10 +791,10 @@ function PreviewCameraSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
         }`}
       >
         <Icon className={`w-4 h-4 ${iconColorClass}`} />
-        <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+        <p className="text-xs text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
         {/* Badge offline no canto */}
         {!isOnline && (
-          <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded text-[8px] font-semibold bg-muted-foreground/60 text-card uppercase">
+          <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded text-xs font-semibold bg-muted-foreground/60 text-card uppercase">
             off
           </span>
         )}
@@ -831,7 +831,7 @@ function PreviewSceneSlot({ slot, Icon, iconColorClass, ringColorClass }: Previe
       {trigger.isPending
         ? <Loader2 className={`w-4 h-4 animate-spin ${iconColorClass}`} />
         : <Icon className={`w-4 h-4 ${iconColorClass}`} />}
-      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+      <p className="text-xs text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
     </button>
   );
 }
@@ -876,7 +876,7 @@ function PreviewAutomationSlot({ slot, Icon, iconColorClass, ringColorClass }: P
       ) : (
         <Icon className={`w-4 h-4 ${iconColorClass}`} />
       )}
-      <p className="text-[9px] text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
+      <p className="text-xs text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
       {/* Badge ⏰ se iconHint não for já 'schedule' */}
       {slot.iconHint !== 'schedule' && (
         <span className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full bg-blue-500/90 ring-1 ring-card flex items-center justify-center">
@@ -1018,7 +1018,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
             via React Query cache (mesmo query key dos botões da row). */}
         {totalCount > 0 && (
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
               Preview do display <span className="text-muted-foreground/50 normal-case font-normal">— clicável</span>
             </p>
             <div className="rounded-xl border border-border/60 bg-background/60 p-2.5">
@@ -1059,7 +1059,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
         {/* Lista combinada com ↑↓ */}
         {totalCount > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Itens vinculados</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Itens vinculados</p>
             {(items as any[]).map((item: any, idx: number) => {
               const isScene = item.type === 'scene';
               // Cenas e devices ambos usam iconHint salvo (ICON_HINT_COMPONENTS).
@@ -1104,7 +1104,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground truncate">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {isScene
                         ? (item.sceneType === 'automation' ? 'Automação programada' : 'Cena (one-shot)')
                         : (ICON_HINT_LABELS[item.iconHint ?? 'other'] ?? 'Dispositivo')}
@@ -1188,7 +1188,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                   if (isAutomation) return null;
                   return (
                     <div>
-                      <label className="text-[11px] text-muted-foreground block mb-1">
+                      <label className="text-xs text-muted-foreground block mb-1">
                         Duração (segundos)
                         <span className="ml-1 text-muted-foreground/60">— quanto tempo o display mostra "executando"</span>
                       </label>
@@ -1276,7 +1276,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
         )}
 
         {atLimit && (
-          <p className="text-[11px] text-amber-500 text-center pt-1">
+          <p className="text-xs text-amber-500 text-center pt-1">
             Limite atingido (6 itens). Remova algum pra adicionar outro.
           </p>
         )}
@@ -1380,7 +1380,7 @@ function PairDisplayCard({ tentId }: { tentId: number }) {
               <p className="text-sm text-emerald-500 text-center font-medium">✓ Display conectado!</p>
             )}
 
-            <p className="text-[11px] text-muted-foreground text-center">
+            <p className="text-xs text-muted-foreground text-center">
               O código vale por 10 minutos. Se expirar, é só reiniciar o display que ele gera outro.
             </p>
           </div>
@@ -1898,19 +1898,19 @@ export default function TentDetails() {
                     const hoursAgo = differenceInHours(new Date(), lastLogDate);
                     const daysAgo = differenceInDays(new Date(), lastLogDate);
                     if (hoursAgo < 24) return (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                         {hoursAgo === 0 ? 'Agora' : `${hoursAgo}h atrás`}
                       </span>
                     );
                     if (daysAgo === 1) return (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                      <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                         Ontem
                       </span>
                     );
                     return (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
+                      <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
                         {daysAgo}d sem registro
                       </span>
@@ -1922,10 +1922,10 @@ export default function TentDetails() {
                 {cycle && currentPhase && currentWeek && (
                   <div className="flex items-center gap-1 mt-0.5">
                     <Calendar className="w-3 h-3 text-primary/60 shrink-0" />
-                    <span className="text-[11px] font-semibold text-primary/80">
+                    <span className="text-xs font-semibold text-primary/80">
                       Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : "Vega"}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       · início {format(new Date(cycle.startDate), "dd/MM", { locale: ptBR })}
                     </span>
                   </div>
@@ -2026,14 +2026,14 @@ export default function TentDetails() {
           if (pills.length === 0) return null;
           return (
             <div className="flex items-center gap-1 flex-wrap px-1">
-              <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mr-1 shrink-0">
+              <span className="text-xs text-muted-foreground/50 flex items-center gap-1 mr-1 shrink-0">
                 <Clock className="w-2.5 h-2.5" />
                 {format(new Date(last.logDate), "dd/MM HH:mm", { locale: ptBR })}
               </span>
               {pills.map((p, i) => (
                 <span
                   key={i}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
                     p.ok === null    ? "bg-muted/30 border-border/40 text-muted-foreground" :
                     p.ok            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
                                       "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"
@@ -2586,7 +2586,7 @@ export default function TentDetails() {
                             {log.rhPct}%
                           </span>
                         )}
-                        <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-auto">A</span>
+                        <span className="text-xs font-bold text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 rounded-full px-1.5 py-0.5 ml-auto">A</span>
                       </div>
                     );
                   }
@@ -2602,7 +2602,7 @@ export default function TentDetails() {
                       <span className="text-xs font-semibold text-foreground/70 capitalize">
                         {format(new Date(log.logDate), "EEE, dd MMM", { locale: ptBR })}
                       </span>
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded leading-none ${
+                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded leading-none ${
                         log.turn === "AM"
                           ? "bg-amber-500/10 text-amber-400/70"
                           : "bg-indigo-500/10 text-indigo-400/70"
@@ -2635,21 +2635,21 @@ export default function TentDetails() {
                       {/* Linha 1 — Temp · Humidade · PPFD */}
                       <div className="grid grid-cols-3 divide-x divide-border/20 bg-white/[0.015]">
                         <div className="px-3 py-3 flex flex-col gap-1">
-                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">Temp</span>
+                          <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">Temp</span>
                           <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
                             <ThermometerSun className="w-3.5 h-3.5 text-orange-400 shrink-0" />
                             {log.tempC ? `${log.tempC}°C` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
-                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">Humidade</span>
+                          <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">Humidade</span>
                           <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
                             <Droplets className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                             {log.rhPct ? `${log.rhPct}%` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
-                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">PPFD</span>
+                          <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">PPFD</span>
                           <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
                             <Sun className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
                             {log.ppfd ? `${log.ppfd} µmol` : <span className="text-muted-foreground/20">—</span>}
@@ -2662,21 +2662,21 @@ export default function TentDetails() {
                       {/* Linha 2 — pH · EC · Runoff */}
                       <div className="grid grid-cols-3 divide-x divide-border/20">
                         <div className="px-3 py-3 flex flex-col gap-1">
-                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">pH</span>
+                          <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">pH</span>
                           <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
                             <FlaskConical className="w-3.5 h-3.5 text-teal-400 shrink-0" />
                             {log.ph ? `${log.ph}` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
-                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">EC</span>
+                          <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">EC</span>
                           <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
                             <Zap className="w-3.5 h-3.5 text-violet-400 shrink-0" />
                             {log.ec ? `${log.ec}` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
-                          <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider leading-none">Runoff</span>
+                          <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">Runoff</span>
                           <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
                             <Droplets className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                             {log.runoffPercentage
@@ -2691,7 +2691,7 @@ export default function TentDetails() {
 
                     {/* Notes */}
                     {log.notes && (
-                      <p className="text-[11px] text-muted-foreground/40 italic px-4 pb-3 -mt-1 truncate">
+                      <p className="text-xs text-muted-foreground/40 italic px-4 pb-3 -mt-1 truncate">
                         {log.notes}
                       </p>
                     )}
@@ -2882,7 +2882,7 @@ function TentPlantsTab({ tentId, tentName: _tentName }: { tentId: number; tentNa
                 {/* Badge saúde */}
                 {healthBadge && (
                   <span
-                    className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm"
+                    className="absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm"
                     style={{ background: healthBadge.bg, color: healthBadge.color }}
                   >
                     {healthBadge.icon}
@@ -2905,7 +2905,7 @@ function TentPlantsTab({ tentId, tentName: _tentName }: { tentId: number; tentNa
                   style={{ height: '55%', background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)' }} />
                 <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5">
                   <p className="text-white font-bold text-xs leading-tight truncate drop-shadow">{plant.name}</p>
-                  <p className="text-white/60 text-[10px] mt-0.5 truncate">{phaseLabel}</p>
+                  <p className="text-white/60 text-xs mt-0.5 truncate">{phaseLabel}</p>
                 </div>
               </div>
             </Link>

@@ -83,7 +83,7 @@ export function TrichomeForm({
           <span className="text-xs text-muted-foreground/60 font-medium">
             Planta {currentIndex + 1} de {totalPlants}
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold">
+          <span className="text-xs px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400 border border-violet-500/20 font-semibold">
             Tricomas
           </span>
         </div>
@@ -106,7 +106,7 @@ export function TrichomeForm({
             >
               <span className="text-base font-bold">{label}</span>
               <span
-                className={`text-[11px] font-normal ${
+                className={`text-xs font-normal ${
                   selected ? "text-white/80" : "text-muted-foreground"
                 }`}
               >
@@ -129,7 +129,7 @@ export function TrichomeForm({
             <div className="grid grid-cols-3 gap-2">
               {PCT_FIELDS.map(({ field, label }) => (
                 <div key={field}>
-                  <label className="text-[11px] text-muted-foreground block mb-1">{label}</label>
+                  <label className="text-xs text-muted-foreground block mb-1">{label}</label>
                   <Input
                     type="number"
                     inputMode="numeric"

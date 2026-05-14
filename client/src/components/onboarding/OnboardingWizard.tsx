@@ -205,7 +205,7 @@ export default function OnboardingWizard() {
               <Sparkles className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground/70 font-semibold">
                 Configuração inicial
               </p>
               <p className="text-sm font-semibold">Bem-vindo ao Cultivo</p>
@@ -314,7 +314,7 @@ function Step1Tent({
             onChange={(e) => onChange({ ...draft, name: e.target.value })}
             placeholder="Ex: Estufa A"
           />
-          <p className="text-[11px] text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground/70">
             Use algo curto. Ex: "Estufa A", "Veg 1", "Box flora".
           </p>
         </div>
@@ -339,7 +339,7 @@ function Step1Tent({
                 }`}
               >
                 <p className="text-sm font-semibold">{opt.l}</p>
-                <p className="text-[10px] text-muted-foreground">{opt.d}</p>
+                <p className="text-xs text-muted-foreground">{opt.d}</p>
               </button>
             ))}
           </div>
@@ -358,13 +358,13 @@ function Step1Tent({
                   }
                   min={1}
                 />
-                <p className="text-[10px] text-muted-foreground text-center mt-1">
+                <p className="text-xs text-muted-foreground text-center mt-1">
                   {k === "width" ? "Largura" : k === "depth" ? "Profundidade" : "Altura"}
                 </p>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground/70">
             Volume calculado automaticamente. Usado pra cálculo de PPFD ideal.
           </p>
         </div>
@@ -449,10 +449,10 @@ function Step2Strain({
                   <p className="text-sm font-semibold">{s.name}</p>
                   {selected && <Check className="w-4 h-4 text-primary shrink-0" />}
                 </div>
-                <p className="text-[10px] text-muted-foreground mb-1.5">
+                <p className="text-xs text-muted-foreground mb-1.5">
                   {s.type} · Veg {s.vegaWeeks}sem · Flora {s.floraWeeks}sem
                 </p>
-                <p className="text-[11px] text-muted-foreground/80 line-clamp-2 leading-snug">
+                <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-snug">
                   {s.description}
                 </p>
               </button>
@@ -613,7 +613,7 @@ function Step3Plant({
             onChange={(e) => onChange({ ...draft, code: e.target.value })}
             placeholder="Ex: NL-001, P1..."
           />
-          <p className="text-[11px] text-muted-foreground/70">
+          <p className="text-xs text-muted-foreground/70">
             Útil pra cultivos com muitas plantas. Pode deixar vazio.
           </p>
         </div>
@@ -678,19 +678,19 @@ function DoneView({ onFinish }: { onFinish: () => void }) {
         </p>
         <div className="space-y-2 text-sm">
           <div className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center mt-0.5 shrink-0">
+            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
               1
             </span>
             <span>Inicia um ciclo na estufa pra começar contagem de semanas</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center mt-0.5 shrink-0">
+            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
               2
             </span>
             <span>Faz primeiro registro com botão + → Status da estufa</span>
           </div>
           <div className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center mt-0.5 shrink-0">
+            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
               3
             </span>
             <span>(Opcional) Conecta SmartLife pra leituras automáticas de sensores</span>

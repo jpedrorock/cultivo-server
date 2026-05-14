@@ -176,14 +176,14 @@ function CalcHistoryPanel({ entries, onClear }: { entries: CalcEntry[]; onClear:
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <ClockIcon className="w-3.5 h-3.5" /> Histórico
         </p>
-        <button onClick={onClear} className="text-[11px] text-muted-foreground/50 hover:text-destructive transition-colors">Limpar</button>
+        <button onClick={onClear} className="text-xs text-muted-foreground/50 hover:text-destructive transition-colors">Limpar</button>
       </div>
       <div className="space-y-1.5">
         {entries.map(e => (
           <div key={e.id} className="flex items-center justify-between gap-3 text-xs py-1.5 border-b border-border/20 last:border-0">
             <span className="text-muted-foreground/70 truncate flex-1">{e.label}</span>
             <span className="font-semibold text-foreground font-mono">{e.result}</span>
-            <span className="text-muted-foreground/40 shrink-0 text-[10px]">
+            <span className="text-muted-foreground/40 shrink-0 text-xs">
               {new Date(e.at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
@@ -196,7 +196,7 @@ function CalcHistoryPanel({ entries, onClear }: { entries: CalcEntry[]; onClear:
 // ── Visual helpers das calculadoras ──────────────────────────────────────────
 function CalcEyebrow({ text }: { text: string }) {
   return (
-    <div className="mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground mb-1.5">
+    <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground mb-1.5">
       ↳ {text}
     </div>
   );
@@ -204,7 +204,7 @@ function CalcEyebrow({ text }: { text: string }) {
 
 function CalcRunning() {
   return (
-    <div className="absolute top-4 right-4 mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground/50 flex items-center gap-1.5 pointer-events-none">
+    <div className="absolute top-4 right-4 mono text-xs uppercase tracking-[0.22em] text-muted-foreground/50 flex items-center gap-1.5 pointer-events-none">
       <span className="h-1.5 w-1.5 rounded-full bg-primary pulse-dot" />
       ao vivo
     </div>
@@ -452,7 +452,7 @@ function WateringRunoffCalculator() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">Calculadora de Rega</p>
-                <p className="text-[11px] text-muted-foreground">Volume ideal por vaso e por sessão</p>
+                <p className="text-xs text-muted-foreground">Volume ideal por vaso e por sessão</p>
               </div>
             </div>
 
@@ -521,7 +521,7 @@ function WateringRunoffCalculator() {
                         ? "bg-emerald-500/15 border border-emerald-400/60 text-emerald-300 shadow-[0_0_12px_rgba(74,222,128,0.2)]"
                         : chipInactive}`}>
                       {n}%
-                      {(n === 15 || n === 20) && <span className="block text-[9px] font-normal opacity-60">ideal</span>}
+                      {(n === 15 || n === 20) && <span className="block text-xs font-normal opacity-60">ideal</span>}
                     </button>
                   ))}
                 </div>
@@ -545,18 +545,18 @@ function WateringRunoffCalculator() {
             {/* Resultado — dentro do mesmo card, separado */}
             <div className="mx-4 mb-4 rounded-xl overflow-hidden border border-cyan-500/20" style={{ background: 'linear-gradient(135deg, rgba(34,211,238,0.12) 0%, rgba(6,182,212,0.06) 100%)' }}>
               <div className="px-4 py-2 border-b border-cyan-500/15">
-                <p className="mono text-[10px] font-semibold uppercase tracking-[0.25em] text-cyan-400/80">Resultado</p>
+                <p className="mono text-xs font-semibold uppercase tracking-[0.25em] text-cyan-400/80">Resultado</p>
               </div>
               <div className="grid grid-cols-2 divide-x divide-cyan-500/15">
                 <div className="p-4 text-center">
-                  <p className="mono text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1">Por Planta</p>
+                  <p className="mono text-xs text-muted-foreground uppercase tracking-[0.2em] mb-1">Por Planta</p>
                   <div className="flex items-baseline justify-center gap-1">
                     <span className="mono text-5xl font-light text-cyan-300" style={{ filter: "drop-shadow(0 0 8px rgba(34,211,238,0.5))" }}>{wateringResult.adjustedVolume}</span>
                     <span className="mono text-sm text-cyan-400/70">L</span>
                   </div>
                 </div>
                 <div className="p-4 text-center">
-                  <p className="mono text-[10px] text-muted-foreground uppercase tracking-[0.2em] mb-1">Total · {numPlants}pl</p>
+                  <p className="mono text-xs text-muted-foreground uppercase tracking-[0.2em] mb-1">Total · {numPlants}pl</p>
                   <div className="flex items-baseline justify-center gap-1">
                     <span className="mono text-5xl font-light text-cyan-300" style={{ filter: "drop-shadow(0 0 8px rgba(34,211,238,0.5))" }}>{wateringResult.totalVolume}</span>
                     <span className="mono text-sm text-cyan-400/70">L</span>
@@ -579,7 +579,7 @@ function WateringRunoffCalculator() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">Verificar Runoff Real</p>
-                <p className="text-[11px] text-muted-foreground">Meça o volume coletado e calcule o %</p>
+                <p className="text-xs text-muted-foreground">Meça o volume coletado e calcule o %</p>
               </div>
             </div>
             <div className="p-4 space-y-4">
@@ -589,14 +589,14 @@ function WateringRunoffCalculator() {
                   <Input id="volumeIn" type="text" inputMode="decimal" placeholder="Ex: 3.5"
                     value={volumeIn} onChange={(e) => setVolumeIn(e.target.value)}
                     className="h-12 text-center text-lg font-bold bg-muted/30 border-border/50" />
-                  <p className="text-[10px] text-center text-muted-foreground">litros (L)</p>
+                  <p className="text-xs text-center text-muted-foreground">litros (L)</p>
                 </div>
                 <div className="space-y-1.5">
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Volume Coletado</span>
                   <Input id="volumeOut" type="text" inputMode="decimal" placeholder="Ex: 0.7"
                     value={volumeOut} onChange={(e) => setVolumeOut(e.target.value)}
                     className="h-12 text-center text-lg font-bold bg-muted/30 border-border/50" />
-                  <p className="text-[10px] text-center text-muted-foreground">litros (L)</p>
+                  <p className="text-xs text-center text-muted-foreground">litros (L)</p>
                 </div>
               </div>
 
@@ -634,7 +634,7 @@ function WateringRunoffCalculator() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">Salvar Receita</p>
-                <p className="text-[11px] text-muted-foreground">Registre para consulta futura</p>
+                <p className="text-xs text-muted-foreground">Registre para consulta futura</p>
               </div>
             </div>
             <div className="p-4 space-y-3">
@@ -843,7 +843,7 @@ function LuxPPFDCalculator() {
 
             {/* Fonte de luz */}
             <div>
-              <div className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">Fonte de luz</div>
+              <div className="mono text-xs uppercase tracking-[0.25em] text-muted-foreground mb-2">Fonte de luz</div>
               <div className="grid grid-cols-2 gap-1">
                 {([
                   ["led-white",        "LED Branco"],
@@ -870,7 +870,7 @@ function LuxPPFDCalculator() {
 
           {/* Result */}
           <div className="flex flex-col justify-center">
-            <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">
+            <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">
               {conversionMode === "lux-to-ppfd" ? "PPFD" : "Lux"}
             </div>
             {result !== null ? (
@@ -902,7 +902,7 @@ function LuxPPFDCalculator() {
 
       {/* Reference table */}
       <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-3">
-        <p className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Referência PPFD por fase</p>
+        <p className="mono text-xs uppercase tracking-[0.25em] text-muted-foreground">Referência PPFD por fase</p>
         <div className="grid grid-cols-2 gap-2 text-xs">
           {[["Clonagem", "100–200"], ["Vegetativa", "400–600"], ["Floração", "600–900"], ["Máximo", "1000–1200"]].map(([phase, range]) => (
             <div key={phase} className="bg-muted/40 rounded-lg p-2.5">
@@ -983,7 +983,7 @@ function PPMECConverter() {
 
             {/* Escala */}
             <div>
-              <div className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">Escala PPM</div>
+              <div className="mono text-xs uppercase tracking-[0.25em] text-muted-foreground mb-2">Escala PPM</div>
               <div className="grid grid-cols-2 gap-1">
                 {(["500", "700"] as const).map((s) => (
                   <button
@@ -1004,7 +1004,7 @@ function PPMECConverter() {
 
           {/* Result */}
           <div className="flex flex-col justify-center">
-            <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">
+            <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">
               {conversionType === "ppm-to-ec" ? "EC" : "PPM"}
             </div>
             {result !== null ? (
@@ -1033,7 +1033,7 @@ function PPMECConverter() {
 
       {/* Reference table */}
       <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-3">
-        <p className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Tabela de referência — Escala ×{scale}</p>
+        <p className="mono text-xs uppercase tracking-[0.25em] text-muted-foreground">Tabela de referência — Escala ×{scale}</p>
         <div className="space-y-2 text-xs">
           {[
             ["Clonagem",              "0.4–0.8 EC", scale === "500" ? "200–400" : "280–560"],
@@ -1126,7 +1126,7 @@ function PHAdjustCalculator() {
           <div className="space-y-6">
             {/* Volume */}
             <div>
-              <div className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">Volume de água</div>
+              <div className="mono text-xs uppercase tracking-[0.25em] text-muted-foreground mb-2">Volume de água</div>
               <Input
                 id="waterVolumePH"
                 type="text"
@@ -1136,7 +1136,7 @@ function PHAdjustCalculator() {
                 onChange={(e) => setWaterVolume(e.target.value)}
                 className="mono text-xl h-12 font-bold text-center"
               />
-              <p className="mono text-[10px] text-muted-foreground/60 text-center mt-1">litros (L)</p>
+              <p className="mono text-xs text-muted-foreground/60 text-center mt-1">litros (L)</p>
             </div>
 
             {/* pH atual */}
@@ -1164,7 +1164,7 @@ function PHAdjustCalculator() {
           <div className="flex flex-col justify-center">
             {result ? (
               <>
-                <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">
+                <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">
                   {currentPH > targetPH ? "pH Down" : "pH Up"}
                 </div>
                 <div className="flex items-baseline gap-2">
@@ -1189,7 +1189,7 @@ function PHAdjustCalculator() {
               </>
             ) : (
               <div className="space-y-2">
-                <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">pH atual → alvo</div>
+                <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground">pH atual → alvo</div>
                 <div className="flex items-baseline gap-3">
                   <span className="mono text-5xl font-light" style={{ color: getPHColor(currentPH) }}>{currentPH.toFixed(1)}</span>
                   <span className="text-muted-foreground">→</span>
@@ -1204,7 +1204,7 @@ function PHAdjustCalculator() {
 
       {/* Reference table */}
       <div className="rounded-2xl border border-border/50 bg-card p-5 space-y-3">
-        <p className="mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">pH ideal por substrato</p>
+        <p className="mono text-xs uppercase tracking-[0.25em] text-muted-foreground">pH ideal por substrato</p>
         <div className="space-y-2 text-xs">
           {[["Solo/Terra", "6.0–7.0"], ["Fibra de Coco", "5.5–6.5"], ["Hidroponia", "5.5–6.0"]].map(([sub, range]) => (
             <div key={sub} className="flex justify-between py-1.5 border-b border-border/20 last:border-0">
@@ -1289,7 +1289,7 @@ function VPDCalculator() {
 
           {/* Result */}
           <div className="flex flex-col justify-center">
-            <div className="mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">VPD</div>
+            <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">VPD</div>
             <div className="flex items-baseline gap-2">
               <span
                 className={`mono text-7xl lg:text-8xl font-light tracking-tight leading-none ${activeZone.textColor}`}
@@ -1336,7 +1336,7 @@ function VPDCalculator() {
       {/* 2D VPD reference grid */}
       <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tabela de Referência VPD (kPa)</p>
-        <p className="text-[11px] text-muted-foreground/60">Temperatura do ar × Umidade Relativa</p>
+        <p className="text-xs text-muted-foreground/60">Temperatura do ar × Umidade Relativa</p>
         {(() => {
           const temps = [18, 20, 22, 24, 26, 28, 30];
           const rhs = [40, 50, 60, 70, 80];
@@ -1351,7 +1351,7 @@ function VPDCalculator() {
           };
           return (
             <div className="overflow-x-auto">
-              <table className="w-full text-center text-[11px]">
+              <table className="w-full text-center text-xs">
                 <thead>
                   <tr>
                     <th className="py-1 pr-2 text-muted-foreground font-normal text-left">UR \ T</th>
@@ -1382,7 +1382,7 @@ function VPDCalculator() {
             </div>
           );
         })()}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground pt-1">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-500/40 inline-block"/>{'< 0.4 Risco mofo'}</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-yellow-500/40 inline-block"/>0.4–0.8 Mudas</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500/40 inline-block"/>0.8–1.0 Vega</span>

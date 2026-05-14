@@ -248,7 +248,7 @@ export default function PlantPhotosTab({ plantId }: Props) {
       {/* Photo grid grouped by month */}
       {grouped.map(({ label, items }) => (
         <div key={label} className="mb-6">
-          <p className="text-[11px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 capitalize">
+          <p className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 capitalize">
             {label}
           </p>
           <div className="grid grid-cols-3 gap-1.5">
@@ -268,11 +268,11 @@ export default function PlantPhotosTab({ plantId }: Props) {
                   />
                   {/* Hover overlay */}
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 pointer-events-none">
-                    <span className="text-[10px] text-white/90 font-medium leading-tight">
+                    <span className="text-xs text-white/90 font-medium leading-tight">
                       {format(new Date(photo.photoDate), "dd/MM/yy")}
                     </span>
                     {(photo as any).weekNumber && (
-                      <span className="text-[9px] text-white/60">Sem. {(photo as any).weekNumber}</span>
+                      <span className="text-xs text-white/60">Sem. {(photo as any).weekNumber}</span>
                     )}
                   </div>
                 </button>
@@ -366,7 +366,7 @@ export default function PlantPhotosTab({ plantId }: Props) {
                 {format(new Date(currentPhoto.photoDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
               </p>
               {(currentPhoto as any).weekNumber && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/50">
                   Semana {(currentPhoto as any).weekNumber}
                 </span>
               )}

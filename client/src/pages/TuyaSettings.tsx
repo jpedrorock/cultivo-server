@@ -328,12 +328,12 @@ export default function TuyaSettings() {
                               <p className="text-sm font-semibold text-foreground">{tent.name}</p>
                               {m ? (
                                 <>
-                                  <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                                  <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
                                     <Wifi className="w-3 h-3 shrink-0 text-emerald-500" />
                                     {m.deviceName}
                                   </p>
                                   {latestReadings[tent.id] && (
-                                    <p className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
+                                    <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                                       {latestReadings[tent.id].tempC != null && (
                                         <span className="text-amber-500 font-medium">{latestReadings[tent.id].tempC!.toFixed(1)}°C</span>
                                       )}
@@ -347,7 +347,7 @@ export default function TuyaSettings() {
                                   )}
                                 </>
                               ) : (
-                                <p className="text-[11px] text-muted-foreground italic">Sem sensor</p>
+                                <p className="text-xs text-muted-foreground italic">Sem sensor</p>
                               )}
                             </div>
                             {/* Toggle por estufa */}
@@ -421,7 +421,7 @@ export default function TuyaSettings() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-sm font-medium text-foreground truncate">{dev.name}</p>
-                                          <p className="text-[10px] text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
+                                          <p className="text-xs text-muted-foreground">{dev.online ? 'Online' : 'Offline'}</p>
                                         </div>
                                         {selected && <Check className="w-4 h-4 text-emerald-500 shrink-0" />}
                                       </button>
@@ -434,7 +434,7 @@ export default function TuyaSettings() {
                               {useManualEntry && (
                                 <div className="px-4 py-4 space-y-3">
                                   <div>
-                                    <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Device ID <span className="text-muted-foreground/60">(do portal iot.tuya.com)</span></p>
+                                    <p className="text-xs text-muted-foreground mb-1.5 font-medium">Device ID <span className="text-muted-foreground/60">(do portal iot.tuya.com)</span></p>
                                     <input
                                       type="text"
                                       value={draft.deviceId}
@@ -444,7 +444,7 @@ export default function TuyaSettings() {
                                     />
                                   </div>
                                   <div>
-                                    <p className="text-[11px] text-muted-foreground mb-1.5 font-medium">Nome do sensor</p>
+                                    <p className="text-xs text-muted-foreground mb-1.5 font-medium">Nome do sensor</p>
                                     <input
                                       type="text"
                                       value={draft.deviceName}

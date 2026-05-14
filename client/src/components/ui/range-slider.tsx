@@ -119,7 +119,7 @@ export function RangeSlider({
               {lbl.icon && <span className="text-base leading-none">{lbl.icon}</span>}
               <span className="font-semibold leading-none">{lbl.label}</span>
               {lbl.sublabel && (
-                <span className="leading-none opacity-75 text-[10px]">{lbl.sublabel}</span>
+                <span className="leading-none opacity-75 text-xs">{lbl.sublabel}</span>
               )}
             </div>
           ))}

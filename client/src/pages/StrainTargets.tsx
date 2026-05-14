@@ -279,7 +279,7 @@ export default function StrainTargets() {
             Semana {weekNumber}
           </span>
           {hasData && (
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.accent}`}>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${config.accent}`}>
               Configurada
             </span>
           )}
@@ -298,7 +298,7 @@ export default function StrainTargets() {
                 <div key={group.label}>
                   <div className="flex items-center gap-1.5 mb-2">
                     <Icon className={`w-3.5 h-3.5 ${group.iconColor}`} />
-                    <span className="text-[11px] text-muted-foreground/60 uppercase tracking-wider font-medium">
+                    <span className="text-xs text-muted-foreground/60 uppercase tracking-wider font-medium">
                       {group.label}
                     </span>
                   </div>
@@ -434,7 +434,7 @@ export default function StrainTargets() {
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">{activeConfig.label}</p>
-              <p className="text-[11px] text-muted-foreground/60">
+              <p className="text-xs text-muted-foreground/60">
                 {weekCount} semana{weekCount !== 1 ? "s" : ""} · configure os parâmetros ideais por semana
               </p>
             </div>
@@ -467,7 +467,7 @@ export default function StrainTargets() {
               <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
                 {/* Column headers */}
                 <div className="grid grid-cols-3 text-xs font-semibold border-b border-border/30 bg-muted/20">
-                  <div className="px-3 py-2.5 text-muted-foreground/60 uppercase tracking-wider text-[10px]">Parâmetro</div>
+                  <div className="px-3 py-2.5 text-muted-foreground/60 uppercase tracking-wider text-xs">Parâmetro</div>
                   <div className="px-3 py-2.5 flex items-center gap-1.5 text-green-400 border-l border-border/20">
                     <Leaf className="w-3.5 h-3.5" /> Vega
                   </div>
@@ -481,7 +481,7 @@ export default function StrainTargets() {
                     <div key={row.label} className={`grid grid-cols-3 text-sm ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
                       <div className="px-3 py-2.5 flex items-center gap-1.5 text-muted-foreground/70">
                         <Icon className={`w-3.5 h-3.5 ${row.iconColor} shrink-0`} />
-                        <span className="text-[11px]">{row.label}</span>
+                        <span className="text-xs">{row.label}</span>
                       </div>
                       <div className={`px-3 py-2.5 font-mono text-xs font-medium border-l border-border/20 ${row.vega === "—" ? "text-muted-foreground/30" : "text-green-400"}`}>
                         {row.vega}
@@ -493,7 +493,7 @@ export default function StrainTargets() {
                   );
                 })}
                 <div className="px-3 py-2 border-t border-border/20 bg-muted/10">
-                  <p className="text-[10px] text-muted-foreground/50">Médias dos alvos configurados por semana</p>
+                  <p className="text-xs text-muted-foreground/50">Médias dos alvos configurados por semana</p>
                 </div>
               </div>
             );

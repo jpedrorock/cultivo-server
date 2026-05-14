@@ -239,7 +239,7 @@ export function InitiateCycleModal({
                   <p className="text-2xl font-bold tabular-nums" style={{ color: activePhase.color }}>
                     {weekNumber}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     de {activePhase.maxWeeks} semanas
                   </p>
                 </div>

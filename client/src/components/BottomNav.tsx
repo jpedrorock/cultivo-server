@@ -87,7 +87,7 @@ function ChatPlantPicker({
           </div>
           <div>
             <p className="text-sm font-bold text-foreground">{activeGroup.tentName}</p>
-            <p className="text-[11px] text-muted-foreground">{activeGroup.plants.length} planta{activeGroup.plants.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">{activeGroup.plants.length} planta{activeGroup.plants.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <div className="space-y-1">
@@ -105,7 +105,7 @@ function ChatPlantPicker({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{stageLabel(p.plantStage ?? '')}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />
               </button>
@@ -130,7 +130,7 @@ function ChatPlantPicker({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">{group.tentName}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{group.plants.length} planta{group.plants.length !== 1 ? 's' : ''}</p>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground/60 shrink-0" />
         </button>
@@ -418,7 +418,7 @@ export function BottomNav() {
                             setTrainingPickerOpen(false);
                             navigate(`/plants/${plant.id}/training?sandbox=1&view=top`);
                           }}
-                          className="px-2.5 h-7 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          className="px-2.5 h-7 rounded-md text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
                           title="Editar em 2D (vista de cima)"
                         >
                           2D
@@ -429,7 +429,7 @@ export function BottomNav() {
                             setTrainingPickerOpen(false);
                             navigate(`/plants/${plant.id}/training?sandbox=1&view=3d`);
                           }}
-                          className="px-2.5 h-7 rounded-md text-[11px] font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
+                          className="px-2.5 h-7 rounded-md text-xs font-semibold bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 active:scale-95 transition-[background-color,transform] shrink-0"
                           title="Editar em 3D"
                         >
                           3D
@@ -509,7 +509,7 @@ export function BottomNav() {
                 {showBadge && (
                   <span
                     className={cn(
-                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
+                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
                       "animate-pulse"
                     )}
                   >
@@ -539,7 +539,7 @@ export function BottomNav() {
                 {((alertCount ?? 0) + (harvestQueueCount ?? 0)) > 0 && (
                   <span
                     className={cn(
-                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm",
+                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
                       badgeShaking ? "animate-badge-shake" : "animate-pulse",
                     )}
                   >
