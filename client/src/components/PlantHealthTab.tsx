@@ -531,12 +531,27 @@ export default function PlantHealthTab({ plantId }: PlantHealthTabProps) {
             })}
           </div>
         ) : (
-          <div className="rounded-2xl border border-border/40 bg-card py-10 text-center">
-            <Heart className="w-8 h-8 mx-auto text-muted-foreground/30 mb-3" />
-            <p className="text-sm text-muted-foreground">Nenhum registro de saúde ainda</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              Clique em "Registrar Saúde" para adicionar o primeiro registro
-            </p>
+          // Empty state com CTA: ao clicar abre o form diretamente (em vez
+          // de só mandar o user "procurar o botão"). Reduz friction pro
+          // primeiro registro de saúde da planta.
+          <div className="rounded-2xl border border-border/40 bg-gradient-to-b from-rose-500/5 to-transparent py-10 px-6 text-center space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+              <Heart className="w-7 h-7 text-rose-400" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Comece a acompanhar a saúde</p>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
+                Tira uma foto e registra o status — vira histórico permanente que ajuda
+                a detectar problemas cedo.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsFormOpen(true)}
+              className="inline-flex items-center gap-1.5 bg-rose-500/90 hover:bg-rose-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Fazer primeiro registro
+            </button>
           </div>
         )}
       </div>
