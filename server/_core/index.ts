@@ -7,6 +7,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerDeviceRoutes } from "./deviceRoutes";
+import { registerWaitlistRoutes } from "./waitlistRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -204,6 +205,9 @@ async function startServer() {
 
   // Rotas REST p/ ESP32 display (X-Device-Token auth, sem JWT)
   registerDeviceRoutes(app);
+
+  // Captura de email do site público cultivo.pro (POST /api/waitlist)
+  registerWaitlistRoutes(app);
 
   // Landing page de redirecionamento para QR codes de plantas
   app.get("/scan/plant/:id", (req, res) => {

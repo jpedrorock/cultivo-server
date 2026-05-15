@@ -678,6 +678,31 @@ const MIGRATIONS: Migration[] = [
       await addColumnIfNotExists(c, 'tentScenes', 'executionSec', 'INT NOT NULL DEFAULT 5 AFTER `iconHint`');
     },
   },
+  {
+    // Captura de email do site cultivo.pro (waitlist beta).
+    // Substitui Formspree quando endpoint próprio for usado.
+    // Anti-enumeração: backend retorna sempre 200 mesmo se email duplicado.
+    id: 'create-waitlist',
+    description: 'Cria tabela waitlist (capturas do form do site público)',
+    run: async (c) => {
+      await c.query(`
+        CREATE TABLE IF NOT EXISTS \`waitlist\` (
+          \`id\`        INT AUTO_INCREMENT PRIMARY KEY,
+          \`email\`     VARCHAR(200) NOT NULL,
+          \`source\`    VARCHAR(50) DEFAULT 'site',
+          \`locale\`    VARCHAR(8) DEFAULT 'en',
+          \`utmSource\` VARCHAR(64) DEFAULT NULL,
+          \`utmMedium\` VARCHAR(64) DEFAULT NULL,
+          \`utmCampaign\` VARCHAR(64) DEFAULT NULL,
+          \`ipHash\`    VARCHAR(64) DEFAULT NULL,
+          \`userAgent\` VARCHAR(255) DEFAULT NULL,
+          \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          UNIQUE KEY \`uniq_email\` (\`email\`),
+          INDEX \`idx_waitlist_created\` (\`createdAt\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
