@@ -136,7 +136,8 @@
     },
     "onlyBuiltDependencies": [
       "sharp",
-      "argon2"
+      "argon2",
+      "esbuild"
     ],
     "peerDependencyRules": {
       "ignoreMissing": [
