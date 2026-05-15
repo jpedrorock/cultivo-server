@@ -3,10 +3,11 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Instalar pnpm
-RUN npm install -g pnpm
+# Pin pnpm 9.x (lockfile e' v9). pnpm 10 introduziu ERR_PNPM_IGNORED_BUILDS
+# que bloqueia install em CI sem `pnpm approve-builds` interativo.
+RUN npm install -g pnpm@9.15.4
 
-# Copiar arquivos de dependências
+# Copiar arquivos de dependências (cache-buster v2 — força rebuild apos pin)
 COPY package.json pnpm-lock.yaml ./
 
 # Instalar dependências
