@@ -74,8 +74,9 @@ import { validateTentOwnership } from "./routers/_helpers";
 
 // ─── Tuya / SmartLife integration router ─────────────────────────────────────
 
-// Adicionada opção 1440 (1x/dia) pra usuários com quota apertada (Tuya Trial 26k/mês)
-const POLL_INTERVAL_OPTIONS = [30, 60, 180, 480, 720, 1440] as const;
+// 5 opções: 1h, 3h, 8h (recomendado), 12h, 24h
+// Removida 30min (agressivo demais — queimava quota Tuya Trial em dias)
+const POLL_INTERVAL_OPTIONS = [60, 180, 480, 720, 1440] as const;
 
 /** Busca credenciais Tuya do usuário no banco. Lança NOT_FOUND se não configurado. */
 async function getTuyaConfig(userId: number, opts: { requireEnabled?: boolean } = {}) {
