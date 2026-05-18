@@ -8,6 +8,8 @@ import { InitiateCycleModal } from "@/components/InitiateCycleModal";
 import { EditCycleModal } from "@/components/EditCycleModal";
 import { CreateTentModal } from "@/components/CreateTentModal";
 import { EditTentDialog } from "@/components/EditTentDialog";
+import { usePaywall } from "@/components/PaywallGate";
+import { usePlan } from "@/_core/hooks/usePlan";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
@@ -35,6 +37,16 @@ import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { startMissingReadingsMonitor, getNotificationPermission } from "@/lib/notifications";
 import PullToRefresh from "react-simple-pull-to-refresh";
+import { isNative, isPWAStandalone } from "@/lib/platform";
+
+/** Em Capacitor nativo OU PWA standalone (instalado na home), o pull-to-refresh
+ *  JS confunde com o gesto nativo da WebView e empurra o header sticky pra baixo
+ *  porque o scroll fica num container interno (#root, não window). Desativa
+ *  só nesses casos. Browser normal mantém o gesto. */
+function MaybePullToRefresh({ onRefresh, children }: { onRefresh: () => Promise<unknown>; children: React.ReactNode }) {
+  if (isNative() || isPWAStandalone()) return <>{children}</>;
+  return <PullToRefresh onRefresh={onRefresh}>{children as any}</PullToRefresh>;
+}
 import { countPendingLogs, syncPendingLogs, onConnectionRestored } from "@/lib/offlineStorage";
 import { PageTransition, StaggerList } from "@/components/PageTransition";
 import { ErrorState } from "@/components/ErrorState";
@@ -60,6 +72,9 @@ export default function Home() {
   // utils DEVE ser declarado antes de qualquer mutation que o usa em callbacks
   const utils = trpc.useUtils();
 
+  const { isPro, limits } = usePlan();
+  const paywall = usePaywall();
+
   const {
     cycleModalOpen, setCycleModalOpen,
     selectedTent, setSelectedTent,
@@ -82,6 +97,15 @@ export default function Home() {
 
   
   const { data: tents, isLoading, isError, refetch } = trpc.tents.list.useQuery();
+
+  const tryCreateTent = () => {
+    const count = tents?.length ?? 0;
+    if (!isPro && limits.maxTents !== null && count >= limits.maxTents) {
+      paywall.open(`O plano Free permite ${limits.maxTents} estufa. Faça upgrade para criar mais.`);
+      return;
+    }
+    setCreateTentModalOpen(true);
+  };
   const { data: activeCycles } = trpc.cycles.listActive.useQuery();
   const { data: notifSettings, refetch: refetchNotifSettings } = trpc.alerts.getNotificationSettings.useQuery();
   const systemPaused = notifSettings?.systemPaused ?? false;
@@ -328,7 +352,7 @@ export default function Home() {
       key: 'n',
       ctrl: true,
       description: 'Criar Nova Estufa',
-      action: () => { setCreateTentModalOpen(true); },
+      action: () => { tryCreateTent(); },
     },
     {
       key: 'h',
@@ -456,7 +480,7 @@ export default function Home() {
       {/* Spacer = header height (py-4 = 32px + h-9 = 36px = 68px) + safe area */}
       <div aria-hidden="true" className="pt-safe" style={{ paddingBottom: '68px' }} />
 
-      <PullToRefresh onRefresh={handleRefresh}>
+      <MaybePullToRefresh onRefresh={handleRefresh}>
         <div>
       {/* Banner de registros offline pendentes */}
       {pendingLogsCount > 0 && (
@@ -507,7 +531,7 @@ export default function Home() {
             ))}
           </div>
         ) : tents && tents.length === 0 ? (
-          <EmptyOnboarding onCreateTent={() => setCreateTentModalOpen(true)} />
+          <EmptyOnboarding onCreateTent={tryCreateTent} />
         ) : (
           <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {tents?.map((tent) => {
@@ -539,7 +563,7 @@ export default function Home() {
             Usa Button variant=outline com override pra dashed border (estilo "add new" típico). */}
         {!isLoading && tents && tents.length > 0 && (
           <Button
-            onClick={() => setCreateTentModalOpen(true)}
+            onClick={tryCreateTent}
             variant="outline"
             size="lg"
             className="w-full mt-4 border-2 border-dashed text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary py-7"
@@ -595,6 +619,8 @@ export default function Home() {
         open={createTentModalOpen}
         onOpenChange={setCreateTentModalOpen}
       />
+
+      {paywall.PaywallElement}
 
       {/* Edit Tent Dialog */}
       <EditTentDialog
@@ -665,7 +691,7 @@ export default function Home() {
         </DialogContent>
       </Dialog>
         </div>
-      </PullToRefresh>
+      </MaybePullToRefresh>
       </div>
     </PageTransition>
   );

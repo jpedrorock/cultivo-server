@@ -2031,3 +2031,54 @@ div[class*="sticky"][class*="bg-background"] {
     background-color: var(--card) !important;
   }
 }
+
+/* ─── Capacitor nativo (iOS / Android) + PWA standalone ──────────────────
+ * Regras aplicadas dentro do app empacotado (Capacitor) OU quando o PWA
+ * está instalado na home screen (iOS Safari "Add to Home Screen", Android
+ * Chrome "Install"). Classes adicionadas em main.tsx (applyPlatformClasses).
+ * Não afetam o uso via browser normal. */
+html.capacitor-native,
+html.capacitor-native body,
+html.pwa-standalone,
+html.pwa-standalone body {
+  /* Mata o "rubber band" do iOS — header sticky e BottomNav fixed param
+   * de subir/descer com o overscroll. overscroll-behavior:none é suficiente,
+   * sem precisar travar o body com position:fixed (que causava flash branco
+   * quando o conteúdo passava da viewport). */
+  overscroll-behavior: none;
+  /* Cor de fundo do tema como fallback caso o overscroll exponha algo. */
+  background-color: var(--background);
+}
+
+html.capacitor-native body,
+html.pwa-standalone body {
+  /* Garante que o body não scrolla sozinho — só os containers internos. */
+  overflow: hidden;
+  /* Altura do viewport completo, descontando safe areas que o Capacitor
+   * gerencia via contentInset (no PWA, safe-area-inset-* via CSS). */
+  height: 100vh;
+}
+
+html.capacitor-native #root,
+html.pwa-standalone #root {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.capacitor-ios {
+  /* Touch callout (tap longo abre menu) atrapalha gestos no iOS embarcado */
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Headers sticky precisam de bg-card preenchendo a safe-area do notch
+ * (contentInset: "never" no Capacitor deixa a WebView cobrir o notch, então
+ * o app gere; PWA standalone tem comportamento similar em iOS). */
+html.capacitor-native header.sticky,
+html.pwa-standalone header.sticky {
+  /* z-index alto e bg de fallback garantem que nada vaza por cima/baixo */
+  isolation: isolate;
+}
