@@ -23,18 +23,22 @@ interface DeviceMapping {
 }
 
 type Region = 'eu' | 'us' | 'cn' | 'in';
-type PollInterval = 30 | 60 | 180 | 480 | 720;
+type PollInterval = 30 | 60 | 180 | 480 | 720 | 1440;
 
 const REGION_LABELS: Record<Region, string> = {
   eu: 'Europa', us: 'América', cn: 'China', in: 'Índia',
 };
 
+// Intervalos ordenados do MAIS econômico (1x/dia) pro MENOS (30min).
+// Quota Tuya Trial = 26k calls/mês. Cada device pollado = ~1 call por poll.
+// 8h (3x/dia) é o sweet spot pra cultivo indoor — temp/RH não muda 100x/dia.
 const POLL_OPTIONS: { value: PollInterval; label: string; sub: string }[] = [
-  { value: 30,  label: 'A cada 30 min',  sub: '~48× por dia' },
-  { value: 60,  label: 'A cada 1 hora',  sub: '~24× por dia' },
-  { value: 180, label: 'A cada 3 horas', sub: '~8× por dia' },
-  { value: 480, label: '3× ao dia',      sub: 'manhã, tarde, noite' },
-  { value: 720, label: '2× ao dia',      sub: 'manhã e noite' },
+  { value: 1440, label: '1× ao dia',      sub: 'mínimo de API calls' },
+  { value: 720,  label: '2× ao dia',      sub: 'manhã e noite' },
+  { value: 480,  label: '3× ao dia',      sub: 'manhã, tarde, noite (recomendado)' },
+  { value: 180,  label: 'A cada 3 horas', sub: '~8× por dia' },
+  { value: 60,   label: 'A cada 1 hora',  sub: '~24× por dia · cuidado quota' },
+  { value: 30,   label: 'A cada 30 min',  sub: '~48× por dia · só monitoramento intenso' },
 ];
 
 // ─── Empty state compartilhado quando Tuya não está configurado ──────────────
