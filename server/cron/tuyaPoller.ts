@@ -43,7 +43,10 @@ async function pollAllUsers() {
     const now = Date.now();
 
     for (const row of rows as any[]) {
-      const intervalMs = (row.pollIntervalMin ?? 60) * 60 * 1000;
+      // Default 480 (3x/dia) — protege contra estouro de quota Tuya Trial (26k/mês).
+      // User pode reduzir intervalo manualmente em Settings -> SmartLife se quiser
+      // monitoramento mais agressivo.
+      const intervalMs = (row.pollIntervalMin ?? 480) * 60 * 1000;
       const lastRead = new Date(row.lastReadAt).getTime();
 
       if (now - lastRead < intervalMs) continue; // ainda não é hora
