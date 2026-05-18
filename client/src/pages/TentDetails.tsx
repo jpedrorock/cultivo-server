@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud, Camera, Maximize2 } from "lucide-react";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud, Camera } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -390,239 +390,6 @@ function DeviceToggleButton({
  * - Click: spinner curto
  * - Sucesso: toast "Cena disparada"
  */
-/**
- * Botão de câmera — click abre modal com player HLS ao vivo.
- *
- * Tuya entrega URLs HLS (.m3u8) temporárias (~10min). Player usa hls.js,
- * que funciona em Chrome/Firefox/Edge (Safari já tem HLS nativo mas hls.js
- * cobre os 2 cenários).
- *
- * Renew automático: a cada 8 min re-aloca URL (margem de 2min antes da
- * expiração default da Tuya). Se renew falhar, player segue rodando até
- * Tuya cortar; user vê erro inline + botão "Tentar de novo".
- */
-function CameraStreamDialog({
-  deviceId,
-  deviceName,
-  open,
-  onOpenChange,
-}: {
-  deviceId: string;
-  deviceName: string;
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<any>(null);
-  const renewTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const allocate = trpc.tuya.getCameraStream.useMutation();
-
-  // Carrega ou renova a URL
-  const loadStream = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { url } = await allocate.mutateAsync({ deviceId, type: 'hls' });
-      setStreamUrl(url);
-    } catch (e: any) {
-      setError(e?.message ?? 'Falha ao alocar stream');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Ao abrir o dialog: aloca primeira URL
-  useEffect(() => {
-    if (!open) return;
-    loadStream();
-    // Renova a cada 8 min (Tuya expira ~10min)
-    renewTimerRef.current = setInterval(loadStream, 8 * 60 * 1000);
-    return () => {
-      if (renewTimerRef.current) clearInterval(renewTimerRef.current);
-      renewTimerRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, deviceId]);
-
-  // Plug hls.js no <video> quando streamUrl mudar
-  useEffect(() => {
-    if (!streamUrl || !videoRef.current) return;
-    const video = videoRef.current;
-
-    // Cleanup do hls anterior
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
-    // Safari tem HLS nativo — só atribui o src
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
-      video.play().catch(() => {/* user precisa tocar pra autoplay com som */});
-      return;
-    }
-
-    // Resto dos browsers: usa hls.js (carregamento dinâmico — só importa quando
-    // user abre o dialog, não vai no bundle inicial)
-    import('hls.js').then(({ default: Hls }) => {
-      if (!Hls.isSupported()) {
-        setError('Browser não suporta HLS');
-        return;
-      }
-      const hls = new Hls({ maxBufferLength: 5 });  // baixa latência
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {/* autoplay sem som ok */});
-      });
-      hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
-        if (data.fatal) {
-          console.warn('[CameraStream] HLS fatal:', data.type, data.details);
-          // Não set error visível — re-allocate vai tentar resolver
-        }
-      });
-      hlsRef.current = hls;
-    });
-
-    return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-  }, [streamUrl]);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
-        <DialogHeader className="px-4 pt-4 pb-2">
-          <DialogTitle className="text-base flex items-center gap-2">
-            <Camera className="w-4 h-4" />
-            {deviceName}
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            Stream ao vivo (HLS) — Tuya/SmartLife
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="relative bg-black aspect-video">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center text-white/70">
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
-          )}
-          {error && !loading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70 p-4">
-              <AlertTriangle className="w-6 h-6 text-amber-400" />
-              <p className="text-xs text-center">{error}</p>
-              <Button size="sm" variant="outline" onClick={loadStream}>
-                <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                Tentar de novo
-              </Button>
-            </div>
-          )}
-          <video
-            ref={videoRef}
-            controls
-            playsInline
-            muted
-            className="w-full h-full object-contain"
-          />
-        </div>
-
-        <div className="px-4 py-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>URL renova a cada 8min</span>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                const v = videoRef.current;
-                if (!v) return;
-                // requestFullscreen disponível em desktop + iOS Safari (com webkit prefix).
-                // Fallback pro webkitEnterFullscreen do iOS (só funciona em <video>).
-                if (v.requestFullscreen) {
-                  v.requestFullscreen().catch(() => {/* user cancelou ou bloqueio do browser */});
-                } else if ((v as any).webkitEnterFullscreen) {
-                  (v as any).webkitEnterFullscreen();
-                }
-              }}
-              className="flex items-center gap-1 hover:text-foreground"
-              title="Tela cheia"
-            >
-              <Maximize2 className="w-3 h-3" />
-              Tela cheia
-            </button>
-            <button
-              onClick={loadStream}
-              disabled={loading}
-              className="flex items-center gap-1 hover:text-foreground disabled:opacity-50"
-              title="Renovar stream agora"
-            >
-              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-              Renovar
-            </button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/**
- * Botão "câmera" — substitui o toggle pra devices com iconHint='camera'.
- * Click abre <CameraStreamDialog>. Compartilha o style do DeviceToggleButton
- * pra encaixar visualmente na row.
- */
-function CameraButton({ deviceId, deviceName }: { deviceId: string; deviceName: string }) {
-  const [open, setOpen] = useState(false);
-  // Polling do status — câmera offline não vai conseguir alocar stream, então
-  // dar feedback ANTES de o user clicar (em vez de erro depois do dialog abrir).
-  // Polling reduzido pra 10min (era 60s) — câmera online/offline raramente muda
-  // e Tuya Trial tem quota baixa.
-  const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
-    { deviceId },
-    {
-      refetchInterval: 10 * 60_000,
-      refetchIntervalInBackground: false,
-      refetchOnWindowFocus: true,
-      retry: false,
-      staleTime: 5 * 60_000,
-    }
-  );
-  const isOnline = status?.online ?? true;  // default true enquanto loading (não bloqueia)
-
-  return (
-    <>
-      <button
-        onClick={() => {
-          if (!isOnline) {
-            toast.error(`${deviceName} está offline. Reabra no SmartLife e tente de novo.`);
-            return;
-          }
-          setOpen(true);
-        }}
-        title={isOnline ? `Ver câmera: ${deviceName}` : `${deviceName} (offline)`}
-        className={`shrink-0 w-10 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95 ${
-          isOnline
-            ? 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
-            : 'bg-muted text-muted-foreground/50 cursor-not-allowed'
-        }`}
-      >
-        <Camera className="w-3.5 h-3.5" />
-      </button>
-      <CameraStreamDialog
-        deviceId={deviceId}
-        deviceName={deviceName}
-        open={open}
-        onOpenChange={setOpen}
-      />
-    </>
-  );
-}
-
 function ScenePlayButton({ sceneId, sceneName }: { sceneId: string; sceneName: string }) {
   const trigger = trpc.tuya.triggerScene.useMutation({
     onSuccess: () => toast.success(`▶ ${sceneName}`),
@@ -775,52 +542,6 @@ function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
       )}
       <p className="text-xs text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
     </button>
-  );
-}
-
-/** Slot funcional pra CÂMERA — click abre dialog com stream HLS ao vivo. */
-function PreviewCameraSlot({ slot, Icon, iconColorClass, ringColorClass }: PreviewSlotProps) {
-  const [open, setOpen] = useState(false);
-  // Poll de status pra mostrar offline antes de o user clicar e tomar erro
-  const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
-    { deviceId: slot.refId },
-    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
-  );
-  const isOnline = status?.online ?? true;
-
-  return (
-    <>
-      <button
-        onClick={() => {
-          if (!isOnline) {
-            toast.error(`${slot.name} está offline.`);
-            return;
-          }
-          setOpen(true);
-        }}
-        title={isOnline ? `Ver câmera: ${slot.name}` : `${slot.name} (offline)`}
-        className={`${SLOT_BASE} ${ringColorClass} ${
-          isOnline
-            ? 'bg-muted/40 hover:bg-indigo-500/10'
-            : 'bg-muted/20 opacity-50 cursor-not-allowed'
-        }`}
-      >
-        <Icon className={`w-4 h-4 ${iconColorClass}`} />
-        <p className="text-xs text-foreground font-medium leading-tight text-center line-clamp-2 px-0.5">{slot.name}</p>
-        {/* Badge offline no canto */}
-        {!isOnline && (
-          <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded text-xs font-semibold bg-muted-foreground/60 text-card uppercase">
-            off
-          </span>
-        )}
-      </button>
-      <CameraStreamDialog
-        deviceId={slot.refId}
-        deviceName={slot.name}
-        open={open}
-        onOpenChange={setOpen}
-      />
-    </>
   );
 }
 
@@ -1055,10 +776,9 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                   // hooks tRPC (queries + mutations) — React Query cache faz a
                   // sync com a row.
                   if (slot.type === 'device') {
-                    // Câmera não tem toggle on/off — abre dialog com stream
-                    if (slot.iconHint === 'camera') {
-                      return <PreviewCameraSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
-                    }
+                    // Câmera removida da UI — feature comia ~43k API calls/mes da Tuya Trial.
+                    // Devices com iconHint='camera' agora viram toggle comum (raramente
+                    // útil — usuário tira camera do mapeamento se quiser sumir).
                     return <PreviewDeviceSlot key={i} slot={slot} Icon={Icon} iconColorClass={iconColor} ringColorClass={ringColor} />;
                   }
                   if (isAutomationSlot) {
@@ -1136,9 +856,7 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                     ? (item.sceneType === 'automation'
                         ? <AutomationToggleButton automationId={item.refId} automationName={item.name} />
                         : <ScenePlayButton sceneId={item.refId} sceneName={item.name} />)
-                    : (item.iconHint === 'camera'
-                        ? <CameraButton deviceId={item.refId} deviceName={item.name} />
-                        : <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />)
+                    : <DeviceToggleButton deviceId={item.refId} savedSwitchCode={item.switchCode ?? null} />
                   }
                   <button
                     onClick={() => handleRemove(item)}
