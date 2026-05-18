@@ -48,7 +48,12 @@ function TentSensorCard({ tentId }: { tentId: number }) {
   const { data: mapping, refetch: refetchMapping } = trpc.tuya.getMappings.useQuery();
   const { data: reading, refetch: refetchReading } = trpc.tuya.getLatestReadingForTent.useQuery(
     { tentId },
-    { refetchInterval: 60_000 }
+    {
+      // Polling reduzido pra 5min (era 60s) — Tuya Trial tem quota de 26k calls/mês
+      // e camera+sensor polling juntos estavam comendo tudo em <2 semanas.
+      refetchInterval: 5 * 60_000,
+      refetchIntervalInBackground: false,
+    }
   );
   const { data: devices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
     undefined,
@@ -304,13 +309,15 @@ function DeviceToggleButton({
   // refetchOnWindowFocus garante que ao voltar pra tab a app capta mudancas
   // feitas pelo display ESP / pelo SmartLife app sem esperar o intervalo.
   // refetchInterval cobre o caso da tab ficar aberta sem foco.
+  // QUOTA: Tuya Trial = 26k calls/mes. Era 30s aqui — quebrava em <2 semanas.
   const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId },
     {
-      refetchInterval: 30_000,
+      refetchInterval: 5 * 60_000,             // 5min (era 30s)
+      refetchIntervalInBackground: false,
       refetchOnWindowFocus: true,
       retry: false,
-      staleTime: 5_000,
+      staleTime: 60_000,                       // confiável por 1min (era 5s)
     }
   );
 
@@ -573,9 +580,17 @@ function CameraButton({ deviceId, deviceName }: { deviceId: string; deviceName: 
   const [open, setOpen] = useState(false);
   // Polling do status — câmera offline não vai conseguir alocar stream, então
   // dar feedback ANTES de o user clicar (em vez de erro depois do dialog abrir).
+  // Polling reduzido pra 10min (era 60s) — câmera online/offline raramente muda
+  // e Tuya Trial tem quota baixa.
   const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId },
-    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+    {
+      refetchInterval: 10 * 60_000,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: true,
+      retry: false,
+      staleTime: 5 * 60_000,
+    }
   );
   const isOnline = status?.online ?? true;  // default true enquanto loading (não bloqueia)
 
@@ -645,7 +660,7 @@ function AutomationToggleButton({ automationId, automationName }: { automationId
 
   const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
     { automationId },
-    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
   );
 
   const toggle = trpc.tuya.toggleAutomation.useMutation({
@@ -722,7 +737,7 @@ function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
   const utils = trpc.useUtils();
   const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId: slot.refId },
-    { refetchInterval: 30_000, refetchOnWindowFocus: true, retry: false, staleTime: 5_000 }
+    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 60_000 }
   );
   const cmd = trpc.tuya.sendDeviceCommand.useMutation({
     onSuccess: () => setTimeout(() => utils.tuya.getDeviceCurrentStatus.invalidate({ deviceId: slot.refId }), 600),
@@ -769,7 +784,7 @@ function PreviewCameraSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
   // Poll de status pra mostrar offline antes de o user clicar e tomar erro
   const { data: status } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId: slot.refId },
-    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
   );
   const isOnline = status?.online ?? true;
 
@@ -841,7 +856,7 @@ function PreviewAutomationSlot({ slot, Icon, iconColorClass, ringColorClass }: P
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
     { automationId: slot.refId },
-    { refetchInterval: 60_000, refetchOnWindowFocus: true, retry: false, staleTime: 30_000 }
+    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
   );
   const toggle = trpc.tuya.toggleAutomation.useMutation({
     onSuccess: ({ enabled }) => {
@@ -1798,7 +1813,7 @@ export default function TentDetails() {
       if (lastLog.ec) lines.push(`⚡ EC: ${lastLog.ec} mS/cm`);
     }
     if (avgTemp !== '--') lines.push(`\n📈 Médias (${dateRange} dias): Temp ${avgTemp}°C | UR ${avgRh}% | PPFD ${avgPpfd}`);
-    lines.push(`\n🔗 App Cultivo — cultivo.x.andy.plus`);
+    lines.push(`\n🔗 App Cultivo — app.cultivo.pro`);
 
     const text = lines.join('\n');
 

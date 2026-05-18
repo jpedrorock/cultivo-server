@@ -638,7 +638,7 @@ const SWIPE_THRESHOLD = 50;
 function DeviceToggle({ mapping, onRemove }: { mapping: DeviceMapping; onRemove: () => void }) {
   const { data: status, isLoading, refetch } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId: mapping.deviceId },
-    { refetchInterval: 30_000, retry: false }
+    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, retry: false }
   );
 
   const cmd = trpc.tuya.sendDeviceCommand.useMutation({
