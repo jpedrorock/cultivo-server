@@ -12,6 +12,7 @@ import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { SplashScreen } from "./components/SplashScreen";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { isNative, isPWAStandalone } from "@/lib/platform";
 import { useAuth } from "./_core/hooks/useAuth";
 import { isWizardDone } from "./components/onboarding/OnboardingWizard";
 import { trpc } from "./lib/trpc";
@@ -206,9 +207,16 @@ function AuthenticatedAppInner() {
           !isDisplayMode && !isOnboarding && (collapsed ? "lg:pl-16" : "lg:pl-64"),
         )}
       >
-        <PullToRefresh>
+        {/* PullToRefresh JS dispara errado quando scroll é num container interno
+            (#root). Tanto Capacitor quanto PWA standalone usam scroll interno —
+            desabilita o gesto pra eles. Browser normal mantém o pull-to-refresh. */}
+        {(isNative() || isPWAStandalone()) ? (
           <Router />
-        </PullToRefresh>
+        ) : (
+          <PullToRefresh>
+            <Router />
+          </PullToRefresh>
+        )}
       </div>
       {!isDisplayMode && !isOnboarding && <BottomNav />}
       <InstallPWA />
