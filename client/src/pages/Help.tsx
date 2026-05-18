@@ -779,20 +779,6 @@ function SmartLifeView() {
         imageCaption="Modal 'Conectar Display' com input do código"
       />
 
-      <Step
-        n={5}
-        accent="sky"
-        title="Câmera Tuya (HLS streaming)"
-        description={
-          <>
-            Câmeras Tuya/SmartLife com IPC Live Stream ativado aparecem como card{" "}
-            <strong>FloraCam</strong> na aba SmartLife. Toque pra abrir player ao vivo (HLS).
-            Stream renova a cada 8min automaticamente. Funciona só na web por enquanto — ESP32
-            não decoda H.264.
-          </>
-        }
-        imageCaption="Card de câmera com player HLS aberto"
-      />
 
       <Tip>
         ESP32 é amarrado a UMA estufa só. Se trocar de estufa fisicamente, refaz o pareamento —
