@@ -15,6 +15,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { LazyImage } from "@/components/LazyImage";
+import { PhotoPicker } from "@/components/PhotoPicker";
+import { isNativeCameraAvailable } from "@/lib/nativeCamera";
 
 export type HealthStatus = "healthy" | "attention" | "sick";
 
@@ -31,7 +33,7 @@ interface PlantHealthFormProps {
   record: PlantHealthRecord | undefined;
   /** Atualiza um campo específico do registro. */
   onChange: (field: keyof PlantHealthRecord, value: string | undefined) => void;
-  /** Handler do `<input type="file">` — sobe a foto. */
+  /** Handler do `<input type="file">` — sobe a foto (web/fallback). */
   onPhotoCapture: (e: React.ChangeEvent<HTMLInputElement>) => void;
   /** Estado do upload em andamento (0–100). */
   uploadProgress: { isUploading: boolean; progress: number };
@@ -136,6 +138,26 @@ export function PlantHealthForm({
           <span className="text-sm text-green-500 font-medium">Enviando foto...</span>
           <span className="text-xs text-green-500 mt-1">{uploadProgress.progress}%</span>
         </div>
+      ) : isNativeCameraAvailable() ? (
+        // Native: PhotoPicker abre action sheet (Câmera / Galeria)
+        // Sintetiza um ChangeEvent fake pra reusar o mesmo onPhotoCapture
+        // que o pai espera — minimiza mudança de API.
+        <PhotoPicker
+          onPick={(file) => {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            const fakeEvent = {
+              target: { files: dt.files, value: "" },
+              currentTarget: { files: dt.files, value: "" },
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+            onPhotoCapture(fakeEvent);
+          }}
+        >
+          <span className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-500/5 transition-colors">
+            <Camera className="h-7 w-7 text-muted-foreground mb-1" />
+            <span className="text-sm text-muted-foreground">Adicionar Foto</span>
+          </span>
+        </PhotoPicker>
       ) : (
         <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-500/5 transition-colors">
           <Camera className="h-7 w-7 text-muted-foreground mb-1" />

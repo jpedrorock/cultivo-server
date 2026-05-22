@@ -28,6 +28,8 @@ import { toast } from "sonner";
 import { uploadImage } from "@/lib/uploadImage";
 import { TrichomesTabSkeleton } from "@/components/TabSkeletons";
 import { LazyImage } from "@/components/LazyImage";
+import { PhotoPicker } from "@/components/PhotoPicker";
+import { isNativeCameraAvailable } from "@/lib/nativeCamera";
 
 interface PlantTrichomesTabProps {
   plantId: number;
@@ -362,33 +364,56 @@ export default function PlantTrichomesTab({
                     <span className="text-sm text-green-600 dark:text-green-400 font-medium">Enviando foto...</span>
                   </div>
                 ) : !photoPreview ? (
-                  <div className="flex gap-2">
-                    <label className="flex-1 flex items-center justify-center gap-2 h-12 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors bg-primary/5 border-primary/30">
-                      <Camera className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-medium text-primary">
-                        Câmera
+                  isNativeCameraAvailable() ? (
+                    // Native: action sheet único Câmera/Galeria
+                    <PhotoPicker
+                      onPick={(file) => {
+                        const dt = new DataTransfer();
+                        dt.items.add(file);
+                        const ev = {
+                          target: { files: dt.files, value: "" },
+                          currentTarget: { files: dt.files, value: "" },
+                        } as unknown as React.ChangeEvent<HTMLInputElement>;
+                        handlePhotoSelect(ev);
+                      }}
+                    >
+                      <span className="flex items-center justify-center gap-2 h-12 w-full border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors bg-primary/5 border-primary/30">
+                        <Camera className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">
+                          Tirar foto / Escolher
+                        </span>
                       </span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif"
-                        capture="environment"
-                        onChange={handlePhotoSelect}
-                      />
-                    </label>
-                    <label className="flex-1 flex items-center justify-center gap-2 h-12 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                      <Image className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        Galeria
-                      </span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif"
-                        onChange={handlePhotoSelect}
-                      />
-                    </label>
-                  </div>
+                    </PhotoPicker>
+                  ) : (
+                    // Web: 2 labels (Câmera vs Galeria) — input file padrão
+                    <div className="flex gap-2">
+                      <label className="flex-1 flex items-center justify-center gap-2 h-12 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors bg-primary/5 border-primary/30">
+                        <Camera className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-primary">
+                          Câmera
+                        </span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif"
+                          capture="environment"
+                          onChange={handlePhotoSelect}
+                        />
+                      </label>
+                      <label className="flex-1 flex items-center justify-center gap-2 h-12 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                        <Image className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          Galeria
+                        </span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*,image/jpeg,image/jpg,image/png,image/heic,image/heif"
+                          onChange={handlePhotoSelect}
+                        />
+                      </label>
+                    </div>
+                  )
                 ) : (
                   <div className="relative inline-block">
                     <img

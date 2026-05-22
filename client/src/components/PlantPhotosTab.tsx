@@ -22,6 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { PhotoPicker } from "@/components/PhotoPicker";
+import { isNativeCameraAvailable } from "@/lib/nativeCamera";
 
 interface Props {
   plantId: number;
@@ -71,9 +73,9 @@ export default function PlantPhotosTab({ plantId }: Props) {
   });
 
   // ── Upload ────────────────────────────────────────────────────────────────
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = "";
+  // Aceita um array de Files. Veio do input multi (web) ou do PhotoPicker
+  // nativo (array com 1 item). Mesmo pipeline pra ambos.
+  const processFiles = async (files: File[]) => {
     if (files.length === 0) return;
 
     const validFiles = files.filter(f => {
@@ -102,6 +104,12 @@ export default function PlantPhotosTab({ plantId }: Props) {
     if (saved > 0) toast.success(saved === 1 ? "Foto salva!" : `${saved} fotos salvas!`);
     setUploading(false);
     setUploadProgress(null);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    await processFiles(files);
   };
 
   // ── Zoom helpers ──────────────────────────────────────────────────────────
@@ -203,31 +211,57 @@ export default function PlantPhotosTab({ plantId }: Props) {
 
   const currentPhoto = lightboxIdx != null ? photos[lightboxIdx] : null;
 
+  // Trigger compartilhado (botão grande dashed). Em native abre PhotoPicker
+  // (action sheet Câmera/Galeria); em web mantém input multi-select.
+  const uploadTrigger = (
+    <span
+      aria-disabled={uploading}
+      className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all py-5 disabled:opacity-50"
+    >
+      {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+      <span className="text-sm font-medium">
+        {uploading && uploadProgress
+          ? `Enviando ${uploadProgress.done}/${uploadProgress.total}…`
+          : uploading
+          ? "Enviando…"
+          : "Tirar / escolher fotos"}
+      </span>
+    </span>
+  );
+
   return (
     <div className="pb-6">
-      {/* Upload button */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={handleFileChange}
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-        className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all py-5 disabled:opacity-50"
-      >
-        {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
-        <span className="text-sm font-medium">
-          {uploading && uploadProgress
-            ? `Enviando ${uploadProgress.done}/${uploadProgress.total}…`
-            : uploading
-            ? "Enviando…"
-            : "Tirar / escolher fotos"}
-        </span>
-      </button>
+      {/* Upload button — native usa PhotoPicker (action sheet Câmera/Galeria),
+          web mantém input multi-select pra escolher várias fotos de uma vez */}
+      {isNativeCameraAvailable() ? (
+        <div className="mb-5">
+          <PhotoPicker
+            onPick={(file) => processFiles([file])}
+            disabled={uploading}
+            quality={88}
+          >
+            {uploadTrigger}
+          </PhotoPicker>
+        </div>
+      ) : (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full mb-5"
+          >
+            {uploadTrigger}
+          </button>
+        </>
+      )}
 
       {/* Loading */}
       {isLoading && (

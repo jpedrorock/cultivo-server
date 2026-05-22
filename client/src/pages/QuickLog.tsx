@@ -17,6 +17,7 @@ import { uploadImage } from "@/lib/uploadImage";
 import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadProgress";
 import { PageTransition } from "@/components/PageTransition";
 import { savePendingLog, isOnline } from "@/lib/offlineStorage";
+import { haptics } from "@/lib/haptics";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
 import { getCircleStyle, getPHColor, getValidationColor } from "@/lib/quickLogColors";
@@ -241,9 +242,11 @@ export default function QuickLog() {
       utils.dailyLogs.list.invalidate();
       utils.dailyLogs.getLatestByTent.invalidate();
       // Log saved — advance to plant health question (step 9)
+      haptics.light();
       setCurrentStep(9);
     },
     onError: (error) => {
+      haptics.error();
       toast.error(`Erro ao salvar: ${error.message}`);
     },
   });
@@ -252,18 +255,22 @@ export default function QuickLog() {
   const savePlantHealthMutation = trpc.plantHealth.create.useMutation({
     onSuccess: () => {
       if (currentPlantIndex < plants.length - 1) {
+        haptics.light();
         setCurrentPlantIndex(currentPlantIndex + 1);
       } else if (isFloraPhase && logMode === 'plant') {
         // Propõe registro de tricomas após saúde (só no modo planta)
+        haptics.light();
         setCurrentTrichomeIndex(0);
         setRecordTrichomes(null);
       } else {
+        haptics.success();
         toast.success("Registros salvos com sucesso!");
         resetForm();
         setTimeout(() => setLocation("/"), 1500);
       }
     },
     onError: (error: any) => {
+      haptics.error();
       toast.error(`Erro ao salvar: ${error.message}`);
     },
   });
@@ -272,14 +279,17 @@ export default function QuickLog() {
   const saveTrichomeMutation = trpc.plantTrichomes.create.useMutation({
     onSuccess: () => {
       if (currentTrichomeIndex < plants.length - 1) {
+        haptics.light();
         setCurrentTrichomeIndex(currentTrichomeIndex + 1);
       } else {
+        haptics.success();
         toast.success("Todos os registros salvos!");
         resetForm();
         setTimeout(() => setLocation("/"), 1500);
       }
     },
     onError: (error: any) => {
+      haptics.error();
       toast.error(`Erro ao salvar tricomas: ${error.message}`);
     },
   });
@@ -287,9 +297,11 @@ export default function QuickLog() {
   // Upload photo mutation
   const uploadPhotoMutation = trpc.plantPhotos.upload.useMutation({
     onSuccess: () => {
+      haptics.success();
       toast.success("Foto salva!");
     },
     onError: (error) => {
+      haptics.error();
       toast.error(`Erro ao salvar foto: ${error.message}`);
     },
   });

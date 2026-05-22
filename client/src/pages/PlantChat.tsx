@@ -7,6 +7,8 @@ import { TentIcon } from '@/components/TentIcon';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { toast } from 'sonner';
+import { isNativeCameraAvailable, takeNativePhoto } from '@/lib/nativeCamera';
+import { haptics } from '@/lib/haptics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -815,9 +817,24 @@ export default function PlantChat() {
 
             <div className="flex items-end gap-2">
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={async () => {
+                  // Native: abre câmera/galeria direto via plugin nativo
+                  // (action sheet do iOS / chooser do Android, sem o input file feio)
+                  if (isNativeCameraAvailable()) {
+                    await haptics.light();
+                    try {
+                      const file = await takeNativePhoto({ source: "prompt", quality: 85 });
+                      if (file) await handleImage(file);
+                    } catch (err: any) {
+                      toast.error(err?.message ?? "Não foi possível abrir câmera.");
+                    }
+                    return;
+                  }
+                  // Web: input file padrão
+                  fileInputRef.current?.click();
+                }}
                 className="shrink-0 w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground transition-colors"
-                title="Tirar ou escolher foto do celular"
+                title="Tirar ou escolher foto"
               >
                 <ImagePlus className="w-4.5 h-4.5" />
               </button>
