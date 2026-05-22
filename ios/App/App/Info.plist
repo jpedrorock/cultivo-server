@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+        <string>Cultivo</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+	<!--
+		Deep link URL Schemes pro iOS.
+		Permite que outros apps abram cloud.evapro.cultivo:// e nos passem URL.
+		Tipicamente usado pra:
+		  - QR codes de plantas → cloud.evapro.cultivo://plant/123
+		  - OAuth callbacks (Tuya, Apple Sign In retorna via Universal Links)
+		  - Notifications nativas
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>cloud.evapro.cultivo</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cloud.evapro.cultivo</string>
+			</array>
+		</dict>
+	</array>
+	<!--
+		Permissions / Privacy strings — Apple exige uma descrição custom pra
+		toda API que acessa dados sensíveis. Sem essas strings, o app crasha
+		na hora que tenta abrir câmera/galeria.
+
+		Estas strings APARECEM PRO USUÁRIO no prompt de permissão.
+		Manter conciso (max ~80 chars) e explicar o BENEFÍCIO, não a API.
+	-->
+	<key>NSCameraUsageDescription</key>
+	<string>Cultivo usa a câmera para fotografar suas plantas e registrar o progresso do cultivo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cultivo precisa acessar suas fotos para anexar imagens existentes ao registro das plantas.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Cultivo pode salvar fotos das suas plantas na sua galeria, se você escolher.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+	<!--
+		WKAppBoundDomains restringe a WebView a navegar apenas para estes
+		domínios. Combina com `limitsNavigationsToAppBoundDomains: true` no
+		capacitor.config.ts.  Sem essa whitelist, qualquer URL (ex: phishing
+		injetado em resposta da IA) abriria DENTRO do app com a UI do Cultivo.
+
+		Máximo de 10 domínios por documentação Apple (WKWebView).
+		Adicionar outros aqui se houver serviços externos legítimos.
+	-->
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>app.cultivo.pro</string>
+		<string>cultivo.pro</string>
+		<string>localhost</string>
+	</array>
+</dict>
+</plist>

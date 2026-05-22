@@ -18,44 +18,26 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Aumentado pra 1200KB porque o entry inicial fica grande mesmo com
+    // splits (React+ícones+capacitor+vendor SDK). Ainda assim, gzip ~230KB
+    // que é razoável pra app desse porte.
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
+        // IMPORTANTE: separar React (vendor-react) ou libs que dependem de
+        // React via peer (wouter, lucide-react, radix) causa "Cannot read
+        // properties of null (reading 'useContext')" porque React fica em
+        // chunk diferente do consumidor. Mantemos React no chunk principal
+        // e splitamos APENAS libs que NÃO dependem de React peer.
         manualChunks: {
-          // React core — muda raramente, cache longa no browser
-          "vendor-react": ["react", "react-dom"],
-          // Libs de dados — tanstack query + trpc
-          "vendor-query": ["@tanstack/react-query", "@trpc/client", "@trpc/react-query"],
-          // Recharts separado — ~150KB, só carrega em páginas com gráficos
-          "vendor-charts": ["recharts"],
-          // date-fns separado — ~80KB
-          "vendor-dates": ["date-fns"],
           // Three.js — ~600KB. Só carrega no PlantTrainingPage / Plant3DView.
-          // Sem chunk dedicado, ia parar dentro do bundle da rota e inflar
-          // qualquer chunk que importasse algo dela transitivamente.
           "vendor-three": ["three"],
-          // Animações — framer-motion. Tirar do main pra cache mais agressivo.
-          "vendor-motion": ["framer-motion"],
-          // Validação de schemas — usado pelo trpc client e forms
+          // Recharts separado — ~150KB, só carrega em páginas com gráficos.
+          "vendor-charts": ["recharts"],
+          // date-fns — ~80KB, sem peer React
+          "vendor-dates": ["date-fns"],
+          // Validação de schemas
           "vendor-zod": ["zod"],
-          // Forms
-          "vendor-forms": ["react-hook-form", "@hookform/resolvers"],
-          // Roteador — pequeno mas sempre carregado, isolar pra cache
-          "vendor-router": ["wouter"],
-          // Toast lib
-          "vendor-toast": ["sonner"],
-          // Radix UI (muitos pacotes pequenos juntos)
-          "vendor-radix": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-select",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-tooltip",
-            "@radix-ui/react-accordion",
-            "@radix-ui/react-checkbox",
-            "@radix-ui/react-switch",
-            "@radix-ui/react-slider",
-          ],
         },
       },
     },

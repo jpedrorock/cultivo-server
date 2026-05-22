@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cultivo</string>
+    <string name="title_activity_main">Cultivo</string>
+    <string name="package_name">cloud.evapro.cultivo</string>
+    <string name="custom_url_scheme">cloud.evapro.cultivo</string>
+</resources>

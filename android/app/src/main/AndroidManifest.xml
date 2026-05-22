@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                Deep link custom scheme: cloud.evapro.cultivo://
+                Usado pra:
+                  - QR codes de plantas (ex: cloud.evapro.cultivo://plant/123)
+                  - OAuth callbacks (Tuya, futuramente)
+                  - Notifications que abrem rota específica
+
+                BROWSABLE permite que outros apps abram esse esquema.
+                DEFAULT permite que clicks em links no browser deep-linkem.
+            -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cloud.evapro.cultivo" />
+            </intent-filter>
+
+            <!--
+                Universal Links (https://app.cultivo.pro/scan/*)
+                Configurar verificação no servidor com /.well-known/assetlinks.json
+                pra Android abrir o app automaticamente (sem prompt).
+                Sem o assetlinks.json verificado, sistema mostra prompt
+                "Abrir com Cultivo ou Chrome?". Aceitável pra MVP.
+            -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.cultivo.pro" android:pathPrefix="/scan" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Camera + galeria (foto de plantas) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Android 13+ usa READ_MEDIA_IMAGES em vez de READ_EXTERNAL_STORAGE -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Local Notifications -->
+    <!-- POST_NOTIFICATIONS é obrigatório no Android 13+ pra mostrar notificações -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- SCHEDULE_EXACT_ALARM pra notificações com hora exata (rega ao 8h, etc) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Re-agendar notificações após reboot do device -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+</manifest>
