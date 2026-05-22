@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { CheckCircle, Clock } from 'lucide-react';
+import { CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { useAuth } from '@/_core/hooks/useAuth';
+import { isAppleSignInAvailable, signInWithApple } from '@/lib/appleSignIn';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -9,10 +10,12 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [registeredName, setRegisteredName] = useState('');
   const [, setLocation] = useLocation();
   const { isAuthenticated, loading: authLoading, refresh } = useAuth();
+  const appleAvailable = isAppleSignInAvailable();
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -20,19 +23,49 @@ export default function Register() {
     }
   }, [authLoading, isAuthenticated, setLocation]);
 
+  const handleAppleSignIn = async () => {
+    setError('');
+    setAppleLoading(true);
+    try {
+      const result = await signInWithApple();
+      if (result.success) {
+        await refresh();
+        setLocation('/');
+        return;
+      }
+      if (result.pending) {
+        // Conta criada via Apple, aguardando aprovação — mostra a tela de confirmação
+        setRegisteredName(email || 'novo usuário');
+        setPending(true);
+        return;
+      }
+      if (!result.error.toLowerCase().includes('cancelado')) {
+        setError(result.error);
+      }
+    } catch {
+      setError('Erro inesperado ao entrar com Apple.');
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (password.length < 6) {
-      setError('Senha deve ter no mínimo 6 caracteres');
+    if (password.length < 12) {
+      setError('A senha deve ter no mínimo 12 caracteres');
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
+      const { isNative, apiUrl } = await import('@/lib/platform');
+      const { persistAuthToken } = await import('@/_core/hooks/useAuth');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (isNative()) headers['X-Client'] = 'capacitor';
+      const res = await fetch(apiUrl('/api/auth/register'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers,
+        credentials: isNative() ? 'omit' : 'include',
         body: JSON.stringify({ email, password, name: name || undefined }),
       });
       const data = await res.json();
@@ -41,6 +74,7 @@ export default function Register() {
           setRegisteredName(name || email);
           setPending(true);
         } else {
+          await persistAuthToken(data.token);
           await refresh();
           setLocation('/');
         }
@@ -107,6 +141,25 @@ export default function Register() {
           <h1 className="text-2xl font-bold text-foreground">Criar conta</h1>
           <p className="text-sm text-muted-foreground mt-1">Comece a gerenciar seu cultivo</p>
         </div>
+
+        {/* Botão Apple — só em iOS native (Apple HIG: design padrão exigido) */}
+        {appleAvailable && (
+          <button
+            type="button"
+            onClick={handleAppleSignIn}
+            disabled={appleLoading}
+            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl bg-foreground text-background font-medium hover:opacity-90 transition-opacity mb-3 disabled:opacity-60"
+          >
+            {appleLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+              </svg>
+            )}
+            Continuar com Apple
+          </button>
+        )}
 
         {/* Botão Google */}
         <a
@@ -180,6 +233,13 @@ export default function Register() {
           >
             {loading ? 'Criando conta...' : 'Criar conta'}
           </button>
+
+          <p className="text-[11px] text-muted-foreground text-center leading-relaxed pt-1">
+            Ao criar a conta você concorda com os{" "}
+            <a href="/terms" target="_blank" rel="noopener" className="underline">Termos de Uso</a>
+            {" "}e a{" "}
+            <a href="/privacy" target="_blank" rel="noopener" className="underline">Política de Privacidade</a>.
+          </p>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6">

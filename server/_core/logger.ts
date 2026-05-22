@@ -34,6 +34,15 @@ const baseOptions: LoggerOptions = {
       "*.secret",
       "*.token",
       "*.apiKey",
+      "*.accessSecret",            // Tuya
+      "*.access_token",            // Google OAuth
+      "*.refresh_token",
+      // PII — emails só visíveis em log estruturado quando explícitos.
+      // Importante pra LGPD/GDPR: emails brutos em logs agregáveis viram
+      // vetor de leak. Use `email_hash` no lugar quando precisar correlacionar.
+      "*.email",
+      "user.email",
+      "body.email",
     ],
     censor: "[REDACTED]",
   },
