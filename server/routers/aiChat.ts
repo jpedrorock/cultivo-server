@@ -528,7 +528,9 @@ export const aiChatRouter = router({
     .input(z.object({
       message:     z.string().min(1).max(4000),
       plantId:     z.number().optional(),
-      imageBase64: z.string().max(10 * 1024 * 1024).optional(),
+      // 4MB de base64 ≈ 3MB de imagem binária — suficiente pra foto comprimida.
+      // Alinhado com o limite global de 5MB do body parser (sobra 1MB pra resto do JSON).
+      imageBase64: z.string().max(4 * 1024 * 1024).optional(),
       imageMime:   z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
     }))
     .mutation(async ({ input, ctx }) => {

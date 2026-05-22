@@ -211,32 +211,148 @@ export const backupRouter = router({
           await tx.delete(fertilizationPresets).where(eq(fertilizationPresets.groupId, gid));
           await tx.delete(notificationHistory).where(eq(notificationHistory.groupId, gid));
 
-          // Inserir dados do backup — tents/plants/templates recebem o groupId do usuário.
+          // ════════════════════════════════════════════════════════════════
+          // MULTI-TENANCY: o backup preserva os IDs originais (auto-increment
+          // PRIMARY KEY), mas se algum desses IDs já existir em outra tenant
+          // do mesmo DB, INSERT falha com "Duplicate entry for key 'PRIMARY'".
           //
-          // ⚠️ NOTA MULTI-TENANCY: o backup preserva os IDs originais (auto-increment
-          // PRIMARY KEY). Se algum dos IDs do backup já existir em outra tenant
-          // do mesmo DB, o INSERT abaixo falhará com "Duplicate entry for key
-          // 'PRIMARY'" e a transação inteira faz rollback (dados ficam intactos).
-          // Solução completa exige re-mapear IDs (build old→new map e reescrever
-          // FKs em cascata). Pra deploy single-tenant atual (1 group por DB),
-          // isso não acontece. Se o app ganhar multi-tenancy real, refazer.
-          if (input.data.tents?.length) await tx.insert(tents).values(withGroup(input.data.tents));
-          // strains tem groupId — usa withGroup pra carimbar com gid do user logado.
-          // Antes era sanitizeDates (preservava groupId do backup). Backup malicioso
-          // podia injetar strain com groupId de OUTRO tenant — strain ficaria
-          // visível pra outro user. Agora todas as strains do import sao do user atual.
-          if (input.data.strains?.length) await tx.insert(strains).values(withGroup(input.data.strains));
-          if (input.data.cycles?.length) await tx.insert(cycles).values(sanitizeDates(input.data.cycles));
-          if (input.data.plants?.length) await tx.insert(plants).values(withGroup(input.data.plants));
-          if (input.data.dailyLogs?.length) await tx.insert(dailyLogs).values(sanitizeDates(input.data.dailyLogs));
-          if (input.data.taskTemplates?.length) await tx.insert(taskTemplates).values(withGroup(input.data.taskTemplates));
-          if (input.data.alertSettings?.length) await tx.insert(alertSettings).values(sanitizeDates(input.data.alertSettings));
-          if (input.data.alerts?.length) await tx.insert(alerts).values(sanitizeDates(input.data.alerts));
-          if (input.data.plantPhotos?.length) await tx.insert(plantPhotos).values(sanitizeDates(input.data.plantPhotos));
-          if (input.data.plantHealthLogs?.length) await tx.insert(plantHealthLogs).values(sanitizeDates(input.data.plantHealthLogs));
-          if (input.data.recipeTemplates?.length) await tx.insert(recipeTemplates).values(withGroup(input.data.recipeTemplates));
-          if (input.data.nutrientApplications?.length) await tx.insert(nutrientApplications).values(sanitizeDates(input.data.nutrientApplications));
-          if (input.data.wateringApplications?.length) await tx.insert(wateringApplications).values(sanitizeDates(input.data.wateringApplications));
+          // Estratégia: inserir SEM o id original (deixar MySQL gerar novo)
+          // e manter um mapa old→new pra remapear FKs em cascata.
+          // ════════════════════════════════════════════════════════════════
+
+          const tentIdMap   = new Map<number, number>();
+          const strainIdMap = new Map<number, number>();
+          const plantIdMap  = new Map<number, number>();
+          const cycleIdMap  = new Map<number, number>();
+
+          // Helper: insere uma linha por vez, retorna insertId
+          async function insertOne(table: any, row: any): Promise<number> {
+            const [result] = await tx.insert(table).values(row);
+            return (result as any).insertId as number;
+          }
+
+          // 1) tents — sem FK, só carimba groupId do usuário
+          for (const raw of sanitizeDates(input.data.tents ?? [])) {
+            const { id: oldId, groupId: _gid, ...rest } = raw;
+            const newId = await insertOne(tents, { ...rest, groupId: gid });
+            if (typeof oldId === "number") tentIdMap.set(oldId, newId);
+          }
+
+          // 2) strains — sem FK, carimba groupId do usuário
+          for (const raw of sanitizeDates(input.data.strains ?? [])) {
+            const { id: oldId, groupId: _gid, ...rest } = raw;
+            const newId = await insertOne(strains, { ...rest, groupId: gid });
+            if (typeof oldId === "number") strainIdMap.set(oldId, newId);
+          }
+
+          // 3) plants — FK: strainId, currentTentId
+          for (const raw of sanitizeDates(input.data.plants ?? [])) {
+            const { id: oldId, groupId: _gid, strainId, currentTentId, ...rest } = raw;
+            const remappedStrain = typeof strainId === "number" ? strainIdMap.get(strainId) ?? null : null;
+            const remappedTent   = typeof currentTentId === "number" ? tentIdMap.get(currentTentId) ?? null : null;
+            const newId = await insertOne(plants, {
+              ...rest,
+              strainId: remappedStrain,
+              currentTentId: remappedTent,
+              groupId: gid,
+            });
+            if (typeof oldId === "number") plantIdMap.set(oldId, newId);
+          }
+
+          // 4) cycles — FK: tentId, strainId, motherPlantId
+          for (const raw of sanitizeDates(input.data.cycles ?? [])) {
+            const { id: oldId, tentId, strainId, motherPlantId, ...rest } = raw;
+            const remappedTent   = typeof tentId === "number" ? tentIdMap.get(tentId) ?? null : null;
+            const remappedStrain = typeof strainId === "number" ? strainIdMap.get(strainId) ?? null : null;
+            const remappedMother = typeof motherPlantId === "number" ? plantIdMap.get(motherPlantId) ?? null : null;
+            if (remappedTent === null) continue; // cycle órfão sem tent — pula
+            const newId = await insertOne(cycles, {
+              ...rest,
+              tentId: remappedTent,
+              strainId: remappedStrain,
+              motherPlantId: remappedMother,
+            });
+            if (typeof oldId === "number") cycleIdMap.set(oldId, newId);
+          }
+
+          // Helper genérico pra tabelas dependentes — remapeia campos de FK e dropa linha se FK essencial faltar
+          async function bulkInsertRemapped(
+            table: any,
+            rows: any[] | undefined,
+            opts: { tentField?: string; plantField?: string; cycleField?: string; requireTent?: boolean; requirePlant?: boolean }
+          ) {
+            if (!rows?.length) return;
+            for (const raw of sanitizeDates(rows)) {
+              const { id: _id, ...rest } = raw;
+              const out: any = { ...rest };
+              if (opts.tentField && typeof rest[opts.tentField] === "number") {
+                const mapped = tentIdMap.get(rest[opts.tentField]);
+                if (!mapped && opts.requireTent) continue;
+                out[opts.tentField] = mapped ?? null;
+              }
+              if (opts.plantField && typeof rest[opts.plantField] === "number") {
+                const mapped = plantIdMap.get(rest[opts.plantField]);
+                if (!mapped && opts.requirePlant) continue;
+                out[opts.plantField] = mapped ?? null;
+              }
+              if (opts.cycleField && typeof rest[opts.cycleField] === "number") {
+                out[opts.cycleField] = cycleIdMap.get(rest[opts.cycleField]) ?? null;
+              }
+              await tx.insert(table).values(out);
+            }
+          }
+
+          // 5) dailyLogs — FK: tentId (required)
+          await bulkInsertRemapped(dailyLogs, input.data.dailyLogs, { tentField: "tentId", requireTent: true });
+
+          // 6) taskTemplates — sem FK, carimba groupId
+          if (input.data.taskTemplates?.length) {
+            for (const raw of sanitizeDates(input.data.taskTemplates)) {
+              const { id: _id, groupId: _gid, ...rest } = raw;
+              await tx.insert(taskTemplates).values({ ...rest, groupId: gid });
+            }
+          }
+
+          // 7) alertSettings — FK: tentId (required)
+          await bulkInsertRemapped(alertSettings, input.data.alertSettings, { tentField: "tentId", requireTent: true });
+
+          // 8) alerts — FK: tentId (required)
+          await bulkInsertRemapped(alerts, input.data.alerts, { tentField: "tentId", requireTent: true });
+
+          // 9) plantPhotos — FK: plantId (required), cycleId (optional)
+          await bulkInsertRemapped(plantPhotos, input.data.plantPhotos, {
+            plantField: "plantId",
+            cycleField: "cycleId",
+            requirePlant: true,
+          });
+
+          // 10) plantHealthLogs — FK: plantId (required)
+          await bulkInsertRemapped(plantHealthLogs, input.data.plantHealthLogs, {
+            plantField: "plantId",
+            requirePlant: true,
+          });
+
+          // 11) recipeTemplates — sem FK, carimba groupId
+          if (input.data.recipeTemplates?.length) {
+            for (const raw of sanitizeDates(input.data.recipeTemplates)) {
+              const { id: _id, groupId: _gid, ...rest } = raw;
+              await tx.insert(recipeTemplates).values({ ...rest, groupId: gid });
+            }
+          }
+
+          // 12) nutrientApplications — FK: tentId (required), cycleId (optional)
+          await bulkInsertRemapped(nutrientApplications, input.data.nutrientApplications, {
+            tentField: "tentId",
+            cycleField: "cycleId",
+            requireTent: true,
+          });
+
+          // 13) wateringApplications — FK: tentId (required), cycleId (optional)
+          await bulkInsertRemapped(wateringApplications, input.data.wateringApplications, {
+            tentField: "tentId",
+            cycleField: "cycleId",
+            requireTent: true,
+          });
         });
 
         return { success: true, message: "Backup restaurado com sucesso" };

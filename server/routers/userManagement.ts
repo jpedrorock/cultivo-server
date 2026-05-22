@@ -116,7 +116,10 @@ export const profileRouter = router({
     }),
 
   updatePassword: protectedProcedure
-    .input(z.object({ currentPassword: z.string(), newPassword: z.string().min(6) }))
+    // Mínimo 12 caracteres — alinhado com o register em authRoutes.ts (linha 76).
+    // Sem isso, usuário podia trocar pra senha de 6 chars depois de registrar com 12,
+    // contornando a política. OWASP recomenda 12+ pra resistência a brute force.
+    .input(z.object({ currentPassword: z.string(), newPassword: z.string().min(12) }))
     .mutation(async ({ ctx, input }) => {
       const user = await getUserById(ctx.user.id);
       if (!user) throw new Error('Usuário não encontrado');

@@ -1207,20 +1207,21 @@ export const appRouter = router({
   // Calculations (Histórico de Cálculos)
 
   // Database (Exportação de Banco de Dados)
-  database: router({
-    export: protectedProcedure.query(async () => {
-      const { generateSQLDump } = await import("./databaseExport");
-      const sqlDump = await generateSQLDump();
-      return { sql: sqlDump };
-    }),
-    import: adminProcedure
-      .input(z.object({ sqlContent: z.string() }))
-      .mutation(async ({ input }) => {
-        const { importSQLDump } = await import("./databaseImport");
-        const result = await importSQLDump(input.sqlContent);
-        return result;
-      }),
-  }),
+  // ❌ REMOVIDO: sub-router `database` (export/import SQL bruto).
+  //
+  // O endpoint `database.import` aceitava `sqlContent: string` e executava via
+  // `sql.raw(...)` — a única "validação" era exigir o cabeçalho literal
+  // "-- App Cultivo - Database Backup" no início (trivial de incluir). Um admin
+  // comprometido (ou bug de privilege escalation futuro) podia rodar
+  // `DROP DATABASE`, criar usuários, alterar permissões — Remote Code Execution
+  // no banco.
+  //
+  // O backup estruturado em `routers/backup.ts` (sub-router `backup`) cobre o
+  // caso de uso real: export/import por tabela com validação Zod, escopo por
+  // groupId, e re-mapeamento de IDs (multi-tenancy safe). Use aquele.
+  //
+  // Os arquivos `server/databaseImport.ts` e `server/databaseExport.ts` foram
+  // deletados junto com este endpoint.
 
   // Notifications (Notificações)
   notifications: router({
