@@ -7,7 +7,51 @@ import superjson from "superjson";
 import { toast } from "sonner";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { isNative, applyPlatformClasses } from "@/lib/platform";
+import { getToken } from "@/lib/authStorage";
+import { initStatusBar } from "@/lib/statusBar";
+import { setKeyboardResize } from "@/lib/keyboard";
+import { initSentry } from "@/lib/sentry";
 import "./index.css";
+
+applyPlatformClasses();
+
+// Sentry primeiro pra capturar erros do próprio init dos outros plugins.
+// No-op se VITE_SENTRY_DSN não estiver setado (dev local).
+initSentry();
+
+// Configura status bar nativa (texto branco em fundo escuro, sem overlay no Android).
+// No-op no web. Fire-and-forget — não bloqueia o render.
+initStatusBar();
+
+// Modo "body" do keyboard: ao abrir teclado, o <body> encolhe pra não cobrir
+// inputs. Isso evita o problema clássico de input "atrás" do teclado em iOS.
+// Web ignora.
+setKeyboardResize("body");
+
+// Dev helper: alterna tier simulado (Free/Pro/Team) sem precisar do RevenueCat.
+// Uso via Web Inspector (Safari → Develop → Simulator → Console):
+//   __setDevPlan('team')  → força Pro Grupo
+//   __setDevPlan('pro')   → força Pro Individual
+//   __setDevPlan('free')  → força Free
+//   __setDevPlan(null)    → volta ao automático
+// Disponível em mobile (Capacitor) APENAS quando VITE_ENABLE_TEST_ACCOUNTS=true.
+// Não expor em build de release (App Store / Play Store).
+if (import.meta.env.VITE_ENABLE_TEST_ACCOUNTS === "true" && isNative() && typeof window !== "undefined") {
+  (window as any).__setDevPlan = async (plan: "free" | "pro" | "team" | null) => {
+    const { Preferences } = await import("@capacitor/preferences");
+    if (plan === null) {
+      await Preferences.remove({ key: "dev_force_plan" });
+    } else if (plan === "free" || plan === "pro" || plan === "team") {
+      await Preferences.set({ key: "dev_force_plan", value: plan });
+    } else {
+      console.error("Plano inválido. Use 'free', 'pro', 'team' ou null.");
+      return;
+    }
+    console.log(`✓ Plano dev = ${plan ?? "automático"} — recarregando...`);
+    location.reload();
+  };
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,15 +100,24 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: `${API_BASE_URL}/api/trpc`,
       transformer: superjson,
+      async headers() {
+        if (!isNative()) return {};
+        const token = await getToken();
+        const headers: Record<string, string> = { "X-Client": "capacitor" };
+        if (token) headers.Authorization = `Bearer ${token}`;
+        return headers;
+      },
       fetch(input, init) {
         return globalThis.fetch(input, {
           ...(init ?? {}),
-          credentials: "include",
+          credentials: isNative() ? "omit" : "include",
         });
       },
     }),
@@ -108,8 +161,9 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-// Registrar Service Worker para PWA
-if ('serviceWorker' in navigator) {
+// Registrar Service Worker para PWA — apenas no web. Capacitor (WKWebView/Android)
+// conflita com SW e usa cache nativo + React Query persisters.
+if ('serviceWorker' in navigator && !isNative()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')

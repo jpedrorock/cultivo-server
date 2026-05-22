@@ -1,24 +1,19 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 import { useTheme } from "@/contexts/ThemeContext";
-import { isNative, isPWAStandalone } from "@/lib/platform";
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme } = useTheme();
 
   const sonnerTheme = theme === "vision" || theme === "forest" || theme === "hps" ? "dark" : "light";
 
-  // Capacitor (WebView ocupando tela toda) E PWA standalone (instalado na home)
-  // ambos sofrem do mesmo problema: toast top-center sobrepõe status bar do iOS.
-  // Browser normal (Safari/Chrome com chrome visível) não precisa.
-  const offset = (isNative() || isPWAStandalone())
-    ? "calc(env(safe-area-inset-top, 0px) + 12px)"
-    : undefined;
+  // Safe-area do notch é tratado via CSS em index.css (bloco capacitor-native /
+  // pwa-standalone) com `[data-sonner-toaster][data-y-position="top"]`. Sonner
+  // não resolve `env()` na prop `offset`, então CSS direto é mais confiável.
 
   return (
     <Sonner
       theme={sonnerTheme}
       position="top-center"
-      offset={offset}
       expand={false}
       richColors={false}
       closeButton={false}

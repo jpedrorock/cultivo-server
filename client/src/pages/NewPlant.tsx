@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { PageTransition } from "@/components/PageTransition";
 import { PageHeader } from "@/components/PageHeader";
+import { haptics } from "@/lib/haptics";
 
 export default function NewPlant() {
   const [, setLocation] = useLocation();
@@ -27,10 +28,12 @@ export default function NewPlant() {
   
   const createPlant = trpc.plants.create.useMutation({
     onSuccess: (data) => {
+      haptics.success();
       toast.success("Planta criada com sucesso!");
       setLocation(`/plants/${data.id}`);
     },
     onError: (error) => {
+      haptics.error();
       toast.error(`Erro ao criar planta: ${error.message}`);
     },
   });
@@ -39,20 +42,24 @@ export default function NewPlant() {
     e.preventDefault();
 
     if (!name.trim()) {
+      haptics.warning();
       toast.error("Nome é obrigatório");
       return;
     }
 
     if (!strainId) {
+      haptics.warning();
       toast.error("Selecione uma strain");
       return;
     }
 
     if (!tentId) {
+      haptics.warning();
       toast.error("Selecione uma estufa");
       return;
     }
 
+    haptics.medium();
     createPlant.mutate({
       name: name.trim(),
       code: code.trim() || undefined,
