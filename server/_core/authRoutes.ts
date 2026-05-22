@@ -12,6 +12,10 @@ import {
   registerUserAtomic,
 } from '../db-auth';
 import {
+  deleteUserAccount,
+  getAccountDeletionPreview,
+} from '../db-account-delete';
+import {
   hashPassword,
   comparePassword,
   createToken,
@@ -20,6 +24,19 @@ import {
   authenticateRequest,
 } from './auth';
 import { ENV } from './env';
+
+/**
+ * Mascara um email pra log seguro (LGPD/GDPR).
+ * Ex: "joaopedro@evapro.cloud" → "j*******@evapro.cloud"
+ * Loga só a 1ª letra do local + domínio inteiro (útil pra debug sem expor PII).
+ */
+function maskEmail(email: string | null | undefined): string {
+  if (!email) return '[no-email]';
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return '[invalid-email]';
+  const head = local.slice(0, 1);
+  return `${head}${'*'.repeat(Math.max(0, local.length - 1))}@${domain}`;
+}
 
 // ---------------------------------------------------------------------------
 // Rate limiters por endpoint sensível
@@ -47,6 +64,16 @@ const forgotPasswordLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Muitos pedidos de recuperação. Tente novamente em 1 hora.' },
+});
+
+// Excluir conta é OPERAÇÃO DESTRUTIVA. Limite agressivo previne abuse
+// (script malicioso tentando deletar contas em massa).
+const deleteAccountLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,           // 1 hora
+  limit: 3,                           // 3 tentativas por hora
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas. Tente novamente em 1 hora.' },
 });
 
 // ---------------------------------------------------------------------------
@@ -227,9 +254,9 @@ export function registerAuthRoutes(app: Express) {
         // const token = randomBytes(32).toString('hex');
         // await savePasswordResetToken(user.id, token, expiresAt);
         // await sendPasswordResetEmail(user.email, token);
-        console.log(`[Auth] Reset pedido pra user ${user.id} (${cleanEmail}) — processar manualmente`);
+        console.log(`[Auth] Reset pedido pra user ${user.id} (${maskEmail(cleanEmail)}) — processar manualmente`);
       } else {
-        console.log(`[Auth] Reset pedido pra email não encontrado (${cleanEmail}) — ignorar`);
+        console.log(`[Auth] Reset pedido pra email não encontrado (${maskEmail(cleanEmail)}) — ignorar`);
       }
 
       // Resposta sempre igual pra não vazar enumeração
@@ -272,6 +299,102 @@ export function registerAuthRoutes(app: Express) {
   app.post('/api/auth/logout', (req: Request, res: Response) => {
     clearAuthCookie(res);
     res.json({ success: true, message: 'Logout realizado com sucesso' });
+  });
+
+  /**
+   * GET /api/auth/delete-preview
+   * Retorna metadados pro user decidir se quer mesmo apagar.
+   * Não apaga nada — é só consulta.
+   *
+   * Response:
+   *  { isLastInGroup: bool, isGroupOwner: bool, counts: { tents, plants, strains } }
+   */
+  app.get('/api/auth/delete-preview', async (req: Request, res: Response) => {
+    try {
+      const user = await authenticateRequest(req);
+      if (!user) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+      const preview = await getAccountDeletionPreview(user.id);
+      if (!preview || !preview.exists) {
+        res.status(404).json({ error: 'Usuário não encontrado' });
+        return;
+      }
+      res.json({
+        success: true,
+        isLastInGroup: preview.isLastInGroup,
+        isGroupOwner: preview.isGroupOwner,
+        counts: preview.counts,
+      });
+    } catch (error) {
+      console.error('[Auth] delete-preview failed', error);
+      res.status(500).json({ error: 'Falha ao processar pedido' });
+    }
+  });
+
+  /**
+   * POST /api/auth/delete-account
+   * Apaga DEFINITIVAMENTE a conta do usuário (LGPD/GDPR/Apple 5.1.1).
+   *
+   * Body:
+   *  { password: string, confirmText: string }
+   *
+   * Regras:
+   *  - User precisa estar autenticado
+   *  - Re-confirmação de senha (proteção contra session hijacking)
+   *  - Texto literal "EXCLUIR" (proteção contra tap acidental)
+   *  - Se é último membro do grupo, apaga grupo + todos os dados
+   *  - Se há outros membros, apaga só o user (dados continuam)
+   *  - Cookie limpo após sucesso (mobile deve apagar token também)
+   */
+  app.post('/api/auth/delete-account', deleteAccountLimiter, async (req: Request, res: Response) => {
+    try {
+      const user = await authenticateRequest(req);
+      if (!user) {
+        res.status(401).json({ error: 'Não autenticado' });
+        return;
+      }
+
+      const { password, confirmText } = req.body as { password?: string; confirmText?: string };
+
+      if (confirmText !== 'EXCLUIR') {
+        res.status(400).json({ error: 'Digite "EXCLUIR" para confirmar a exclusão da conta.' });
+        return;
+      }
+
+      // Verifica senha. Se user só tem OAuth (sem senha), aceitar mediante
+      // re-autenticação prévia — mas como esse endpoint exige session válida,
+      // já é re-auth implícita.
+      if (user.passwordHash) {
+        if (!password) {
+          res.status(400).json({ error: 'Senha obrigatória.' });
+          return;
+        }
+        const { ok } = await comparePassword(password, user.passwordHash);
+        if (!ok) {
+          res.status(401).json({ error: 'Senha incorreta.' });
+          return;
+        }
+      }
+      // (User OAuth-only sem passwordHash → segue direto. Já tem JWT válido.)
+
+      const result = await deleteUserAccount(user.id);
+
+      clearAuthCookie(res);
+
+      // Audit log — sem PII (só id numérico). LGPD-safe.
+      console.log(`[delete-account] user=${user.id} method=${user.passwordHash ? 'password' : 'oauth'} groupDeleted=${result.groupDeleted} transferred=${result.ownershipTransferred}`);
+
+      res.json({
+        success: true,
+        message: 'Conta excluída com sucesso.',
+        groupDeleted: result.groupDeleted,
+      });
+    } catch (error) {
+      console.error('[Auth] delete-account failed', error);
+      res.status(500).json({ error: 'Falha ao excluir conta. Entre em contato com o suporte.' });
+    }
   });
 
   /**
@@ -376,7 +499,7 @@ export function registerAuthRoutes(app: Express) {
       // Bloqueia se Google diz que email não foi verificado
       // (Sem isso, atacante poderia usar email de terceiros não verificado.)
       if (googleUser.verified_email === false) {
-        console.warn(`[Auth] Google email não verificado: ${googleUser.email}`);
+        console.warn(`[Auth] Google email não verificado: ${maskEmail(googleUser.email)}`);
         res.redirect('/login?error=google_email_not_verified');
         return;
       }
@@ -401,7 +524,7 @@ export function registerAuthRoutes(app: Express) {
           // e usar a opção "Vincular Google" no perfil (a implementar).
           if (existingByEmail.openId && existingByEmail.openId !== googleUser.id) {
             // Conta já vinculada a OUTRO Google ID — definitivamente não é a mesma pessoa
-            console.warn(`[Auth] Tentativa de login Google para email com openId diferente: ${googleUser.email}`);
+            console.warn(`[Auth] Tentativa de login Google para email com openId diferente: ${maskEmail(googleUser.email)}`);
             res.redirect('/login?error=google_account_conflict');
             return;
           }

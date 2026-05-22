@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
-import { User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle, Lock, Sparkles } from 'lucide-react';
+import { usePlan } from '@/_core/hooks/usePlan';
+import { usePaywall } from '@/components/PaywallGate';
 import { PageHeader } from '@/components/PageHeader';
 
 function UserAvatar({ user, size = 'md' }: { user: { name?: string | null; email?: string; avatarUrl?: string | null } | null; size?: 'md' | 'lg' }) {
@@ -23,6 +25,7 @@ import { PageTransition } from '@/components/PageTransition';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { toast } from 'sonner';
+import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
 
 export default function AccountSettings() {
   const { user } = useAuth();
@@ -62,9 +65,9 @@ function ProfileCard() {
   const [showNew, setShowNew] = useState(false);
   const [nameFeedback, setNameFeedback] = useState('');
 
-  // Password complexity
+  // Password complexity — alinhado com a política de register e backend (min 12 chars)
   const pwReqs = {
-    length:  newPassword.length >= 8,
+    length:  newPassword.length >= 12,
     upper:   /[A-Z]/.test(newPassword),
     lower:   /[a-z]/.test(newPassword),
     digit:   /[0-9]/.test(newPassword),
@@ -97,13 +100,19 @@ function ProfileCard() {
     onError: (e) => setPwError(e.message),
   });
 
-  const deleteAccount = trpc.profile.deleteAccount.useMutation({
-    onSuccess: async () => { await logout(); setLocation('/login'); },
-    onError: (e) => setNameError(e.message),
-  });
+  // O dialog DeleteAccountDialog usa diretamente o REST /api/auth/delete-account
+  // que faz delete cascade completo (estufas, plantas, fotos, etc.) — compliant
+  // com Apple 5.1.1 e LGPD. Não usamos mais trpc.profile.deleteAccount (que era
+  // simplista — só deletava o user da tabela, deixando órfão tudo o resto).
 
   const handleDeleteAccount = () => {
     setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteSuccess = async () => {
+    await logout();
+    // Hard reload garante limpeza total (React Query, tRPC client, estado SPA)
+    window.location.href = '/login';
   };
 
   return (
@@ -154,7 +163,7 @@ function ProfileCard() {
             </div>
             <div className="relative">
               <input type={showNew ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                placeholder="Nova senha (mín. 8 caracteres)" className="w-full px-3 py-2 pr-9 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-emerald-500" />
+                placeholder="Nova senha (mín. 12 caracteres)" className="w-full px-3 py-2 pr-9 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-emerald-500" />
               <button onClick={() => setShowNew(!showNew)} className="absolute right-2.5 top-2.5 text-muted-foreground">
                 {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -202,7 +211,7 @@ function ProfileCard() {
             )}
             <div className="flex gap-2">
               <Button size="sm" onClick={() => {
-                if (newPassword.length < 8) { setPwError('A senha deve ter pelo menos 8 caracteres'); return; }
+                if (newPassword.length < 12) { setPwError('A senha deve ter pelo menos 12 caracteres'); return; }
                 if (newPassword !== confirmPassword) { setPwError('As senhas não coincidem'); return; }
                 setPwError(''); updatePassword.mutate({ currentPassword, newPassword });
               }} disabled={updatePassword.isPending || (!!confirmPassword && confirmPassword !== newPassword)}>Salvar</Button>
@@ -221,50 +230,45 @@ function ProfileCard() {
         {pwFeedback && <p className="text-sm text-emerald-600 font-medium">{pwFeedback}</p>}
         {pwError && <p className="text-sm text-destructive">{pwError}</p>}
 
-        <Button variant="outline" className="w-full justify-start gap-2" onClick={logout}>
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2"
+          onClick={async () => {
+            await logout();
+            // Hard reload garante limpeza completa: React Query cache, tRPC client,
+            // qualquer state global do app. Mais seguro que setLocation que mantém
+            // a SPA viva e pode disparar refetch com token expirado.
+            window.location.href = '/login';
+          }}
+        >
           <LogOut className="w-4 h-4" />
           Sair da conta
         </Button>
 
         <button
           onClick={handleDeleteAccount}
-          disabled={deleteAccount.isPending}
-          className="flex items-center gap-2 text-sm text-destructive hover:underline disabled:opacity-60"
+          className="flex items-center gap-2 text-sm text-destructive hover:underline"
         >
           <Trash2 className="w-3.5 h-3.5" />
           Excluir minha conta
         </button>
       </CardContent>
 
-      {/* Delete account confirmation dialog */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-destructive flex items-center gap-2">
-              <Trash2 className="w-5 h-5" /> Excluir conta
-            </DialogTitle>
-            <DialogDescription>
-              Excluir sua conta permanentemente? Todos os seus dados serão removidos. Esta ação não pode ser desfeita.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
-            <Button
-              variant="destructive"
-              disabled={deleteAccount.isPending}
-              onClick={() => { setDeleteConfirmOpen(false); deleteAccount.mutate(); }}
-            >
-              {deleteAccount.isPending ? 'Excluindo…' : 'Excluir conta'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delete account com fluxo robusto: preview + senha + texto "EXCLUIR" */}
+      <DeleteAccountDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        hasPassword={!!user?.email && !user?.email.endsWith('@privaterelay.appleid.com')}
+        onSuccess={handleDeleteSuccess}
+      />
     </Card>
   );
 }
 
 function GroupCard() {
   const { user } = useAuth();
+  const { isTeam, limits } = usePlan();
+  const paywall = usePaywall();
   const [copied, setCopied] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
   const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
@@ -307,21 +311,45 @@ function GroupCard() {
         <CardDescription className="text-xs sm:text-sm">{group.name}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="p-3 bg-muted rounded-lg">
-          <p className="text-xs text-muted-foreground mb-1.5">Código de cultivo — compartilhe com quem quiser convidar</p>
-          <div className="flex items-center gap-2">
-            <span className="font-mono font-bold tracking-widest text-lg flex-1">{group.inviteCode}</span>
-            <Button size="sm" variant="outline" onClick={handleCopy} className="gap-1.5 shrink-0">
-              <Copy className="w-3.5 h-3.5" />
-              {copied ? 'Copiado!' : 'Copiar'}
-            </Button>
-            {group.isOwner && (
-              <Button size="sm" variant="ghost" onClick={handleRegenerate} disabled={regenerate.isPending} className="shrink-0" title="Gerar novo código">
-                <RefreshCw className={`w-3.5 h-3.5 ${regenerate.isPending ? 'animate-spin' : ''}`} />
+        {isTeam ? (
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="text-xs text-muted-foreground mb-1.5">Código de cultivo — compartilhe com quem quiser convidar</p>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold tracking-widest text-lg flex-1">{group.inviteCode}</span>
+              <Button size="sm" variant="outline" onClick={handleCopy} className="gap-1.5 shrink-0">
+                <Copy className="w-3.5 h-3.5" />
+                {copied ? 'Copiado!' : 'Copiar'}
               </Button>
-            )}
+              {group.isOwner && (
+                <Button size="sm" variant="ghost" onClick={handleRegenerate} disabled={regenerate.isPending} className="shrink-0" title="Gerar novo código">
+                  <RefreshCw className={`w-3.5 h-3.5 ${regenerate.isPending ? 'animate-spin' : ''}`} />
+                </Button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {group.members.length} de {limits.maxMembers} membros · {limits.maxMembers - group.members.length} vagas
+            </p>
           </div>
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => paywall.open("Convidar membros para compartilhar o cultivo é exclusivo do plano Pro Grupo.")}
+            className="w-full text-left p-3 bg-gradient-to-br from-violet-500/15 to-transparent border border-violet-500/30 rounded-lg active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <Lock className="w-3.5 h-3.5 text-violet-400" />
+              <p className="text-xs font-bold uppercase tracking-wider text-violet-400">Pro Grupo</p>
+            </div>
+            <p className="text-sm font-semibold text-foreground mb-1">Compartilhe com até 3 pessoas</p>
+            <p className="text-xs text-muted-foreground">
+              Convide casal, família ou parceiros de cultivo pra acessar suas estufas.
+            </p>
+            <div className="flex items-center gap-1.5 mt-2 text-xs font-bold text-violet-400">
+              <Sparkles className="w-3.5 h-3.5" />
+              Fazer upgrade
+            </div>
+          </button>
+        )}
 
         <div>
           <p className="text-xs text-muted-foreground mb-2">{group.members.length} membro(s)</p>
@@ -381,6 +409,8 @@ function GroupCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {paywall.PaywallElement}
     </Card>
   );
 }

@@ -29,6 +29,26 @@ export const ENV = {
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
 
+  // Sign in with Apple — OBRIGATÓRIO pra publicar na App Store enquanto existir
+  // Google OAuth (Guideline 4.8). Configurar quando comprar Apple Developer ($99/ano).
+  //
+  // APPLE_CLIENT_ID: Service ID que você criar no Apple Developer
+  //   - Tipicamente: cloud.evapro.cultivo.signin (Service ID, NÃO o bundle ID do app)
+  //   - O bundle ID do app iOS também pode ser usado como audience pra fluxo NATIVO
+  //
+  // APPLE_TEAM_ID: 10 chars que aparece no canto superior direito da conta dev
+  // APPLE_KEY_ID: 10 chars do .p8 gerado em "Keys"
+  // APPLE_PRIVATE_KEY: conteúdo completo do .p8 (incluindo BEGIN/END PRIVATE KEY)
+  //   - No .env coloca em uma linha só substituindo quebras de linha por \n literal
+  //   - Ex: APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGTAg...\n-----END PRIVATE KEY-----"
+  //
+  // O private key só é necessário pra revogar tokens via /auth/revoke (Guideline 5.1.1)
+  // — pro fluxo de login básico, só APPLE_CLIENT_ID basta.
+  appleClientId: process.env.APPLE_CLIENT_ID ?? '',
+  appleTeamId: process.env.APPLE_TEAM_ID ?? '',
+  appleKeyId: process.env.APPLE_KEY_ID ?? '',
+  applePrivateKey: (process.env.APPLE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
+
   // Chave de criptografia para API keys dos usuários (AES-256-GCM)
   // Gere com: openssl rand -base64 32
   encryptionKey: process.env.ENCRYPTION_KEY ?? '',

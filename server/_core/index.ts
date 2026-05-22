@@ -6,8 +6,10 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
+import { registerAppleAuthRoutes } from "./appleAuthRoutes";
 import { registerDeviceRoutes } from "./deviceRoutes";
 import { registerWaitlistRoutes } from "./waitlistRoutes";
+import { registerLegalRoutes } from "./legalRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -77,7 +79,18 @@ async function startServer() {
           : ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https:", ...(isProd ? [] : ["ws:", "wss:"])],
+        // connectSrc whitelist explícita — antes era "https:" (qualquer HTTPS),
+        // o que permitia exfiltração arbitrária via XSS. Adicionar domínios
+        // aqui APENAS se o CLIENT (browser/WebView) precisar chamar diretamente.
+        // Chamadas server-to-server (IA providers, Tuya, open-meteo) NÃO entram
+        // aqui — só passam pelo backend.
+        connectSrc: [
+          "'self'",
+          "https://app.cultivo.pro",
+          "https://cultivo.pro",
+          "https://static.cloudflareinsights.com",    // analytics beacon
+          ...(isProd ? [] : ["ws:", "wss:", "http://localhost:*"]),
+        ],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
@@ -149,6 +162,18 @@ async function startServer() {
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
     : [];
 
+  // Origens permitidas para apps mobile Capacitor empacotado.
+  // iOS:     "capacitor://localhost"
+  // Android: "https://localhost"
+  // Essas duas são sempre aceitas em qualquer ambiente — são scheme exclusivo
+  // do WebView empacotado, não atingíveis por browser comum.
+  //
+  // "http://localhost" foi REMOVIDO do allow-list de prod por ser atingível
+  // por browser comum em qualquer máquina (ex: alguém abrindo
+  // http://localhost:8080/malicioso.html e fazendo CSRF cross-origin pra API
+  // de prod). Continua aceito em dev pelo regex genérico abaixo.
+  const capacitorOrigins = ['capacitor://localhost', 'https://localhost'];
+
   app.use((req, res, next) => {
     const origin = req.headers.origin as string | undefined;
 
@@ -156,7 +181,11 @@ async function startServer() {
     if (!origin) { next(); return; }
 
     let allowed = false;
-    if (!isProd) {
+
+    // Capacitor (iOS/Android nativo) — sempre permitido independente de ambiente
+    if (capacitorOrigins.includes(origin)) {
+      allowed = true;
+    } else if (!isProd) {
       // Dev: aceita qualquer localhost/127.0.0.1
       allowed = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
     } else {
@@ -170,7 +199,7 @@ async function startServer() {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,trpc-batch-mode');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,trpc-batch-mode,X-Client');
     }
 
     if (req.method === 'OPTIONS') {
@@ -186,9 +215,12 @@ async function startServer() {
     next();
   });
 
-  // Body parser com limite maior para uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Body parser — 5MB cobre payloads tRPC e bases64 pequenos (e.g. avatares).
+  // Uploads de imagem reais (fotos de planta) passam por /api/upload (multipart)
+  // que tem seu próprio limite no multer. Antes era 50MB no JSON global o que
+  // permitia DoS via payloads gigantes mesmo após auth.
+  app.use(express.json({ limit: "5mb" }));
+  app.use(express.urlencoded({ limit: "5mb", extended: true }));
 
   // Cookie parser para autenticação JWT
   app.use(cookieParser());
@@ -203,11 +235,19 @@ async function startServer() {
   // Rotas de autenticação JWT (registro, login, logout, me)
   registerAuthRoutes(app);
 
+  // Sign in with Apple — obrigatório pra App Store enquanto existir Google OAuth
+  // (Guideline 4.8). Endpoint só responde se APPLE_CLIENT_ID estiver setado.
+  registerAppleAuthRoutes(app);
+
   // Rotas REST p/ ESP32 display (X-Device-Token auth, sem JWT)
   registerDeviceRoutes(app);
 
   // Captura de email do site público cultivo.pro (POST /api/waitlist)
   registerWaitlistRoutes(app);
+
+  // Páginas legais (Privacy Policy + Terms of Service) servidas estaticamente
+  // em /privacy e /terms — pré-requisito Apple/Google Play.
+  registerLegalRoutes(app);
 
   // Landing page de redirecionamento para QR codes de plantas
   app.get("/scan/plant/:id", (req, res) => {
@@ -414,9 +454,23 @@ async function startServer() {
   // Em ambos os casos, o operador tem que ter acesso ao servidor — não dá
   // para escalar privilégio a partir do navegador.
 
+  // Rate limit no tRPC — protege contra DoS de cliente autenticado.
+  // 600 req/min por IP é folgado: a Home faz ~5-10 queries em batch (= 1 HTTP
+  // request), e há polling em alguns hooks. Atacante consegue no máximo 10
+  // requests/seg antes de tomar 429.
+  const { default: rateLimit } = await import("express-rate-limit");
+  const trpcLimiter = rateLimit({
+    windowMs: 60 * 1000,            // 1 minuto
+    limit: 600,                     // 600 requests/min/IP
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { error: "Muitas requisições. Aguarde um momento." },
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
+    trpcLimiter,
     createExpressMiddleware({
       router: appRouter,
       createContext,
