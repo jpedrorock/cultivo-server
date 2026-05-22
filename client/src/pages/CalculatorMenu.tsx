@@ -1,8 +1,137 @@
-import { Link } from "wouter";
-import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight, Wind } from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight, Wind, Lock, Sparkles, Play } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
+import { usePlan } from "@/_core/hooks/usePlan";
+import { usePaywall } from "@/components/PaywallGate";
+import { useCalculatorUnlock } from "@/_core/hooks/useCalculatorUnlock";
+import { RewardedUnlockModal } from "@/components/RewardedUnlockModal";
+
+/** Helper: card individual de calculadora que gerencia seu próprio unlock */
+function CalculatorCard({
+  calc,
+  index,
+  isProUser,
+  isAllowed,
+  openPaywall,
+}: {
+  calc: any;
+  index: number;
+  isProUser: boolean;
+  isAllowed: boolean;
+  openPaywall: (msg: string) => void;
+}) {
+  const [, setLocation] = useLocation();
+  const { unlocked, expiresAt, grantUnlock } = useCalculatorUnlock(calc.id);
+  const [rewardedOpen, setRewardedOpen] = useState(false);
+
+  const Icon = calc.icon;
+  const isLocked = !isProUser && !isAllowed && !unlocked;
+  const showUnlockedBadge = !isProUser && !isAllowed && unlocked;
+  const triggerMsg = `A calculadora "${calc.title}" faz parte do plano Pro.`;
+
+  const innerCard = (
+    <div
+      className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4 md:h-full ${isLocked ? "opacity-90" : ""}`}
+      style={{
+        animationDelay: `${index * 80}ms`,
+        animationFillMode: 'backwards',
+        background: `linear-gradient(145deg, ${calc.glow} 0%, var(--card) 55%)`,
+      }}
+    >
+      {isLocked && (
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full bg-foreground/85 text-background px-2 py-0.5 text-[10px] font-bold shadow">
+          <Lock className="w-2.5 h-2.5" />
+          <span>Pro</span>
+          <Sparkles className="w-2.5 h-2.5" />
+        </div>
+      )}
+      {showUnlockedBadge && (
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-full bg-amber-500/90 text-white px-2 py-0.5 text-[10px] font-bold shadow">
+          <Play className="w-2.5 h-2.5 fill-current" />
+          <span>24h</span>
+        </div>
+      )}
+
+      {/* Mobile: horizontal */}
+      <div className="flex md:hidden items-center gap-4 px-4 h-[88px] overflow-hidden">
+        <div className={`w-14 h-14 rounded-2xl ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} shrink-0`}>
+          <Icon className="w-7 h-7 text-white drop-shadow-sm" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-0.5">
+            <h3 className="text-base font-bold text-foreground leading-tight">{calc.title}</h3>
+            {calc.badge && !isLocked && !showUnlockedBadge && (
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${calc.badgeStyle}`}>
+                {calc.badge}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground leading-snug line-clamp-1 mb-1.5">{calc.description}</p>
+          <div className={`flex items-center gap-1 text-xs font-medium ${calc.accentColor}`}>
+            <span>{isLocked ? "Desbloquear" : "Abrir calculadora"}</span>
+            <ArrowRight className="w-3 h-3" />
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: vertical */}
+      <div className="hidden md:flex flex-col p-5 h-full">
+        <div className="flex items-start justify-between gap-2 mb-4">
+          <div className={`w-14 h-14 rounded-2xl ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
+            <Icon className="w-7 h-7 text-white drop-shadow-sm" />
+          </div>
+          {calc.badge && !isLocked && !showUnlockedBadge && (
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${calc.badgeStyle}`}>
+              {calc.badge}
+            </span>
+          )}
+        </div>
+        <div className="flex-1 space-y-1.5 mb-3">
+          <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{calc.description}</p>
+        </div>
+        <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200`}>
+          <span>{isLocked ? "Desbloquear" : "Abrir calculadora"}</span>
+          <ArrowRight className="w-4 h-4" />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (isLocked) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setRewardedOpen(true)}
+          className="block w-full text-left md:h-full"
+        >
+          {innerCard}
+        </button>
+        <RewardedUnlockModal
+          open={rewardedOpen}
+          onOpenChange={setRewardedOpen}
+          calculatorTitle={calc.title}
+          onRewardEarned={async () => {
+            await grantUnlock();
+          }}
+          onOpenPaywall={() => openPaywall(triggerMsg)}
+        />
+      </>
+    );
+  }
+
+  return (
+    <Link href={`/calculators/${calc.id}`} className="block md:h-full">
+      {innerCard}
+    </Link>
+  );
+}
 
 export default function CalculatorMenu() {
+  const { limits, isPro } = usePlan();
+  const paywall = usePaywall();
   const calculators = [
     {
       id: "watering-runoff",
@@ -115,66 +244,18 @@ export default function CalculatorMenu() {
     >
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-          {calculators.map((calc, index) => {
-            const Icon = calc.icon;
-            return (
-              <Link key={calc.id} href={`/calculators/${calc.id}`} className="block md:h-full">
-                <div
-                  className={`group relative rounded-2xl border ${calc.border} cursor-pointer overflow-hidden transition-all duration-300 hover:scale-[1.02] animate-in fade-in slide-in-from-bottom-4 md:h-full`}
-                  style={{
-                    animationDelay: `${index * 80}ms`,
-                    animationFillMode: 'backwards',
-                    background: `linear-gradient(145deg, ${calc.glow} 0%, var(--card) 55%)`,
-                  }}
-                >
-                  {/* Mobile: horizontal layout — fixed h-[88px] = 56px icon + 16px padding each side */}
-                  <div className="flex md:hidden items-center gap-4 px-4 h-[88px] overflow-hidden">
-                    <div className={`w-14 h-14 rounded-2xl ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} shrink-0`}>
-                      <Icon className="w-7 h-7 text-white drop-shadow-sm" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-0.5">
-                        <h3 className="text-base font-bold text-foreground leading-tight">{calc.title}</h3>
-                        {calc.badge && (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${calc.badgeStyle}`}>
-                            {calc.badge}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-snug line-clamp-1 mb-1.5">{calc.description}</p>
-                      <div className={`flex items-center gap-1 text-xs font-medium ${calc.accentColor}`}>
-                        <span>Abrir calculadora</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tablet/Desktop: vertical layout — CSS Grid equalizes row heights */}
-                  <div className="hidden md:flex flex-col p-5 h-full">
-                    <div className="flex items-start justify-between gap-2 mb-4">
-                      <div className={`w-14 h-14 rounded-2xl ${calc.gradient} flex items-center justify-center shadow-lg ${calc.shadowColor} group-hover:scale-105 transition-transform duration-300 shrink-0`}>
-                        <Icon className="w-7 h-7 text-white drop-shadow-sm" />
-                      </div>
-                      {calc.badge && (
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${calc.badgeStyle}`}>
-                          {calc.badge}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-1.5 mb-3">
-                      <h3 className="text-lg font-bold text-foreground leading-tight">{calc.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{calc.description}</p>
-                    </div>
-                    <div className={`flex items-center gap-1.5 text-sm font-medium ${calc.accentColor} group-hover:gap-2.5 transition-all duration-200`}>
-                      <span>Abrir calculadora</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+          {calculators.map((calc, index) => (
+            <CalculatorCard
+              key={calc.id}
+              calc={calc}
+              index={index}
+              isProUser={isPro}
+              isAllowed={limits.allowedCalculators.includes(calc.id)}
+              openPaywall={paywall.open}
+            />
+          ))}
         </div>
+        {paywall.PaywallElement}
 
         {/* Info Card */}
         <div className="mt-4 rounded-2xl border border-border/50 bg-muted/10 p-4 space-y-2.5">
