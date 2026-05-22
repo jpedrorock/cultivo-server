@@ -1,8 +1,9 @@
 {
-  "name": "App Cultivo - Gerenciamento de Estufas",
-  "short_name": "App Cultivo",
-  "description": "Sistema completo para gerenciamento de cultivo de cannabis: controle de estufas, plantas, ambiente e análises.",
+  "name": "Cultivo — Gerenciamento de Cultivo Indoor",
+  "short_name": "Cultivo",
+  "description": "Gerencie estufas, plantas e ciclos. Controle de ambiente, alertas, calculadoras técnicas e integração SmartLife.",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#10b981",
   "theme_color": "#10b981",
@@ -12,13 +13,19 @@
       "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/favicon.svg",
