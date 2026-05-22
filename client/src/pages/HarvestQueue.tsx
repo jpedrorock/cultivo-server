@@ -18,6 +18,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
+import { PlantCardSkeleton } from "@/components/PlantCardSkeleton";
+import { Wind as WindIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -130,9 +132,22 @@ export default function HarvestQueue() {
   };
 
   if (isLoading) {
+    // Skeleton em vez de spinner cobre a tela inteira com placeholders
+    // que parecem o conteúdo real — sensação de carregamento mais rápida.
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <PageHeader
+          backHref="/"
+          title={
+            <>
+              <WindIcon className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0" />
+              <span className="truncate">Aguardando Secagem</span>
+            </>
+          }
+        />
+        <main className="container mx-auto px-4 py-6 max-w-3xl space-y-3">
+          {[1, 2, 3].map((i) => <PlantCardSkeleton key={i} />)}
+        </main>
       </div>
     );
   }

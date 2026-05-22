@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Sprout, Leaf, Flower2, Wind } from "lucide-react";
 import { toast } from "sonner";
+import { haptics } from "@/lib/haptics";
 
 
 interface CreateTentModalProps {
@@ -42,6 +43,7 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
 
   const createTent = trpc.tents.create.useMutation({
     onSuccess: () => {
+      haptics.success();
       toast.success("Estufa criada com sucesso!");
       utils.tents.list.invalidate();
       onOpenChange(false);
@@ -56,6 +58,7 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
       });
     },
     onError: (error) => {
+      haptics.error();
       toast.error(`Erro ao criar estufa: ${error.message}`);
     },
   });
@@ -65,10 +68,12 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
 
     // Validação básica
     if (!formData.name || !formData.width || !formData.depth || !formData.height) {
+      haptics.warning();
       toast.error("Preencha todos os campos obrigatórios.");
       return;
     }
 
+    haptics.medium();
     createTent.mutate({
       name: formData.name,
       category: formData.category,

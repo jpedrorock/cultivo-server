@@ -6,6 +6,7 @@ import { ptBR } from "date-fns/locale";
 import { Cpu, Plus, Trash2, Copy, Check, Loader2, AlertCircle } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PageTransition } from "@/components/PageTransition";
+import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -172,20 +173,28 @@ export default function Dispositivos() {
           )}
 
           {!isLoading && tokens.length === 0 && (
-            <div className="bg-card border border-border rounded-2xl p-8 text-center">
-              <Cpu className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-4">
-                Nenhum dispositivo cadastrado ainda.
-              </p>
-              <Button size="sm" onClick={() => setAddOpen(true)} disabled={tents.length === 0}>
-                <Plus className="w-4 h-4 mr-1" /> Criar primeiro token
-              </Button>
+            <>
+              <EmptyState
+                icon={Cpu}
+                title="Nenhum dispositivo cadastrado"
+                description={
+                  tents.length === 0
+                    ? "Cadastre uma estufa primeiro pra vincular o token do ESP32."
+                    : "Crie um token de acesso pra conectar seu display ESP32 ao app."
+                }
+                accent="sky"
+                action={
+                  tents.length > 0
+                    ? { label: "Criar primeiro token", onClick: () => setAddOpen(true) }
+                    : undefined
+                }
+              />
               {tents.length === 0 && (
                 <p className="text-xs text-amber-600 mt-3 flex items-center justify-center gap-1">
                   <AlertCircle className="w-3 h-3" /> Cadastre uma estufa antes.
                 </p>
               )}
-            </div>
+            </>
           )}
 
           {!isLoading && tokens.length > 0 && (

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Leaf, Sparkles, Trees, Zap, Telescope } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -66,34 +65,12 @@ const THEMES = [
   },
 ] as const;
 
-function applyThemeToDOM(t: ThemeValue) {
-  const root = document.documentElement;
-  root.classList.remove("forest", "hps", "monstera", "vision", "aurora", "jardim", "light", "dark");
-  root.classList.add(t);
-  if (t === "hps" || t === "vision" || t === "forest" || t === "aurora") {
-    root.classList.add("dark");
-  }
-}
-
 export function ThemeToggle() {
   const { theme, setTheme, switchable } = useTheme();
-  const [hovering, setHovering] = useState<ThemeValue | null>(null);
 
   if (!switchable) return null;
 
   const activeTheme = THEMES.find((t) => t.value === theme);
-
-  const handleMouseEnter = (val: ThemeValue) => {
-    setHovering(val);
-    applyThemeToDOM(val);
-  };
-
-  const handleMouseLeave = () => {
-    setHovering(null);
-    applyThemeToDOM(theme);
-  };
-
-  const displayTheme = hovering ?? theme;
 
   return (
     <Card>
@@ -103,25 +80,20 @@ export function ThemeToggle() {
           Tema
         </CardTitle>
         <CardDescription className="text-xs sm:text-sm">
-          {hovering
-            ? <span className="text-primary font-medium">Pré-visualizando: {THEMES.find(t => t.value === hovering)?.label}</span>
-            : 'Passe o mouse ou toque para ver o tema ao vivo'}
+          Toque em uma opção para mudar o tema do app.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
           {THEMES.map((t) => {
-            const isActive = displayTheme === t.value;
             const isSaved = theme === t.value;
             return (
               <button
                 key={t.value}
                 type="button"
-                onClick={() => { setTheme(t.value); setHovering(null); }}
-                onMouseEnter={() => handleMouseEnter(t.value)}
-                onMouseLeave={handleMouseLeave}
+                onClick={() => setTheme(t.value)}
                 className={`w-full flex items-center gap-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-all duration-150 min-h-[56px] text-left active:scale-[0.98] ${
-                  isActive
+                  isSaved
                     ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                     : "border-border hover:bg-accent/50 hover:border-border/80"
                 }`}

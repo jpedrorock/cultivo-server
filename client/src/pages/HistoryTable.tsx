@@ -177,7 +177,7 @@ export default function HistoryTable() {
       `📅 Período: ${dateFrom} — ${dateTo}`,
       `📝 Total de registros: ${total}`,
       ``,
-      `🔗 App Cultivo — cultivo.x.andy.plus`,
+      `🔗 App Cultivo — app.cultivo.pro`,
     ].join('\n');
 
     if (navigator.share) {

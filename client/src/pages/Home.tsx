@@ -23,6 +23,7 @@ import {
   ArrowRight,
   PauseCircle,
   Menu,
+  Sparkles,
 } from "lucide-react";
 import {
   Dialog,
@@ -56,6 +57,7 @@ import { TodayMissionWidget } from "@/components/TodayMissionWidget";
 import { HomeLoadingState } from "@/components/HomeLoadingState";
 import { DeleteTentDialog } from "@/components/DeleteTentDialog";
 import { TentCard } from "@/components/TentCard";
+import { AdBanner } from "@/components/AdBanner";
 
 
 export default function Home() {
@@ -92,7 +94,14 @@ export default function Home() {
   
   const { data: deletePreview, isLoading: deletePreviewLoading } = trpc.tents.getDeletePreview.useQuery(
     { id: deletePreviewTentId! },
-    { enabled: deletePreviewTentId !== null }
+    {
+      enabled: deletePreviewTentId !== null,
+      // Query pré-deleção — sempre buscar dado fresco. Sem isso, o user pode
+      // ver contagem stale de plantas/cycles após import de backup ou mover
+      // plantas, e o modal bloqueia exclusão por "razão" que não existe mais.
+      staleTime: 0,
+      refetchOnMount: "always",
+    }
   );
 
   
@@ -523,6 +532,11 @@ export default function Home() {
           />
         )}
 
+        {/* Ad banner — só pra usuário Free em mobile, no-op pro Pro/web */}
+        <div className="mt-3">
+          <AdBanner slot="home-top" />
+        </div>
+
         {/* Tents Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -534,10 +548,50 @@ export default function Home() {
           <EmptyOnboarding onCreateTent={tryCreateTent} />
         ) : (
           <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {tents?.map((tent) => {
+            {tents?.map((tent, idx) => {
             const cycle = getTentCycle(tent.id);
             const phaseInfo = getPhaseInfo(tent.category, cycle);
             const PhaseIcon = phaseInfo.icon;
+            // Free permite N estufas (limits.maxTents). As que ultrapassam ficam locked.
+            const isLocked = !isPro && limits.maxTents !== null && idx >= limits.maxTents;
+
+            if (isLocked) {
+              return (
+                <button
+                  key={tent.id}
+                  type="button"
+                  onClick={() => paywall.open(`A estufa "${tent.name}" precisa do plano Pro. O plano Free permite ${limits.maxTents} estufa ativa.`)}
+                  className="block w-full text-left relative group"
+                >
+                  <div className="pointer-events-none opacity-50 grayscale-[40%]">
+                    <TentCard
+                      tent={tent}
+                      cycle={cycle}
+                      phaseInfo={phaseInfo}
+                      PhaseIcon={PhaseIcon}
+                      onStartCycle={handleStartCycle}
+                      onStartFlora={handleStartFlora}
+                      onInitiateCycle={handleInitiateCycle}
+                      onEditCycle={handleEditCycle}
+                      onFinalizeCycle={handleFinalizeCycle}
+                      onEditTent={handleEditTent}
+                      onDeleteTent={handleDeleteTent}
+                    />
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-[2px] rounded-2xl group-active:scale-[0.98] transition-transform">
+                    <div className="flex flex-col items-center gap-2 text-center px-4 py-3 rounded-2xl bg-foreground/90 text-background shadow-2xl">
+                      <div className="flex items-center gap-1.5 text-sm font-bold">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        Bloqueado · Pro
+                      </div>
+                      <p className="text-[11px] text-background/80 max-w-[200px]">
+                        Plano Free permite {limits.maxTents} estufa. Faça upgrade pra ativar esta.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            }
 
             return (
               <TentCard

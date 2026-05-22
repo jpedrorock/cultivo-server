@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { Sprout, Flower2, Scissors, Wrench, ChevronLeft, ChevronRight, Leaf, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
+import { haptics } from "@/lib/haptics";
 
 interface InitiateCycleModalProps {
   open: boolean;
@@ -100,6 +101,7 @@ export function InitiateCycleModal({
   const hasNoPlants = open && plantsInTent && plantsInTent.length === 0;
   const initiate = trpc.cycles.initiate.useMutation({
     onSuccess: () => {
+      haptics.success();
       toast.success("Ciclo iniciado com sucesso!");
       utils.cycles.listActive.invalidate();
       utils.cycles.getByTent.invalidate();
@@ -107,6 +109,7 @@ export function InitiateCycleModal({
       onOpenChange(false);
     },
     onError: (error) => {
+      haptics.error();
       toast.error(`Erro ao iniciar ciclo: ${error.message}`);
     },
   });
@@ -114,12 +117,14 @@ export function InitiateCycleModal({
   const activePhase = PHASES.find((p) => p.key === phase)!;
 
   const handlePhaseChange = (key: PhaseKey) => {
+    haptics.light();
     setPhase(key);
     setWeekNumber(1);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.medium();
     initiate.mutate({
       tentId,
       strainId: strainId || null,
@@ -173,13 +178,12 @@ export function InitiateCycleModal({
                     Esta estufa ainda não tem plantas ativas. O ciclo vai iniciar normalmente,
                     mas as tarefas semanais só fazem sentido com plantas cadastradas.
                   </p>
-                  <Link href={`/tent/${tentId}?tab=plantas`}>
-                    <a
-                      onClick={() => onOpenChange(false)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2"
-                    >
-                      Adicionar plantas primeiro →
-                    </a>
+                  <Link
+                    href={`/tent/${tentId}?tab=plantas`}
+                    onClick={() => onOpenChange(false)}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-amber-300 hover:text-amber-200 underline underline-offset-2"
+                  >
+                    Adicionar plantas primeiro →
                   </Link>
                 </div>
               </div>

@@ -296,12 +296,13 @@ function HubView() {
           </p>
 
           {/* CTA principal */}
-          <Link href="/help/setup">
-            <a className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-3 text-sm font-semibold shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.99] transition-all">
-              <Rocket className="w-4 h-4" />
-              Começar do zero em 5 minutos
-              <ChevronRight className="w-4 h-4" />
-            </a>
+          <Link
+            href="/help/setup"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-3 text-sm font-semibold shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.99] transition-all"
+          >
+            <Rocket className="w-4 h-4" />
+            Começar do zero em 5 minutos
+            <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
       </div>
@@ -315,35 +316,35 @@ function HubView() {
           {CATEGORIES.map((cat) => {
             const Icon = cat.icon;
             return (
-              <Link key={cat.id} href={`/help/${cat.id}`}>
-                <a
-                  className={`group rounded-2xl border ${cat.color.border} p-4 active:scale-[0.98] hover:scale-[1.02] transition-all duration-200`}
-                  style={{
-                    background: `linear-gradient(160deg, ${cat.color.glow} 0%, var(--card) 70%)`,
-                  }}
-                >
-                  <div className="flex flex-col gap-3 h-full">
-                    <div
-                      className={`w-10 h-10 rounded-xl ${cat.color.iconBg} flex items-center justify-center shadow-sm`}
-                    >
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-h-0">
-                      <h3 className="text-sm font-semibold text-foreground leading-snug mb-1">
-                        {cat.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
-                        {cat.subtitle}
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground/60">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {cat.estimatedMin} min
-                      </span>
-                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                    </div>
+              <Link
+                key={cat.id}
+                href={`/help/${cat.id}`}
+                className={`group rounded-2xl border ${cat.color.border} p-4 active:scale-[0.98] hover:scale-[1.02] transition-all duration-200`}
+                style={{
+                  background: `linear-gradient(160deg, ${cat.color.glow} 0%, var(--card) 70%)`,
+                }}
+              >
+                <div className="flex flex-col gap-3 h-full">
+                  <div
+                    className={`w-10 h-10 rounded-xl ${cat.color.iconBg} flex items-center justify-center shadow-sm`}
+                  >
+                    <Icon className="w-5 h-5 text-white" />
                   </div>
-                </a>
+                  <div className="flex-1 min-h-0">
+                    <h3 className="text-sm font-semibold text-foreground leading-snug mb-1">
+                      {cat.title}
+                    </h3>
+                    <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
+                      {cat.subtitle}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground/60">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {cat.estimatedMin} min
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
               </Link>
             );
           })}
@@ -473,7 +474,7 @@ function SetupView() {
           <>
             Se você tem sensores Tuya/SmartLife, vai em <strong>Configurações → SmartLife</strong>{" "}
             e cadastra suas credenciais. O app puxa temp/RH automaticamente a cada 5min sem você
-            precisar registrar manualmente. Veja a <Link href="/help/smartlife"><a className="text-primary underline">seção SmartLife</a></Link> pro passo a passo completo.
+            precisar registrar manualmente. Veja a <Link href="/help/smartlife" className="text-primary underline">seção SmartLife</Link> pro passo a passo completo.
           </>
         }
       />
@@ -1072,19 +1073,21 @@ function RelatedLinks({ current }: { current: string }) {
         {related.map((cat) => {
           const Icon = cat.icon;
           return (
-            <Link key={cat.id} href={`/help/${cat.id}`}>
-              <a className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/50 px-3 py-2.5 hover:bg-card hover:border-border/50 transition-colors group">
-                <div
-                  className={`w-8 h-8 rounded-lg ${cat.color.iconBg} flex items-center justify-center shrink-0`}
-                >
-                  <Icon className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{cat.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{cat.subtitle}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:translate-x-0.5 transition-transform shrink-0" />
-              </a>
+            <Link
+              key={cat.id}
+              href={`/help/${cat.id}`}
+              className="flex items-center gap-3 rounded-xl border border-border/30 bg-card/50 px-3 py-2.5 hover:bg-card hover:border-border/50 transition-colors group"
+            >
+              <div
+                className={`w-8 h-8 rounded-lg ${cat.color.iconBg} flex items-center justify-center shrink-0`}
+              >
+                <Icon className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{cat.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{cat.subtitle}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:translate-x-0.5 transition-transform shrink-0" />
             </Link>
           );
         })}

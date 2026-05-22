@@ -111,9 +111,11 @@ function ActionButton({ action }: { action: EmptyStateAction }) {
 function SecondaryActionLink({ action }: { action: EmptyStateAction }) {
   const cls = "text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-2";
   if (action.href) {
+    // Wouter v3: Link aceita className direto, não envolver <a> dentro.
+    // Sintaxe antiga (v2) <Link><a>...</a></Link> dispara warning "a inside a".
     return (
-      <Link href={action.href}>
-        <a className={cls}>{action.label}</a>
+      <Link href={action.href} className={cls}>
+        {action.label}
       </Link>
     );
   }

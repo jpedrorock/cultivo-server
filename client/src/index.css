@@ -2054,14 +2054,15 @@ html.capacitor-native body,
 html.pwa-standalone body {
   /* Garante que o body não scrolla sozinho — só os containers internos. */
   overflow: hidden;
-  /* Altura do viewport completo, descontando safe areas que o Capacitor
-   * gerencia via contentInset (no PWA, safe-area-inset-* via CSS). */
-  height: 100vh;
+  /* 100dvh em vez de 100vh: dynamic viewport height ajusta corretamente
+   * quando o teclado virtual abre/fecha no iOS. Com 100vh, o viewport
+   * "encolhe" e o header sticky sobe pra dentro do notch. */
+  height: 100dvh;
 }
 
 html.capacitor-native #root,
 html.pwa-standalone #root {
-  height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
@@ -2081,4 +2082,12 @@ html.capacitor-native header.sticky,
 html.pwa-standalone header.sticky {
   /* z-index alto e bg de fallback garantem que nada vaza por cima/baixo */
   isolation: isolate;
+}
+
+/* Sonner toast no top-center precisa descer abaixo do notch.
+ * A prop `offset` do Sonner não resolve `env()` (não é CSS context),
+ * então sobrescrevemos o `top` direto no container injetado pelo Sonner. */
+html.capacitor-native [data-sonner-toaster][data-y-position="top"],
+html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
+  top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
 }

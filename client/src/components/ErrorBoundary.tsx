@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
+import { Component, ReactNode, ErrorInfo } from "react";
+import { captureException } from "@/lib/sentry";
 
 interface Props {
   children: ReactNode;
@@ -23,6 +24,15 @@ class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  // React passa o componentStack — útil pra debugar onde o erro veio.
+  // Reportamos pro Sentry SEMPRE — em dev vira console.error (via lib/sentry.ts).
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    captureException(error, {
+      componentStack: info.componentStack,
+      mode: this.props.inline ? "inline" : "fullscreen",
+    });
   }
 
   handleReset = () => {

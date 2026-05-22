@@ -19,6 +19,7 @@ import { EditTentDialog } from "@/components/EditTentDialog";
 import { EditLogDialog } from "@/components/EditLogDialog";
 import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
 import { PhaseBadge } from "@/components/PhaseBadge";
+import { EmptyState } from "@/components/EmptyState";
 import {
   Dialog,
   DialogContent,
@@ -1972,14 +1973,12 @@ export default function TentDetails() {
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
             ) : chartData.length === 0 ? (
-              <Card className="bg-card/90 backdrop-blur-sm">
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground">Nenhum registro encontrado para este período</p>
-                  <Button asChild className="mt-4">
-                    <Link href={`/tent/${tentId}/log`}>Criar Primeiro Registro</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={Calendar}
+                title="Sem registros neste período"
+                description="Crie registros diários pra ver gráficos de evolução."
+                action={{ label: "Criar Primeiro Registro", href: `/tent/${tentId}/log` }}
+              />
             ) : (
               <>
                 {/* Temperature Chart */}
@@ -2436,15 +2435,12 @@ export default function TentDetails() {
                 })}
               </div>
             ) : (
-              <Card className="bg-card/90 backdrop-blur-sm">
-                <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground font-medium mb-1">Nenhum registro encontrado</p>
-                  <p className="text-sm text-muted-foreground mb-4">Comece registrando as condições da estufa diariamente.</p>
-                  <Button asChild>
-                    <Link href={`/tent/${tentId}/log`}>Criar Primeiro Registro</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={Calendar}
+                title="Nenhum registro encontrado"
+                description="Comece registrando as condições da estufa diariamente — temperatura, umidade, pH e EC."
+                action={{ label: "Criar Primeiro Registro", href: `/tent/${tentId}/log` }}
+              />
             )}
           </TabsContent>
 
@@ -2564,13 +2560,13 @@ function TentPlantsTab({ tentId, tentName: _tentName }: { tentId: number; tentNa
 
   if (!plants || plants.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <Leaf className="w-10 h-10 text-muted-foreground/20" />
-        <p className="text-sm text-muted-foreground">Nenhuma planta nesta estufa</p>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/plants/new"><Plus className="w-3.5 h-3.5 mr-1.5" />Nova Planta</Link>
-        </Button>
-      </div>
+      <EmptyState
+        icon={Leaf}
+        title="Nenhuma planta nesta estufa"
+        description="Cadastre a primeira planta pra começar a acompanhar o ciclo."
+        variant="compact"
+        action={{ label: "Nova Planta", href: "/plants/new", variant: "outline" }}
+      />
     );
   }
 

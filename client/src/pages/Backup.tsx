@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageTransition } from "@/components/PageTransition";
 import { PageHeader } from "@/components/PageHeader";
+import { usePlan } from "@/_core/hooks/usePlan";
+import { usePaywall } from "@/components/PaywallGate";
 
 const AUTO_BACKUP_KEY   = "cultivo:autoBackup";
 const LAST_BACKUP_KEY   = "cultivo:lastAutoBackup";
@@ -19,6 +21,8 @@ interface BackupFile {
 }
 
 export default function Backup() {
+  const { isPro, limits } = usePlan();
+  const paywall = usePaywall();
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importConfirm, setImportConfirm] = useState(false);
@@ -97,47 +101,57 @@ export default function Backup() {
     }
   }, [autoBackupEnabled, lastAutoBackup, doExport]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleImport = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "application/json,.json";
-    
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      
-      setIsImporting(true);
-      try {
-        const text = await file.text();
-        const backupData = JSON.parse(text);
-        
-        // Validar estrutura básica
-        if (!backupData.version || !backupData.data) {
-          throw new Error("Arquivo de backup inválido: faltam campos obrigatórios (version, data)");
-        }
+    fileInputRef.current?.click();
+  };
 
-        // Validar compatibilidade de versão
-        const SUPPORTED_VERSIONS = ["1.0"];
-        if (!SUPPORTED_VERSIONS.includes(backupData.version)) {
-          throw new Error(
-            `Backup incompatível: versão "${backupData.version}" não suportada. ` +
-            `Versões suportadas: ${SUPPORTED_VERSIONS.join(", ")}. ` +
-            `Este backup pode ter sido criado por uma versão mais nova do app.`
-          );
-        }
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset do input pra permitir selecionar o mesmo arquivo de novo
+    e.target.value = "";
+    if (!file) return;
 
-        // Guardar dados e abrir confirm dialog
-        setPendingFile(backupData);
-        setIsImporting(false);
-        setImportConfirm(true);
-        return;
-      } catch (error: any) {
-        toast.error(`Erro ao ler arquivo: ${error.message}`);
-        setIsImporting(false);
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const backupData = JSON.parse(text);
+
+      if (!backupData.version || !backupData.data) {
+        throw new Error("Arquivo de backup inválido: faltam campos obrigatórios (version, data)");
       }
-    };
-    
-    input.click();
+
+      const SUPPORTED_VERSIONS = ["1.0"];
+      if (!SUPPORTED_VERSIONS.includes(backupData.version)) {
+        throw new Error(
+          `Backup incompatível: versão "${backupData.version}" não suportada. ` +
+          `Versões suportadas: ${SUPPORTED_VERSIONS.join(", ")}. ` +
+          `Este backup pode ter sido criado por uma versão mais nova do app.`
+        );
+      }
+
+      // Validar capacidade do plano — se Free e o backup tem mais estufas que o limite,
+      // avisa antes de prosseguir.
+      if (!isPro && limits.maxTents !== null) {
+        const tentsInBackup = (backupData.data?.tents as unknown[] | undefined)?.length ?? 0;
+        if (tentsInBackup > limits.maxTents) {
+          setIsImporting(false);
+          paywall.open(
+            `Seu backup contém ${tentsInBackup} estufas, mas o plano Free permite apenas ${limits.maxTents}. ` +
+            `Faça upgrade para Pro ou importe um backup menor.`
+          );
+          return;
+        }
+      }
+
+      setPendingFile(backupData);
+      setIsImporting(false);
+      setImportConfirm(true);
+    } catch (error: any) {
+      toast.error(`Erro ao ler arquivo: ${error.message}`);
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -263,6 +277,13 @@ export default function Backup() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            onChange={handleFileSelected}
+            style={{ display: "none" }}
+          />
           <Button
             onClick={handleImport}
             disabled={isImporting}
@@ -355,6 +376,8 @@ export default function Backup() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {paywall.PaywallElement}
         </div>
       </div>
     </PageTransition>

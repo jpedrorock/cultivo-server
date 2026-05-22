@@ -13,12 +13,16 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/EmptyState";
+import { haptics } from "@/lib/haptics";
 
-// Haptic feedback helper
+// Haptic feedback helper.
+//
+// Antes era só navigator.vibrate(10), que NÃO funciona em iOS Safari/WKWebView
+// (Apple desabilitou). Agora usa nosso wrapper @capacitor/haptics que aciona
+// o Taptic Engine real em iOS e VibratorService em Android. Web continua
+// usando navigator.vibrate via fallback do helper (no-op em iOS browser).
 const triggerHapticFeedback = () => {
-  if ('vibrate' in navigator) {
-    navigator.vibrate(10); // 10ms light vibration
-  }
+  haptics.light().catch(() => {});
 };
 
 type NavItem = {
