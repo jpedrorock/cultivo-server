@@ -354,11 +354,12 @@ static uint32_t freshnessColor(int ageSec) {
 // interno do LVGL nao suporta floating-point format (default config).
 // Usar snprintf padrao do C numa string buffer + lv_label_set_text.
 // ════════════════════════════════════════════════════════════════════════════════
-static lv_obj_t *idleOverlay = nullptr;
-static lv_obj_t *idleClockLbl = nullptr;
-static lv_obj_t *idleTempLbl  = nullptr;
-static lv_obj_t *idleRhLbl    = nullptr;
-static lv_obj_t *idleVpdLbl   = nullptr;
+static lv_obj_t *idleOverlay    = nullptr;
+static lv_obj_t *idleClockLbl  = nullptr;
+static lv_obj_t *idleTempLbl   = nullptr;
+static lv_obj_t *idleRhLbl     = nullptr;
+static lv_obj_t *idleVpdLbl    = nullptr;
+static lv_obj_t *idleVpdZoneLbl = nullptr;  // zona VPD: IDEAL/UMIDO/SECO
 
 extern "C" void cultivoUI_showIdleOverlay(void) {
   if (idleOverlay) return;  // ja mostrando
@@ -401,16 +402,25 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_set_style_text_font(idleRhLbl, FONT_TITLE, 0);
   lv_obj_align(idleRhLbl, LV_ALIGN_CENTER, 0, sh(40));
 
-  // VPD (direita) — verde PRIMARY (consistente com card VPD da Home)
+  // VPD (direita) — cor dinamica por zona: verde=IDEAL, azul=UMIDO, amarelo=SECO
   idleVpdLbl = lv_label_create(idleOverlay);
   if (isnan(vpd)) lv_label_set_text(idleVpdLbl, "--");
   else {
     snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
     lv_label_set_text(idleVpdLbl, buf);
   }
-  lv_obj_set_style_text_color(idleVpdLbl, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_text_color(idleVpdLbl,
+    lv_color_hex(isnan(vpd) ? COL_DIM : vpdColor(vpd)), 0);
   lv_obj_set_style_text_font(idleVpdLbl, FONT_TITLE, 0);
-  lv_obj_align(idleVpdLbl, LV_ALIGN_CENTER, sw(80), sh(40));
+  lv_obj_align(idleVpdLbl, LV_ALIGN_CENTER, sw(80), sh(38));
+
+  // Indicador de zona VPD — "IDEAL" / "UMIDO" / "SECO" em fonte caption
+  idleVpdZoneLbl = lv_label_create(idleOverlay);
+  lv_label_set_text(idleVpdZoneLbl, isnan(vpd) ? "" : vpdZone(vpd));
+  lv_obj_set_style_text_color(idleVpdZoneLbl,
+    lv_color_hex(isnan(vpd) ? COL_DIM : vpdColor(vpd)), 0);
+  lv_obj_set_style_text_font(idleVpdZoneLbl, FONT_CAPTION, 0);
+  lv_obj_align(idleVpdZoneLbl, LV_ALIGN_CENTER, sw(80), sh(54));
 
   cultivoUI_tickIdleOverlay();  // update inicial do clock
 }
@@ -418,7 +428,7 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
 extern "C" void cultivoUI_hideIdleOverlay(void) {
   if (!idleOverlay) return;
   lv_obj_del(idleOverlay);
-  idleOverlay = idleClockLbl = idleTempLbl = idleRhLbl = idleVpdLbl = nullptr;
+  idleOverlay = idleClockLbl = idleTempLbl = idleRhLbl = idleVpdLbl = idleVpdZoneLbl = nullptr;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -566,10 +576,21 @@ extern "C" void cultivoUI_tickIdleOverlay(void) {
     }
   }
   if (idleVpdLbl) {
-    if (isnan(vpd)) lv_label_set_text(idleVpdLbl, "--");
-    else {
+    if (isnan(vpd)) {
+      lv_label_set_text(idleVpdLbl, "--");
+      lv_obj_set_style_text_color(idleVpdLbl, lv_color_hex(COL_DIM), 0);
+    } else {
       snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
       lv_label_set_text(idleVpdLbl, buf);
+      lv_obj_set_style_text_color(idleVpdLbl, lv_color_hex(vpdColor(vpd)), 0);
+    }
+  }
+  if (idleVpdZoneLbl) {
+    if (isnan(vpd)) {
+      lv_label_set_text(idleVpdZoneLbl, "");
+    } else {
+      lv_label_set_text(idleVpdZoneLbl, vpdZone(vpd));
+      lv_obj_set_style_text_color(idleVpdZoneLbl, lv_color_hex(vpdColor(vpd)), 0);
     }
   }
 }

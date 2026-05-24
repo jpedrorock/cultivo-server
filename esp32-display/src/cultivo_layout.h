@@ -105,6 +105,23 @@ static inline uint32_t tempColor(float t) {
   return COL_RED;
 }
 
+// Helper: resolve VPD (kPa) -> cor token por faixa.
+//   < 0.8 kPa  : azul   (UMIDO — VPD baixo, stomatos fechados, risco mofo)
+//   0.8–1.2 kPa: verde  (IDEAL — faixa veg/flora equilibrada)
+//   > 1.2 kPa  : amarelo (SECO  — VPD alto, stress hidrico, ponta queimada)
+static inline uint32_t vpdColor(float v) {
+  if (v < 0.8f)  return COL_CYN;      // azul  — umido
+  if (v <= 1.2f) return COL_PRIMARY;  // verde — ideal
+  return COL_YEL;                      // amarelo — seco
+}
+
+// Helper: retorna nome curto da zona de VPD (ASCII — LVGL nao renderiza emoji).
+static inline const char* vpdZone(float v) {
+  if (v < 0.8f)  return "UMIDO";
+  if (v <= 1.2f) return "IDEAL";
+  return "SECO";
+}
+
 // Helper: resolve nome de fase ("VEGA"/"FLORA"/"DRYING"/etc) -> cor token.
 // Default = primary (caso fase desconhecida ou string vazia).
 static inline uint32_t phaseColor(const char *fase) {
