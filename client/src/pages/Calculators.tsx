@@ -10,6 +10,7 @@ import { Calculator, Droplets, Download, AlertCircle, CheckCircle2, Target, Ligh
 import { trpc } from "@/lib/trpc";
 import { PageTransition } from "@/components/PageTransition";
 import { CalcSlider } from "@/components/ui/calc-slider";
+import { CalcEyebrow, CalcRunning } from "@/components/ui/calc-helpers";
 
 // Funções de exportação de receitas (não usadas atualmente, mantidas para futuro)
 function _exportIrrigationRecipe(potVolume: string, substrate: string, result: { volume: number; frequency: string }) {
@@ -189,24 +190,6 @@ function CalcHistoryPanel({ entries, onClear }: { entries: CalcEntry[]; onClear:
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ── Visual helpers das calculadoras ──────────────────────────────────────────
-function CalcEyebrow({ text }: { text: string }) {
-  return (
-    <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground mb-1.5">
-      ↳ {text}
-    </div>
-  );
-}
-
-function CalcRunning() {
-  return (
-    <div className="absolute top-4 right-4 mono text-xs uppercase tracking-[0.22em] text-muted-foreground/50 flex items-center gap-1.5 pointer-events-none">
-      <span className="h-1.5 w-1.5 rounded-full bg-primary pulse-dot" />
-      ao vivo
     </div>
   );
 }

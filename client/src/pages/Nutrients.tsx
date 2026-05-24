@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast as showToast } from "sonner";
 import { Beaker, Printer, Loader2, Download, Droplets, Zap, FlaskConical, Sprout, Leaf, Flower2, Wrench, Wind, ClipboardList, ArrowUpDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { CalcEyebrow, CalcRunning } from "@/components/ui/calc-helpers";
 import { PageTransition } from "@/components/PageTransition";
 
 type Phase = "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
@@ -631,6 +632,12 @@ export default function Nutrients() {
 
           {/* ── CALCULADORA ── */}
           <TabsContent value="calculator" className="space-y-6">
+            {/* Editorial header — DNA visual do site */}
+            <div>
+              <CalcEyebrow text="npk · fertilização mineral" />
+              <div className="text-2xl font-semibold tracking-tight">Receita de nutrientes.</div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Fase e Semana */}
               <Card>
@@ -709,7 +716,9 @@ export default function Nutrients() {
             </div>
 
             {/* ── RECEITA COLORIDA (layout do app) ── */}
-            <Card className="border-green-500/40">
+            <Card className="border-green-500/40 relative overflow-hidden"
+              style={{ background: "linear-gradient(160deg, color-mix(in oklch, var(--primary) 6%, var(--card)), var(--card))" }}>
+              <CalcRunning />
               <CardHeader className="pb-3">
                 {/* Box arredondado verde em vez de tarja */}
                 <div
@@ -739,7 +748,7 @@ export default function Nutrients() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">EC Estimado</p>
-                      <p className="text-xl font-bold text-amber-300">{ecEstimated} <span className="text-xs font-normal">mS/cm</span></p>
+                      <p className="mono text-xl font-bold text-amber-300">{ecEstimated} <span className="text-xs font-normal">mS/cm</span></p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 bg-sky-500/8 border border-sky-400/25 rounded-xl p-3">
@@ -748,7 +757,7 @@ export default function Nutrients() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">PPM Aprox.</p>
-                      <p className="text-xl font-bold text-sky-300">{ppmApprox} <span className="text-xs font-normal">ppm</span></p>
+                      <p className="mono text-xl font-bold text-sky-300">{ppmApprox} <span className="text-xs font-normal">ppm</span></p>
                     </div>
                   </div>
                 </div>
@@ -781,9 +790,9 @@ export default function Nutrients() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold truncate">{prod.name}</p>
-                            <p className="text-xs text-muted-foreground">{prod.gPerLiter.toFixed(2)} g/L × {volumeL} L</p>
+                            <p className="mono text-xs text-muted-foreground">{prod.gPerLiter.toFixed(2)} g/L × {volumeL} L</p>
                           </div>
-                          <span className={`inline-block px-2.5 py-1 rounded-lg text-sm font-bold shrink-0 ${colors.badge}`}>
+                          <span className={`mono inline-block px-2.5 py-1 rounded-lg text-sm font-bold shrink-0 ${colors.badge}`}>
                             {prod.totalG.toFixed(1)} g
                           </span>
                         </div>
@@ -806,16 +815,16 @@ export default function Nutrients() {
                       <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-2">NPK Total (ppm)</p>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-2 py-1.5">
-                          <p className="text-xs text-green-400 font-semibold uppercase">N</p>
-                          <p className="text-base font-bold text-green-300">{totalN.toFixed(0)}</p>
+                          <p className="mono text-xs text-green-400 font-semibold uppercase">N</p>
+                          <p className="mono text-base font-bold text-green-300">{totalN.toFixed(0)}</p>
                         </div>
                         <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1.5">
-                          <p className="text-xs text-orange-400 font-semibold uppercase">P</p>
-                          <p className="text-base font-bold text-orange-300">{totalP.toFixed(0)}</p>
+                          <p className="mono text-xs text-orange-400 font-semibold uppercase">P</p>
+                          <p className="mono text-base font-bold text-orange-300">{totalP.toFixed(0)}</p>
                         </div>
                         <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg px-2 py-1.5">
-                          <p className="text-xs text-violet-400 font-semibold uppercase">K</p>
-                          <p className="text-base font-bold text-violet-300">{totalK.toFixed(0)}</p>
+                          <p className="mono text-xs text-violet-400 font-semibold uppercase">K</p>
+                          <p className="mono text-base font-bold text-violet-300">{totalK.toFixed(0)}</p>
                         </div>
                       </div>
                     </div>
