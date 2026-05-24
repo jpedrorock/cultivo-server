@@ -2095,6 +2095,23 @@ export const appRouter = router({
 
   // Sub-routers extraídos pra arquivos próprios em server/routers/*.ts.
   // Mantém o appRouter limpo enquanto ainda funciona como fonte única de tipos.
+  auth: router({
+    /**
+     * Encerra a sessão do usuário limpando o cookie JWT.
+     * Espelho tRPC do POST /api/auth/logout (que é REST).
+     */
+    logout: protectedProcedure.mutation(({ ctx }) => {
+      ctx.res.clearCookie("auth_token", {
+        maxAge: -1,
+        secure: true,
+        sameSite: "none",
+        httpOnly: true,
+        path: "/",
+      });
+      return { success: true };
+    }),
+  }),
+
   groups: groupsRouter,
   profile: profileRouter,
   admin: adminRouter,

@@ -1,25 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import type { Context } from "./_core/context";
-
-// Mock context for authenticated user
-const mockContext: Context = {
-  user: {
-    openId: "test-user",
-    name: "Test User",
-    email: "test@example.com",
-    role: "admin",
-  },
-  req: {} as any,
-  res: {} as any,
-};
+import { createTestContext } from "./test-helpers";
 
 describe("Backup System", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeEach(() => {
-    caller = appRouter.createCaller(mockContext);
+    caller = appRouter.createCaller(createTestContext());
   });
 
   it("should export backup with all data", async () => {
@@ -92,7 +80,9 @@ describe("Backup System", () => {
     expect(tentInBackup).toBeDefined();
 
     // Importar backup original (restaurar estado anterior)
-    const result = await caller.backup.import(originalBackup);
+    // JSON.parse(JSON.stringify(...)) converte Date objects em strings ISO,
+    // que é o que o schema Zod do backup.import espera (string | number | boolean | null)
+    const result = await caller.backup.import(JSON.parse(JSON.stringify(originalBackup)));
     expect(result.success).toBe(true);
     expect(result.message).toBe("Backup restaurado com sucesso");
 

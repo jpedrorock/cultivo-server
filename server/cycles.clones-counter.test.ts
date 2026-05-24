@@ -9,7 +9,8 @@ describe("Clones Counter System", () => {
   beforeEach(async () => {
     connection = await mysql.createConnection(DATABASE_URL);
     
-    // Limpar dados de teste
+    // Limpar dados de teste (ordem importa: FK constraints)
+    await connection.query("DELETE FROM plants WHERE strainId >= 9100");
     await connection.query("DELETE FROM cycles WHERE id >= 9100");
     await connection.query("DELETE FROM tents WHERE id >= 9100");
     await connection.query("DELETE FROM strains WHERE id >= 9100");

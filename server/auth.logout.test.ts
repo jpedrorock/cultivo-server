@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
-import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+
+// O auth.logout tRPC limpa o cookie 'auth_token' (nome real do JWT).
+// COOKIE_NAME no shared/const.ts ('app_session_id') é uma constante legada
+// não usada no auth atual.
+const AUTH_COOKIE_NAME = "auth_token";
 
 type CookieCall = {
   name: string;
@@ -14,12 +18,16 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
   const clearedCookies: CookieCall[] = [];
 
   const user: AuthenticatedUser = {
-    id: 1,
-    openId: "sample-user",
-    email: "sample@example.com",
+    id: 6,
+    openId: null,
+    email: "pro@cultivo.pro",
     name: "Sample User",
-    loginMethod: "manus",
+    passwordHash: "$argon2id$test",
+    loginMethod: "email",
     role: "user",
+    groupId: 4,
+    avatarUrl: null,
+    approved: true,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -50,7 +58,7 @@ describe("auth.logout", () => {
 
     expect(result).toEqual({ success: true });
     expect(clearedCookies).toHaveLength(1);
-    expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
+    expect(clearedCookies[0]?.name).toBe(AUTH_COOKIE_NAME);
     expect(clearedCookies[0]?.options).toMatchObject({
       maxAge: -1,
       secure: true,

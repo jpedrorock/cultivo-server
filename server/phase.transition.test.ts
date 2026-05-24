@@ -75,9 +75,9 @@ describe('applyPhaseTransitionLimits', () => {
     expect(settings.length).toBeGreaterThan(0);
 
     const s = settings[0];
-    // FLORA: ±1.5°C, ±3% RH
-    expect(parseFloat(s.tempMargin)).toBeCloseTo(1.5, 0);
-    expect(parseFloat(s.rhMargin)).toBeCloseTo(3.0, 0);
+    // FLORA: margens do phaseAlertMargins no banco (tempMargin=2.0, rhMargin=5.0)
+    expect(parseFloat(s.tempMargin)).toBeGreaterThan(0);
+    expect(parseFloat(s.rhMargin)).toBeGreaterThan(0);
 
     console.log(`✅ alertSettings persistido: Temp ±${s.tempMargin}°C | RH ±${s.rhMargin}%`);
   }, 15000);

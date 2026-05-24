@@ -2,10 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import mysql from "mysql2/promise";
-import * as dotenv from "dotenv";
-
-// Load environment variables
-dotenv.config();
+import { createTestContext } from "./test-helpers";
 
 describe("Plant Archive System", () => {
   let testStrainId: number;
@@ -24,23 +21,23 @@ describe("Plant Archive System", () => {
     );
     testStrainId = (strainResult as any).insertId;
 
-    // Create test tent
+    // Create test tent — groupId: 4 para coincidir com createTestContext()
     const [tentResult] = await connection.execute(
-      `INSERT INTO tents (name, category, width, depth, height, volume) VALUES (?, ?, ?, ?, ?, ?)`,
-      [`Test Tent Archive ${Date.now()}`, "VEGA", 100, 100, 200, "2.000"]
+      `INSERT INTO tents (name, category, width, depth, height, volume, groupId) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [`Test Tent Archive ${Date.now()}`, "VEGA", 100, 100, 200, "2.000", 4]
     );
     testTentId = (tentResult as any).insertId;
 
-    // Create test plant
+    // Create test plant — groupId: 4 para coincidir com createTestContext()
     const [plantResult] = await connection.execute(
-      `INSERT INTO plants (name, strainId, currentTentId, status) VALUES (?, ?, ?, ?)`,
-      [`Test Plant Archive ${Date.now()}`, testStrainId, testTentId, "ACTIVE"]
+      `INSERT INTO plants (name, strainId, currentTentId, status, groupId) VALUES (?, ?, ?, ?, ?)`,
+      [`Test Plant Archive ${Date.now()}`, testStrainId, testTentId, "ACTIVE", 4]
     );
     testPlantId = (plantResult as any).insertId;
   });
 
   it("should archive plant as HARVESTED", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Archive plant
     const result = await caller.plants.archive({
@@ -60,7 +57,7 @@ describe("Plant Archive System", () => {
   });
 
   it("should list archived plants", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // List all archived plants
     const archived = await caller.plants.listArchived({});
@@ -73,12 +70,12 @@ describe("Plant Archive System", () => {
   });
 
   it("should filter archived plants by status", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
-    // Create another plant and archive as DISCARDED
+    // Create another plant and archive as DISCARDED — groupId: 4 para coincidir com createTestContext()
     const [plantResult] = await connection.execute(
-      `INSERT INTO plants (name, strainId, currentTentId, status) VALUES (?, ?, ?, ?)`,
-      [`Test Plant Discard ${Date.now()}`, testStrainId, testTentId, "ACTIVE"]
+      `INSERT INTO plants (name, strainId, currentTentId, status, groupId) VALUES (?, ?, ?, ?, ?)`,
+      [`Test Plant Discard ${Date.now()}`, testStrainId, testTentId, "ACTIVE", 4]
     );
     const discardPlantId = (plantResult as any).insertId;
 
@@ -99,7 +96,7 @@ describe("Plant Archive System", () => {
   });
 
   it("should unarchive plant and restore to tent", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Unarchive plant
     const result = await caller.plants.unarchive({
@@ -118,7 +115,7 @@ describe("Plant Archive System", () => {
   });
 
   it("should not list archived plants in regular list", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Archive plant again
     await caller.plants.archive({
@@ -133,7 +130,7 @@ describe("Plant Archive System", () => {
   });
 
   it("should prevent archiving non-active plants", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Try to archive already archived plant
     await expect(
@@ -145,7 +142,7 @@ describe("Plant Archive System", () => {
   });
 
   it("should prevent unarchiving active plants", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Unarchive first
     await caller.plants.unarchive({
@@ -163,12 +160,12 @@ describe("Plant Archive System", () => {
   });
 
   it("should delete plant permanently", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
-    // Create plant to delete
+    // Create plant to delete — groupId: 4 para coincidir com createTestContext()
     const [plantResult] = await connection.execute(
-      `INSERT INTO plants (name, strainId, currentTentId, status) VALUES (?, ?, ?, ?)`,
-      [`Test Plant Delete ${Date.now()}`, testStrainId, testTentId, "ACTIVE"]
+      `INSERT INTO plants (name, strainId, currentTentId, status, groupId) VALUES (?, ?, ?, ?, ?)`,
+      [`Test Plant Delete ${Date.now()}`, testStrainId, testTentId, "ACTIVE", 4]
     );
     const deletePlantId = (plantResult as any).insertId;
 
@@ -179,8 +176,7 @@ describe("Plant Archive System", () => {
 
     expect(result.success).toBe(true);
 
-    // Verify plant is gone
-    const deletedPlant = await caller.plants.getById({ id: deletePlantId });
-    expect(deletedPlant).toBeUndefined();
+    // Verify plant is gone — getById throws "Planta não encontrada" when permanently deleted
+    await expect(caller.plants.getById({ id: deletePlantId })).rejects.toThrow();
   });
 });

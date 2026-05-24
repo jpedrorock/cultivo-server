@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { appRouter } from "./routers";
+import { createTestContext } from "./test-helpers";
 
 describe("tents.update", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
   let testTentId: number;
 
   beforeEach(async () => {
-    caller = appRouter.createCaller({} as any);
+    caller = appRouter.createCaller(createTestContext());
 
     // Create a test tent
     const result = await caller.tents.create({

@@ -1,21 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
-import type { TrpcContext } from "./_core/context";
-
-function createMockContext(): TrpcContext {
-  return {
-    user: undefined,
-    req: {
-      protocol: "https",
-      headers: {},
-    } as TrpcContext["req"],
-    res: {} as TrpcContext["res"],
-  };
-}
+import { createTestContext } from "./test-helpers";
 
 describe("strains API", () => {
   it("should list all strains", async () => {
-    const ctx = createMockContext();
+    const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
     const strains = await caller.strains.list();
@@ -29,7 +18,7 @@ describe("strains API", () => {
   });
 
   it("should create a new strain", async () => {
-    const ctx = createMockContext();
+    const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
     const result = await caller.strains.create({
@@ -43,7 +32,7 @@ describe("strains API", () => {
   });
 
   it("should get strain by id", async () => {
-    const ctx = createMockContext();
+    const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
     // Get first strain from list
@@ -62,7 +51,7 @@ describe("strains API", () => {
   });
 
   it("should update an existing strain", async () => {
-    const ctx = createMockContext();
+    const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
     // Get first strain from list
@@ -88,7 +77,7 @@ describe("strains API", () => {
   });
 
   it("should delete a strain", async () => {
-    const ctx = createMockContext();
+    const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);
 
     // Create a strain to delete

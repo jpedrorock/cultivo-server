@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import { tents, strains, cycles } from "../drizzle/schema";
+import { createTestContext } from "./test-helpers";
 
 describe("tents.delete", () => {
   let db: Awaited<ReturnType<typeof getDb>>;
@@ -21,14 +22,15 @@ describe("tents.delete", () => {
     });
     testStrainId = strainResult.insertId;
 
-    // Criar estufa de teste
+    // Criar estufa de teste — groupId: 4 para coincidir com createTestContext()
     const [tentResult] = await db.insert(tents).values({
       name: "Test Tent Delete",
-      tentType: "A",
+      category: "VEGA",
       width: 50,
       depth: 50,
       height: 100,
       volume: "250.000",
+      groupId: 4,
     });
     testTentId = tentResult.insertId;
   });
@@ -49,7 +51,7 @@ describe("tents.delete", () => {
   });
 
   it("deve permitir excluir estufa sem ciclos ativos", async () => {
-    const caller = appRouter.createCaller({ req: {}, res: {}, user: null } as any);
+    const caller = appRouter.createCaller(createTestContext());
 
     const result = await caller.tents.delete({ id: testTentId });
 
@@ -63,14 +65,15 @@ describe("tents.delete", () => {
   it("deve bloquear exclusão de estufa com ciclo ativo", async () => {
     if (!db) throw new Error("Database not available");
 
-    // Recriar estufa
+    // Recriar estufa — groupId: 4 para coincidir com createTestContext()
     const [tentResult] = await db.insert(tents).values({
       name: "Test Tent Delete 2",
-      tentType: "B",
+      category: "FLORA",
       width: 60,
       depth: 60,
       height: 120,
       volume: "432.000",
+      groupId: 4,
     });
     const tentId = tentResult.insertId;
 
@@ -83,7 +86,7 @@ describe("tents.delete", () => {
     });
     testCycleId = cycleResult.insertId;
 
-    const caller = appRouter.createCaller({ req: {}, res: {}, user: null } as any);
+    const caller = appRouter.createCaller(createTestContext());
 
     // Tentar excluir deve falhar
     await expect(

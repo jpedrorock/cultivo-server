@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { appRouter } from "./routers";
 import mysql from "mysql2/promise";
-import * as dotenv from "dotenv";
-
-dotenv.config();
+import { createTestContext } from "./test-helpers";
 
 describe("Plant Edit Functionality", () => {
   let testStrainId: number;
@@ -21,23 +19,23 @@ describe("Plant Edit Functionality", () => {
     );
     testStrainId = (strainResult as any).insertId;
 
-    // Create test tent
+    // Create test tent — groupId: 4 para coincidir com createTestContext()
     const [tentResult] = await connection.execute(
-      `INSERT INTO tents (name, category, width, depth, height, volume) VALUES (?, ?, ?, ?, ?, ?)`,
-      [`Test Tent Edit ${Date.now()}`, "VEGA", 100, 100, 200, "2.000"]
+      `INSERT INTO tents (name, category, width, depth, height, volume, groupId) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [`Test Tent Edit ${Date.now()}`, "VEGA", 100, 100, 200, "2.000", 4]
     );
     testTentId = (tentResult as any).insertId;
 
-    // Create test plant
+    // Create test plant — groupId: 4 para coincidir com createTestContext()
     const [plantResult] = await connection.execute(
-      `INSERT INTO plants (name, code, notes, strainId, currentTentId, status) VALUES (?, ?, ?, ?, ?, ?)`,
-      [`Test Plant Edit ${Date.now()}`, "TEST-001", "Original notes", testStrainId, testTentId, "ACTIVE"]
+      `INSERT INTO plants (name, code, notes, strainId, currentTentId, status, groupId) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [`Test Plant Edit ${Date.now()}`, "TEST-001", "Original notes", testStrainId, testTentId, "ACTIVE", 4]
     );
     testPlantId = (plantResult as any).insertId;
   });
 
   it("should update plant name", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     const result = await caller.plants.update({
       id: testPlantId,
@@ -53,7 +51,7 @@ describe("Plant Edit Functionality", () => {
   });
 
   it("should update plant code", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     const result = await caller.plants.update({
       id: testPlantId,
@@ -67,7 +65,7 @@ describe("Plant Edit Functionality", () => {
   });
 
   it("should update plant notes", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     const result = await caller.plants.update({
       id: testPlantId,
@@ -81,7 +79,7 @@ describe("Plant Edit Functionality", () => {
   });
 
   it("should update multiple fields at once", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     const result = await caller.plants.update({
       id: testPlantId,
@@ -99,7 +97,7 @@ describe("Plant Edit Functionality", () => {
   });
 
   it("should clear optional fields with empty string", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // First set values
     await caller.plants.update({
@@ -123,7 +121,7 @@ describe("Plant Edit Functionality", () => {
   });
 
   it("should reject update with empty name", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     await expect(
       caller.plants.update({
@@ -134,7 +132,7 @@ describe("Plant Edit Functionality", () => {
   });
 
   it("should reject update for non-existent plant", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     await expect(
       caller.plants.update({

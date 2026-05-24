@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { appRouter } from "./routers";
+import { createTestContext } from "./test-helpers";
 
 describe("plants.moveSelectedPlants", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(() => {
-    caller = appRouter.createCaller({});
+    caller = appRouter.createCaller(createTestContext());
   });
 
   it("should move selected plants to another tent", async () => {
@@ -78,13 +79,14 @@ describe("plants.moveSelectedPlants", () => {
     });
     expect(remainingInTent1.length).toBe(2);
 
-    // Cleanup
+    // Cleanup — permanentDelete remove o registro do banco (delete é soft-delete)
     const allPlants = await caller.plants.list({});
     const testPlants = allPlants.filter(p => p.name.startsWith("Plant Selected"));
     for (const plant of testPlants) {
-      await caller.plants.delete({ plantId: plant.id });
+      await caller.plants.permanentDelete({ plantId: plant.id });
     }
-    // Note: strains.delete might not return the created ID, skip cleanup for strains
+    // Strain cleanup: permanentDelete garante que não há referências antes de deletar a strain
+    await caller.strains.delete({ id: strain.id });
     await caller.tents.delete({ id: tent1.id });
     await caller.tents.delete({ id: tent2.id });
   });

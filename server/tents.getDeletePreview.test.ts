@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
+import { createTestContext } from "./test-helpers";
 
 describe("tents.getDeletePreview", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
@@ -11,7 +12,7 @@ describe("tents.getDeletePreview", () => {
     const database = await getDb();
     if (!database) throw new Error("Database not initialized");
 
-    caller = appRouter.createCaller({ user: null, db: database });
+    caller = appRouter.createCaller(createTestContext());
 
     // Create a test strain
     const timestamp = Date.now();

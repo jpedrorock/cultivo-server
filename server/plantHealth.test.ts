@@ -1,19 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appRouter } from './routers';
-import type { TrpcContext } from './_core/context';
-
-function createTestContext(): TrpcContext {
-  return {
-    user: null,
-    req: {
-      protocol: 'https',
-      headers: {},
-    } as TrpcContext['req'],
-    res: {
-      clearCookie: () => {},
-    } as TrpcContext['res'],
-  };
-}
+import { createTestContext } from './test-helpers';
 
 describe('Plant Health - Update and Delete', () => {
   let caller: ReturnType<typeof appRouter.createCaller>;

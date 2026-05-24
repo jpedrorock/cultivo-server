@@ -15,5 +15,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    setupFiles: ["./server/_core/testSetup.ts"],
+    // Rodar arquivos de teste sequencialmente para evitar interferência via DB compartilhado
+    fileParallelism: false,
   },
 });

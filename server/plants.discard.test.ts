@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { appRouter } from "./routers";
+import { createTestContext } from "./test-helpers";
 
 describe("Plants - Discard Functionality", () => {
   it("should discard a plant with DISCARDED status", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Create a tent first
     const tent = await caller.tents.create({
@@ -57,7 +58,7 @@ describe("Plants - Discard Functionality", () => {
   });
 
   it("should discard a plant without reason", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Create a tent
     const tent = await caller.tents.create({
@@ -109,7 +110,7 @@ describe("Plants - Discard Functionality", () => {
   });
 
   it("should filter plants by DISCARDED status", async () => {
-    const caller = appRouter.createCaller({});
+    const caller = appRouter.createCaller(createTestContext());
 
     // Create tent and strain
     const tent = await caller.tents.create({

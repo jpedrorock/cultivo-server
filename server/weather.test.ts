@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
+import { createTestContext } from "./test-helpers";
 
 // Mock global fetch
 global.fetch = vi.fn();
@@ -24,7 +25,7 @@ describe("Weather Router", () => {
       json: async () => mockWeatherData,
     });
 
-    const caller = appRouter.createCaller({} as any);
+    const caller = appRouter.createCaller(createTestContext());
     const result = await caller.weather.getCurrent({ lat: -15.7939, lon: -47.8828 });
 
     expect(result).toEqual({
@@ -51,7 +52,7 @@ describe("Weather Router", () => {
       status: 500,
     });
 
-    const caller = appRouter.createCaller({} as any);
+    const caller = appRouter.createCaller(createTestContext());
 
     await expect(
       caller.weather.getCurrent({ lat: -15.7939, lon: -47.8828 })
@@ -73,7 +74,7 @@ describe("Weather Router", () => {
       json: async () => mockWeatherData,
     });
 
-    const caller = appRouter.createCaller({} as any);
+    const caller = appRouter.createCaller(createTestContext());
     const result = await caller.weather.getCurrent({ lat: -23.5505, lon: -46.6333 }); // São Paulo
 
     expect(result.temperature).toBe(18.3);
