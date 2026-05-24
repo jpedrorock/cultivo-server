@@ -703,6 +703,27 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    // Configurações globais do site (singleton, id=1).
+    // Painel /admin do cultivo-site lê/escreve via GET + PATCH /api/admin/site-settings.
+    id: 'create-site-settings',
+    description: 'Cria tabela siteSettings (configurações globais do site, singleton)',
+    run: async (c) => {
+      await c.query(`
+        CREATE TABLE IF NOT EXISTS \`siteSettings\` (
+          \`id\`                  INT AUTO_INCREMENT PRIMARY KEY,
+          \`pricingPt\`           VARCHAR(200) DEFAULT NULL,
+          \`pricingEn\`           VARCHAR(200) DEFAULT NULL,
+          \`contactEmail\`        VARCHAR(200) DEFAULT NULL,
+          \`formspreeId\`         VARCHAR(100) DEFAULT NULL,
+          \`betaWaitlistEnabled\` TINYINT(1) DEFAULT 0,
+          \`updatedAt\`           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+      // Garante que o row singleton (id=1) sempre existe
+      await c.query(`INSERT IGNORE INTO \`siteSettings\` (\`id\`) VALUES (1)`);
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

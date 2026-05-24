@@ -10,6 +10,7 @@ import { registerAppleAuthRoutes } from "./appleAuthRoutes";
 import { registerDeviceRoutes } from "./deviceRoutes";
 import { registerWaitlistRoutes } from "./waitlistRoutes";
 import { registerLegalRoutes } from "./legalRoutes";
+import { registerSiteSettingsRoutes } from "./siteSettingsRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -244,6 +245,9 @@ async function startServer() {
 
   // Captura de email do site público cultivo.pro (POST /api/waitlist)
   registerWaitlistRoutes(app);
+
+  // Configurações globais do site (painel /admin do cultivo-site)
+  registerSiteSettingsRoutes(app);
 
   // Páginas legais (Privacy Policy + Terms of Service) servidas estaticamente
   // em /privacy e /terms — pré-requisito Apple/Google Play.

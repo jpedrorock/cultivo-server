@@ -1057,3 +1057,21 @@ export const aiChatMessages = mysqlTable("aiChatMessages", {
 }));
 
 export type AiChatMessage = typeof aiChatMessages.$inferSelect;
+
+/**
+ * Configurações globais do site — tabela singleton (1 linha, id=1).
+ * Gerenciada via painel /admin do cultivo-site.
+ * Sem groupId: configurações são globais para o produto, não por tenant.
+ */
+export const siteSettings = mysqlTable("siteSettings", {
+  id:                  int("id").autoincrement().primaryKey(),
+  pricingPt:           varchar("pricingPt", { length: 200 }),
+  pricingEn:           varchar("pricingEn", { length: 200 }),
+  contactEmail:        varchar("contactEmail", { length: 200 }),
+  formspreeId:         varchar("formspreeId", { length: 100 }),
+  betaWaitlistEnabled: boolean("betaWaitlistEnabled").default(false),
+  updatedAt:           timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SiteSettings = typeof siteSettings.$inferSelect;
+export type InsertSiteSettings = typeof siteSettings.$inferInsert;
