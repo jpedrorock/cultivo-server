@@ -704,6 +704,35 @@ const MIGRATIONS: Migration[] = [
     },
   },
   {
+    // Coluna `plan` e `planExpiresAt` em users.
+    // Usuários existentes ficam como 'pro' (grandfather — não quebrar ninguém em produção).
+    // Novos usuários registrados após esta migration entram como 'free' (default da coluna).
+    id: 'users-plan-column',
+    description: 'Adiciona coluna plan e planExpiresAt em users; marca existentes como pro',
+    run: async (c) => {
+      // Verificar se a coluna 'plan' já existe (compatibilidade com MySQL que não suporta ADD COLUMN IF NOT EXISTS)
+      const [planColRows] = await c.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'plan'`
+      ) as [Array<{ COLUMN_NAME: string }>, unknown];
+
+      if (!planColRows || (planColRows as any[]).length === 0) {
+        await c.query(`ALTER TABLE \`users\` ADD COLUMN \`plan\` ENUM('free','pro','team') NOT NULL DEFAULT 'free'`);
+      }
+
+      // Verificar planExpiresAt separadamente
+      const [expiresColRows] = await c.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'planExpiresAt'`
+      ) as [Array<{ COLUMN_NAME: string }>, unknown];
+
+      if (!expiresColRows || (expiresColRows as any[]).length === 0) {
+        await c.query(`ALTER TABLE \`users\` ADD COLUMN \`planExpiresAt\` TIMESTAMP NULL DEFAULT NULL`);
+      }
+
+      // Grandfather: todos os usuários já existentes ficam como 'pro' (nunca expira)
+      await c.query(`UPDATE \`users\` SET \`plan\` = 'pro' WHERE \`plan\` = 'free'`);
+    },
+  },
+  {
     // Configurações globais do site (singleton, id=1).
     // Painel /admin do cultivo-site lê/escreve via GET + PATCH /api/admin/site-settings.
     id: 'create-site-settings',

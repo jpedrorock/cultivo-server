@@ -14,6 +14,14 @@ import {
   cloningEvents, tentAState, weeklyTargets, strains,
   nutrientApplications, wateringApplications,
 } from "../../drizzle/schema";
+import type { User } from "../../drizzle/schema";
+
+/** Mapeamento de plano → maxTents (null = ilimitado) */
+const MAX_TENTS_BY_PLAN: Record<string, number | null> = {
+  free: 1,
+  pro:  null,
+  team: null,
+};
 import { validateTentOwnership, validateCycleOwnership } from "./_helpers";
 
 export const tentsRouter = router({
@@ -69,6 +77,30 @@ export const tentsRouter = router({
         if (!database) {
           throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
         }
+
+        // ── Enforcement server-side do limite de estufas por plano ────────────
+        // ctx.user é populado via getUserById (SELECT * FROM users) — inclui `plan`
+        // após a migration users-plan-column. Antes da migration, plan é undefined;
+        // fallback 'pro' garante que usuários legítimos não sejam bloqueados.
+        const userPlan: string = (ctx.user as User & { plan?: string }).plan ?? "pro";
+        const maxTents = MAX_TENTS_BY_PLAN[userPlan] ?? null;
+
+        if (maxTents !== null) {
+          // Contar estufas existentes do grupo
+          const [countRow] = await database
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(tents)
+            .where(eq(tents.groupId, ctx.user.groupId ?? 0));
+
+          const currentCount = Number(countRow?.count ?? 0);
+          if (currentCount >= maxTents) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `Plano Free permite no máximo ${maxTents} estufa. Faça upgrade para Pro para criar mais estufas.`,
+            });
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         // Calcular volume (em litros)
         const volume = (input.width * input.depth * input.height) / 1000;

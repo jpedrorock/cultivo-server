@@ -56,6 +56,17 @@ export const users = mysqlTable("users", {
   avatarUrl: text("avatarUrl"),
   /** Se o usuário foi aprovado por um admin (false = aguardando aprovação) */
   approved: boolean("approved").default(false).notNull(),
+  /**
+   * Plano de assinatura. Default = 'free' para novos usuários.
+   * Usuários existentes antes da migração ficam como 'pro' (grandfather).
+   * Gerenciado via RevenueCat webhook ou promo manual.
+   */
+  plan: mysqlEnum("plan", ["free", "pro", "team"]).default("free").notNull(),
+  /**
+   * Expiração do plano pago. Null = nunca expira (promo / lifetime).
+   * RevenueCat webhook atualiza este campo em RENEWAL e EXPIRATION.
+   */
+  planExpiresAt: timestamp("planExpiresAt"),
   /** Timestamps */
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

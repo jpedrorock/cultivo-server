@@ -34,6 +34,8 @@ export function createTestContext(overrides?: Partial<TrpcContext>): TrpcContext
       groupId: 4,
       avatarUrl: null,
       approved: true,
+      plan: 'pro' as const,
+      planExpiresAt: null,
       createdAt: new Date('2024-01-01'),
       updatedAt: new Date('2024-01-01'),
       lastSignedIn: new Date('2024-01-01'),
