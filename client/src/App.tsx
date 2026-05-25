@@ -14,14 +14,16 @@ import { PullToRefresh } from "./components/PullToRefresh";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { isNative, isPWAStandalone } from "@/lib/platform";
 import { useAuth } from "./_core/hooks/useAuth";
-import { isWizardDone } from "./components/onboarding/OnboardingWizard";
+// [P1] Importa apenas a utilidade leve de localStorage — NÃO o componente inteiro.
+// Antes estava: import { isWizardDone } from "./components/onboarding/OnboardingWizard"
+// Isso puxava todo o wizard (~57 kB) pro bundle principal, tornando o lazy() abaixo ineficaz.
+import { isWizardDone } from "./lib/wizardStorage";
 import { useOnboardingTour } from "./hooks/useOnboardingTour";
 import { useAppStateRefetch } from "./hooks/useAppStateRefetch";
 import { hideSplash } from "./lib/splash";
 import { initAndroidBackButton, pushBackHandler } from "./lib/androidBackButton";
 import { initDeepLinks } from "./lib/deepLinks";
 import { trpc } from "./lib/trpc";
-import { PaywallSheet } from "./components/PaywallSheet";
 import { NetworkStatusBanner } from "./components/NetworkStatusBanner";
 
 import { prefetchRoutes } from "./lib/prefetchRoutes";
@@ -33,7 +35,6 @@ import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Setup from "./pages/Setup";
 import NotFound from "./pages/NotFound";
-import QuickLog from "./pages/QuickLog"; // usado direto na nav inferior
 
 // Rotas secundárias — carregadas sob demanda (e prefetchadas em background)
 const TentLog              = lazy(() => import("./pages/TentLog"));
@@ -53,8 +54,8 @@ const AppearanceSettings   = lazy(() => import("./pages/AppearanceSettings"));
 const Backup               = lazy(() => import("./pages/Backup"));
 const StrainTargets        = lazy(() => import("./pages/StrainTargets"));
 const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
-const Reminders           = lazy(() => import("./pages/Reminders"));
-const About               = lazy(() => import("./pages/About"));
+const Reminders            = lazy(() => import("./pages/Reminders"));
+const About                = lazy(() => import("./pages/About"));
 const AlertHistory         = lazy(() => import("./pages/AlertHistory"));
 const AlertSettings        = lazy(() => import("./pages/AlertSettings"));
 const PlantsList           = lazy(() => import("./pages/PlantsList"));
@@ -72,7 +73,10 @@ const MorningCheck         = lazy(() => import("./pages/MorningCheck"));
 const PlantChat            = lazy(() => import("./pages/PlantChat"));
 const TuyaSettings         = lazy(() => import("./pages/TuyaSettings"));
 const SmartLife            = lazy(() => import("./pages/SmartLife"));
-// QuickLog removido daqui — agora é eager (import estático acima)
+// [P2] QuickLog movido para lazy — não é mais "rota crítica", spinner é imperceptível
+const QuickLog             = lazy(() => import("./pages/QuickLog"));
+// [P3] PaywallSheet carregada sob demanda — chunk só é baixado quando paywall abre pela 1ª vez
+const PaywallSheet         = lazy(() => import("./components/PaywallSheet").then(m => ({ default: m.PaywallSheet })));
 
 // Spinner minimalista usado durante carregamento lazy
 function PageLoader() {
@@ -168,6 +172,13 @@ function AuthenticatedAppInner() {
   // wizard de setup. `checked` impede flash de UI antes do Preferences resolver.
   const { shouldShow: showTour, checked: tourChecked, complete: completeTour } = useOnboardingTour();
   const [paywallOpen, setPaywallOpen] = useState(false);
+  // [P3] Garante que o chunk do PaywallSheet só é baixado quando o paywall abre
+  // pela primeira vez. Antes estava sempre montado no DOM (27 kB no bundle principal).
+  const [paywallEverOpened, setPaywallEverOpened] = useState(false);
+  const openPaywall = (open: boolean) => {
+    if (open) setPaywallEverOpened(true);
+    setPaywallOpen(open);
+  };
 
   // Refetch automático de queries voláteis (tents, cycles, alerts...) ao
   // voltar do background. Listener global — chama uma vez aqui.
@@ -234,15 +245,20 @@ function AuthenticatedAppInner() {
         <Suspense fallback={null}>
           <OnboardingTour
             onComplete={completeTour}
-            onShowPaywall={() => setPaywallOpen(true)}
+            onShowPaywall={() => openPaywall(true)}
           />
         </Suspense>
       )}
-      <PaywallSheet
-        open={paywallOpen}
-        onOpenChange={setPaywallOpen}
-        trigger="Cultivo Pro — desbloqueie tudo"
-      />
+      {/* [P3] PaywallSheet renderizado só após primeira abertura — chunk lazy */}
+      {paywallEverOpened && (
+        <Suspense fallback={null}>
+          <PaywallSheet
+            open={paywallOpen}
+            onOpenChange={openPaywall}
+            trigger="Cultivo Pro — desbloqueie tudo"
+          />
+        </Suspense>
+      )}
       {/* Onboarding e display mode são "fullscreen" — sem Sidebar/BottomNav */}
       {!isDisplayMode && !isOnboarding && <Sidebar />}
       <div

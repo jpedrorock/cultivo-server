@@ -1,13 +1,15 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
 import { useHomeModals } from "@/hooks/useHomeModals";
-import StartCycleModal from "@/components/StartCycleModal";
-import { InitiateCycleModal } from "@/components/InitiateCycleModal";
-import { EditCycleModal } from "@/components/EditCycleModal";
-import { CreateTentModal } from "@/components/CreateTentModal";
-import { EditTentDialog } from "@/components/EditTentDialog";
+// [P4] Dialogs lazy — só carregam o chunk quando o modal abre pela 1ª vez
+const StartCycleModal    = lazy(() => import("@/components/StartCycleModal"));
+const InitiateCycleModal = lazy(() => import("@/components/InitiateCycleModal").then(m => ({ default: m.InitiateCycleModal })));
+const EditCycleModal     = lazy(() => import("@/components/EditCycleModal").then(m => ({ default: m.EditCycleModal })));
+const CreateTentModal    = lazy(() => import("@/components/CreateTentModal").then(m => ({ default: m.CreateTentModal })));
+const EditTentDialog     = lazy(() => import("@/components/EditTentDialog").then(m => ({ default: m.EditTentDialog })));
+const DeleteTentDialog   = lazy(() => import("@/components/DeleteTentDialog").then(m => ({ default: m.DeleteTentDialog })));
 import { usePaywall } from "@/components/PaywallGate";
 import { usePlan } from "@/_core/hooks/usePlan";
 import { Button } from "@/components/ui/button";
@@ -55,10 +57,18 @@ import { TentCardSkeleton } from "@/components/TentCardSkeleton";
 import { EmptyOnboarding } from "@/components/EmptyOnboarding";
 import { TodayMissionWidget } from "@/components/TodayMissionWidget";
 import { HomeLoadingState } from "@/components/HomeLoadingState";
-import { DeleteTentDialog } from "@/components/DeleteTentDialog";
 import { TentCard } from "@/components/TentCard";
 import { AdBanner } from "@/components/AdBanner";
 
+/**
+ * Monta `children` apenas quando `active` fica true pela primeira vez,
+ * e permanece montado depois (para preservar animação de fechamento de dialogs).
+ */
+function LazyMount({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => { if (active) setShow(true); }, [active]);
+  return show ? <>{children}</> : null;
+}
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -634,82 +644,106 @@ export default function Home() {
 
       </main>
 
-      {/* Start Cycle Modal */}
-      {selectedTent && (
-        <StartCycleModal
-          tentId={selectedTent.id}
-          tentName={selectedTent.name}
-          open={cycleModalOpen}
-          onOpenChange={setCycleModalOpen}
-        />
-      )}
+      {/* Start Cycle Modal — lazy: chunk carrega na 1ª abertura */}
+      <LazyMount active={!!(selectedTent && cycleModalOpen)}>
+        <Suspense fallback={null}>
+          {selectedTent && (
+            <StartCycleModal
+              tentId={selectedTent.id}
+              tentName={selectedTent.name}
+              open={cycleModalOpen}
+              onOpenChange={setCycleModalOpen}
+            />
+          )}
+        </Suspense>
+      </LazyMount>
 
-      {/* Initiate Cycle Modal */}
-      {selectedTent && (
-        <InitiateCycleModal
-          open={initiateModalOpen}
-          onOpenChange={setInitiateModalOpen}
-          tentId={selectedTent.id}
-          tentName={selectedTent.name}
-        />
-      )}
+      {/* Initiate Cycle Modal — lazy */}
+      <LazyMount active={!!(selectedTent && initiateModalOpen)}>
+        <Suspense fallback={null}>
+          {selectedTent && (
+            <InitiateCycleModal
+              open={initiateModalOpen}
+              onOpenChange={setInitiateModalOpen}
+              tentId={selectedTent.id}
+              tentName={selectedTent.name}
+            />
+          )}
+        </Suspense>
+      </LazyMount>
 
-      {/* Edit Cycle Modal */}
-      {selectedTent && selectedCycle && (
-        <EditCycleModal
-          open={editModalOpen}
-          onOpenChange={setEditModalOpen}
-          cycleId={selectedCycle.id}
-          tentId={selectedTent.id}
-          tentName={selectedTent.name}
-          currentStartDate={selectedCycle.startDate}
-          currentFloraStartDate={selectedCycle.floraStartDate}
-          currentStrainId={selectedCycle.strainId}
-        />
-      )}
+      {/* Edit Cycle Modal — lazy */}
+      <LazyMount active={!!(selectedTent && selectedCycle && editModalOpen)}>
+        <Suspense fallback={null}>
+          {selectedTent && selectedCycle && (
+            <EditCycleModal
+              open={editModalOpen}
+              onOpenChange={setEditModalOpen}
+              cycleId={selectedCycle.id}
+              tentId={selectedTent.id}
+              tentName={selectedTent.name}
+              currentStartDate={selectedCycle.startDate}
+              currentFloraStartDate={selectedCycle.floraStartDate}
+              currentStrainId={selectedCycle.strainId}
+            />
+          )}
+        </Suspense>
+      </LazyMount>
 
-      {/* Create Tent Modal */}
-      <CreateTentModal
-        open={createTentModalOpen}
-        onOpenChange={setCreateTentModalOpen}
-      />
+      {/* Create Tent Modal — lazy */}
+      <LazyMount active={createTentModalOpen}>
+        <Suspense fallback={null}>
+          <CreateTentModal
+            open={createTentModalOpen}
+            onOpenChange={setCreateTentModalOpen}
+          />
+        </Suspense>
+      </LazyMount>
 
       {paywall.PaywallElement}
 
-      {/* Edit Tent Dialog */}
-      <EditTentDialog
-        tent={tentToEdit}
-        open={editTentDialogOpen}
-        onOpenChange={setEditTentDialogOpen}
-        onSuccess={() => {
-          utils.tents.list.invalidate();
-          utils.cycles.listActive.invalidate();
-        }}
-      />
+      {/* Edit Tent Dialog — lazy */}
+      <LazyMount active={editTentDialogOpen}>
+        <Suspense fallback={null}>
+          <EditTentDialog
+            tent={tentToEdit}
+            open={editTentDialogOpen}
+            onOpenChange={setEditTentDialogOpen}
+            onSuccess={() => {
+              utils.tents.list.invalidate();
+              utils.cycles.listActive.invalidate();
+            }}
+          />
+        </Suspense>
+      </LazyMount>
 
-      {/* Delete Tent Confirmation Dialog */}
-      <DeleteTentDialog
-        open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open);
-          if (!open) setDeletePreviewTentId(null);
-        }}
-        tentToDelete={tentToDelete}
-        tents={tents}
-        deletePreview={deletePreview}
-        deletePreviewLoading={deletePreviewLoading}
-        isDeleting={deleteTent.isPending}
-        isMovingPlants={moveAllPlants.isPending}
-        onConfirmDelete={confirmDeleteTent}
-        onMoveAllPlants={(toTentId) => {
-          if (!tentToDelete) return;
-          moveAllPlants.mutate({
-            fromTentId: tentToDelete.id,
-            toTentId,
-            reason: "Movimentação antes de excluir estufa",
-          });
-        }}
-      />
+      {/* Delete Tent Confirmation Dialog — lazy */}
+      <LazyMount active={deleteDialogOpen}>
+        <Suspense fallback={null}>
+          <DeleteTentDialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              setDeleteDialogOpen(open);
+              if (!open) setDeletePreviewTentId(null);
+            }}
+            tentToDelete={tentToDelete}
+            tents={tents}
+            deletePreview={deletePreview}
+            deletePreviewLoading={deletePreviewLoading}
+            isDeleting={deleteTent.isPending}
+            isMovingPlants={moveAllPlants.isPending}
+            onConfirmDelete={confirmDeleteTent}
+            onMoveAllPlants={(toTentId) => {
+              if (!tentToDelete) return;
+              moveAllPlants.mutate({
+                fromTentId: tentToDelete.id,
+                toTentId,
+                reason: "Movimentação antes de excluir estufa",
+              });
+            }}
+          />
+        </Suspense>
+      </LazyMount>
 
       {/* Finalizar Ciclo Confirm Dialog */}
       <Dialog open={finalizeCycleConfirm.open} onOpenChange={(open) => !open && setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" })}>
