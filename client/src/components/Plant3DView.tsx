@@ -25,6 +25,16 @@ import {
   Scissors, Zap, Leaf, ArrowUp, GitBranch, GitMerge, Trash2, X,
   ZoomIn, ZoomOut, Maximize2, RotateCcw,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const COLOR = {
   active:        "#22c55e",
@@ -251,9 +261,10 @@ export default function Plant3DView({
   plantId, height, potSizeL = 5, onTechniqueApplied,
 }: Plant3DViewProps) {
   const mountRef     = useRef<HTMLDivElement>(null);
-  const [nodes,           setNodes]           = useState<PlantGraphNode[]>([]);
-  const [selectedId,      setSelectedId]      = useState<string | null>(null);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [nodes,              setNodes]              = useState<PlantGraphNode[]>([]);
+  const [selectedId,         setSelectedId]         = useState<string | null>(null);
+  const [selectedBranchId,   setSelectedBranchId]   = useState<string | null>(null);
+  const [resetConfirmOpen,   setResetConfirmOpen]   = useState(false);
 
   // Refs Three.js (acessíveis no callback de click)
   const sceneRef       = useRef<THREE.Scene | null>(null);
@@ -845,7 +856,10 @@ export default function Plant3DView({
   }
 
   function resetPositions() {
-    if (!confirm("Resetar posições de drag de todos os nós? Isso volta ao layout automático.")) return;
+    setResetConfirmOpen(true);
+  }
+
+  function doResetPositions() {
     setNodes(prev => {
       const updated = prev.map(n => {
         const { pos3D: _pos3D, ...rest } = n;
@@ -854,7 +868,7 @@ export default function Plant3DView({
       if (plantId) saveMutation.mutate({ plantId, nodes: updated });
       return updated;
     });
-    didFitRef.current = false; // permite auto-fit novamente
+    didFitRef.current = false;
     toast.success("Posições resetadas");
   }
 
@@ -972,6 +986,23 @@ export default function Plant3DView({
           onAction={applyAction}
         />
       )}
+
+      <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar posições dos nós?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todas as posições de drag serão removidas e o layout voltará ao automático. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={doResetPositions} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Resetar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
