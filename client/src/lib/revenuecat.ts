@@ -1,4 +1,4 @@
-import { Purchases, type PurchasesOffering, type PurchasesPackage, LOG_LEVEL } from "@revenuecat/purchases-capacitor";
+import type { PurchasesOffering, PurchasesPackage } from "@revenuecat/purchases-capacitor";
 import { isNative, isIOS, isAndroid } from "./platform";
 
 let initialized = false;
@@ -22,6 +22,7 @@ export async function initRevenueCat(userId: number | string): Promise<boolean> 
   }
 
   try {
+    const { Purchases, LOG_LEVEL } = await import("@revenuecat/purchases-capacitor");
     await Purchases.setLogLevel({ level: LOG_LEVEL.WARN });
     await Purchases.configure({
       apiKey,
@@ -42,6 +43,7 @@ export async function isInitialized(): Promise<boolean> {
 export async function logoutRevenueCat(): Promise<void> {
   if (!initialized) return;
   try {
+    const { Purchases } = await import("@revenuecat/purchases-capacitor");
     await Purchases.logOut();
   } catch (err) {
     console.warn("[RC] Falha ao logout:", err);
@@ -52,6 +54,7 @@ export async function logoutRevenueCat(): Promise<void> {
 export async function getCurrentOffering(): Promise<PurchasesOffering | null> {
   if (!initialized) return null;
   try {
+    const { Purchases } = await import("@revenuecat/purchases-capacitor");
     const { current } = await Purchases.getOfferings();
     return current ?? null;
   } catch (err) {
@@ -63,6 +66,7 @@ export async function getCurrentOffering(): Promise<PurchasesOffering | null> {
 export async function purchase(pkg: PurchasesPackage): Promise<{ success: boolean; cancelled?: boolean; error?: string }> {
   if (!initialized) return { success: false, error: "RC not initialized" };
   try {
+    const { Purchases } = await import("@revenuecat/purchases-capacitor");
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
     const hasPro = "pro" in (customerInfo.entitlements?.active ?? {});
     return { success: hasPro };
@@ -75,6 +79,7 @@ export async function purchase(pkg: PurchasesPackage): Promise<{ success: boolea
 export async function restorePurchases(): Promise<{ success: boolean; isPro: boolean; error?: string }> {
   if (!initialized) return { success: false, isPro: false, error: "RC not initialized" };
   try {
+    const { Purchases } = await import("@revenuecat/purchases-capacitor");
     const customerInfo = await Purchases.restorePurchases();
     const hasPro = "pro" in (customerInfo.customerInfo.entitlements?.active ?? {});
     return { success: true, isPro: hasPro };

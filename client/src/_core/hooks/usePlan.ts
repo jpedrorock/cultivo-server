@@ -1,9 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { App as CapacitorApp } from "@capacitor/app";
-import { Preferences } from "@capacitor/preferences";
-import { Purchases } from "@revenuecat/purchases-capacitor";
 import { isNative } from "@/lib/platform";
-import { isInitialized } from "@/lib/revenuecat";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const DEV_PLAN_KEY = "dev_force_plan";
@@ -112,20 +108,24 @@ export function usePlan() {
       setIsLoading(false);
       return;
     }
-    // 3. Override manual via Capacitor Preferences (window.__setDevPlan) — também só em dev
+    // 3 + 4. Native-only: dynamic imports keep @capacitor/* and @revenuecat/* out of the web bundle
+    const [{ Preferences }, { isInitialized }] = await Promise.all([
+      import("@capacitor/preferences"),
+      import("@/lib/revenuecat"),
+    ]);
     const override = testAccountsEnabled ? await Preferences.get({ key: DEV_PLAN_KEY }) : { value: null };
     if (isValidTier(override.value)) {
       setTier(override.value);
       setIsLoading(false);
       return;
     }
-    // 4. RevenueCat real (quando configurado) — checa entitlements team / pro
     if (!(await isInitialized())) {
       setTier("free");
       setIsLoading(false);
       return;
     }
     try {
+      const { Purchases } = await import("@revenuecat/purchases-capacitor");
       const { customerInfo } = await Purchases.getCustomerInfo();
       const active = customerInfo?.entitlements?.active ?? {};
       if ("team" in active) setTier("team");
@@ -147,11 +147,14 @@ export function usePlan() {
     let removed = false;
     let handle: { remove: () => void } | null = null;
 
-    CapacitorApp.addListener("appStateChange", (state) => {
-      if (state.isActive && !removed) refresh();
-    }).then((h) => {
-      if (removed) h.remove();
-      else handle = h;
+    import("@capacitor/app").then(({ App: CapacitorApp }) => {
+      if (removed) return;
+      CapacitorApp.addListener("appStateChange", (state) => {
+        if (state.isActive && !removed) refresh();
+      }).then((h) => {
+        if (removed) h.remove();
+        else handle = h;
+      });
     });
 
     return () => {
