@@ -1,15 +1,25 @@
-import { Capacitor } from "@capacitor/core";
-
 export type Platform = "web" | "ios" | "android";
 
+/**
+ * Acessa o objeto Capacitor global de forma segura.
+ * - Em apps Capacitor (iOS/Android): objeto injetado pelo runtime
+ * - Em PWA/web: undefined → todos os helpers retornam fallback web
+ * Evita import estático de @capacitor/core (não instalado no build web).
+ */
+function cap() {
+  return typeof window !== "undefined"
+    ? (window as unknown as { Capacitor?: { getPlatform(): string; isNativePlatform(): boolean } }).Capacitor
+    : undefined;
+}
+
 export function getPlatform(): Platform {
-  const p = Capacitor.getPlatform();
+  const p = cap()?.getPlatform() ?? "web";
   if (p === "ios" || p === "android") return p;
   return "web";
 }
 
 export function isNative(): boolean {
-  return Capacitor.isNativePlatform();
+  return cap()?.isNativePlatform() ?? false;
 }
 
 export function isIOS(): boolean {
