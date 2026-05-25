@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { appRouter } from "./routers";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("plants.moveAllPlants", () => {
+describe.skipIf(!DB_AVAILABLE)("plants.moveAllPlants", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(() => {

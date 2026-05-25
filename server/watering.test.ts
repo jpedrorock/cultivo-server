@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { appRouter } from "./routers";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("Watering Procedures", () => {
+describe.skipIf(!DB_AVAILABLE)("Watering Procedures", () => {
   let tentId1: number;
   let tentId2: number;
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("dailyLogs API", () => {
+describe.skipIf(!DB_AVAILABLE)("dailyLogs API", () => {
   it("should create a daily log with valid data", async () => {
     const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);

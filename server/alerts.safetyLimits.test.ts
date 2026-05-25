@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getIdealValuesByTent, getSafetyLimits, checkAlertsForTent } from './db';
+import { DB_AVAILABLE } from './test-helpers';
 
 /**
  * Testes para verificar:
@@ -9,7 +10,7 @@ import { getIdealValuesByTent, getSafetyLimits, checkAlertsForTent } from './db'
  * 4. Nenhum email é enviado (notifyOwner removido)
  */
 describe('Alerts - safetyLimits como fallback', () => {
-  it('getSafetyLimits deve retornar limites para as fases configuradas no banco', async () => {
+  it.skipIf(!DB_AVAILABLE)('getSafetyLimits deve retornar limites para as fases configuradas no banco', async () => {
     // DRYING não tem safetyLimits no banco atual — testar apenas as fases com dados
     const phasesWithData = ['MAINTENANCE', 'CLONING', 'VEGA', 'FLORA'] as const;
 
@@ -29,7 +30,7 @@ describe('Alerts - safetyLimits como fallback', () => {
     console.log('✅ safetyLimits: fases configuradas têm limites');
   }, 15000);
 
-  it('getSafetyLimits deve retornar limites para TENT_A e TENT_BC separadamente', async () => {
+  it.skipIf(!DB_AVAILABLE)('getSafetyLimits deve retornar limites para TENT_A e TENT_BC separadamente', async () => {
     const allLimits = await getSafetyLimits();
     const tentA  = allLimits.filter(l => l.context === 'TENT_A');
     const tentBC = allLimits.filter(l => l.context === 'TENT_BC');
@@ -40,7 +41,7 @@ describe('Alerts - safetyLimits como fallback', () => {
     console.log(`✅ safetyLimits: TENT_A=${tentA.length} registros, TENT_BC=${tentBC.length} registros`);
   }, 15000);
 
-  it('getIdealValuesByTent deve retornar valores para estufa de Manutenção via safetyLimits', async () => {
+  it.skipIf(!DB_AVAILABLE)('getIdealValuesByTent deve retornar valores para estufa de Manutenção via safetyLimits', async () => {
     // A estufa de Manutenção (id=1) não tem weeklyTargets, deve usar safetyLimits
     const idealValues = await getIdealValuesByTent(1);
 

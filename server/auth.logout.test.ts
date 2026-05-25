@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { DB_AVAILABLE } from "./test-helpers";
 
 // O auth.logout tRPC limpa o cookie 'auth_token' (nome real do JWT).
 // COOKIE_NAME no shared/const.ts ('app_session_id') é uma constante legada
@@ -49,7 +50,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
   return { ctx, clearedCookies };
 }
 
-describe("auth.logout", () => {
+describe.skipIf(!DB_AVAILABLE)("auth.logout", () => {
   it("clears the session cookie and reports success", async () => {
     const { ctx, clearedCookies } = createAuthContext();
     const caller = appRouter.createCaller(ctx);

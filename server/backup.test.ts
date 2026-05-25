@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("Backup System", () => {
+describe.skipIf(!DB_AVAILABLE)("Backup System", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeEach(() => {

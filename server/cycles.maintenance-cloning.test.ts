@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import mysql from "mysql2/promise";
+import { DB_AVAILABLE } from "./test-helpers";
 
 const DATABASE_URL = process.env.DATABASE_URL!;
 
-describe("Cycles MAINTENANCE↔CLONING Transitions", () => {
+describe.skipIf(!DB_AVAILABLE)("Cycles MAINTENANCE↔CLONING Transitions", () => {
   let connection: mysql.Connection;
 
   beforeEach(async () => {

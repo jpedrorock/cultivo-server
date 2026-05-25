@@ -3,6 +3,7 @@ import { applyPhaseTransitionLimits, getSafetyLimits } from './db';
 import { getDb } from './db';
 import { alertSettings } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
+import { DB_AVAILABLE } from './test-helpers';
 
 /**
  * Testes para verificar que applyPhaseTransitionLimits:
@@ -24,7 +25,7 @@ describe('applyPhaseTransitionLimits', () => {
     expect(result.phase).toBe('DRYING');
   }, 15000);
 
-  it('deve aplicar margens de VEGA corretamente', async () => {
+  it.skipIf(!DB_AVAILABLE)('deve aplicar margens de VEGA corretamente', async () => {
     const result = await applyPhaseTransitionLimits(TEST_TENT_ID, 'VEGA');
 
     expect(result.applied).toBe(true);
@@ -42,7 +43,7 @@ describe('applyPhaseTransitionLimits', () => {
     console.log(`✅ VEGA: Temp ±${result.margins?.tempMargin}°C | RH ±${result.margins?.rhMargin}% | PPFD ±${result.margins?.ppfdMargin} | pH ±${result.margins?.phMargin}`);
   }, 15000);
 
-  it('deve aplicar margens de FLORA corretamente e serem diferentes de VEGA', async () => {
+  it.skipIf(!DB_AVAILABLE)('deve aplicar margens de FLORA corretamente e serem diferentes de VEGA', async () => {
     const vegaResult  = await applyPhaseTransitionLimits(TEST_TENT_ID, 'VEGA');
     const floraResult = await applyPhaseTransitionLimits(TEST_TENT_ID, 'FLORA');
 
@@ -58,7 +59,7 @@ describe('applyPhaseTransitionLimits', () => {
     console.log(`✅ FLORA: Temp ±${floraResult.margins?.tempMargin}°C | RH ±${floraResult.margins?.rhMargin}% | PPFD ±${floraResult.margins?.ppfdMargin} | pH ±${floraResult.margins?.phMargin}`);
   }, 15000);
 
-  it('deve persistir as margens no banco (alertSettings)', async () => {
+  it.skipIf(!DB_AVAILABLE)('deve persistir as margens no banco (alertSettings)', async () => {
     // Aplicar FLORA
     await applyPhaseTransitionLimits(TEST_TENT_ID, 'FLORA');
 

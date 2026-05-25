@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { appRouter } from "./routers";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("Plants - Discard Functionality", () => {
+describe.skipIf(!DB_AVAILABLE)("Plants - Discard Functionality", () => {
   it("should discard a plant with DISCARDED status", async () => {
     const caller = appRouter.createCaller(createTestContext());
 

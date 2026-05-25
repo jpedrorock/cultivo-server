@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appRouter } from './routers';
-import { createTestContext } from './test-helpers';
+import { createTestContext, DB_AVAILABLE } from './test-helpers';
 
-describe('Plant Health - Update and Delete', () => {
+describe.skipIf(!DB_AVAILABLE)('Plant Health - Update and Delete', () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
   let testPlantId: number;
   let testHealthLogId: number;

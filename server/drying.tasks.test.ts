@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { getDb } from './db';
+import { DB_AVAILABLE } from './test-helpers';
 import { taskTemplates } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
-describe('DRYING Task Templates', () => {
+describe.skipIf(!DB_AVAILABLE)('DRYING Task Templates', () => {
   it('should have 5 task templates for DRYING phase', async () => {
     const database = await getDb();
     if (!database) throw new Error('Database not available');

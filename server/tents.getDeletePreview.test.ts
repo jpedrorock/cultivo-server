@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("tents.getDeletePreview", () => {
+describe.skipIf(!DB_AVAILABLE)("tents.getDeletePreview", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
   let tentId: number;
   let strainId: number;

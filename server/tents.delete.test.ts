@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import { tents, strains, cycles } from "../drizzle/schema";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("tents.delete", () => {
+describe.skipIf(!DB_AVAILABLE)("tents.delete", () => {
   let db: Awaited<ReturnType<typeof getDb>>;
   let testTentId: number;
   let testStrainId: number;

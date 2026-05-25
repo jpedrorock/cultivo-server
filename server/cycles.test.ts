@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("cycles API", () => {
+describe.skipIf(!DB_AVAILABLE)("cycles API", () => {
   it("should create a new cycle", async () => {
     const ctx = createTestContext();
     const caller = appRouter.createCaller(ctx);

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { appRouter } from "./routers";
-import { createTestContext } from "./test-helpers";
+import { createTestContext, DB_AVAILABLE } from "./test-helpers";
 
-describe("tents.update", () => {
+describe.skipIf(!DB_AVAILABLE)("tents.update", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
   let testTentId: number;
 
