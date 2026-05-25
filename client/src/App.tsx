@@ -30,6 +30,7 @@ import { prefetchRoutes } from "./lib/prefetchRoutes";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import Setup from "./pages/Setup";
 import NotFound from "./pages/NotFound";
 import QuickLog from "./pages/QuickLog"; // usado direto na nav inferior
@@ -334,6 +335,7 @@ function App() {
           <Switch>
             <Route path="/login" component={Login} />
             <Route path="/register" component={Register} />
+            <Route path="/reset-password" component={ResetPassword} />
             <Route path="/setup" component={Setup} />
             <Route path="/pending-approval">
               <Suspense fallback={<PageLoader />}>

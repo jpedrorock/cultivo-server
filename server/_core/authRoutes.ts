@@ -19,11 +19,13 @@ import {
   hashPassword,
   comparePassword,
   createToken,
+  verifyToken,
   setAuthCookie,
   clearAuthCookie,
   authenticateRequest,
 } from './auth';
 import { ENV } from './env';
+import { sendPasswordResetEmail } from './emailService';
 
 /**
  * Mascara um email pra log seguro (LGPD/GDPR).
@@ -250,11 +252,11 @@ export function registerAuthRoutes(app: Express) {
       // Tenta achar o user — se não existir, comportamento idêntico (anti-enum)
       const user = await getUserByEmail(cleanEmail);
       if (user) {
-        // TODO: substituir por email service real quando plugar
-        // const token = randomBytes(32).toString('hex');
-        // await savePasswordResetToken(user.id, token, expiresAt);
-        // await sendPasswordResetEmail(user.email, token);
-        console.log(`[Auth] Reset pedido pra user ${user.id} (${maskEmail(cleanEmail)}) — processar manualmente`);
+        // Gera JWT de curta duração (1h) com purpose=password-reset (stateless, sem tabela extra)
+        const resetToken = createToken(user.id, user.email, '1h');
+        // Dispara email em background (não bloqueia resposta)
+        sendPasswordResetEmail(user.email, resetToken).catch(() => {/* já loga internamente */});
+        console.log(`[Auth] Reset pedido pra user ${user.id} (${maskEmail(cleanEmail)}) — email enviado`);
       } else {
         console.log(`[Auth] Reset pedido pra email não encontrado (${maskEmail(cleanEmail)}) — ignorar`);
       }
@@ -267,6 +269,54 @@ export function registerAuthRoutes(app: Express) {
     } catch (error) {
       console.error('[Auth] forgot-password failed', error);
       res.status(500).json({ error: 'Falha ao processar pedido' });
+    }
+  });
+
+  /**
+   * POST /api/auth/reset-password
+   * Valida token JWT de reset e define nova senha.
+   *
+   * Body: { token: string, password: string }
+   *
+   * O token é um JWT HS256 gerado pelo /forgot-password, expira em 1h.
+   * Por ser stateless, um token usado não é invalidado imediatamente (janela 1h).
+   * Aceitável pra MVP; se quiser invalidação imediata, salvar token em DB/Redis.
+   */
+  app.post('/api/auth/reset-password', forgotPasswordLimiter, async (req: Request, res: Response) => {
+    try {
+      const { token, password } = req.body as { token: string; password: string };
+      if (!token || typeof token !== 'string') {
+        res.status(400).json({ error: 'Token obrigatório' });
+        return;
+      }
+      if (!password || typeof password !== 'string' || password.length < 8) {
+        res.status(400).json({ error: 'Senha deve ter pelo menos 8 caracteres' });
+        return;
+      }
+
+      // Verifica JWT (valida assinatura + expiração)
+      const payload = verifyToken(token);
+      if (!payload) {
+        res.status(400).json({ error: 'Link inválido ou expirado. Solicite um novo.' });
+        return;
+      }
+
+      // Confirma que o user ainda existe
+      const user = await getUserByEmail(payload.email);
+      if (!user || user.id !== payload.userId) {
+        res.status(400).json({ error: 'Usuário não encontrado.' });
+        return;
+      }
+
+      const newHash = await hashPassword(password);
+      await updateUserPassword(user.id, newHash);
+
+      console.log(`[Auth] Senha redefinida pra user ${user.id} (${maskEmail(user.email)})`);
+
+      res.json({ success: true, message: 'Senha redefinida com sucesso. Faça login com a nova senha.' });
+    } catch (error) {
+      console.error('[Auth] reset-password failed', error);
+      res.status(500).json({ error: 'Falha ao redefinir senha' });
     }
   });
 

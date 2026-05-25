@@ -18,6 +18,7 @@ import type { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { getMysqlPool } from '../mysql-pool';
+import { sendWelcomeEmail } from './emailService';
 
 const waitlistLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1h
@@ -113,10 +114,8 @@ export function registerWaitlistRoutes(app: Express): void {
 
       console.log(`[Waitlist] +1 ${cleanEmail} (utm=${utmSource ?? '-'}/${utmMedium ?? '-'}/${utmCampaign ?? '-'})`);
 
-      // TODO: enviar welcome email via Resend
-      // if (process.env.RESEND_API_KEY) {
-      //   await sendWelcomeEmail(cleanEmail, locale);
-      // }
+      // Welcome email via Resend (dispara em background, não bloqueia resposta)
+      sendWelcomeEmail(cleanEmail, locale ?? 'en').catch(() => {/* já loga internamente */});
 
       // Resposta sempre igual (anti-enumeração)
       res.json({

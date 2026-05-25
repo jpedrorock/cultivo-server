@@ -53,6 +53,13 @@ export const ENV = {
   // Gere com: openssl rand -base64 32
   encryptionKey: process.env.ENCRYPTION_KEY ?? '',
 
+  // Email (Resend) — https://resend.com
+  // Configure em https://resend.com/api-keys e adicione no Coolify
+  resendApiKey: process.env.RESEND_API_KEY ?? '',
+
+  // URL pública do app (usada em links de email)
+  appUrl: (process.env.APP_URL ?? 'https://app.cultivo.pro').replace(/\/$/, ''),
+
   // Helpers
   isProduction: process.env.NODE_ENV === 'production',
   isDevelopment: process.env.NODE_ENV !== 'production',
