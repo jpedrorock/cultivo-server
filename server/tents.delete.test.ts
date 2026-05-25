@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import { tents, strains, cycles } from "../drizzle/schema";
@@ -40,13 +41,13 @@ describe.skipIf(!DB_AVAILABLE)("tents.delete", () => {
     
     // Limpar dados de teste
     if (testCycleId) {
-      await db.delete(cycles).where({ id: testCycleId });
+      await db.delete(cycles).where(eq(cycles.id, testCycleId));
     }
     if (testTentId) {
-      await db.delete(tents).where({ id: testTentId });
+      await db.delete(tents).where(eq(tents.id, testTentId));
     }
     if (testStrainId) {
-      await db.delete(strains).where({ id: testStrainId });
+      await db.delete(strains).where(eq(strains.id, testStrainId));
     }
   });
 
@@ -58,7 +59,7 @@ describe.skipIf(!DB_AVAILABLE)("tents.delete", () => {
     expect(result.success).toBe(true);
 
     // Verificar se foi realmente deletada
-    const tentsList = await db.select().from(tents).where({ id: testTentId });
+    const tentsList = await db.select().from(tents).where(eq(tents.id, testTentId));
     expect(tentsList.length).toBe(0);
   });
 
@@ -94,11 +95,11 @@ describe.skipIf(!DB_AVAILABLE)("tents.delete", () => {
     ).rejects.toThrow("Não é possível excluir uma estufa com ciclos ativos");
 
     // Verificar que estufa ainda existe
-    const tentsList = await db.select().from(tents).where({ id: tentId });
+    const tentsList = await db.select().from(tents).where(eq(tents.id, tentId));
     expect(tentsList.length).toBe(1);
 
     // Limpar
-    await db.delete(cycles).where({ id: testCycleId });
-    await db.delete(tents).where({ id: tentId });
+    await db.delete(cycles).where(eq(cycles.id, testCycleId));
+    await db.delete(tents).where(eq(tents.id, tentId));
   });
 });

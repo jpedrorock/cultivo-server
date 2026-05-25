@@ -234,15 +234,17 @@ export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWi
                 fontSize: "11px",
               }}
               labelStyle={{ color: "var(--foreground)", fontSize: "10px" }}
-              formatter={(value: number | undefined, name: string | undefined, payload: any) => {
-                if (value === undefined || !name) return ['--', name || ''];
-                const param = name as keyof typeof parameterConfig;
+              formatter={(value, name, payload) => {
+                const num = typeof value === 'number' ? value : undefined;
+                const nameStr = typeof name === 'string' ? name : undefined;
+                if (num === undefined || !nameStr) return ['--', nameStr || ''];
+                const param = nameStr as keyof typeof parameterConfig;
                 const config = parameterConfig[param];
-                const rawValue = payload?.payload?.[`${param}Raw`];
+                const rawValue = (payload as any)?.payload?.[`${param}Raw`];
                 if (rawValue !== undefined && typeof rawValue === 'number') {
-                  return [`${rawValue.toFixed(1)}${config.unit} (${value.toFixed(0)}%)`, config.label];
+                  return [`${rawValue.toFixed(1)}${config.unit} (${num.toFixed(0)}%)`, config.label];
                 }
-                return [`${value.toFixed(0)}%`, config.label];
+                return [`${num.toFixed(0)}%`, config.label];
               }}
             />
           )}
