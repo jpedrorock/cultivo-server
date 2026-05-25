@@ -1724,10 +1724,14 @@ static void connectWifi() {
   }
 }
 
-// Certificados raiz ISRG (Let's Encrypt) — bundle X1 (RSA, cobre R3/R10/R11)
-// e X2 (ECDSA, cobre E5/E6/E7/E8). cultivo.pro usa intermediate E8 -> X2;
-// outros endpoints podem usar X1. WiFiClientSecure aceita multiplos PEMs
-// concatenados em uma string (chain bundle), validando contra qualquer um.
+// Certificados Let's Encrypt — bundle de 3 entries concatenados:
+//   1. ISRG Root X1 (RSA)  — ancora pra chains R3/R10/R11
+//   2. ISRG Root X2 (ECDSA)— ancora pra chains E5/E6/E7/E8
+//   3. Let's Encrypt E8    — intermediate necessario pq Cloudflare (app.cultivo.pro)
+//      nao inclui o intermediate na handshake TLS e mbedTLS nao faz AIA fetch.
+//      Com E8 no bundle, mbedTLS consegue completar: leaf → E8 → Root X2.
+//      E8 valido ate 2027-03-12 (fonte: letsencrypt.org/certs/2024/e8.pem).
+// WiFiClientSecure aceita multiplos PEMs concatenados; setCACert valida contra qualquer.
 static const char LE_ROOTS[] PROGMEM = R"EOF(-----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
 TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
@@ -1773,23 +1777,37 @@ zj0EAwMDaAAwZQIwe3lORlCEwkSHRhtFcP9Ymd70/aTSVaYgLXTWNLxBo1BfASdW
 tL4ndQavEi51mI38AjEAi/V3bNTIZargCyzuFJ0nN6T5U6VR5CmD1/iQMVtCnwr1
 /q4AaOeMSQ+2b1tbFfLn
 -----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIICtTCCAjugAwIBAgIQfo8UX4exWTMtf9QIK4JraTAKBggqhkjOPQQDAzBPMQsw
+CQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJuZXQgU2VjdXJpdHkgUmVzZWFyY2gg
+R3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBYMjAeFw0yNDAzMTMwMDAwMDBaFw0y
+NzAzMTIyMzU5NTlaMDIxCzAJBgNVBAYTAlVTMRYwFAYDVQQKEw1MZXQncyBFbmNy
+eXB0MQswCQYDVQQDEwJFODB2MBAGByqGSM49AgEGBSuBBAAiA2IABNFl8l7cS7QM
+ApzSsvru6WyrOq44ofTUOTIzxULUzDMMNMchIJBwXOhiLxxxs0LXeb5GDcHbR6ET
+oMffgSZjO9SNHfY9gjMy9vQr5/WWOrQTZxh7az6NSNnq3u2ubT6HTKOB+DCB9TAO
+BgNVHQ8BAf8EBAMCAYYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMBIG
+A1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFI8NE6L2Ln7RUGwzGDhdWY4jcpHK
+MB8GA1UdIwQYMBaAFHxClq7eS0g7+pL4nozPbYupcjeVMDIGCCsGAQUFBwEBBCYw
+JDAiBggrBgEFBQcwAoYWaHR0cDovL3gyLmkubGVuY3Iub3JnLzATBgNVHSAEDDAK
+MAgGBmeBDAECATAnBgNVHR8EIDAeMBygGqAYhhZodHRwOi8veDIuYy5sZW5jci5v
+cmcvMAoGCCqGSM49BAMDA2gAMGUCMQClsUNJdX36GE+o2yDf7L02m3P3ElVWRLls
+5ZyLYPjcNamBxRB9gZYoj24mGZtP3GkCMASZcALg6kpScomqIIjVHXRUQ500cdl4
+4n7fhxwokLo/lVlO8YyHwAi7ejTHtvw9Vg==
+-----END CERTIFICATE-----
 )EOF";
 
 // Helper que escolhe WiFiClient (http) ou WiFiClientSecure (https) automaticamente.
-// Usa ISRG Root X1 para validar certs Let's Encrypt (cultivo.x.andy.plus).
-// Para servidores self-hosted com outra CA, ajuste ISRG_ROOT_X1 acima.
+// setCACert(LE_ROOTS) valida o cert do servidor contra o bundle X1+X2+E8.
+// Para servidores self-hosted com outra CA, adicione o PEM ao bundle LE_ROOTS acima.
 static WiFiClient       httpPlainClient;
 static WiFiClientSecure httpSecureClient;
 static bool httpClientsInited = false;
 
 static bool httpBegin(HTTPClient &http, const char *url) {
   if (!httpClientsInited) {
-    // setInsecure: pula validacao do cert servidor. Necessario pq Cloudflare
-    // (que serve app.cultivo.pro) so envia o leaf cert sem o intermediate
-    // Let's Encrypt E8, e o mbedTLS do ESP nao fetch AIA. Bundle de roots
-    // (X1+X2) nao basta — precisaria do intermediate tambem.
-    // TODO: adicionar E8 PEM ao LE_ROOTS bundle p/ ativar setCACert seguro.
-    httpSecureClient.setInsecure();
+    // Bundle inclui ISRG Root X1, Root X2 e intermediate E8 — cobre Cloudflare
+    // (app.cultivo.pro) que nao envia o intermediate na chain TLS.
+    httpSecureClient.setCACert(LE_ROOTS);
     httpClientsInited = true;
   }
   if (strncmp(url, "https://", 8) == 0) {
