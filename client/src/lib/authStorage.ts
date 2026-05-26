@@ -1,4 +1,3 @@
-import { Preferences } from "@capacitor/preferences";
 import { SecureStorage } from "@aparajita/capacitor-secure-storage";
 import { isNative } from "./platform";
 
@@ -25,6 +24,7 @@ async function migrateFromPreferences(): Promise<void> {
     return;
   }
   try {
+    const { Preferences } = await import("@capacitor/preferences");
     const legacy = await Preferences.get({ key: TOKEN_KEY });
     if (legacy.value) {
       // Move pro Keychain
@@ -73,6 +73,7 @@ export async function clearToken(): Promise<void> {
   }
   // Limpa também o Preferences legacy (idempotente)
   try {
+    const { Preferences } = await import("@capacitor/preferences");
     await Preferences.remove({ key: TOKEN_KEY });
   } catch {}
 }
