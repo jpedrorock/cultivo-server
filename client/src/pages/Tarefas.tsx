@@ -12,6 +12,7 @@ import { TaskCardSkeleton } from "@/components/ListSkeletons";
 import { PageHeader } from "@/components/PageHeader";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { useState } from "react";
+import { flushSync } from "react-dom";
 
 export default function Tarefas() {
   const { data: tasks, isLoading } = trpc.tasks.getCurrentWeekTasks.useQuery();
@@ -21,13 +22,23 @@ export default function Tarefas() {
   const [deleteTaskConfirm, setDeleteTaskConfirm] = useState<{ open: boolean; taskId: number | null }>({
     open: false, taskId: null
   });
+  const [collapsingIds, setCollapsingIds] = useState<Set<number>>(new Set());
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set());
 
   const markAsDone = trpc.tasks.markAsDone.useMutation({
-    onSuccess: () => {
-      utils.tasks.getCurrentWeekTasks.invalidate();
+    onSuccess: (_, vars) => {
       toast.success("Tarefa concluída!");
+      setTimeout(() => {
+        setCollapsingIds(prev => { const n = new Set(prev); n.delete(vars.taskId); return n; });
+        setCollapsedIds(prev => { const n = new Set(prev); n.delete(vars.taskId); return n; });
+        utils.tasks.getCurrentWeekTasks.invalidate();
+      }, 350);
     },
-    onError: (error) => {
+    onError: (error, vars) => {
+      setCollapsedIds(prev => { const n = new Set(prev); n.delete(vars.taskId); return n; });
+      setTimeout(() => {
+        setCollapsingIds(prev => { const n = new Set(prev); n.delete(vars.taskId); return n; });
+      }, 10);
       toast.error(`Erro ao marcar tarefa: ${error.message}`);
     },
   });
@@ -44,6 +55,12 @@ export default function Tarefas() {
 
   const handleToggleTask = (taskId: number, isDone: boolean) => {
     if (!isDone && taskId > 0) {
+      flushSync(() => {
+        setCollapsingIds(prev => new Set([...prev, taskId]));
+      });
+      requestAnimationFrame(() => {
+        setCollapsedIds(prev => new Set([...prev, taskId]));
+      });
       markAsDone.mutate({ taskId });
     }
   };
@@ -224,7 +241,15 @@ export default function Tarefas() {
                           {tentTasks.map((task) => (
                             <div
                               key={task.id || task.title}
-                              className={`flex items-start gap-3 px-3 py-3 rounded-lg border transition-all min-h-[56px] ${
+                              style={collapsingIds.has(task.id) ? {
+                                overflow: 'hidden',
+                                maxHeight: collapsedIds.has(task.id) ? '0px' : '200px',
+                                opacity: collapsedIds.has(task.id) ? 0 : 1,
+                                transition: 'max-height 300ms ease-out, opacity 250ms ease-out',
+                              } : {}}
+                            >
+                            <div
+                              className={`flex items-start gap-3 px-3 py-3 rounded-lg border transition-colors min-h-[56px] ${
                                 task.isDone
                                   ? "bg-primary/10 border-primary/20"
                                   : "bg-background border-border hover:border-green-300"
@@ -284,6 +309,7 @@ export default function Tarefas() {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
+                            </div>
                             </div>
                           ))}
                         </div>
