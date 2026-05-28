@@ -22,6 +22,9 @@ export default tseslint.config(
       "scripts/**",
       "*.config.js",
       "*.config.ts",
+      // Capacitor build artifacts — minified JS gerado pelo Vite, não lint
+      "android/**",
+      "ios/**",
     ],
   },
 

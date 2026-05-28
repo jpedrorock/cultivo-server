@@ -173,8 +173,8 @@ export default function Settings() {
             {/* Seção: Legal */}
             <ListItemAnimation>
               <SettingsSection title="Legal">
-                <SettingsRow href="/privacy" icon={<LockIcon className="w-4 h-4" />} label="Política de Privacidade" description="Como tratamos seus dados" external />
-                <SettingsRow href="/terms" icon={<FileText className="w-4 h-4" />} label="Termos de Uso" description="Regras de utilização do app" external />
+                <SettingsRow href="https://cultivo.pro/pt/privacidade" icon={<LockIcon className="w-4 h-4" />} label="Política de Privacidade" description="Como tratamos seus dados" external />
+                <SettingsRow href="https://cultivo.pro/pt/termos" icon={<FileText className="w-4 h-4" />} label="Termos de Uso" description="Regras de utilização do app" external />
               </SettingsSection>
             </ListItemAnimation>
 
