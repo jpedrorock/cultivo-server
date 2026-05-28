@@ -25,6 +25,10 @@ import {
   Scissors, Zap, Leaf, ArrowUp, GitBranch, GitMerge, Trash2, X,
   ZoomIn, ZoomOut, Maximize2, RotateCcw,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const COLOR = {
   active:        "#22c55e",
@@ -254,6 +258,7 @@ export default function Plant3DView({
   const [nodes,           setNodes]           = useState<PlantGraphNode[]>([]);
   const [selectedId,      setSelectedId]      = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   // Refs Three.js (acessíveis no callback de click)
   const sceneRef       = useRef<THREE.Scene | null>(null);
@@ -845,7 +850,10 @@ export default function Plant3DView({
   }
 
   function resetPositions() {
-    if (!confirm("Resetar posições de drag de todos os nós? Isso volta ao layout automático.")) return;
+    setResetConfirmOpen(true);
+  }
+
+  function doResetPositions() {
     setNodes(prev => {
       const updated = prev.map(n => {
         const { pos3D: _pos3D, ...rest } = n;
@@ -972,6 +980,21 @@ export default function Plant3DView({
           onAction={applyAction}
         />
       )}
+
+      <AlertDialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar posições?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso remove todos os ajustes manuais de posição e volta ao layout automático.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={doResetPositions}>Resetar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
