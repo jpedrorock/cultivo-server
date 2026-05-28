@@ -3,6 +3,8 @@ import { useLocation } from 'wouter';
 import { User, Users, Eye, EyeOff, LogOut, Trash2, Copy, RefreshCw, UserMinus, Bot, Key, CheckCircle2, AlertCircle, Lock, Sparkles } from 'lucide-react';
 import { usePlan } from '@/_core/hooks/usePlan';
 import { usePaywall } from '@/components/PaywallGate';
+import { isNative } from '@/lib/platform';
+import { haptics } from '@/lib/haptics';
 import { PageHeader } from '@/components/PageHeader';
 
 function UserAvatar({ user, size = 'md' }: { user: { name?: string | null; email?: string; avatarUrl?: string | null } | null; size?: 'md' | 'lg' }) {
@@ -44,6 +46,7 @@ export default function AccountSettings() {
         />
         <main className="container mx-auto px-4 py-6 pb-28 sm:pb-8 max-w-2xl space-y-5">
           <ProfileCard />
+          <SubscriptionCard />
           <GroupCard />
           <AiSettingsCard />
         </main>
@@ -261,6 +264,74 @@ function ProfileCard() {
         hasPassword={!!user?.email && !user?.email.endsWith('@privaterelay.appleid.com')}
         onSuccess={handleDeleteSuccess}
       />
+    </Card>
+  );
+}
+
+/**
+ * Card de assinatura — exibe plano atual, CTA de upgrade e botão "Restaurar Compras".
+ * O botão de restaurar aparece APENAS em builds nativos (iOS/Android) — Apple Guideline 3.1.1.
+ */
+function SubscriptionCard() {
+  const { tier, isPro, isLoading, refetch } = usePlan();
+  const paywall = usePaywall();
+  const [restoring, setRestoring] = useState(false);
+
+  const planLabel = tier === 'team' ? 'Pro Grupo' : tier === 'pro' ? 'Pro' : 'Free';
+
+  async function handleRestore() {
+    haptics.light();
+    setRestoring(true);
+    try {
+      // Dynamic import para não impactar bundle web (Purchases é native-only)
+      const { Purchases } = await import('@revenuecat/purchases-capacitor');
+      await Purchases.restorePurchases();
+      await refetch();
+      toast.success('Compras restauradas! Seu plano foi atualizado.');
+    } catch {
+      toast.error('Não foi possível restaurar. Tente novamente ou contate o suporte.');
+    } finally {
+      setRestoring(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
+          Assinatura
+        </CardTitle>
+        <CardDescription className="text-xs sm:text-sm">
+          Plano atual:{' '}
+          <span className={isPro ? 'font-semibold text-violet-400' : 'font-semibold'}>
+            {planLabel}
+          </span>
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {!isPro && (
+          <Button
+            className="w-full"
+            onClick={() => paywall.open('Faça upgrade para o Pro e desbloqueie todas as funcionalidades do Cultivo.')}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Fazer upgrade para Pro
+          </Button>
+        )}
+        {isNative() && (
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={restoring || isLoading}
+            onClick={handleRestore}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${restoring ? 'animate-spin' : ''}`} />
+            {restoring ? 'Restaurando…' : 'Restaurar Compras'}
+          </Button>
+        )}
+      </CardContent>
+      {paywall.PaywallElement}
     </Card>
   );
 }
