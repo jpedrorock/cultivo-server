@@ -11,8 +11,7 @@
  *
  * Rate limit: 5 submits/IP/hora (anti-spam).
  *
- * TODO: integrar Resend pra welcome email automático.
- *       Hoje: só registra no DB. Sequência de email manual via admin panel.
+ * Welcome email: enviado via Resend (sendWelcomeEmail) em background após INSERT.
  */
 import type { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
