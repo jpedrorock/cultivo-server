@@ -1,23 +1,14 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
  * PhaseBadge — badge semântico por fase do ciclo
- * Usa tokens CSS --phase-* definidos em index.css
+ * Usa hex hardcoded de phaseColors.ts (CSS vars falham em SVG/canvas)
  *
  * Variante "solid"  (padrão) → dot colorido + fundo suave + borda
  * Variante "subtle"          → só texto e dot, sem fundo — para listas densas
  * Variante "pill"            → fully rounded, compacto, sem dot — para timelines
  */
 
-type Phase =
-  | "SEEDLING"
-  | "VEGA"
-  | "FLORA"
-  | "FLUSHING"
-  | "HARVEST"
-  | "DRYING"
-  | "CURING"
-  | "MAINTENANCE"
-  | "CLONING";
+import { type Phase, phaseColor } from "@/lib/phaseColors";
 
 interface PhaseBadgeProps {
   phase: Phase;
@@ -28,16 +19,16 @@ interface PhaseBadgeProps {
   className?: string;
 }
 
-const PHASE_CONFIG: Record<Phase, { label: string; cssVar: string }> = {
-  SEEDLING:    { label: "Muda",        cssVar: "--phase-seedling"    },
-  VEGA:        { label: "Vegetativa",  cssVar: "--phase-vegetative"  },
-  FLORA:       { label: "Floração",    cssVar: "--phase-flowering"   },
-  FLUSHING:    { label: "Flush",       cssVar: "--phase-flushing"    },
-  HARVEST:     { label: "Colheita",    cssVar: "--phase-harvest"     },
-  DRYING:      { label: "Secagem",     cssVar: "--phase-drying"      },
-  CURING:      { label: "Cura",        cssVar: "--phase-curing"      },
-  MAINTENANCE: { label: "Manutenção",  cssVar: "--phase-maintenance" },
-  CLONING:     { label: "Clonagem",    cssVar: "--phase-seedling"    },
+const PHASE_LABELS: Record<Phase, string> = {
+  SEEDLING:    "Muda",
+  VEGA:        "Vegetativa",
+  FLORA:       "Floração",
+  FLUSHING:    "Flush",
+  HARVEST:     "Colheita",
+  DRYING:      "Secagem",
+  CURING:      "Cura",
+  MAINTENANCE: "Manutenção",
+  CLONING:     "Clonagem",
 };
 
 export function PhaseBadge({
@@ -48,8 +39,8 @@ export function PhaseBadge({
   size = "md",
   className = "",
 }: PhaseBadgeProps) {
-  const config = PHASE_CONFIG[phase] ?? PHASE_CONFIG["VEGA"];
-  const color = `var(${config.cssVar})`;
+  const label = PHASE_LABELS[phase] ?? PHASE_LABELS["VEGA"];
+  const color = phaseColor(phase);
 
   const suffix =
     week != null
@@ -68,7 +59,7 @@ export function PhaseBadge({
           className="w-1.5 h-1.5 rounded-full shrink-0"
           style={{ background: color }}
         />
-        {config.label}
+        {label}
         {suffix && (
           <span className="font-mono opacity-70" style={{ fontSize: 10 }}>
             {suffix}
@@ -87,7 +78,7 @@ export function PhaseBadge({
           color,
         }}
       >
-        {config.label}
+        {label}
         {suffix && <span className="font-mono opacity-80">{suffix}</span>}
       </span>
     );
@@ -110,7 +101,7 @@ export function PhaseBadge({
         className="w-1.5 h-1.5 rounded-full shrink-0"
         style={{ background: color }}
       />
-      {config.label}
+      {label}
       {suffix && (
         <span className="font-mono opacity-75" style={{ fontSize: size === "sm" ? 9 : 10 }}>
           {suffix}
