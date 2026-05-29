@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { phaseColor } from "@/lib/phaseColors";
 import { useState, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { toast } from "sonner";
@@ -262,7 +263,14 @@ export function TentCard({
           </div>
         </Link>
       )}
-      <Card className="relative z-10 py-0 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden" data-tour="tent-card" style={{ backgroundColor: 'var(--card)' }}>
+      <Card
+        className="relative z-10 py-0 shadow-lg shadow-black/15 transition-all duration-200 ease-out active:scale-[0.99] overflow-hidden"
+        data-tour="tent-card"
+        style={{
+          backgroundColor: 'var(--card)',
+          borderLeft: `4px solid ${phaseColor(cycle?.floraStartDate ? 'FLORA' : (tent.category ?? 'VEGA'))}`,
+        }}
+      >
         {/* Fundo gradiente da fase */}
         {phaseBg !== 'none' && (
           <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
