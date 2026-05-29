@@ -8,8 +8,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
+  ReferenceArea,
 } from "recharts";
+import { CHART_AXIS_COLOR, CHART_TARGET_FILL, CHART_TARGET_STROKE } from "@/lib/chartColors";
 import { Thermometer, Droplets, Sun, Beaker, Zap } from "lucide-react";
 
 type Parameter = "all" | "temp" | "rh" | "ppfd" | "ph" | "ec";
@@ -45,6 +46,15 @@ const idealValues = {
   ppfd: 600, // µmol/m²/s - ideal light intensity
   ph: 6.0, // ideal pH
   ec: 1.8, // mS/cm - ideal EC
+};
+
+// Ideal ranges for target-band (ReferenceArea) — raw values, normalized on use
+const idealRanges: Record<keyof typeof idealValues, { min: number; max: number }> = {
+  temp: { min: 22, max: 26 },    // 22–26 °C
+  rh:   { min: 45, max: 65 },    // 45–65 %
+  ppfd: { min: 600, max: 900 },  // 600–900 µmol
+  ph:   { min: 6.0, max: 6.8 },  // 6.0–6.8
+  ec:   { min: 1.6, max: 2.2 },  // 1.6–2.2 mS/cm
 };
 
 // Normalize value to 0-100% scale
@@ -214,16 +224,14 @@ export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWi
           <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 11 }}
-            stroke="currentColor"
-            className="text-muted-foreground"
+            tick={{ fontSize: 11, fill: CHART_AXIS_COLOR() }}
+            stroke={CHART_AXIS_COLOR()}
           />
           <YAxis
             domain={yAxisDomain}
-            tick={{ fontSize: 11 }}
-            stroke="currentColor"
-            className="text-muted-foreground"
-            label={{ value: '%', angle: 0, position: 'top', offset: 10, fontSize: 10 }}
+            tick={{ fontSize: 11, fill: CHART_AXIS_COLOR() }}
+            stroke={CHART_AXIS_COLOR()}
+            label={{ value: '%', angle: 0, position: 'top', offset: 10, fontSize: 10, fill: CHART_AXIS_COLOR() }}
           />
           {selectedParam !== "all" && (
             <Tooltip
@@ -256,20 +264,21 @@ export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWi
             }}
           />
 
-          {/* Ideal Reference Lines (normalized) */}
+          {/* Target-band: faixa ideal sutil (verde) por parâmetro — substitui ReferenceLine dashed */}
           {visibleParams.map((param) => {
-            const config = parameterConfig[param];
-            const idealRaw = idealValues[param];
-            const idealNormalized = normalizeValue(idealRaw, param);
-            if (idealNormalized === undefined) return null;
+            const range = idealRanges[param];
+            const y1 = normalizeValue(range.min, param);
+            const y2 = normalizeValue(range.max, param);
+            if (y1 === undefined || y2 === undefined) return null;
             return (
-              <ReferenceLine
-                key={`ideal-${param}`}
-                y={idealNormalized}
-                stroke={config.color}
-                strokeDasharray="5 5"
-                strokeOpacity={0.4}
-                strokeWidth={1.5}
+              <ReferenceArea
+                key={`band-${param}`}
+                y1={y1}
+                y2={y2}
+                fill={CHART_TARGET_FILL}
+                stroke={CHART_TARGET_STROKE}
+                strokeWidth={1}
+                ifOverflow="hidden"
               />
             );
           })}
