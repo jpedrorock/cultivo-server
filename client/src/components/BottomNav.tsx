@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, Plus, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, PenLine, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -206,13 +206,22 @@ export function BottomNav() {
     return () => vv.removeEventListener('resize', handleResize);
   }, []);
 
+  // Slots diretos: Estufas · Plantas · [FAB] · Alertas · Mais
   const navItems: NavItem[] = [
     { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/plants", icon: Leaf, label: "Plantas" },
-    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
   ];
 
+  // Alerta direto — fica visível sem passar pelo Mais
+  const alertNavItem: NavItem = {
+    href: "/alerts",
+    icon: Bell,
+    label: "Alertas",
+    badge: alertCount || 0,
+  };
+
   const moreMenuItems: NavItem[] = [
+    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
     { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
@@ -286,7 +295,7 @@ export function BottomNav() {
       <div className="max-w-screen-xl mx-auto px-2">
         <div className="relative flex justify-around items-end pt-2" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Nav items — Estufas, Plantas (antes do FAB) */}
-          {navItems.slice(0, 2).map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
             return (
@@ -296,13 +305,16 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 aria-label={item.label}
                 className={cn(
-                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
+                  "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
                 <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
+                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -505,37 +517,41 @@ export function BottomNav() {
               aria-label="Registrar log diário"
               className={cn(
                 "w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/30 transition-all duration-200",
-                fabMenuOpen ? "scale-90 rotate-45" : "active:scale-95"
+                fabMenuOpen ? "scale-90 opacity-75" : "active:scale-95"
               )}
             >
-              <Plus className="w-6 h-6 text-white stroke-[2.5]" />
+              <PenLine className="w-5 h-5 text-white stroke-[2.5]" />
             </button>
           </div>
 
-          {/* Nav items — terceiro slot (após o FAB) */}
-          {navItems.slice(2).map((item) => {
+          {/* Alertas — slot 4 direto (antes ficava em Mais) */}
+          {(() => {
+            const item = alertNavItem;
             const Icon = item.icon;
             const isActive = location === item.href;
             const showBadge = item.badge !== undefined && item.badge > 0;
             return (
               <Link
-                key={item.href}
                 href={item.href}
                 onClick={triggerHapticFeedback}
                 aria-label={item.label}
+                data-tour="alerts-menu"
                 className={cn(
-                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
+                  "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
                 <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
+                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">
+                  {item.label}
+                </span>
                 {showBadge && (
                   <span
                     className={cn(
-                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
-                      "animate-pulse"
+                      "absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
+                      badgeShaking ? "animate-badge-shake" : "animate-pulse"
                     )}
                   >
                     {item.badge! > 9 ? '9+' : item.badge}
@@ -543,7 +559,7 @@ export function BottomNav() {
                 )}
               </Link>
             );
-          })}
+          })()}
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
@@ -552,7 +568,7 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 aria-label="Mais opções"
                 className={cn(
-                  "flex items-center justify-center p-3 rounded-xl transition-colors relative",
+                  "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
                   "hover:bg-primary/10",
                   isMoreMenuActive
                     ? "text-primary bg-primary/10"
@@ -560,15 +576,16 @@ export function BottomNav() {
                 )}
               >
                 <MoreHorizontal className={cn("w-6 h-6", isMoreMenuActive && "stroke-[2.5]")} />
-                {/* Badge agregado: soma alertas + secagem (qualquer item do Mais com badge) */}
-                {((alertCount ?? 0) + (harvestQueueCount ?? 0)) > 0 && (
+                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">Mais</span>
+                {/* Badge: só secagem (alertas são diretos agora) */}
+                {(harvestQueueCount ?? 0) > 0 && (
                   <span
                     className={cn(
-                      "absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
-                      badgeShaking ? "animate-badge-shake" : "animate-pulse",
+                      "absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
+                      "animate-pulse",
                     )}
                   >
-                    {((alertCount ?? 0) + (harvestQueueCount ?? 0)) > 9 ? "9+" : ((alertCount ?? 0) + (harvestQueueCount ?? 0))}
+                    {(harvestQueueCount ?? 0) > 9 ? "9+" : (harvestQueueCount ?? 0)}
                   </span>
                 )}
               </button>
