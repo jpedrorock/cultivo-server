@@ -629,9 +629,12 @@ html.forest::before {
   z-index: 9999;
 }
 
-/* Body e wrappers transparentes — o gradient do html aparece */
+/* Body e wrappers de PÁGINA transparentes — o gradient do html aparece.
+   Seletor restrito a full-page wrappers (min-h-screen ou min-h-dvh + bg-background)
+   para não zerar o background de overlays, textareas e botões internos. */
 html.forest body,
-html.forest .bg-background {
+html.forest .min-h-screen.bg-background,
+html.forest .min-h-dvh.bg-background {
   background-color: transparent !important;
 }
 
