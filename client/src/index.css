@@ -603,18 +603,28 @@ html.aurora .kpi-ppfd {
 }
 
 /* Gradiente atmosférico do Forest — alinhado com o site cultivo.pro.
-   Blob verde top-right + blob esverdeado bottom-left + blob índigo (=phase-tint MAINTENANCE)
-   — reproduce a atmosfera "azul-escura" que se vê no site. */
+   Nota: background-attachment:fixed NÃO funciona em iOS WebView (Capacitor).
+   O gradiente vive no html (root element = viewport) — em mobile sem fixed
+   ele ainda renderiza corretamente porque html não é o elemento que scrolla. */
 html.forest {
-  /* Site (.phase-aware + phase-tint MAINTENANCE):
-     base oklch(0.10 0.018 150) + blob verde + blob teal + blob índigo hue 245  */
-  background:
-    radial-gradient(900px 600px at 88%  -5%,  oklch(0.28 0.06 150 / 0.38), transparent 55%),
-    radial-gradient(700px 550px at 75%  80%,  oklch(0.22 0.08 245 / 0.18), transparent 55%),
-    radial-gradient(600px 500px at  0%  68%,  oklch(0.24 0.05 160 / 0.25), transparent 55%),
-    oklch(0.100 0.018 150);
-  background-attachment: fixed;
+  background-color: oklch(0.100 0.018 150);
   min-height: 100dvh;
+}
+
+/* Gradiente em pseudo-elemento fixo — funciona em iOS WebView porque
+   position:fixed é calculado relativo ao viewport, não ao scroll position.
+   z-index:-1 → aparece ACIMA do background-color do html mas ABAIXO do body,
+   permitindo que backdrop-filter nos cards borre os blobs. */
+html.forest::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(900px 600px at 88%  -5%,  oklch(0.28 0.06 150 / 0.40), transparent 55%),
+    radial-gradient(700px 550px at 75%  80%,  oklch(0.22 0.08 245 / 0.20), transparent 55%),
+    radial-gradient(600px 500px at  0%  68%,  oklch(0.24 0.05 160 / 0.28), transparent 55%);
 }
 
 /* Grain texture sutil (mesmo do site) */
@@ -638,12 +648,17 @@ html.forest .min-h-dvh.bg-background {
   background-color: transparent !important;
 }
 
-/* Cards: glass sutil + borda verde discreta — igual ao site */
+/* Cards: glass real — opacidade baixa para que backdrop-filter seja visível.
+   O blur cria o efeito de vidro borrando os blobs do gradiente atmosférico atrás.
+   inset box-shadow = highlight superior (borda de vidro iluminada, igual ao site). */
 html.forest [data-slot="card"] {
-  background: oklch(0.175 0.022 150 / 0.85) !important;
-  backdrop-filter: blur(12px) saturate(140%);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
-  border: 1px solid oklch(0.260 0.022 150 / 0.55) !important;
+  background: oklch(0.175 0.022 150 / 0.45) !important;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid oklch(0.320 0.025 150 / 0.40) !important;
+  box-shadow:
+    inset 0 1px 0 oklch(0.55 0.06 145 / 0.14),   /* glass edge top */
+    0 2px 12px oklch(0 0 0 / 0.28);               /* profundidade sutil */
 }
 
 /* Botão primário: glow verde no hover — igual ao dark */
