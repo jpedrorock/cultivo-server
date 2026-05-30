@@ -535,48 +535,50 @@ html.aurora .kpi-ppfd {
 }
 
 .forest {
-  /* === FOREST THEME (deep green, inspired by PlantPulse & LittleBee) === */
-  
-  /* Primary: bright lime-green accent */
-  --primary: oklch(0.68 0.20 140);
-  --primary-foreground: oklch(0.10 0.02 145);
-  --sidebar-primary: oklch(0.68 0.20 140);
-  --sidebar-primary-foreground: oklch(0.10 0.02 145);
+  /* === FOREST THEME — alinhado ao site cultivo.pro ===
+   * Referência site: --color-bg oklch(0.10 0.018 150)
+   * O erro anterior: L=0.135 + C=0.035 ficava verde-claro.
+   * Agora: L=0.105 + C=0.018 → quase-preto com micro-tint, igual ao site. */
 
-  /* Radius: slightly more rounded */
+  /* Primary: lime-green accent vibrante */
+  --primary: oklch(0.68 0.20 140);
+  --primary-foreground: oklch(0.08 0.015 145);
+  --sidebar-primary: oklch(0.68 0.20 140);
+  --sidebar-primary-foreground: oklch(0.08 0.015 145);
+
   --radius: 0.85rem;
 
-  /* Background: deep forest green */
-  --background: oklch(0.135 0.035 145);   /* deep forest */
-  --foreground: oklch(0.95 0.012 145);
+  /* Background: quase-preto com tint floresta mínimo — igual ao site */
+  --background: oklch(0.105 0.018 148);
+  --foreground: oklch(0.95 0.010 148);
 
-  /* Cards: elevated forest surface */
-  --card: oklch(0.185 0.035 145);
-  --card-foreground: oklch(0.95 0.012 145);
+  /* Cards: superfície elevada — diferença de L=0.07 garante profundidade */
+  --card: oklch(0.175 0.022 148);
+  --card-foreground: oklch(0.95 0.010 148);
 
-  /* Popover */
-  --popover: oklch(0.200 0.030 145);
-  --popover-foreground: oklch(0.95 0.012 145);
+  /* Popover: ligeiramente acima do card */
+  --popover: oklch(0.195 0.022 148);
+  --popover-foreground: oklch(0.95 0.010 148);
 
-  /* Secondary: clearly distinct from card (0.185) and background (0.135) */
-  --secondary: oklch(0.240 0.032 145);
-  --secondary-foreground: oklch(0.95 0.012 145);
+  /* Secondary: acima do card — botões secundários, badges */
+  --secondary: oklch(0.215 0.024 147);
+  --secondary-foreground: oklch(0.95 0.010 148);
 
-  /* Muted */
-  --muted: oklch(0.165 0.030 145);
-  --muted-foreground: oklch(0.68 0.022 145);  /* raised from 0.58 → 0.68 for better legibility */
+  /* Muted: entre bg e card — fundo de inputs inativos, tooltips */
+  --muted: oklch(0.150 0.018 148);
+  --muted-foreground: oklch(0.65 0.018 148);
 
-  /* Accent: bright green tint */
-  --accent: oklch(0.245 0.045 140);
-  --accent-foreground: oklch(0.95 0.012 145);
+  /* Accent: tint verde para hover/selecionado */
+  --accent: oklch(0.210 0.038 140);
+  --accent-foreground: oklch(0.95 0.010 148);
 
   /* Destructive */
   --destructive: oklch(0.65 0.18 20);
   --destructive-foreground: oklch(0.98 0 0);
 
-  /* Borders: clearly visible against dark card/background surfaces */
-  --border: oklch(0.260 0.030 145);  /* raised from 0.200 — enough contrast against card (0.185) */
-  --input: oklch(0.230 0.035 145);   /* above card (0.185) so input fields are visibly elevated */
+  /* Border/Input: visíveis mas discretos */
+  --border: oklch(0.230 0.022 147);
+  --input: oklch(0.200 0.022 147);
   --ring: oklch(0.68 0.20 140);
 
   /* Charts */
@@ -586,8 +588,8 @@ html.aurora .kpi-ppfd {
   --chart-4: oklch(0.60 0.18 280);  /* purple */
   --chart-5: oklch(0.68 0.20 35);   /* orange */
 
-  /* Sidebar: deepest forest */
-  --sidebar: oklch(0.105 0.030 145);
+  /* Sidebar: mais escuro que o bg — draga máxima */
+  --sidebar: oklch(0.078 0.014 150);
   --sidebar-foreground: oklch(0.96 0.010 145);  /* near-white for max contrast */
   --sidebar-accent: oklch(0.210 0.048 140);
   --sidebar-accent-foreground: oklch(0.96 0.010 145);
@@ -598,10 +600,12 @@ html.aurora .kpi-ppfd {
 /* Gradiente atmosférico do Forest — alinhado com o site cultivo.pro.
    Blob verde top-right + blob esverdeado bottom-left, igual ao .phase-aware do site. */
 html.forest {
+  /* Copia o gradiente exato do site (.phase-aware em global.css):
+     blob top-right + blob bottom-left sobre base quase-preta (L=0.105) */
   background:
-    radial-gradient(900px 600px at 90% -5%,  oklch(0.28 0.06 145 / 0.45), transparent 55%),
-    radial-gradient(600px 500px at 0%  70%,  oklch(0.24 0.05 155 / 0.30), transparent 55%),
-    oklch(0.135 0.035 145);
+    radial-gradient(900px 600px at 88% -5%,  oklch(0.28 0.06 150 / 0.40), transparent 55%),
+    radial-gradient(600px 500px at 0%  68%,  oklch(0.24 0.05 160 / 0.28), transparent 55%),
+    oklch(0.105 0.018 148);
   background-attachment: fixed;
   min-height: 100dvh;
 }
@@ -624,12 +628,12 @@ html.forest .bg-background {
   background-color: transparent !important;
 }
 
-/* Cards: glass sutil + borda verde — mesma linguagem do site */
+/* Cards: glass sutil + borda verde discreta — igual ao site */
 html.forest [data-slot="card"] {
-  background: oklch(0.185 0.035 145 / 0.80) !important;
+  background: oklch(0.175 0.022 148 / 0.85) !important;
   backdrop-filter: blur(12px) saturate(140%);
   -webkit-backdrop-filter: blur(12px) saturate(140%);
-  border: 1px solid oklch(0.30 0.035 145 / 0.60) !important;
+  border: 1px solid oklch(0.260 0.022 147 / 0.55) !important;
 }
 
 /* Botão primário: glow verde no hover — igual ao dark */
