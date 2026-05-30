@@ -535,77 +535,84 @@ html.aurora .kpi-ppfd {
 }
 
 .forest {
-  /* === FOREST THEME — alinhado ao site cultivo.pro ===
-   * Referência site: --color-bg oklch(0.10 0.018 150)
-   * O erro anterior: L=0.135 + C=0.035 ficava verde-claro.
-   * Agora: L=0.105 + C=0.018 → quase-preto com micro-tint, igual ao site. */
+  /* === FOREST THEME — mirror exato do site cultivo.pro ===
+   *
+   * Site usa hue 150 em TODAS as superfícies + primary 145.
+   * O "azul" que você vê no site vem do phase-tint dinâmico da Hero
+   * (seção MAINTENANCE = índigo hue 245). Aqui reproduzimos isso
+   * com um blob índigo fixo no gradiente atmosférico.
+   *
+   * Referência site (global.css):
+   *   --color-bg:          oklch(0.10 0.018 150)
+   *   --color-card:        oklch(0.20 0.022 150)
+   *   --color-border:      oklch(0.28 0.018 150)
+   *   --color-primary:     oklch(0.68 0.20  145)
+   */
 
-  /* Primary: lime-green accent vibrante */
-  --primary: oklch(0.68 0.20 140);
-  --primary-foreground: oklch(0.08 0.015 145);
-  --sidebar-primary: oklch(0.68 0.20 140);
-  --sidebar-primary-foreground: oklch(0.08 0.015 145);
+  /* Primary: = site --color-primary */
+  --primary: oklch(0.68 0.20 145);
+  --primary-foreground: oklch(0.08 0.015 150);
+  --sidebar-primary: oklch(0.68 0.20 145);
+  --sidebar-primary-foreground: oklch(0.08 0.015 150);
 
   --radius: 0.85rem;
 
-  /* Background: quase-preto com tint floresta mínimo — igual ao site */
-  --background: oklch(0.105 0.018 148);
-  --foreground: oklch(0.95 0.010 148);
+  /* Superfícies: hue 150 em tudo — = site */
+  --background: oklch(0.100 0.018 150);
+  --foreground: oklch(0.97 0 0);
 
-  /* Cards: superfície elevada — diferença de L=0.07 garante profundidade */
-  --card: oklch(0.175 0.022 148);
-  --card-foreground: oklch(0.95 0.010 148);
+  --card: oklch(0.175 0.022 150);
+  --card-foreground: oklch(0.97 0 0);
 
-  /* Popover: ligeiramente acima do card */
-  --popover: oklch(0.195 0.022 148);
-  --popover-foreground: oklch(0.95 0.010 148);
+  --popover: oklch(0.195 0.020 150);
+  --popover-foreground: oklch(0.97 0 0);
 
-  /* Secondary: acima do card — botões secundários, badges */
-  --secondary: oklch(0.215 0.024 147);
-  --secondary-foreground: oklch(0.95 0.010 148);
+  --secondary: oklch(0.215 0.022 150);
+  --secondary-foreground: oklch(0.97 0 0);
 
-  /* Muted: entre bg e card — fundo de inputs inativos, tooltips */
-  --muted: oklch(0.150 0.018 148);
-  --muted-foreground: oklch(0.65 0.018 148);
+  --muted: oklch(0.145 0.016 150);
+  --muted-foreground: oklch(0.68 0.014 150);   /* = site --color-fg-muted */
 
-  /* Accent: tint verde para hover/selecionado */
-  --accent: oklch(0.210 0.038 140);
-  --accent-foreground: oklch(0.95 0.010 148);
+  /* Accent: tint verde-primário para hover */
+  --accent: oklch(0.205 0.036 145);
+  --accent-foreground: oklch(0.97 0 0);
 
   /* Destructive */
   --destructive: oklch(0.65 0.18 20);
   --destructive-foreground: oklch(0.98 0 0);
 
-  /* Border/Input: visíveis mas discretos */
-  --border: oklch(0.230 0.022 147);
-  --input: oklch(0.200 0.022 147);
-  --ring: oklch(0.68 0.20 140);
+  /* Border/Input: = site --color-border */
+  --border: oklch(0.280 0.018 150);
+  --input:  oklch(0.200 0.020 150);
+  --ring:   oklch(0.68 0.20 145);
 
   /* Charts */
-  --chart-1: oklch(0.68 0.20 140);  /* bright green */
-  --chart-2: oklch(0.65 0.15 180);  /* teal */
-  --chart-3: oklch(0.72 0.18 75);   /* yellow-green */
-  --chart-4: oklch(0.60 0.18 280);  /* purple */
-  --chart-5: oklch(0.68 0.20 35);   /* orange */
+  --chart-1: oklch(0.68 0.20 145);  /* verde-primário */
+  --chart-2: oklch(0.65 0.15 185);  /* teal */
+  --chart-3: oklch(0.72 0.18 75);   /* âmbar */
+  --chart-4: oklch(0.60 0.18 280);  /* púrpura */
+  --chart-5: oklch(0.68 0.20 35);   /* laranja */
 
-  /* Sidebar: mais escuro que o bg — draga máxima */
-  --sidebar: oklch(0.078 0.014 150);
-  --sidebar-foreground: oklch(0.96 0.010 145);  /* near-white for max contrast */
-  --sidebar-accent: oklch(0.210 0.048 140);
-  --sidebar-accent-foreground: oklch(0.96 0.010 145);
-  --sidebar-border: oklch(0.195 0.025 145);  /* subtle sidebar border */
-  --sidebar-ring: oklch(0.68 0.20 140);
+  /* Sidebar: mais escuro que bg, mesmo hue 150 */
+  --sidebar: oklch(0.075 0.012 150);
+  --sidebar-foreground: oklch(0.97 0 0);
+  --sidebar-accent: oklch(0.200 0.036 145);
+  --sidebar-accent-foreground: oklch(0.97 0 0);
+  --sidebar-border: oklch(0.200 0.016 150);
+  --sidebar-ring: oklch(0.68 0.20 145);
 }
 
 /* Gradiente atmosférico do Forest — alinhado com o site cultivo.pro.
-   Blob verde top-right + blob esverdeado bottom-left, igual ao .phase-aware do site. */
+   Blob verde top-right + blob esverdeado bottom-left + blob índigo (=phase-tint MAINTENANCE)
+   — reproduce a atmosfera "azul-escura" que se vê no site. */
 html.forest {
-  /* Copia o gradiente exato do site (.phase-aware em global.css):
-     blob top-right + blob bottom-left sobre base quase-preta (L=0.105) */
+  /* Site (.phase-aware + phase-tint MAINTENANCE):
+     base oklch(0.10 0.018 150) + blob verde + blob teal + blob índigo hue 245  */
   background:
-    radial-gradient(900px 600px at 88% -5%,  oklch(0.28 0.06 150 / 0.40), transparent 55%),
-    radial-gradient(600px 500px at 0%  68%,  oklch(0.24 0.05 160 / 0.28), transparent 55%),
-    oklch(0.105 0.018 148);
+    radial-gradient(900px 600px at 88%  -5%,  oklch(0.28 0.06 150 / 0.38), transparent 55%),
+    radial-gradient(700px 550px at 75%  80%,  oklch(0.22 0.08 245 / 0.18), transparent 55%),
+    radial-gradient(600px 500px at  0%  68%,  oklch(0.24 0.05 160 / 0.25), transparent 55%),
+    oklch(0.100 0.018 150);
   background-attachment: fixed;
   min-height: 100dvh;
 }
@@ -630,10 +637,10 @@ html.forest .bg-background {
 
 /* Cards: glass sutil + borda verde discreta — igual ao site */
 html.forest [data-slot="card"] {
-  background: oklch(0.175 0.022 148 / 0.85) !important;
+  background: oklch(0.175 0.022 150 / 0.85) !important;
   backdrop-filter: blur(12px) saturate(140%);
   -webkit-backdrop-filter: blur(12px) saturate(140%);
-  border: 1px solid oklch(0.260 0.022 147 / 0.55) !important;
+  border: 1px solid oklch(0.260 0.022 150 / 0.55) !important;
 }
 
 /* Botão primário: glow verde no hover — igual ao dark */
