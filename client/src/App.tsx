@@ -343,7 +343,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider
-        defaultTheme="monstera"
+        defaultTheme="forest"
         switchable
       >
         <TooltipProvider>

@@ -585,6 +585,65 @@ html.aurora .kpi-ppfd {
   --sidebar-ring: oklch(0.68 0.20 140);
 }
 
+/* Gradiente atmosférico do Forest — alinhado com o site cultivo.pro.
+   Blob verde top-right + blob esverdeado bottom-left, igual ao .phase-aware do site. */
+html.forest {
+  background:
+    radial-gradient(900px 600px at 90% -5%,  oklch(0.28 0.06 145 / 0.45), transparent 55%),
+    radial-gradient(600px 500px at 0%  70%,  oklch(0.24 0.05 155 / 0.30), transparent 55%),
+    oklch(0.135 0.035 145);
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+
+/* Grain texture sutil (mesmo do site) */
+html.forest::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.038;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  z-index: 9999;
+}
+
+/* Body e wrappers transparentes — o gradient do html aparece */
+html.forest body,
+html.forest .bg-background {
+  background-color: transparent !important;
+}
+
+/* Cards: glass sutil + borda verde — mesma linguagem do site */
+html.forest [data-slot="card"] {
+  background: oklch(0.185 0.035 145 / 0.80) !important;
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid oklch(0.30 0.035 145 / 0.60) !important;
+}
+
+/* Botão primário: glow verde no hover — igual ao dark */
+html.forest [data-slot="button"][class*="bg-primary"] {
+  border-radius: 999px;
+  box-shadow: 0 2px 10px -2px oklch(0.68 0.20 140 / 0.35);
+  transition: box-shadow 200ms ease, transform 150ms ease;
+}
+html.forest [data-slot="button"][class*="bg-primary"]:hover:not(:disabled) {
+  box-shadow: 0 0 24px oklch(0.68 0.20 140 / 0.55), 0 6px 20px -6px oklch(0.68 0.20 140 / 0.50);
+  transform: translateY(-1px);
+}
+
+/* KPI numerals com glow no forest */
+html.forest .kpi-temp div > p,
+html.forest .kpi-rh   div > p,
+html.forest .kpi-ppfd div > p,
+html.forest .kpi-vpd  div > p {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  font-weight: 700;
+  text-shadow: 0 0 18px oklch(0.68 0.20 140 / 0.40);
+}
+
 .hps {
   /* === HPS AGRÍCOLA — alto contraste para ambientes com luz HPS/LED === */
   color-scheme: dark;

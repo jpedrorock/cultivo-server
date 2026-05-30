@@ -21,8 +21,9 @@ interface ThemeProviderProps {
 // Migrate old theme values to new names
 function migrateTheme(stored: string | null, defaultTheme: Theme): Theme {
   if (!stored) return defaultTheme;
-  if (stored === "light") return "monstera";
-  if (stored === "dark") return "vision";
+  if (stored === "light") return "forest";    // antigo light → forest (nova IDV)
+  if (stored === "dark") return "forest";     // antigo dark → forest (nova IDV)
+  if (stored === "monstera") return "forest"; // monstera era o default → forest agora
   const valid: Theme[] = ["forest", "hps", "monstera", "vision", "aurora"];
   return valid.includes(stored as Theme) ? (stored as Theme) : defaultTheme;
 }
