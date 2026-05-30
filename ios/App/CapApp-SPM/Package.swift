@@ -22,8 +22,8 @@ let package = Package(
         .package(name: "CapacitorPreferences", path: "../../../node_modules/.pnpm/@capacitor+preferences@8.0.1_@capacitor+core@8.3.4/node_modules/@capacitor/preferences"),
         .package(name: "CapacitorSplashScreen", path: "../../../node_modules/.pnpm/@capacitor+splash-screen@8.0.1_@capacitor+core@8.3.4/node_modules/@capacitor/splash-screen"),
         .package(name: "CapacitorStatusBar", path: "../../../node_modules/.pnpm/@capacitor+status-bar@8.0.2_@capacitor+core@8.3.4/node_modules/@capacitor/status-bar"),
-        .package(name: "RevenuecatPurchasesCapacitor", path: "../../../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.1.1_@capacitor+core@8.3.4/node_modules/@revenuecat/purchases-capacitor"),
-        .package(name: "SentryCapacitor", path: "../../../node_modules/.pnpm/@sentry+capacitor@4.0.0_@capacitor+core@8.3.4_@sentry+react@10.53.1_react@19.2.1_/node_modules/@sentry/capacitor")
+        .package(name: "RevenuecatPurchasesCapacitor", path: "../../../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.1.4_@capacitor+core@8.3.4/node_modules/@revenuecat/purchases-capacitor"),
+        .package(name: "SentryCapacitor", path: "../../../node_modules/.pnpm/@sentry+capacitor@4.0.0_@capacitor+core@8.3.4_@sentry+react@10.55.0_react@19.2.6_/node_modules/@sentry/capacitor")
     ],
     targets: [
         .target(
