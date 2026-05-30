@@ -74,7 +74,7 @@ export function PhaseBadge({
       <span
         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${className}`}
         style={{
-          background: `color-mix(in oklch, ${color} 15%, transparent)`,
+          background: `color-mix(in oklch, ${color} 28%, transparent)`,
           color,
         }}
       >
@@ -92,8 +92,8 @@ export function PhaseBadge({
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border font-semibold ${textSize} ${padding} ${className}`}
       style={{
-        background: `color-mix(in oklch, ${color} 14%, transparent)`,
-        borderColor: `color-mix(in oklch, ${color} 30%, transparent)`,
+        background: `color-mix(in oklch, ${color} 22%, transparent)`,
+        borderColor: `color-mix(in oklch, ${color} 45%, transparent)`,
         color: `color-mix(in oklch, ${color} 90%, black 10%)`,
       }}
     >

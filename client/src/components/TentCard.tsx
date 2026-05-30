@@ -258,10 +258,32 @@ export function TentCard({
     onError: (e) => toast.error(`Sensor: ${e.message}`),
   });
 
-  const phaseAccentColor = !cycle ? '#6b7280' : phaseColor(tent.category);
+  const phaseAccentColor = !cycle ? '#6b7280' : phaseColor(cycle?.floraStartDate ? 'FLORA' : (tent.category ?? 'VEGA'));
 
-  // Fundo da fase — só no dark mode via data-theme check; no light ficamos flat
-  const phaseBg = 'none';
+  // Helper: CSS class do bloco de ciclo → usa todas as 9 fases
+  const resolvedCategory = cycle?.floraStartDate ? 'FLORA' : (tent.category ?? 'VEGA');
+  const phaseCardClass =
+    resolvedCategory === 'VEGA'        ? 'phase-card-vega'
+    : resolvedCategory === 'FLORA'     ? 'phase-card-flora'
+    : resolvedCategory === 'DRYING'    ? 'phase-card-drying'
+    : resolvedCategory === 'FLUSHING'  ? 'phase-card-flushing'
+    : resolvedCategory === 'HARVEST'   ? 'phase-card-harvest'
+    : resolvedCategory === 'CURING'    ? 'phase-card-curing'
+    : resolvedCategory === 'SEEDLING'  ? 'phase-card-seedling'
+    : resolvedCategory === 'CLONING'   ? 'phase-card-cloning'
+    : 'phase-card-maintenance';
+
+  // Cor do texto no bloco de ciclo (dark mode) → por fase
+  const phaseTextDarkClass =
+    resolvedCategory === 'VEGA'        ? 'dark:text-green-400'
+    : resolvedCategory === 'FLORA'     ? 'dark:text-purple-400'
+    : resolvedCategory === 'DRYING'    ? 'dark:text-amber-400'
+    : resolvedCategory === 'FLUSHING'  ? 'dark:text-teal-400'
+    : resolvedCategory === 'HARVEST'   ? 'dark:text-orange-400'
+    : resolvedCategory === 'CURING'    ? 'dark:text-yellow-400'
+    : resolvedCategory === 'SEEDLING'  ? 'dark:text-lime-400'
+    : resolvedCategory === 'CLONING'   ? 'dark:text-lime-400'
+    : 'dark:text-blue-400';
 
   // Flash sutil quando sensor polling retorna nova leitura
   const kpiFlashing = useKpiFlash(sensorReading?.readAt as string | undefined);
@@ -286,15 +308,11 @@ export function TentCard({
         data-tour="tent-card"
         style={{
           backgroundColor: 'var(--card)',
-          borderLeft: `4px solid ${phaseColor(cycle?.floraStartDate ? 'FLORA' : (tent.category ?? 'VEGA'))}`,
+          borderLeft: `5px solid ${phaseAccentColor}`,
         }}
       >
-        {/* Fundo gradiente da fase */}
-        {phaseBg !== 'none' && (
-          <div className="pointer-events-none absolute inset-0 z-0" style={{ background: phaseBg }} />
-        )}
-        {/* Linha de acento no topo */}
-        <div className="pointer-events-none absolute top-0 left-0 right-0 h-[2px] z-20" style={{ background: `linear-gradient(90deg, ${phaseAccentColor}99 0%, ${phaseAccentColor}33 100%)` }} />
+        {/* Linha de acento no topo — 3px, mais opaca */}
+        <div className="pointer-events-none absolute top-0 left-0 right-0 h-[3px] z-20" style={{ background: `linear-gradient(90deg, ${phaseAccentColor}cc 0%, ${phaseAccentColor}22 100%)` }} />
       <CardHeader className="relative z-10 px-5 pt-5 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -459,30 +477,15 @@ export function TentCard({
           {cycle ? (
             <div
               onClick={() => navigate(`/tent/${tent.id}`)}
-              className={`rounded-xl p-3.5 border cursor-pointer active:scale-[0.99] transition-all duration-150 ${
-                tent.category === 'VEGA'        ? 'phase-card-vega'
-                : tent.category === 'FLORA'     ? 'phase-card-flora'
-                : tent.category === 'DRYING'    ? 'phase-card-drying'
-                : 'phase-card-maintenance'
-              }`}
+              className={`rounded-xl p-3.5 border cursor-pointer active:scale-[0.99] transition-all duration-150 ${phaseCardClass}`}
             >
               {/* Linha 1: fase | semana / clonagem */}
               <div className="flex justify-between items-center">
-                <span className={`text-sm font-semibold flex items-center gap-1.5 text-white dark:${
-                  tent.category === 'VEGA'    ? 'text-green-400'
-                  : tent.category === 'FLORA' ? 'text-purple-400'
-                  : tent.category === 'DRYING'? 'text-amber-400'
-                  : 'text-blue-400'
-                }`}>
+                <span className={`text-sm font-semibold flex items-center gap-1.5 text-white ${phaseTextDarkClass}`}>
                   <PhaseIcon className="w-3.5 h-3.5" />
                   {tent.category === 'MAINTENANCE' ? 'Manutenção Perpétua' : 'Ciclo Ativo'}
                 </span>
-                <span className={`text-sm font-bold text-white dark:${
-                  tent.category === 'VEGA'    ? 'text-green-400'
-                  : tent.category === 'FLORA' ? 'text-purple-400'
-                  : tent.category === 'DRYING'? 'text-amber-400'
-                  : 'text-blue-400'
-                }`}>
+                <span className={`text-sm font-bold text-white ${phaseTextDarkClass}`}>
                   {tent.category === 'MAINTENANCE'
                     ? (tent.lastCloningAt
                         ? (() => { const d = Math.floor((Date.now() - tent.lastCloningAt) / 86400000); return d === 0 ? 'Hoje' : d === 1 ? 'Ontem' : `Há ${d}d`; })()

@@ -1611,7 +1611,7 @@ export default function TentDetails() {
           className="pointer-events-none absolute inset-x-0 top-0 z-0"
           style={{
             height: '240px',
-            background: `radial-gradient(ellipse 80% 70% at 50% -5%, ${phaseColorAlpha(resolvedPhase, 0.10)} 0%, transparent 80%)`,
+            background: `radial-gradient(ellipse 80% 70% at 50% -5%, ${phaseColorAlpha(resolvedPhase, 0.18)} 0%, transparent 80%)`,
           }}
         />
       )}

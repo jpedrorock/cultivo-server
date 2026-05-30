@@ -378,7 +378,7 @@ export default function PlantDetail() {
           className="pointer-events-none absolute inset-x-0 top-0 z-0"
           style={{
             height: '200px',
-            background: `radial-gradient(ellipse 90% 80% at 50% -15%, ${phaseColorAlpha(activePhase, 0.10)} 0%, transparent 80%)`,
+            background: `radial-gradient(ellipse 90% 80% at 50% -15%, ${phaseColorAlpha(activePhase, 0.18)} 0%, transparent 80%)`,
           }}
         />
 

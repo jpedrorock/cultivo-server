@@ -321,23 +321,42 @@
 .dark .pill-danger  { background: rgba(239,68,68,0.10);  color: #f87171; border-color: rgba(239,68,68,0.40);  }
 
 /* ─── Cycle info box — gradiente no light, gradiente neon no dark ─────────
-   Base: fallback sólido. Monstera (light): gradiente diagonal saturado.
-   Dark (via .dark): gradiente neon transparente */
+   Base: fallback sólido (todas as 9 fases).
+   Monstera (light): gradiente diagonal saturado.
+   Dark (via .dark): gradiente neon com opacidade forte (45%) pra visibilidade real. */
+
+/* Light base — sólido saturado ─────────────────────────────────────── */
 .phase-card-vega        { background: #166534; border-color: transparent; }
+.phase-card-seedling    { background: #14532d; border-color: transparent; }
+.phase-card-cloning     { background: #14532d; border-color: transparent; }
 .phase-card-flora       { background: #7e22ce; border-color: transparent; }
+.phase-card-flushing    { background: #065f46; border-color: transparent; }
+.phase-card-harvest     { background: #7c2d12; border-color: transparent; }
 .phase-card-drying      { background: #92400e; border-color: transparent; }
+.phase-card-curing      { background: #78350f; border-color: transparent; }
 .phase-card-maintenance { background: #1e40af; border-color: transparent; }
 
-/* Monstera (light mode) — gradiente diagonal elegante */
+/* Monstera (light mode) — gradiente diagonal elegante ──────────────── */
 .monstera .phase-card-vega        { background: linear-gradient(135deg, #1a6004 0%, #a7d498 100%); border-color: transparent; }
+.monstera .phase-card-seedling    { background: linear-gradient(135deg, #166534 0%, #86efac 100%); border-color: transparent; }
+.monstera .phase-card-cloning     { background: linear-gradient(135deg, #166534 0%, #86efac 100%); border-color: transparent; }
 .monstera .phase-card-flora       { background: linear-gradient(135deg, #7d35a2 0%, #d6a5f1 100%); border-color: transparent; }
+.monstera .phase-card-flushing    { background: linear-gradient(135deg, #065f46 0%, #6ee7b7 100%); border-color: transparent; }
+.monstera .phase-card-harvest     { background: linear-gradient(135deg, #7c2d12 0%, #fdba74 100%); border-color: transparent; }
 .monstera .phase-card-drying      { background: linear-gradient(135deg, #78350f 0%, #92400e 45%, #b45309 100%); border-color: transparent; }
+.monstera .phase-card-curing      { background: linear-gradient(135deg, #78350f 0%, #fde68a 100%); border-color: transparent; }
 .monstera .phase-card-maintenance { background: linear-gradient(135deg, #006fbb 0%, #b0d2e9 100%); border-color: transparent; }
 
-.dark .phase-card-vega        { background: linear-gradient(135deg, rgba(34,197,94,0.28)  0%, rgba(34,197,94,0.07)  100%) !important; border-color: rgba(34,197,94,0.28)   !important; }
-.dark .phase-card-flora       { background: linear-gradient(135deg, rgba(168,85,247,0.28) 0%, rgba(168,85,247,0.07) 100%) !important; border-color: rgba(168,85,247,0.28)  !important; }
-.dark .phase-card-drying      { background: linear-gradient(135deg, rgba(245,158,11,0.28) 0%, rgba(245,158,11,0.07) 100%) !important; border-color: rgba(245,158,11,0.28)  !important; }
-.dark .phase-card-maintenance { background: linear-gradient(135deg, rgba(59,130,246,0.28) 0%, rgba(59,130,246,0.07) 100%) !important; border-color: rgba(59,130,246,0.28)  !important; }
+/* Dark mode — 45% opacity pra fase ser claramente visível ──────────── */
+.dark .phase-card-vega        { background: linear-gradient(135deg, rgba(64,192,87,0.45)   0%, rgba(64,192,87,0.10)   100%) !important; border-color: rgba(64,192,87,0.45)   !important; }
+.dark .phase-card-seedling    { background: linear-gradient(135deg, rgba(114,219,74,0.45)  0%, rgba(114,219,74,0.10)  100%) !important; border-color: rgba(114,219,74,0.45)  !important; }
+.dark .phase-card-cloning     { background: linear-gradient(135deg, rgba(114,219,74,0.45)  0%, rgba(114,219,74,0.10)  100%) !important; border-color: rgba(114,219,74,0.45)  !important; }
+.dark .phase-card-flora       { background: linear-gradient(135deg, rgba(196,75,219,0.45)  0%, rgba(196,75,219,0.10)  100%) !important; border-color: rgba(196,75,219,0.45)  !important; }
+.dark .phase-card-flushing    { background: linear-gradient(135deg, rgba(32,200,151,0.45)  0%, rgba(32,200,151,0.10)  100%) !important; border-color: rgba(32,200,151,0.45)  !important; }
+.dark .phase-card-harvest     { background: linear-gradient(135deg, rgba(245,114,48,0.45)  0%, rgba(245,114,48,0.10)  100%) !important; border-color: rgba(245,114,48,0.45)  !important; }
+.dark .phase-card-drying      { background: linear-gradient(135deg, rgba(216,162,48,0.45)  0%, rgba(216,162,48,0.10)  100%) !important; border-color: rgba(216,162,48,0.45)  !important; }
+.dark .phase-card-curing      { background: linear-gradient(135deg, rgba(192,144,64,0.45)  0%, rgba(192,144,64,0.10)  100%) !important; border-color: rgba(192,144,64,0.45)  !important; }
+.dark .phase-card-maintenance { background: linear-gradient(135deg, rgba(92,125,224,0.45)  0%, rgba(92,125,224,0.10)  100%) !important; border-color: rgba(92,125,224,0.45)  !important; }
 
 /* ─── Streak pill (∅ Nd) — amber/orange pra "fogo de streak", evita verde
    redundante com o resto da marca. Mesmo padrão de done (forte) vs pending (suave). */
