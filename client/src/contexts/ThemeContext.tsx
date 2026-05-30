@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "forest" | "hps" | "monstera" | "vision" | "aurora";
+type Theme = "forest" | "hps" | "monstera" | "vision";
 
 interface ThemeContextType {
   theme: Theme;
@@ -24,7 +24,7 @@ function migrateTheme(stored: string | null, defaultTheme: Theme): Theme {
   if (stored === "light") return "forest";    // antigo light → forest (nova IDV)
   if (stored === "dark") return "forest";     // antigo dark → forest (nova IDV)
   if (stored === "monstera") return "forest"; // monstera era o default → forest agora
-  const valid: Theme[] = ["forest", "hps", "monstera", "vision", "aurora"];
+  const valid: Theme[] = ["forest", "hps", "monstera", "vision"];
   return valid.includes(stored as Theme) ? (stored as Theme) : defaultTheme;
 }
 
@@ -48,12 +48,12 @@ export function ThemeProvider({
     root.classList.add('no-transitions');
 
     // Remove all theme classes (include legacy names to clean old localStorage)
-    root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "aurora", "jardim", "positivus", "highcontrast", "highcontrast-dark");
+    root.classList.remove("light", "dark", "forest", "hps", "monstera", "vision", "aurora", "jardim", "positivus", "highcontrast", "highcontrast-dark"); // aurora mantido no remove para limpar localStorage antigo
     // Add current theme class
     root.classList.add(theme);
     // dark: utilitários do Tailwind dependem da classe .dark no <html>
     // Temas escuros: hps, vision, forest — temas claros: monstera
-    const isDarkTheme = theme === "hps" || theme === "vision" || theme === "forest" || theme === "aurora";
+    const isDarkTheme = theme === "hps" || theme === "vision" || theme === "forest";
     if (isDarkTheme) {
       root.classList.add("dark");
     }
@@ -81,8 +81,7 @@ export function ThemeProvider({
     ? () => {
         setTheme(prev => {
           if (prev === "monstera") return "vision";
-          if (prev === "vision") return "aurora";
-          if (prev === "aurora") return "forest";
+          if (prev === "vision") return "forest";
           if (prev === "forest") return "hps";
           return "monstera";
         });
