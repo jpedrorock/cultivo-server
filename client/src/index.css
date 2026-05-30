@@ -1868,7 +1868,7 @@ input[type="range"]::-moz-range-track {
   backdrop-filter: blur(32px) saturate(200%) !important;
   -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
   border: 1px solid rgba(255, 255, 255, 0.07) !important;
-  border-radius: 14px !important;
+  border-radius: 18px !important;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.50), 0 1px 0 rgba(255, 255, 255, 0.04) inset !important;
   color: rgba(255, 255, 255, 0.85) !important;
   font-size: 13.5px !important;
