@@ -315,7 +315,7 @@ export function BottomNav() {
       />
 
       <div className="max-w-screen-xl mx-auto px-2">
-        <div className="relative flex justify-around items-end pt-2" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="relative flex justify-around items-center" style={{ height: '56px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           {/* Nav items — Estufas, Plantas (antes do FAB) */}
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -327,22 +327,19 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 aria-label={item.label}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
+                  "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative",
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
                 <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">
-                  {item.label}
-                </span>
               </Link>
             );
           })}
 
-          {/* FAB — Mini menu Force Touch style — CENTER */}
-          <div ref={fabRef} className="relative flex flex-col items-center justify-center -mt-10" data-tour="quick-log-menu">
+          {/* FAB — posicionado absolutamente no centro do notch — CENTER */}
+          <div ref={fabRef} className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ bottom: 'calc(28px + env(safe-area-inset-bottom, 0px))' }} data-tour="quick-log-menu">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
               <div className="fixed left-1/2 -translate-x-1/2 w-[85vw] max-w-sm rounded-2xl border border-border/60 bg-card/98 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
@@ -546,6 +543,9 @@ export function BottomNav() {
             </button>
           </div>
 
+          {/* Placeholder do FAB no flex flow — ocupa o slot central sem conteúdo */}
+          <div className="w-12 h-12 shrink-0" aria-hidden />
+
           {/* Calculadoras — slot 4: popup flutuante igual ao FAB */}
           <div ref={calcRef} className="relative">
             {calcMenuOpen && (
@@ -593,14 +593,13 @@ export function BottomNav() {
               onClick={() => { triggerHapticFeedback(); setCalcMenuOpen(v => !v); }}
               aria-label="Calculadoras"
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
+                "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative",
                 isCalcActive || calcMenuOpen
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-primary hover:bg-primary/10"
               )}
             >
               <Calculator className={cn("w-6 h-6", (isCalcActive || calcMenuOpen) && "stroke-[2.5]")} />
-              <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">Calc</span>
             </button>
           </div>
 
@@ -611,7 +610,7 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 aria-label="Mais opções"
                 className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
+                  "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative",
                   "hover:bg-primary/10",
                   isMoreMenuActive
                     ? "text-primary bg-primary/10"
@@ -619,7 +618,6 @@ export function BottomNav() {
                 )}
               >
                 <MoreHorizontal className={cn("w-6 h-6", isMoreMenuActive && "stroke-[2.5]")} />
-                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">Mais</span>
                 {/* Badge: alertas + secagem */}
                 {((alertCount || 0) + (harvestQueueCount ?? 0)) > 0 && (
                   <span
