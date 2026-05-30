@@ -240,11 +240,7 @@ export function TentCard({
     onError: (e) => toast.error(`Sensor: ${e.message}`),
   });
 
-  const phaseAccentColor = !cycle ? '#6b7280' :
-    tent.category === 'VEGA'   ? '#4ade80' :
-    tent.category === 'FLORA'  ? '#a78bfa' :
-    tent.category === 'DRYING' ? '#fbbf24' :
-    '#60a5fa';
+  const phaseAccentColor = !cycle ? '#6b7280' : phaseColor(tent.category);
 
   // Fundo da fase — só no dark mode via data-theme check; no light ficamos flat
   const phaseBg = 'none';

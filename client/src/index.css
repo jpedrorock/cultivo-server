@@ -55,11 +55,15 @@
    * Cada token tem variante light (sólida pra texto/border) e dark
    * (vivenciada via :root vs .dark).
    * ─────────────────────────────────────────────────────────────────── */
-  --color-phase-vega:        oklch(0.55 0.18 145);   /* verde — crescimento */
-  --color-phase-flora:       oklch(0.58 0.20 305);   /* violeta — produção */
-  --color-phase-drying:      oklch(0.70 0.16 75);    /* amber — pós-colheita */
-  --color-phase-maintenance: oklch(0.58 0.17 245);   /* azul — mães/clones */
-  --color-phase-cloning:     oklch(0.65 0.13 195);   /* teal — clonagem */
+  --color-phase-seedling:    oklch(0.72 0.22 130);   /* lime — muda/germinação   (hue 130) */
+  --color-phase-vega:        oklch(0.55 0.18 145);   /* verde — crescimento      (hue 145, = site) */
+  --color-phase-flora:       oklch(0.58 0.20 305);   /* violeta — produção       (hue 305, = site) */
+  --color-phase-flushing:    oklch(0.68 0.15 185);   /* teal — flush pré-col.   (hue 185) */
+  --color-phase-harvest:     oklch(0.72 0.20 38);    /* laranja — colheita       (hue 38) */
+  --color-phase-drying:      oklch(0.70 0.16 75);    /* amber — pós-colheita     (hue 75, = site) */
+  --color-phase-curing:      oklch(0.68 0.14 65);    /* dourado — cura           (hue 65) */
+  --color-phase-maintenance: oklch(0.58 0.17 245);   /* azul — mães/clones      (hue 245, = site) */
+  --color-phase-cloning:     oklch(0.72 0.22 130);   /* lime — clonagem (= SEEDLING) */
 
   /* ─── Semantic state tokens ─────────────────────────────────────────────
    * Aliases pra estados (success/warning/info/danger). Compartilham cor
@@ -498,29 +502,35 @@ html.aurora .kpi-ppfd {
   --phase-drying-card-bg:      linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 100%);
   --phase-maintenance-card-bg: linear-gradient(135deg, rgba(59,130,246,0.12) 0%, rgba(59,130,246,0.04) 100%);
 
-  /* Phase palette — versão dark: mais vibrante no fundo escuro */
-  --phase-seedling:   #8ec58c;
-  --phase-vegetative: #40c057;
-  --phase-flowering:  #be4bdb;
-  --phase-flushing:   #20c997;
-  --phase-harvest:    #fd7c36;
-  --phase-drying:     #e0a32e;
-  --phase-curing:     #b07e3a;
-  --phase-maintenance:#93c5fd;
+  /* Phase palette — versão dark: mais vibrante no fundo escuro
+   * Alinhado ao design system do site (oklch → sRGB hex). */
+  --phase-seedling:   #72db4a;  /* lime   oklch(0.72 0.22 130) */
+  --phase-vegetative: #40c057;  /* verde  oklch(0.70 0.20 145) = site */
+  --phase-flowering:  #c44bdb;  /* roxo   oklch(0.68 0.22 305) = site */
+  --phase-flushing:   #20c897;  /* teal   oklch(0.68 0.15 185) */
+  --phase-harvest:    #f57230;  /* laranj oklch(0.72 0.20 38) */
+  --phase-drying:     #d8a230;  /* âmbar  oklch(0.74 0.17 75)  = site */
+  --phase-curing:     #c09040;  /* dourad oklch(0.68 0.14 65) */
+  --phase-maintenance:#5c7de0;  /* índigo oklch(0.62 0.17 245) = site */
 
   /* ─── Phase semantic tokens override pra dark mode ─────────────────────
    * Versão mais vibrante porque fundo escuro absorve cor.
    * Override dos tokens definidos no @theme inline pra :root (light).
+   * Todos os 9 tokens aqui — 4 âncora (= site) + 5 adjacentes.
    * ─────────────────────────────────────────────────────────────────── */
-  --color-phase-vega:        oklch(0.68 0.20 145);
-  --color-phase-flora:       oklch(0.68 0.22 305);
-  --color-phase-drying:      oklch(0.78 0.16 75);
-  --color-phase-maintenance: oklch(0.70 0.17 245);
-  --color-phase-cloning:     oklch(0.75 0.13 195);
+  --color-phase-seedling:    oklch(0.72 0.22 130);  /* lime          (hue 130) */
+  --color-phase-vega:        oklch(0.70 0.20 145);  /* verde-floresta (hue 145, = site) */
+  --color-phase-flora:       oklch(0.68 0.22 305);  /* violeta        (hue 305, = site) */
+  --color-phase-flushing:    oklch(0.68 0.15 185);  /* teal           (hue 185) */
+  --color-phase-harvest:     oklch(0.72 0.20 38);   /* laranja        (hue 38) */
+  --color-phase-drying:      oklch(0.74 0.17 75);   /* âmbar          (hue 75, = site) */
+  --color-phase-curing:      oklch(0.68 0.14 65);   /* dourado        (hue 65) */
+  --color-phase-maintenance: oklch(0.62 0.17 245);  /* índigo-azul    (hue 245, = site) */
+  --color-phase-cloning:     oklch(0.72 0.22 130);  /* lime (= SEEDLING) */
 
-  --color-state-success:  oklch(0.68 0.20 145);
-  --color-state-warning:  oklch(0.78 0.16 75);
-  --color-state-info:     oklch(0.70 0.17 245);
+  --color-state-success:  oklch(0.70 0.20 145);
+  --color-state-warning:  oklch(0.74 0.17 75);
+  --color-state-info:     oklch(0.62 0.17 245);
   --color-state-danger:   oklch(0.65 0.22 27);
 }
 
@@ -2126,6 +2136,72 @@ div[class*="sticky"][class*="bg-background"] {
     background-color: var(--card) !important;
   }
 }
+
+/* ─── Design system utilities — portados do site cultivo.pro ────────────────
+ * Reutilizáveis em qualquer tela. Mesma linguagem do marketing site,
+ * adaptada para o contexto dark-first do app. */
+
+/* Glass — superfície translúcida com blur (funciona em dark e light) */
+.glass {
+  background: oklch(from var(--card) l c h / 0.78);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid oklch(from var(--border) l c h / 0.55);
+}
+.dark .glass {
+  background: oklch(from var(--card) l c h / 0.70);
+  border-color: oklch(from var(--border) l c h / 0.45);
+}
+
+/* Editorial typography — display pesado, tight tracking, igual ao hero do site */
+.editorial {
+  font-size: clamp(2.5rem, 6.5vw, 5.5rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.92;
+}
+.editorial-md {
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 0.96;
+}
+
+/* Reveal — animação de entrada por scroll (adicionar .visible via IntersectionObserver) */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+/* Stagger helpers */
+.reveal-delay-1 { transition-delay: 80ms; }
+.reveal-delay-2 { transition-delay: 160ms; }
+.reveal-delay-3 { transition-delay: 240ms; }
+.reveal-delay-4 { transition-delay: 320ms; }
+
+/* Marquee — carrossel horizontal contínuo (usar dois filhos idênticos) */
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  overflow: hidden;
+  user-select: none;
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+.marquee-inner {
+  display: flex;
+  gap: 2rem;
+  flex-shrink: 0;
+  animation: marquee-scroll 28s linear infinite;
+}
+.marquee-track:hover .marquee-inner { animation-play-state: paused; }
 
 /* ─── Capacitor nativo (iOS / Android) + PWA standalone ──────────────────
  * Regras aplicadas dentro do app empacotado (Capacitor) OU quando o PWA

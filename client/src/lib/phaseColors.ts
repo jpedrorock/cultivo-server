@@ -1,5 +1,5 @@
 /**
- * phaseColors.ts — Hex canônicos das fases de cultivo
+ * phaseColors.ts — Cores canônicas das fases de cultivo
  *
  * Por que hex em vez de var(--phase-*)?
  * CSS custom properties NÃO resolvem em contexto SVG/canvas — recharts,
@@ -11,9 +11,25 @@
  *
  * Para elementos HTML normais, var(--phase-*) ainda funciona.
  *
- * Fonte: valores dark-mode de index.css (versão vibrante pra fundo escuro).
- * Manter em sincronia com --phase-* no .dark block de index.css.
- */
+ * ── Paleta alinhada ao design system do cultivo.pro ─────────────────────────
+ * O site usa 4 hues de referência (oklch):
+ *   manutenção → hue 245 (índigo-azul)
+ *   vegetativa → hue 145 (verde-floresta)
+ *   floração   → hue 305 (violeta)
+ *   secagem    → hue 75  (âmbar)
+ *
+ * O app expande para 9 fases preservando os mesmos hues âncora e inserindo
+ * fases adicionais em hues logicamente adjacentes:
+ *
+ *   130 lime  → SEEDLING / CLONING   (mais claro que vega — vida nova)
+ *   145 verde → VEGA                 (= site)
+ *   305 roxo  → FLORA                (= site)
+ *   185 teal  → FLUSHING             (entre flora e manutenção)
+ *    38 laranja→ HARVEST             (colheita quente)
+ *    75 âmbar → DRYING               (= site)
+ *    65 dourado→ CURING              (pós-secagem, mais mellow)
+ *   245 índigo → MAINTENANCE         (= site)
+ * ─────────────────────────────────────────────────────────────────────────── */
 
 /** Fase do ciclo de cultivo (espelha o enum backend + PhaseBadge) */
 export type Phase =
@@ -27,17 +43,31 @@ export type Phase =
   | "MAINTENANCE"
   | "CLONING";
 
-/** Hex canônicos — extraídos de .dark { --phase-* } em index.css */
+/**
+ * Hex canônicos — derivados dos valores oklch do design system.
+ * Manter em sincronia com `--phase-*` no bloco `.dark` de index.css
+ * e com os tokens `html.forest` / `@theme inline`.
+ *
+ * Conversões oklch → sRGB hex (tema dark, vibrante sobre fundo escuro):
+ *   SEEDLING    oklch(0.72 0.22 130) ≈ #72db4a  lime
+ *   VEGA        oklch(0.70 0.20 145) ≈ #40c057  verde-floresta
+ *   FLORA       oklch(0.68 0.22 305) ≈ #c44bdb  violeta
+ *   FLUSHING    oklch(0.68 0.15 185) ≈ #20c897  teal
+ *   HARVEST     oklch(0.72 0.20 38)  ≈ #f57230  laranja
+ *   DRYING      oklch(0.74 0.17 75)  ≈ #d8a230  âmbar
+ *   CURING      oklch(0.68 0.14 65)  ≈ #c09040  dourado
+ *   MAINTENANCE oklch(0.62 0.17 245) ≈ #5c7de0  índigo-azul  ← alinhado ao site
+ */
 export const PHASE_COLORS = {
-  SEEDLING:    "#8ec58c",  // --phase-seedling    (verde claro — muda)
-  VEGA:        "#40c057",  // --phase-vegetative  (verde médio — veg)
-  FLORA:       "#be4bdb",  // --phase-flowering   (violeta — floração)
-  FLUSHING:    "#20c997",  // --phase-flushing    (teal — flush)
-  HARVEST:     "#fd7c36",  // --phase-harvest     (laranja — colheita)
-  DRYING:      "#e0a32e",  // --phase-drying      (âmbar — secagem)
-  CURING:      "#b07e3a",  // --phase-curing      (mogno — cura)
-  MAINTENANCE: "#93c5fd",  // --phase-maintenance (azul claro — manutenção)
-  CLONING:     "#8ec58c",  // → mesmo que SEEDLING (clones são mudas)
+  SEEDLING:    "#72db4a",  // lime — muda / germinação         (hue 130)
+  VEGA:        "#40c057",  // verde-floresta — vegetativa       (hue 145, = site)
+  FLORA:       "#c44bdb",  // violeta — floração                (hue 305, = site)
+  FLUSHING:    "#20c897",  // teal — flush pré-colheita         (hue 185)
+  HARVEST:     "#f57230",  // laranja — colheita                (hue 38)
+  DRYING:      "#d8a230",  // âmbar — secagem                   (hue 75, = site)
+  CURING:      "#c09040",  // dourado — cura                    (hue 65)
+  MAINTENANCE: "#5c7de0",  // índigo-azul — manutenção/mães     (hue 245, = site)
+  CLONING:     "#72db4a",  // lime — clonagem (= SEEDLING)      (hue 130)
 } as const satisfies Record<Phase, string>;
 
 /**
@@ -51,7 +81,7 @@ export function phaseColor(phase: string | null | undefined): string {
 }
 
 /**
- * Variante com opacidade — útil para fondos/fills sutis.
+ * Variante com opacidade — útil para fundos/fills sutis.
  * @param phase  Chave da fase
  * @param alpha  0–1 (default 0.15)
  */
