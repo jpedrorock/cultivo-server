@@ -1311,6 +1311,8 @@ export default function TentDetails() {
   };
 
   const phaseInfo = getPhaseInfo();
+  // Fase resolvida como enum value — usada para o phase-aware tint
+  const resolvedPhase = cycle ? resolvePhase(tent.category, cycle.floraStartDate, true) : null;
 
   const handlePrint = () => {
     const phase = getPhaseInfo().phase;
@@ -1601,7 +1603,18 @@ export default function TentDetails() {
 
   return (
     <PageTransition>
-        <div className="min-h-screen bg-background">
+        <div className="relative min-h-screen bg-background">
+      {/* Phase-aware tint: radial glow sutil na cor da fase corrente */}
+      {resolvedPhase && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-0"
+          style={{
+            height: '240px',
+            background: `radial-gradient(ellipse 80% 70% at 50% -5%, ${phaseColorAlpha(resolvedPhase, 0.10)} 0%, transparent 80%)`,
+          }}
+        />
+      )}
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-20 pt-safe">
         <div className="container py-4 md:py-6">

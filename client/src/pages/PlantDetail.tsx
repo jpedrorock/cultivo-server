@@ -47,6 +47,7 @@ import PlantCloneDialog from "@/components/PlantCloneDialog";
 import PlantQrDialog from "@/components/PlantQrDialog";
 import PlantStatsStrip from "@/components/PlantStatsStrip";
 import { exportPlantPDF } from "@/utils/plantExportPDF";
+import { phaseColor, phaseColorAlpha, PHASE_LABELS, type Phase } from "@/lib/phaseColors";
 
 // Tabs carregadas sob demanda para reduzir bundle inicial de PlantDetail
 const PlantHealthTab       = lazy(() => import("@/components/PlantHealthTab"));
@@ -175,19 +176,33 @@ export default function PlantDetail() {
     );
   }
 
-  // Hero config — always-dark background so photo "floats" on colored canvas
-  const heroColor =
-    plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA' ? '#581c87' :
-    tent?.category === 'DRYING'      ? '#78350f' :
-    tent?.category === 'MAINTENANCE' ? '#1e3a8a' :
-    '#14532d';
+  // Fase ativa via phaseColors.ts (centralizado)
+  // Extraído em variável para evitar narrowing excessivo do TS na ternária longa
+  const tentCat: string = tent?.category ?? '';
+  const activePhase: Phase =
+    plant.cyclePhase === 'FLORA' || tentCat === 'FLORA' ? 'FLORA'       :
+    tentCat === 'DRYING'      ? 'DRYING'       :
+    tentCat === 'CURING'      ? 'CURING'        :
+    tentCat === 'MAINTENANCE' ? 'MAINTENANCE'   :
+    tentCat === 'CLONING'     ? 'CLONING'       :
+    tentCat === 'FLUSHING'    ? 'FLUSHING'      :
+    tentCat === 'HARVEST'     ? 'HARVEST'       :
+    plant.plantStage === 'SEEDLING'  ? 'SEEDLING'      : 'VEGA';
 
-  const phaseLabel =
-    plant.cyclePhase === 'FLORA' || tent?.category === 'FLORA' ? 'Flora' :
-    plant.cyclePhase === 'VEGA'  || tent?.category === 'VEGA'  ? 'Vega'  :
-    tent?.category === 'DRYING'      ? 'Secagem'    :
-    tent?.category === 'MAINTENANCE' ? 'Manutenção' :
-    plant.plantStage === 'SEEDLING'  ? 'Muda'       : 'Vega';
+  // Hero config — always-dark so the photo "floats" on a colored canvas
+  // Mantemos valores escuros para o hero (phase-aware, mas em tom 800/900)
+  const heroColor =
+    activePhase === 'FLORA'       ? '#3b0764' :  // violet-950 (era #581c87)
+    activePhase === 'DRYING'      ? '#78350f' :  // amber-900
+    activePhase === 'CURING'      ? '#713f12' :  // yellow-900
+    activePhase === 'MAINTENANCE' ? '#1e1b4b' :  // indigo-950
+    activePhase === 'CLONING'     ? '#052e16' :  // green-950
+    activePhase === 'FLUSHING'    ? '#042f2e' :  // teal-950
+    activePhase === 'HARVEST'     ? '#431407' :  // orange-950
+    activePhase === 'SEEDLING'    ? '#052e16' :  // green-950
+    '#052e16';                                   // VEGA: green-950
+
+  const phaseLabel = PHASE_LABELS[activePhase];
 
   const daysOld = Math.floor(
     (Date.now() - new Date(plant.createdAt).getTime()) / (1000 * 60 * 60 * 24)
@@ -355,6 +370,18 @@ export default function PlantDetail() {
           </div>
         </div>
 
+        {/* ── Content: stats + tabs (relative pra o phase tint funcionar) ── */}
+        <div className="relative">
+        {/* Phase-aware tint: radial glow sutil na cor da fase abaixo do hero */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 z-0"
+          style={{
+            height: '200px',
+            background: `radial-gradient(ellipse 90% 80% at 50% -15%, ${phaseColorAlpha(activePhase, 0.10)} 0%, transparent 80%)`,
+          }}
+        />
+
         {/* ── Stats: IDADE · FASE · ESTUFA ── */}
         <PlantStatsStrip
           daysOld={daysOld}
@@ -465,6 +492,7 @@ export default function PlantDetail() {
             </TabsContent>
           </Tabs>
         </main>
+        </div>{/* /relative content wrapper */}
 
         {/* ── Modals & Dialogs ── */}
         <MoveTentModal
