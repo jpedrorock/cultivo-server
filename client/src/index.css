@@ -1847,6 +1847,22 @@ input[type="range"]::-moz-range-track {
   transform-origin: center;
 }
 
+/* ─── KPI pulse: flash sutil quando sensor polling retorna dado novo ──
+   A animação pisca o fundo uma vez em ~650ms. Desativada por
+   prefers-reduced-motion para acessibilidade.
+   ──────────────────────────────────────────────────────────────────── */
+@keyframes kpi-update {
+  0%   { opacity: 1; background-color: transparent; }
+  18%  { opacity: 0.60; background-color: rgba(255, 255, 255, 0.07); }
+  100% { opacity: 1; background-color: transparent; }
+}
+.kpi-updating {
+  animation: kpi-update 0.65s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi-updating { animation: none; }
+}
+
 /* ─── Frosted glass toasts (Sonner) ─────────────────────────────────
    Sonner usa [data-sonner-toast][data-type="success"] (especificidade
    de 2 atributos). Precisamos igualar ou superar com os mesmos seletores

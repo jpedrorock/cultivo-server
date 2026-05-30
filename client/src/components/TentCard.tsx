@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { phaseColor } from "@/lib/phaseColors";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +47,24 @@ import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog"
 import { PhaseConfirmDialog, type PhaseConfirmType } from "@/components/PhaseConfirmDialog";
 import { MiniSparkline } from "@/components/MiniSparkline";
 
+
+/**
+ * Flash sutil quando sensor polling retorna nova leitura.
+ * Ignora a primeira montagem — só pulsa em atualizações reais.
+ * Desativado automaticamente via CSS @media prefers-reduced-motion.
+ */
+function useKpiFlash(readAt: string | Date | undefined): boolean {
+  const [flashing, setFlashing] = useState(false);
+  const isFirst = useRef(true);
+  useEffect(() => {
+    if (isFirst.current) { isFirst.current = false; return; }
+    if (!readAt) return;
+    setFlashing(true);
+    const t = setTimeout(() => setFlashing(false), 650);
+    return () => clearTimeout(t);
+  }, [readAt]);
+  return flashing;
+}
 
 /**
  * Card de uma estufa na Home — renderiza estado, leitura ao vivo, sparklines,
@@ -244,6 +262,10 @@ export function TentCard({
 
   // Fundo da fase — só no dark mode via data-theme check; no light ficamos flat
   const phaseBg = 'none';
+
+  // Flash sutil quando sensor polling retorna nova leitura
+  const kpiFlashing = useKpiFlash(sensorReading?.readAt as string | undefined);
+  const kpiFlashClass = kpiFlashing ? 'kpi-updating' : '';
 
   return (
     <ListItemAnimation>
@@ -499,7 +521,7 @@ export function TentCard({
             <button
               type="button"
               disabled={!isSensorAuto || readNow.isPending}
-              className={`kpi-temp flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-orange-500/20 dark:border-orange-500/15 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
+              className={`kpi-temp flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-orange-500/20 dark:border-orange-500/15 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''} ${kpiFlashClass}`}
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <ThermometerSun className="w-4 h-4 text-orange-500 dark:text-orange-400 mb-0.5" />
@@ -524,7 +546,7 @@ export function TentCard({
             <button
               type="button"
               disabled={!isSensorAuto || readNow.isPending}
-              className={`kpi-rh flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-cyan-500/20 dark:border-cyan-500/20 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
+              className={`kpi-rh flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-cyan-500/20 dark:border-cyan-500/20 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''} ${kpiFlashClass}`}
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <Droplets className="w-4 h-4 text-cyan-500 dark:text-cyan-400 mb-0.5" />
@@ -549,7 +571,7 @@ export function TentCard({
             <button
               type="button"
               disabled={!isSensorAuto || readNow.isPending}
-              className={`kpi-vpd flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-emerald-500/20 dark:border-emerald-500/20 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''}`}
+              className={`kpi-vpd flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border border-emerald-500/20 dark:border-emerald-500/20 relative w-full ${isSensorAuto ? 'active:scale-95 transition-transform' : ''} ${kpiFlashClass}`}
               onClick={isSensorAuto ? () => readNow.mutate({ tentId: tent.id }) : undefined}
             >
               <Wind className="w-4 h-4 text-emerald-500 dark:text-emerald-400 mb-0.5" />

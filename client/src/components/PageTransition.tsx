@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, animate, useReducedMotion } from "framer-motion";
 import { ReactNode, useEffect } from "react";
 
 interface PageTransitionProps {
@@ -102,6 +102,8 @@ export function StaggerList({
   className,
   staggerDelay = 0.06,
 }: StaggerListProps) {
+  const reduced = useReducedMotion();
+  if (reduced) return <div className={className}>{children}</div>;
   return (
     <motion.div
       className={className}
@@ -124,6 +126,8 @@ export function StaggerList({
 
 // List item animation — use inside StaggerList
 export function ListItemAnimation({ children, className }: PageTransitionProps) {
+  const reduced = useReducedMotion();
+  if (reduced) return <div className={className}>{children}</div>;
   return (
     <motion.div
       className={className}
@@ -170,19 +174,25 @@ export function AnimatedCounter({
   suffix = "",
   prefix = "",
 }: AnimatedCounterProps) {
-  const motionValue = useMotionValue(0);
+  const reduced = useReducedMotion();
+  const motionValue = useMotionValue(reduced ? value : 0);
   const rounded = useTransform(motionValue, (latest) => {
     const formatted = latest.toFixed(decimals);
     return `${prefix}${formatted}${suffix}`;
   });
 
   useEffect(() => {
+    if (reduced) {
+      // sem animação: definir valor imediatamente
+      motionValue.set(value);
+      return;
+    }
     const controls = animate(motionValue, value, {
       duration,
       ease: "easeOut",
     });
     return controls.stop;
-  }, [value, duration, motionValue]);
+  }, [value, duration, motionValue, reduced]);
 
   return <motion.span className={className}>{rounded}</motion.span>;
 }
