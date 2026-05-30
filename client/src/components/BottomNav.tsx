@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, PenLine, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, PenLine, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi, Timer, FlaskConical, Sun, TestTube, Droplets } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -150,6 +150,7 @@ export function BottomNav() {
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [trainingPickerOpen, setTrainingPickerOpen] = useState(false);
   const [chatPickerOpen, setChatPickerOpen] = useState(false);
+  const [calcSheetOpen, setCalcSheetOpen] = useState(false);
   const fabRef = useRef<HTMLDivElement>(null);
 
   // Carrega plantas ativas quando o picker de treinamento ou chat está aberto
@@ -212,16 +213,20 @@ export function BottomNav() {
     { href: "/plants", icon: Leaf, label: "Plantas" },
   ];
 
-  // Alerta direto — fica visível sem passar pelo Mais
-  const alertNavItem: NavItem = {
-    href: "/alerts",
-    icon: Bell,
-    label: "Alertas",
-    badge: alertCount || 0,
-  };
+  // Slot 4: calculadoras em sheet
+  const isCalcActive = location.startsWith("/calculators");
+
+  const CALC_ITEMS = [
+    { id: "watering-runoff",     title: "Rega e Runoff",    desc: "Volume ideal + medição de runoff",  icon: Droplets,    color: "bg-teal-600" },
+    { id: "irrigation-schedule", title: "Rega Automática",  desc: "Cronograma por bomba gotejadora",   icon: Timer,       color: "bg-blue-600" },
+    { id: "nutrients",           title: "Fertilização",     desc: "Receitas por fase e semana",        icon: FlaskConical,color: "bg-emerald-600" },
+    { id: "lux-ppfd",            title: "Lux → PPFD",       desc: "Converta leitura de luxímetro",     icon: Sun,         color: "bg-amber-600" },
+    { id: "ppm-ec",              title: "PPM ↔ EC",          desc: "Converta condutividade elétrica",   icon: Calculator,  color: "bg-violet-600" },
+    { id: "ph-adjust",           title: "pH",               desc: "Quanto ácido/base para ajustar",    icon: TestTube,    color: "bg-rose-600" },
+    { id: "vpd",                 title: "VPD",              desc: "Zona ideal de temperatura e umidade",icon: Wind,        color: "bg-indigo-600" },
+  ] as const;
 
   const moreMenuItems: NavItem[] = [
-    { href: "/calculators", icon: Calculator, label: "Calculadoras" },
     { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
@@ -524,42 +529,53 @@ export function BottomNav() {
             </button>
           </div>
 
-          {/* Alertas — slot 4 direto (antes ficava em Mais) */}
-          {(() => {
-            const item = alertNavItem;
-            const Icon = item.icon;
-            const isActive = location === item.href;
-            const showBadge = item.badge !== undefined && item.badge > 0;
-            return (
-              <Link
-                href={item.href}
+          {/* Calculadoras — slot 4: abre sheet com lista de calcs */}
+          <Sheet open={calcSheetOpen} onOpenChange={setCalcSheetOpen}>
+            <SheetTrigger asChild>
+              <button
                 onClick={triggerHapticFeedback}
-                aria-label={item.label}
-                data-tour="alerts-menu"
+                aria-label="Calculadoras"
                 className={cn(
                   "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
-                  isActive
+                  isCalcActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
               >
-                <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
-                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">
-                  {item.label}
-                </span>
-                {showBadge && (
-                  <span
-                    className={cn(
-                      "absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
-                      badgeShaking ? "animate-badge-shake" : "animate-pulse"
-                    )}
-                  >
-                    {item.badge! > 9 ? '9+' : item.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })()}
+                <Calculator className={cn("w-6 h-6", isCalcActive && "stroke-[2.5]")} />
+                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">Calc</span>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-auto" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+              <SheetHeader className="pb-2">
+                <SheetTitle className="text-base flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-primary" />
+                  Calculadoras
+                </SheetTitle>
+              </SheetHeader>
+              <div className="space-y-1 pb-4">
+                {CALC_ITEMS.map((calc) => {
+                  const Icon = calc.icon;
+                  return (
+                    <Link
+                      key={calc.id}
+                      href={`/calculators/${calc.id}`}
+                      onClick={() => { triggerHapticFeedback(); setCalcSheetOpen(false); }}
+                      className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-primary/8 active:bg-primary/15 transition-colors"
+                    >
+                      <div className={`w-10 h-10 rounded-xl ${calc.color} flex items-center justify-center shrink-0 shadow-sm`}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground leading-tight">{calc.title}</p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">{calc.desc}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </SheetContent>
+          </Sheet>
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
@@ -577,15 +593,15 @@ export function BottomNav() {
               >
                 <MoreHorizontal className={cn("w-6 h-6", isMoreMenuActive && "stroke-[2.5]")} />
                 <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">Mais</span>
-                {/* Badge: só secagem (alertas são diretos agora) */}
-                {(harvestQueueCount ?? 0) > 0 && (
+                {/* Badge: alertas + secagem */}
+                {((alertCount || 0) + (harvestQueueCount ?? 0)) > 0 && (
                   <span
                     className={cn(
                       "absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm",
-                      "animate-pulse",
+                      (alertCount || 0) > 0 && badgeShaking ? "animate-badge-shake" : "animate-pulse",
                     )}
                   >
-                    {(harvestQueueCount ?? 0) > 9 ? "9+" : (harvestQueueCount ?? 0)}
+                    {((alertCount || 0) + (harvestQueueCount ?? 0)) > 9 ? "9+" : (alertCount || 0) + (harvestQueueCount ?? 0)}
                   </span>
                 )}
               </button>
