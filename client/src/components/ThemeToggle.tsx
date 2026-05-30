@@ -34,6 +34,12 @@ function ThemePreview({ type }: { type: ThemeValue }) {
 
 const THEMES = [
   {
+    value: "forest" as ThemeValue,
+    label: "Floresta",
+    description: "Identidade visual do Cultivo — verde escuro atmosférico, igual ao site",
+    icon: <Trees className="w-4 h-4 text-green-500 shrink-0" />,
+  },
+  {
     value: "monstera" as ThemeValue,
     label: "Claro",
     description: "Botânico minimalista — branco limpo, verde-floresta, acentos menta",
@@ -46,22 +52,16 @@ const THEMES = [
     icon: <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />,
   },
   {
-    value: "forest" as ThemeValue,
-    label: "Floresta",
-    description: "Verde escuro profundo, inspirado em apps de cultivo premium",
-    icon: <Trees className="w-4 h-4 text-green-500 shrink-0" />,
+    value: "aurora" as ThemeValue,
+    label: "Aurora",
+    description: "Dark atmosférico — glow verde, cards glass e textura de grão",
+    icon: <Telescope className="w-4 h-4 text-emerald-300 shrink-0" />,
   },
   {
     value: "hps" as ThemeValue,
     label: "HPS Agrícola",
     description: "Preto absoluto + verde neon — máximo contraste sob luz HPS/LED",
     icon: <Zap className="w-4 h-4 text-green-400 shrink-0" />,
-  },
-  {
-    value: "aurora" as ThemeValue,
-    label: "Aurora",
-    description: "Dark atmosférico — glow verde, cards glass e textura de grão",
-    icon: <Telescope className="w-4 h-4 text-emerald-300 shrink-0" />,
   },
 ] as const;
 

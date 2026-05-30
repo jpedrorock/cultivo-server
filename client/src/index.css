@@ -1089,12 +1089,12 @@ html.vision {
   /* Fundo verde durante splash screen (antes do React montar e aplicar o tema) */
   /* Classe adicionada no <body> no HTML e removida pelo ThemeProvider após montar */
   body.splash-loading {
-    background-color: #10b981 !important;
+    background-color: #0f2318 !important;
     color: #ffffff !important;
     transition: none !important;
   }
   body.splash-loading > #root {
-    background-color: #10b981 !important;
+    background-color: #0f2318 !important;
     transition: none !important;
   }
 
