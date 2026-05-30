@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { Plus, ThermometerSun, Droplets, Sun, Clock, CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { differenceInHours, differenceInDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { PageHeader } from "@/components/PageHeader";
+import { phaseColor, phaseColorAlpha, PHASE_LABELS, resolvePhase } from "@/lib/phaseColors";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -44,14 +45,11 @@ function TentMorningCard({
   const ppfd = log?.ppfd ? Number(log.ppfd) : null;
   const fresh = log ? freshnessInfo(new Date(log.logDate)) : null;
 
-  const phaseLabel = !cycle ? "Sem ciclo"
-    : tent.category === "MAINTENANCE" ? "Manutenção"
-    : tent.category === "DRYING" ? "Secagem"
-    : cycle.floraStartDate ? "Flora" : "Vega";
-
-  const phaseColor = !cycle ? "bg-muted text-muted-foreground"
-    : cycle.floraStartDate ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
-    : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400";
+  const resolvedPhase = resolvePhase(tent.category, cycle?.floraStartDate ?? null, !!cycle);
+  const phaseLabel = !cycle ? "Sem ciclo" : PHASE_LABELS[resolvedPhase];
+  const phaseBadgeStyle: CSSProperties = !cycle
+    ? {}
+    : { backgroundColor: phaseColorAlpha(resolvedPhase, 0.15), color: phaseColor(resolvedPhase) };
 
   const borderColor = !fresh ? "border-border"
     : fresh.dot === "bg-emerald-500" ? "border-emerald-500/30"
@@ -69,7 +67,7 @@ function TentMorningCard({
               <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
             </div>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${phaseColor}`}>{phaseLabel}</span>
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${!cycle ? "bg-muted text-muted-foreground" : ""}`} style={phaseBadgeStyle}>{phaseLabel}</span>
               <span className="text-xs text-muted-foreground">{tent.width}×{tent.depth}×{tent.height}cm</span>
             </div>
           </div>

@@ -2,7 +2,8 @@ import type React from "react";
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, Leaf, Sprout, Scissors } from "lucide-react";
+import { phaseColor, phaseColorAlpha, PHASE_LABELS, type Phase } from "@/lib/phaseColors";
+import { Sprout, Leaf, Scissors, Droplets, Wind, Package, Calendar } from "lucide-react";
 // PhaseTransitionDialog moved to tent cards
 
 export function CyclesDashboard() {
@@ -44,54 +45,25 @@ export function CyclesDashboard() {
       <h2 className="text-2xl font-bold">Ciclos Ativos</h2>
       <div className="grid gap-4 md:grid-cols-2">
         {cycles.map((cycle: any) => {
-          // Determinar ícone, cor e badge baseado na fase
-          let PhaseIcon = Sprout;
-          let phaseColor = 'text-green-600 dark:text-green-400';
-          let phaseBg = 'bg-green-500/10';
-          let phaseProgressBg = 'bg-green-500/20';
-          let phaseProgressStyle: React.CSSProperties = {
-            background: 'linear-gradient(90deg, #34d399, #22c55e, #16a34a)',
-            boxShadow: '0 0 8px rgba(34,197,94,0.7), 0 0 18px rgba(34,197,94,0.3)',
+          const pc = phaseColor(cycle.phase as Phase);
+          const pcAlpha10 = phaseColorAlpha(cycle.phase as Phase, 0.10);
+          const phaseProgressStyle: React.CSSProperties = {
+            background: pc,
+            boxShadow: `0 0 8px ${phaseColorAlpha(cycle.phase as Phase, 0.65)}, 0 0 18px ${phaseColorAlpha(cycle.phase as Phase, 0.28)}`,
           };
-          let phaseLabel = 'Vegetativa';
+          const gradientBorder = `linear-gradient(135deg, ${pc}, ${phaseColorAlpha(cycle.phase as Phase, 0.55)})`;
+          const phaseLabel = PHASE_LABELS[cycle.phase as Phase] ?? cycle.phase;
 
-          if (cycle.phase === 'MAINTENANCE') {
-            PhaseIcon = Leaf;
-            phaseColor = 'text-blue-600 dark:text-blue-400';
-            phaseBg = 'bg-blue-500/10';
-            phaseProgressBg = 'bg-blue-500/20';
-            phaseProgressStyle = {
-              background: 'linear-gradient(90deg, #60a5fa, #3b82f6, #2563eb)',
-              boxShadow: '0 0 8px rgba(59,130,246,0.7), 0 0 18px rgba(59,130,246,0.3)',
-            };
-            phaseLabel = 'Manutenção';
-          } else if (cycle.phase === 'CLONING') {
-            PhaseIcon = Scissors;
-            phaseColor = 'text-cyan-600 dark:text-cyan-400';
-            phaseBg = 'bg-cyan-500/10';
-            phaseProgressBg = 'bg-cyan-500/20';
-            phaseProgressStyle = {
-              background: 'linear-gradient(90deg, #2dd4bf, #06b6d4, #0891b2)',
-              boxShadow: '0 0 8px rgba(6,182,212,0.7), 0 0 18px rgba(6,182,212,0.3)',
-            };
-            phaseLabel = 'Clonagem';
-          } else if (cycle.phase === 'FLORA') {
-            PhaseIcon = Leaf;
-            phaseColor = 'text-purple-600 dark:text-purple-400';
-            phaseBg = 'bg-purple-500/10';
-            phaseProgressBg = 'bg-purple-500/20';
-            phaseProgressStyle = {
-              background: 'linear-gradient(90deg, #818cf8, #a78bfa, #c084fc, #a855f7)',
-              boxShadow: '0 0 8px rgba(168,85,247,0.8), 0 0 20px rgba(139,92,246,0.4)',
-            };
-            phaseLabel = 'Floração';
-          }
-
-          const gradientBorder =
-            cycle.phase === 'MAINTENANCE' ? 'linear-gradient(135deg, #60a5fa, #3b82f6, #2563eb)'
-            : cycle.phase === 'CLONING'    ? 'linear-gradient(135deg, #2dd4bf, #06b6d4, #0891b2)'
-            : cycle.phase === 'FLORA'      ? 'linear-gradient(135deg, #818cf8, #a78bfa, #a855f7)'
-            :                               'linear-gradient(135deg, #4ade80, #22c55e, #16a34a)';
+          const PHASE_ICONS: Partial<Record<Phase, React.ElementType>> = {
+            MAINTENANCE: Leaf,
+            CLONING: Scissors,
+            FLORA: Leaf,
+            FLUSHING: Droplets,
+            HARVEST: Scissors,
+            DRYING: Wind,
+            CURING: Package,
+          };
+          const PhaseIcon = PHASE_ICONS[cycle.phase as Phase] ?? Sprout;
 
           return (
             <div key={cycle.id} style={{ background: gradientBorder, padding: '1.5px', borderRadius: '0.75rem' }}>
@@ -99,15 +71,15 @@ export function CyclesDashboard() {
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${phaseBg}`}>
-                    <PhaseIcon className={`w-5 h-5 ${phaseColor}`} />
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: pcAlpha10 }}>
+                    <PhaseIcon className="w-5 h-5" style={{ color: pc }} />
                   </div>
                   <div>
                     <h3 className="font-semibold text-lg">{cycle.tentName}</h3>
                     <p className="text-sm text-muted-foreground">{cycle.strainName}</p>
                   </div>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${phaseBg} ${phaseColor}`}>
+                <span className="px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: pcAlpha10, color: pc }}>
                   {phaseLabel}
                 </span>
               </div>
@@ -125,7 +97,7 @@ export function CyclesDashboard() {
                   )}
                 </div>
                 {(cycle.phase === 'VEGA' || cycle.phase === 'FLORA') && (
-                  <Progress value={cycle.progress} className={`h-2 ${phaseProgressBg}`} indicatorStyle={phaseProgressStyle} />
+                  <Progress value={cycle.progress} className="h-2" indicatorStyle={phaseProgressStyle} />
                 )}
               </div>
 

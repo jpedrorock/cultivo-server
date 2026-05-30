@@ -70,6 +70,35 @@ export const PHASE_COLORS = {
   CLONING:     "#72db4a",  // lime — clonagem (= SEEDLING)      (hue 130)
 } as const satisfies Record<Phase, string>;
 
+/** Labels em português para cada fase */
+export const PHASE_LABELS: Record<Phase, string> = {
+  SEEDLING:    "Muda",
+  VEGA:        "Vegetativa",
+  FLORA:       "Floração",
+  FLUSHING:    "Flush",
+  HARVEST:     "Colheita",
+  DRYING:      "Secagem",
+  CURING:      "Cura",
+  MAINTENANCE: "Manutenção",
+  CLONING:     "Clonagem",
+} as const;
+
+/**
+ * Resolve a fase visível a partir de tent.category + cycle.floraStartDate.
+ * Usado onde o backend não retorna um campo `phase` resolvido.
+ */
+export function resolvePhase(
+  tentCategory: string | null | undefined,
+  floraStartDate: string | Date | null | undefined,
+  hasCycle: boolean,
+): Phase {
+  if (!hasCycle) return "VEGA";
+  const cat = (tentCategory ?? "VEGA") as Phase;
+  if (cat === "MAINTENANCE" || cat === "DRYING" || cat === "CURING" || cat === "CLONING") return cat;
+  if (floraStartDate) return "FLORA";
+  return "VEGA";
+}
+
 /**
  * Retorna o hex da fase.
  * Aceita string nullable/undefined — útil direto de dados do backend.

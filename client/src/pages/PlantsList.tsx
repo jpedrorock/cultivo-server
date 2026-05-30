@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useTactileFeedback } from "@/hooks/useTactileFeedback";
@@ -17,6 +17,7 @@ import {
 import { Plus, Sprout, Search, Filter, ChevronDown, ChevronRight, MoveRight, Loader2, Archive, Trash2, RotateCcw, MoreHorizontal, X, Leaf, Check } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
+import { phaseColor, phaseColorAlpha } from "@/lib/phaseColors";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/EmptyState";
@@ -418,19 +419,16 @@ export default function PlantsList() {
               const selectedInTent = tentPlants.filter((p: any) => selectedPlants.has(p.id)).length;
 
               // Tent category color
-              const tentColor =
-                tent.category === 'MAINTENANCE' ? { border: 'border-border/60', accent: 'text-blue-300', glow: 'rgba(59,130,246,0.12)', dot: 'bg-blue-400' }
-                : tent.category === 'DRYING'    ? { border: 'border-border/60', accent: 'text-amber-300', glow: 'rgba(245,158,11,0.12)', dot: 'bg-amber-400' }
-                : tent.category === 'FLORA'     ? { border: 'border-border/60', accent: 'text-purple-300', glow: 'rgba(168,85,247,0.12)', dot: 'bg-purple-400' }
-                : tent.category === 'VEGA'      ? { border: 'border-border/60', accent: 'text-green-300', glow: 'rgba(34,197,94,0.12)', dot: 'bg-green-400' }
-                :                                 { border: 'border-border/60', accent: 'text-emerald-300', glow: 'rgba(16,185,129,0.10)', dot: 'bg-emerald-400' };
+              const _pc = phaseColor(tent.category);
+              const _pcAlpha = phaseColorAlpha(tent.category, 0.12);
+              const tentColor = {
+                accentStyle: { color: _pc } as CSSProperties,
+                glowStyle:   { backgroundColor: _pcAlpha } as CSSProperties,
+                dotStyle:    { backgroundColor: _pc } as CSSProperties,
+              };
 
               // Card bg para thumbnails no collapsed
-              const tentCardBg =
-                tent.category === 'FLORA'       ? '#581c87' :
-                tent.category === 'DRYING'      ? '#78350f' :
-                tent.category === 'MAINTENANCE' ? '#1e3a8a' :
-                '#14532d';
+              const tentCardBg = phaseColor(tent.category);
 
               return (
                 <div key={tent.id} className="space-y-2">
@@ -441,16 +439,16 @@ export default function PlantsList() {
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       {isExpanded
-                        ? <ChevronDown className={`w-4 h-4 shrink-0 ${tentColor.accent}`} />
-                        : <ChevronRight className={`w-4 h-4 shrink-0 ${tentColor.accent}`} />
+                        ? <ChevronDown className="w-4 h-4 shrink-0" style={tentColor.accentStyle} />
+                        : <ChevronRight className="w-4 h-4 shrink-0" style={tentColor.accentStyle} />
                       }
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${tentColor.dot}`} />
+                      <span className="w-2 h-2 rounded-full shrink-0" style={tentColor.dotStyle} />
                       <span className="font-bold text-foreground truncate">{tent.name}</span>
                       <span className="text-xs text-muted-foreground/70 shrink-0">
                         {tentPlants.length} {tentPlants.length === 1 ? "planta" : "plantas"}
                       </span>
                       {selectedInTent > 0 && (
-                        <span className={`text-xs font-bold shrink-0 ${tentColor.accent}`}>
+                        <span className="text-xs font-bold shrink-0" style={tentColor.accentStyle}>
                           · {selectedInTent} ✓
                         </span>
                       )}

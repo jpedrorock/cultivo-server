@@ -19,6 +19,7 @@ import { EditTentDialog } from "@/components/EditTentDialog";
 import { EditLogDialog } from "@/components/EditLogDialog";
 import { MoveToHarvestQueueDialog } from "@/components/MoveToHarvestQueueDialog";
 import { PhaseBadge } from "@/components/PhaseBadge";
+import { phaseColor, phaseColorAlpha, PHASE_LABELS, resolvePhase } from "@/lib/phaseColors";
 import { EmptyState } from "@/components/EmptyState";
 import {
   Dialog,
@@ -1298,19 +1299,15 @@ export default function TentDetails() {
   }
 
   const getPhaseInfo = () => {
-    if (!cycle) {
-      return { phase: "Inativo", color: "bg-muted" };
-    }
-
-    if (tent.category === "MAINTENANCE") {
-      return { phase: "Manutenção", color: "bg-blue-500" };
-    }
-
-    if (cycle.floraStartDate) {
-      return { phase: "Floração", color: "bg-purple-500" };
-    }
-
-    return { phase: "Vegetativa", color: "bg-primary/100" };
+    if (!cycle) return { phase: "Inativo", badgeStyle: {} as React.CSSProperties };
+    const phase = resolvePhase(tent.category, cycle.floraStartDate, true);
+    return {
+      phase: PHASE_LABELS[phase],
+      badgeStyle: {
+        backgroundColor: phaseColorAlpha(phase, 0.15),
+        color: phaseColor(phase),
+      } as React.CSSProperties,
+    };
   };
 
   const phaseInfo = getPhaseInfo();

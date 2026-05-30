@@ -19,6 +19,7 @@ import { Link, useParams } from "wouter";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { PageTransition } from "@/components/PageTransition";
+import { phaseColor, phaseColorAlpha, PHASE_LABELS, resolvePhase } from "@/lib/phaseColors";
 
 export default function TentLog() {
   const { id } = useParams<{ id: string }>();
@@ -132,11 +133,16 @@ export default function TentLog() {
 
   // Fase info (para badge)
   const getPhaseInfo = () => {
-    if (!cycle) return { phase: "Inativo", color: "bg-muted" };
-    if (tent?.category === "MAINTENANCE") return { phase: "Manutenção", color: "bg-blue-500 dark:bg-blue-600" };
-    if (tent?.category === "DRYING") return { phase: "Secagem", color: "bg-yellow-800 dark:bg-yellow-700" };
-    if (cycle.floraStartDate) return { phase: "Floração", color: "bg-purple-500 dark:bg-purple-600" };
-    return { phase: "Vegetativa", color: "bg-green-500 dark:bg-green-600" };
+    if (!cycle) return { phase: "Inativo", badgeStyle: {} as React.CSSProperties };
+    const phase = resolvePhase(tent?.category, cycle.floraStartDate, true);
+    return {
+      phase: PHASE_LABELS[phase],
+      badgeStyle: {
+        backgroundColor: phaseColorAlpha(phase, 0.15),
+        color: phaseColor(phase),
+        border: "none",
+      } as React.CSSProperties,
+    };
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -254,7 +260,7 @@ export default function TentLog() {
                   {tent.category} • {tent.width}×{tent.depth}×{tent.height}cm
                 </p>
               </div>
-              <Badge className={`${phaseInfo.color} text-white border-0 text-xs shrink-0`}>
+              <Badge className="text-xs shrink-0 border-0" style={phaseInfo.badgeStyle}>
                 {phaseInfo.phase}
               </Badge>
             </div>
