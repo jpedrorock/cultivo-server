@@ -150,8 +150,9 @@ export function BottomNav() {
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [trainingPickerOpen, setTrainingPickerOpen] = useState(false);
   const [chatPickerOpen, setChatPickerOpen] = useState(false);
-  const [calcSheetOpen, setCalcSheetOpen] = useState(false);
+  const [calcMenuOpen, setCalcMenuOpen] = useState(false);
   const fabRef = useRef<HTMLDivElement>(null);
+  const calcRef = useRef<HTMLDivElement>(null);
 
   // Carrega plantas ativas quando o picker de treinamento ou chat está aberto
   const { data: activePlants = [] } = trpc.plants.list.useQuery(
@@ -193,6 +194,22 @@ export function BottomNav() {
       document.removeEventListener('touchstart', handler);
     };
   }, [fabMenuOpen]);
+
+  // Close Calc menu when clicking outside
+  useEffect(() => {
+    if (!calcMenuOpen) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (calcRef.current && !calcRef.current.contains(e.target as Node)) {
+        setCalcMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [calcMenuOpen]);
 
   // Detectar teclado virtual iOS (visualViewport encolhe quando teclado abre)
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -529,53 +546,63 @@ export function BottomNav() {
             </button>
           </div>
 
-          {/* Calculadoras — slot 4: abre sheet com lista de calcs */}
-          <Sheet open={calcSheetOpen} onOpenChange={setCalcSheetOpen}>
-            <SheetTrigger asChild>
-              <button
-                onClick={triggerHapticFeedback}
-                aria-label="Calculadoras"
-                className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
-                  isCalcActive
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                )}
+          {/* Calculadoras — slot 4: popup flutuante igual ao FAB */}
+          <div ref={calcRef} className="relative">
+            {calcMenuOpen && (
+              <div
+                className="fixed left-1/2 -translate-x-1/2 w-[85vw] max-w-sm rounded-2xl border border-border/60 bg-card/98 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]"
+                style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
               >
-                <Calculator className={cn("w-6 h-6", isCalcActive && "stroke-[2.5]")} />
-                <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">Calc</span>
-              </button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-auto" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-              <SheetHeader className="pb-2">
-                <SheetTitle className="text-base flex items-center gap-2">
+                {/* Seta apontando para o botão Calc (slot 4 ≈ 73% da largura) */}
+                <div className="absolute bottom-0 left-[73%] -translate-x-1/2 translate-y-full w-0 h-0 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-border/60" />
+                <div className="absolute bottom-0 left-[73%] -translate-x-1/2 translate-y-[5px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-card/95" />
+
+                {/* Header */}
+                <div className="flex items-center gap-2 px-5 py-3 border-b border-border/40">
                   <Calculator className="w-4 h-4 text-primary" />
-                  Calculadoras
-                </SheetTitle>
-              </SheetHeader>
-              <div className="space-y-1 pb-4">
-                {CALC_ITEMS.map((calc) => {
-                  const Icon = calc.icon;
-                  return (
-                    <Link
-                      key={calc.id}
-                      href={`/calculators/${calc.id}`}
-                      onClick={() => { triggerHapticFeedback(); setCalcSheetOpen(false); }}
-                      className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-primary/8 active:bg-primary/15 transition-colors"
-                    >
-                      <div className={`w-10 h-10 rounded-xl ${calc.color} flex items-center justify-center shrink-0 shadow-sm`}>
-                        <Icon className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground leading-tight">{calc.title}</p>
-                        <p className="text-xs text-muted-foreground/60 mt-0.5">{calc.desc}</p>
-                      </div>
-                    </Link>
-                  );
-                })}
+                  <p className="text-sm font-semibold text-foreground">Calculadoras</p>
+                </div>
+
+                {/* Lista */}
+                <div className="overflow-y-auto" style={{ maxHeight: '62vh' }}>
+                  {CALC_ITEMS.map((calc, index) => {
+                    const Icon = calc.icon;
+                    const isLast = index === CALC_ITEMS.length - 1;
+                    return (
+                      <Link
+                        key={calc.id}
+                        href={`/calculators/${calc.id}`}
+                        onClick={() => { triggerHapticFeedback(); setCalcMenuOpen(false); }}
+                        className={`flex items-center gap-4 px-5 py-4 hover:bg-muted/40 active:bg-muted/60 transition-colors w-full${!isLast ? ' border-b border-border/30' : ''}`}
+                      >
+                        <div className={`w-10 h-10 rounded-xl ${calc.color} flex items-center justify-center shrink-0 shadow-sm`}>
+                          <Icon className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-base font-semibold text-foreground leading-tight">{calc.title}</p>
+                          <p className="text-xs text-muted-foreground/60 mt-0.5">{calc.desc}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            </SheetContent>
-          </Sheet>
+            )}
+
+            <button
+              onClick={() => { triggerHapticFeedback(); setCalcMenuOpen(v => !v); }}
+              aria-label="Calculadoras"
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-xl transition-colors relative",
+                isCalcActive || calcMenuOpen
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+              )}
+            >
+              <Calculator className={cn("w-6 h-6", (isCalcActive || calcMenuOpen) && "stroke-[2.5]")} />
+              <span className="text-[9px] font-mono uppercase tracking-widest leading-none opacity-70">Calc</span>
+            </button>
+          </div>
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
