@@ -120,19 +120,40 @@ export function PaywallSheet({ open, onOpenChange, trigger }: PaywallSheetProps)
           <X className="w-4 h-4" />
         </button>
 
-        <div className="bg-gradient-to-br from-emerald-500/20 via-background to-violet-500/10 px-6 pt-8 pb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Cultivo Pro</span>
+        {/* ── Hero atmosférico — mesma linguagem da tela de Login ── */}
+        <div className="relative overflow-hidden px-6 pt-8 pb-6">
+          {/* Blob verde topo */}
+          <div aria-hidden className="pointer-events-none absolute -top-[40%] left-1/2 -translate-x-1/2 w-[360px] h-[360px] rounded-full blur-3xl opacity-[0.22]"
+               style={{ background: 'radial-gradient(circle, oklch(0.68 0.20 145) 0%, transparent 65%)' }} />
+          {/* Blob índigo canto direito */}
+          <div aria-hidden className="pointer-events-none absolute -top-[10%] -right-[20%] w-[220px] h-[220px] rounded-full blur-2xl opacity-[0.14]"
+               style={{ background: 'radial-gradient(circle, oklch(0.62 0.17 245) 0%, transparent 70%)' }} />
+
+          <div className="relative flex items-start gap-4">
+            {/* Ícone Pro com halo */}
+            <div className="relative shrink-0">
+              <div className="absolute inset-[-6px] rounded-3xl blur-xl opacity-60 pointer-events-none"
+                   style={{ background: 'radial-gradient(circle, oklch(0.68 0.20 145 / 0.60) 0%, transparent 70%)' }} />
+              <div className="relative w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center shadow-lg">
+                <img src="/icon.svg" alt="Cultivo" className="w-9 h-9" />
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0 pt-0.5">
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Cultivo Pro</span>
+              </div>
+              <h2 className="text-xl font-black text-foreground tracking-tight leading-tight">
+                Desbloqueie tudo
+              </h2>
+              {trigger && (
+                <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                  {trigger}
+                </p>
+              )}
+            </div>
           </div>
-          <h2 className="text-2xl font-bold text-foreground mb-1">
-            Desbloqueie tudo
-          </h2>
-          {trigger && (
-            <p className="text-sm text-muted-foreground">
-              {trigger}
-            </p>
-          )}
         </div>
 
         <div className="px-6 py-4 space-y-2.5">
