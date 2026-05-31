@@ -315,7 +315,7 @@ export function BottomNav() {
       />
 
       <div className="max-w-screen-xl mx-auto px-2">
-        <div className="relative flex justify-around items-center" style={{ height: '56px', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="relative flex justify-around items-center" style={{ height: 'calc(56px + env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           {/* Nav items — Estufas, Plantas (antes do FAB) */}
           {navItems.map((item) => {
             const Icon = item.icon;
