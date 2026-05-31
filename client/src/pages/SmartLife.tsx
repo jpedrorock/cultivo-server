@@ -181,27 +181,64 @@ function ConfigTab({ onSaved }: { onSaved: () => void }) {
   return (
     <div className="space-y-4 pt-2">
       {/* Guia */}
-      <div className="rounded-2xl bg-blue-500/8 border border-blue-500/20 p-4 space-y-3">
-        <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Como configurar</p>
+      <div className="rounded-2xl bg-blue-500/8 border border-blue-500/20 p-4 space-y-4">
+        <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Como configurar — iot.tuya.com</p>
 
-        <div className="space-y-1">
-          <p className="text-xs font-semibold text-foreground">① Access ID e Access Secret</p>
+        {/* Passo 1: Serviços obrigatórios */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-foreground">① Ative esses serviços no seu projeto</p>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            <span className="font-mono text-foreground">iot.tuya.com</span> → Cloud → seu projeto → aba <strong>Overview</strong> → campo <strong>Access ID/Client ID</strong> e <strong>Access Secret</strong>
+            Projeto → <strong>Service API</strong> → busque cada nome abaixo → <strong>Subscribe → Basic</strong> (grátis e permanente)
+          </p>
+          <div className="rounded-xl overflow-hidden border border-blue-500/15">
+            {[
+              { name: 'IoT Core',                          note: 'base de tudo',              required: true  },
+              { name: 'Authorization Token Management',    note: 'autenticação',              required: true  },
+              { name: 'Smart Home Basic Service',          note: 'casas e dispositivos',      required: true  },
+              { name: 'Industry Basic Service',            note: 'listagem de devices',       required: true  },
+              { name: 'Identity and Access Management',    note: 'UID do usuário SmartLife',  required: true  },
+              { name: 'General Scene Template',            note: 'cenas tap-to-run · opcional', required: false },
+            ].map((s, i, arr) => (
+              <div
+                key={s.name}
+                className={`flex items-center gap-2.5 px-3 py-2 ${i < arr.length - 1 ? 'border-b border-blue-500/10' : ''} ${s.required ? 'bg-blue-500/5' : 'bg-muted/30'}`}
+              >
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${s.required ? 'bg-emerald-500 text-white' : 'bg-border text-muted-foreground'}`}>
+                  {s.required ? '✓' : '?'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-mono font-medium truncate ${s.required ? 'text-foreground' : 'text-muted-foreground'}`}>{s.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{s.note}</p>
+                </div>
+                <span className={`text-[10px] font-semibold shrink-0 ${s.required ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                  {s.required ? 'necessário' : 'opcional'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Passo 2: Access ID */}
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-foreground">② Access ID e Access Secret</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            <span className="font-mono text-foreground">iot.tuya.com</span> → Cloud → seu projeto → aba <strong>Overview</strong> → campos <strong>Access ID</strong> e <strong>Access Secret</strong>
           </p>
         </div>
 
+        {/* Passo 3: Região */}
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-foreground">② Região</p>
+          <p className="text-xs font-semibold text-foreground">③ Região</p>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Veja no canto superior direito do portal. <strong>Western America</strong> = América · <strong>Western Europe</strong> = Europa · <strong>China</strong> = China
+            Canto superior direito do portal: <strong>Western America</strong> = América · <strong>Western Europe</strong> = Europa · <strong>China</strong> = China
           </p>
         </div>
 
+        {/* Passo 4: Vincular SmartLife */}
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-foreground">③ Vincular SmartLife (para sensores e dispositivos)</p>
+          <p className="text-xs font-semibold text-foreground">④ Vincular SmartLife</p>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Aba <strong>Devices → Link App Account</strong> → clique em <strong>Add App Account</strong> → escaneie o QR code no SmartLife. Após vincular, o UID do usuário aparece na coluna <strong>UID</strong> e os Device IDs aparecem em <strong>All Devices</strong>.
+            <strong>Devices → Link App Account → Add App Account</strong> → escaneie o QR no SmartLife. O UID aparece na coluna <strong>UID</strong> e os Device IDs em <strong>All Devices</strong>.
           </p>
         </div>
       </div>

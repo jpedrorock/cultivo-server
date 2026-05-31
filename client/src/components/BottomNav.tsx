@@ -338,8 +338,8 @@ export function BottomNav() {
             );
           })}
 
-          {/* FAB — posicionado absolutamente no centro do notch — CENTER */}
-          <div ref={fabRef} className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ bottom: 'calc(28px + env(safe-area-inset-bottom, 0px))' }} data-tour="quick-log-menu">
+          {/* FAB — centro alinhado ao apex do notch SVG (y=38 de 65px) → top = 38 - 24 = 14px */}
+          <div ref={fabRef} className="absolute left-1/2 -translate-x-1/2" style={{ top: '14px' }} data-tour="quick-log-menu">
             {/* Popup menu — aparece acima do FAB, ancorado na viewport para não sair da tela */}
             {fabMenuOpen && (
               <div className="fixed left-1/2 -translate-x-1/2 w-[85vw] max-w-sm rounded-2xl border border-border/60 bg-card/98 backdrop-blur-xl shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150 z-[200]" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}>
