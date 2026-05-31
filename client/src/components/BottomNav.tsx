@@ -535,7 +535,7 @@ export function BottomNav() {
               onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
               aria-label="Registrar log diário"
               className={cn(
-                "w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/30 transition-all duration-200",
+                "w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg transition-all duration-200",
                 fabMenuOpen ? "scale-90 opacity-75" : "active:scale-95"
               )}
             >
