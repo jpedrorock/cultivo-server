@@ -327,10 +327,10 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 aria-label={item.label}
                 className={cn(
-                  "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative",
+                  "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative focus-visible:outline-none",
                   isActive
                     ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                    : "text-muted-foreground hover:text-primary"
                 )}
               >
                 <Icon className={cn("w-6 h-6", isActive && "stroke-[2.5]")} />
@@ -535,7 +535,7 @@ export function BottomNav() {
               onClick={() => { triggerHapticFeedback(); setFabMenuOpen(v => !v); }}
               aria-label="Registrar log diário"
               className={cn(
-                "w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg transition-all duration-200",
+                "w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/30 transition-all duration-200 focus-visible:outline-none",
                 fabMenuOpen ? "scale-90 opacity-75" : "active:scale-95"
               )}
             >
@@ -593,7 +593,7 @@ export function BottomNav() {
               onClick={() => { triggerHapticFeedback(); setCalcMenuOpen(v => !v); }}
               aria-label="Calculadoras"
               className={cn(
-                "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative",
+                "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative focus-visible:outline-none",
                 isCalcActive || calcMenuOpen
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-primary hover:bg-primary/10"
@@ -610,7 +610,7 @@ export function BottomNav() {
                 onClick={triggerHapticFeedback}
                 aria-label="Mais opções"
                 className={cn(
-                  "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative",
+                  "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative focus-visible:outline-none",
                   "hover:bg-primary/10",
                   isMoreMenuActive
                     ? "text-primary bg-primary/10"
