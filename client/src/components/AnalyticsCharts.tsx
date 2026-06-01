@@ -102,8 +102,8 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis domain={['dataMin - 2', 'dataMax + 2']} className="text-xs" />
+                  <XAxis dataKey="date" className="text-xs font-mono" />
+                  <YAxis domain={['dataMin - 2', 'dataMax + 2']} className="text-xs font-mono" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   <Area type="monotone" dataKey="temp" stroke="#f97316" strokeWidth={2.5}
@@ -137,8 +137,8 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis domain={[0, 100]} className="text-xs" />
+                  <XAxis dataKey="date" className="text-xs font-mono" />
+                  <YAxis domain={[0, 100]} className="text-xs font-mono" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   <Area type="monotone" dataKey="rh" stroke="#3b82f6" strokeWidth={2.5}
@@ -172,8 +172,8 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis domain={['dataMin - 50', 'dataMax + 50']} className="text-xs" />
+                  <XAxis dataKey="date" className="text-xs font-mono" />
+                  <YAxis domain={['dataMin - 50', 'dataMax + 50']} className="text-xs font-mono" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   <Area type="monotone" dataKey="ppfd" stroke="#eab308" strokeWidth={2.5}
@@ -211,9 +211,9 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted opacity-30" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis yAxisId="left" domain={[0, 14]} className="text-xs" />
-                  <YAxis yAxisId="right" orientation="right" domain={[0, 'dataMax + 0.5']} className="text-xs" />
+                  <XAxis dataKey="date" className="text-xs font-mono" />
+                  <YAxis yAxisId="left" domain={[0, 14]} className="text-xs font-mono" />
+                  <YAxis yAxisId="right" orientation="right" domain={[0, 'dataMax + 0.5']} className="text-xs font-mono" />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   {hasPHData && (

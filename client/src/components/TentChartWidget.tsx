@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { CHART_AXIS_COLOR, CHART_TARGET_FILL, CHART_TARGET_STROKE } from "@/lib/chartColors";
 import { Thermometer, Droplets, Sun, Beaker, Zap } from "lucide-react";
+import { LivePill } from "@/components/LivePill";
 
 type Parameter = "all" | "temp" | "rh" | "ppfd" | "ph" | "ec";
 
@@ -180,7 +181,7 @@ export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWi
           <h3 className="text-lg font-bold text-foreground">
             {tentName}
           </h3>
-          <span className="text-xs text-muted-foreground">Última Semana</span>
+          <LivePill count={data.length} label="DIAS" color="var(--primary)" pulse={false} />
         </div>
       </div>
 
@@ -224,12 +225,12 @@ export function TentChartWidget({ tentId: _tentId, tentName, data }: TentChartWi
           <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 11, fill: CHART_AXIS_COLOR() }}
+            tick={{ fontSize: 11, fill: CHART_AXIS_COLOR(), fontFamily: 'var(--font-mono)' }}
             stroke={CHART_AXIS_COLOR()}
           />
           <YAxis
             domain={yAxisDomain}
-            tick={{ fontSize: 11, fill: CHART_AXIS_COLOR() }}
+            tick={{ fontSize: 11, fill: CHART_AXIS_COLOR(), fontFamily: 'var(--font-mono)' }}
             stroke={CHART_AXIS_COLOR()}
             label={{ value: '%', angle: 0, position: 'top', offset: 10, fontSize: 10, fill: CHART_AXIS_COLOR() }}
           />

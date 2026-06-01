@@ -34,6 +34,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { HistoryTableSkeleton } from "@/components/ListSkeletons";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
+import { LivePill } from "@/components/LivePill";
 import {
   Sheet,
   SheetContent,
@@ -560,11 +561,14 @@ export default function HistoryTable() {
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Registros Diários</CardTitle>
-                <CardDescription>
-                  {logsData?.total || 0} registro(s) encontrado(s)
-                </CardDescription>
+              <div className="flex items-center gap-3">
+                <div>
+                  <CardTitle>Registros Diários</CardTitle>
+                  <CardDescription>
+                    {logsData?.total || 0} registro(s) encontrado(s)
+                  </CardDescription>
+                </div>
+                <LivePill count={logsData?.total ?? 0} label="REGISTROS" color="var(--primary)" pulse={false} />
               </div>
               <Badge variant="outline">
                 Página {currentPage} de {totalPages}
@@ -726,7 +730,7 @@ export default function HistoryTable() {
                         const vpd = calcVPD(log.tempC, log.rhPct);
                         return (
                         <TableRow key={log.id}>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium font-mono text-xs">
                             {new Date(log.logDate).toLocaleDateString("pt-BR")}
                           </TableCell>
                           <TableCell>
@@ -735,12 +739,12 @@ export default function HistoryTable() {
                             </Badge>
                           </TableCell>
                           <TableCell>{log.tentName || "-"}</TableCell>
-                          <TableCell className="text-right">{log.tempC || "-"}</TableCell>
-                          <TableCell className="text-right">{log.rhPct || "-"}</TableCell>
-                          <TableCell className="text-right">{log.ppfd || "-"}</TableCell>
-                          <TableCell className="text-right">{log.ph || "-"}</TableCell>
-                          <TableCell className="text-right">{log.ec || "-"}</TableCell>
-                          <TableCell className="text-right hidden lg:table-cell font-mono text-xs">
+                          <TableCell className="text-right font-mono font-semibold text-orange-500 dark:text-orange-400">{log.tempC || "-"}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold text-cyan-500 dark:text-cyan-400">{log.rhPct || "-"}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold text-amber-500 dark:text-amber-400">{log.ppfd || "-"}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold text-sky-500 dark:text-sky-300">{log.ph || "-"}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold text-violet-500 dark:text-violet-300">{log.ec || "-"}</TableCell>
+                          <TableCell className="text-right hidden lg:table-cell font-mono font-semibold text-emerald-500 dark:text-emerald-400">
                             {vpd ?? "-"}
                           </TableCell>
                           <TableCell className="max-w-xs truncate hidden md:table-cell" title={log.notes || ""}>

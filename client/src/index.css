@@ -2178,3 +2178,18 @@ html.capacitor-native [data-sonner-toaster][data-y-position="top"],
 html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
   top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
 }
+
+/* LivePill — dot pulsante (portado do site Features.astro).
+ * Halo radial que expande e some, como "sinal ao vivo". Cor vem do inline style. */
+.live-pill-dot {
+  animation: live-pill-pulse 2s ease-out infinite;
+}
+@keyframes live-pill-pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; }
+  70%  { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+/* Acessibilidade: sem animação se o usuário pediu menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .live-pill-dot { animation: none; }
+}
