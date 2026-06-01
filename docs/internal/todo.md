@@ -3592,7 +3592,7 @@ Remover fase CLONING e adicionar botão "Tirar Clones" direto na MANUTENÇÃO
 - [x] Adicionar "Avançar para Floração" em verde (fase VEGA)
 - [x] Adicionar "Avançar para Secagem" em laranja (fase FLORA)
 - [x] Adicionar "Finalizar Clonagem" em azul (fase CLONING)
-- [ ] Aplicar as mesmas ações na página de detalhes da estufa (TentDetail)
+- [x] Aplicar as mesmas ações na página de detalhes da estufa (TentDetail) — botão "Finalizar Clonagem" adicionado (routine 2026-06-01)
 
 ## Mini-modal de confirmação de avanço de fase (27/02/2026)
 
