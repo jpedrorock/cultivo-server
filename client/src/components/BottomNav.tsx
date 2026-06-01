@@ -596,7 +596,7 @@ export function BottomNav() {
                 "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative focus-visible:outline-none",
                 isCalcActive || calcMenuOpen
                   ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  : "text-muted-foreground hover:text-primary"
               )}
             >
               <Calculator className={cn("w-6 h-6", (isCalcActive || calcMenuOpen) && "stroke-[2.5]")} />
@@ -611,7 +611,6 @@ export function BottomNav() {
                 aria-label="Mais opções"
                 className={cn(
                   "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative focus-visible:outline-none",
-                  "hover:bg-primary/10",
                   isMoreMenuActive
                     ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover:text-primary"
