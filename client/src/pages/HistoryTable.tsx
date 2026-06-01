@@ -601,9 +601,9 @@ export default function HistoryTable() {
                               <Badge variant={log.turn === "AM" ? "default" : "secondary"} className="text-xs px-2 py-0.5">
                                 {log.turn || "-"}
                               </Badge>
-                              <span className="text-base font-semibold">
-                                {new Date(log.logDate).toLocaleDateString("pt-BR", { 
-                                  day: '2-digit', 
+                              <span className="text-base font-semibold font-mono">
+                                {new Date(log.logDate).toLocaleDateString("pt-BR", {
+                                  day: '2-digit',
                                   month: 'short',
                                   year: 'numeric'
                                 })}
@@ -636,28 +636,28 @@ export default function HistoryTable() {
                       <CardContent className="pt-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">Temperatura</p>
-                            <p className="text-lg font-semibold">{log.tempC ? `${log.tempC}°C` : "-"}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-mono">Temperatura</p>
+                            <p className="text-lg font-semibold font-mono text-orange-500 dark:text-orange-400">{log.tempC ? `${log.tempC}°C` : "-"}</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">Umidade</p>
-                            <p className="text-lg font-semibold">{log.rhPct ? `${log.rhPct}%` : "-"}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-mono">Umidade</p>
+                            <p className="text-lg font-semibold font-mono text-cyan-500 dark:text-cyan-400">{log.rhPct ? `${log.rhPct}%` : "-"}</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">PPFD</p>
-                            <p className="text-lg font-semibold">{log.ppfd || "-"}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-mono">PPFD</p>
+                            <p className="text-lg font-semibold font-mono text-amber-500 dark:text-amber-400">{log.ppfd || "-"}</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">pH</p>
-                            <p className="text-lg font-semibold">{log.ph || "-"}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-mono">pH</p>
+                            <p className="text-lg font-semibold font-mono text-sky-500 dark:text-sky-300">{log.ph || "-"}</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">EC</p>
-                            <p className="text-lg font-semibold">{log.ec || "-"}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-mono">EC</p>
+                            <p className="text-lg font-semibold font-mono text-violet-500 dark:text-violet-300">{log.ec || "-"}</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wide">VPD (kPa)</p>
-                            <p className="text-lg font-semibold font-mono">{vpdMobile ?? "-"}</p>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-mono">VPD (kPa)</p>
+                            <p className="text-lg font-semibold font-mono text-emerald-500 dark:text-emerald-400">{vpdMobile ?? "-"}</p>
                           </div>
                         </div>
                         {log.notes && (

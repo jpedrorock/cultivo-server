@@ -3,7 +3,8 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, TestTube, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud, Camera } from "lucide-react";
+import { LivePill } from "@/components/LivePill";
+import { Loader2, ThermometerSun, Droplets, Sun, ArrowLeft, Calendar, FileDown, Plus, Play, Leaf, Flower2, Wind, Trash2, AlertTriangle, Pencil, Share2, MoreVertical, Clock, Zap, Sprout, Monitor, QrCode, FlaskConical, Wifi, WifiOff, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, RefreshCw, Settings, Lightbulb, Fan, Droplet, Flame, Snowflake, Cloud, Camera } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useParams, useLocation } from "wouter";
@@ -1758,41 +1759,6 @@ export default function TentDetails() {
       {/* Main Content */}
       <main className="container py-6 max-w-7xl space-y-6">
 
-        {/* ── Último registro — linha compacta ── */}
-        {logs && logs.length > 0 && (() => {
-          const last = logs[0];
-          type Pill = { icon: React.ReactNode; value: string; ok: boolean | null };
-          const pills: Pill[] = [
-            { icon: <ThermometerSun className="w-3 h-3 text-orange-400" />, value: last.tempC ? `${parseFloat(last.tempC).toFixed(1)}°C` : "—", ok: last.tempC ? (parseFloat(last.tempC) >= 20 && parseFloat(last.tempC) <= 28) : null },
-            { icon: <Droplets className="w-3 h-3 text-teal-400" />,         value: last.rhPct  ? `${parseFloat(last.rhPct).toFixed(0)}%`  : "—", ok: last.rhPct  ? (parseFloat(last.rhPct)  >= 40 && parseFloat(last.rhPct)  <= 70) : null },
-            { icon: <TestTube  className="w-3 h-3 text-purple-400" />,      value: last.ph     ? `pH ${parseFloat(last.ph).toFixed(1)}`    : "—", ok: last.ph     ? (parseFloat(last.ph)    >= 5.8 && parseFloat(last.ph)    <= 6.5) : null },
-            { icon: <Zap       className="w-3 h-3 text-emerald-400" />,     value: last.ec     ? `${parseFloat(last.ec).toFixed(1)} mS`    : "—", ok: last.ec     ? (parseFloat(last.ec)    >= 1.0 && parseFloat(last.ec)    <= 2.5) : null },
-            { icon: <Droplets  className="w-3 h-3 text-cyan-400" />,        value: last.wateringVolume ? `${last.wateringVolume}ml`         : "—", ok: null },
-            { icon: <Sun       className="w-3 h-3 text-amber-400" />,       value: (weekTargets as any)?.photoperiod ? `${(weekTargets as any).photoperiod}h` : "—", ok: null },
-          ].filter(p => p.value !== "—");
-          if (pills.length === 0) return null;
-          return (
-            <div className="flex items-center gap-1 flex-wrap px-1">
-              <span className="text-xs text-muted-foreground/50 flex items-center gap-1 mr-1 shrink-0">
-                <Clock className="w-2.5 h-2.5" />
-                {format(new Date(last.logDate), "dd/MM HH:mm", { locale: ptBR })}
-              </span>
-              {pills.map((p, i) => (
-                <span
-                  key={i}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-                    p.ok === null    ? "bg-muted/30 border-border/40 text-muted-foreground" :
-                    p.ok            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
-                                      "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {p.icon}{p.value}
-                </span>
-              ))}
-            </div>
-          );
-        })()}
-
         {/* Cycle — fase + botões de avanço de fase */}
         {cycle && tent && (
           <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
@@ -1908,6 +1874,122 @@ export default function TentDetails() {
           </>
         )}
 
+        {/* Hero do ambiente — módulo de destaque estilo dashboard (DNA do site).
+            Pílula LIVE + KPIs grandes em mono + linha PPFD com target band.
+            Usa leitura live do sensor (reading) com fallback pro último log. */}
+        {(() => {
+          const heroTemp = logs?.[0]?.tempC ? parseFloat(logs[0].tempC) : null;
+          const heroRh = logs?.[0]?.rhPct ? parseFloat(logs[0].rhPct) : null;
+          const heroVpd = heroTemp != null && heroRh != null
+            ? parseFloat((0.6108 * Math.exp(17.27 * heroTemp / (heroTemp + 237.3)) * (1 - heroRh / 100)).toFixed(2))
+            : null;
+          const heroPpfd = logs?.[0]?.ppfd ?? null;
+          const heroPh = logs?.[0]?.ph ? parseFloat(logs[0].ph) : null;
+          const heroEc = logs?.[0]?.ec ? parseFloat(logs[0].ec) : null;
+          const heroWater = logs?.[0]?.wateringVolume ?? null;
+          const heroPhoto = (weekTargets as any)?.photoperiod ?? null;
+          const heroDate = logs?.[0]?.logDate ?? null;
+          // "LIVE" se o último log é recente (< 2h)
+          const isLive = !!(logs?.[0]?.logDate && (Date.now() - new Date(logs[0].logDate).getTime()) < 2 * 60 * 60 * 1000);
+          const phaseClr = phaseColor(currentPhase);
+          const ppfdSeries = chartData.filter(d => d.ppfd != null).slice(-12).map(d => d.ppfd as number);
+          const ppfdMax = Math.max(900, ...ppfdSeries, heroPpfd ?? 0);
+          return (
+            <div className="rounded-[1.25rem] border border-border bg-card overflow-hidden" style={{ borderLeft: `4px solid ${phaseClr}` }}>
+              {/* Header: nome + pílula LIVE */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+                <span className="flex items-center gap-2 font-bold tracking-wide">
+                  <span className="inline-block w-3.5 h-3.5 rounded-[4px] border-2" style={{ borderColor: phaseClr }} />
+                  {tent.name}
+                </span>
+                <LivePill
+                  count={typeof tentId === "string" ? tentId : tent.id}
+                  label={isLive ? "LIVE" : (currentPhase ?? "—")}
+                  phase={currentPhase}
+                  pulse={isLive}
+                />
+              </div>
+              {/* KPIs grandes em mono */}
+              <div className="grid grid-cols-3">
+                <div className="py-5 text-center border-r border-border/60">
+                  <div className="font-mono text-3xl font-bold leading-none text-orange-500 dark:text-orange-400">
+                    {heroTemp != null ? `${heroTemp.toFixed(1)}°` : "--"}
+                  </div>
+                  <div className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase mt-2">Temp</div>
+                </div>
+                <div className="py-5 text-center border-r border-border/60">
+                  <div className="font-mono text-3xl font-bold leading-none text-cyan-500 dark:text-cyan-400">
+                    {heroRh != null ? `${Math.round(heroRh)}%` : "--"}
+                  </div>
+                  <div className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase mt-2">Hum</div>
+                </div>
+                <div className="py-5 text-center">
+                  <div className="font-mono text-3xl font-bold leading-none text-emerald-500 dark:text-emerald-400">
+                    {heroVpd != null ? heroVpd.toFixed(2) : "--"}
+                  </div>
+                  <div className="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase mt-2">VPD</div>
+                </div>
+              </div>
+              {/* Linha PPFD + target band */}
+              {heroPpfd != null && (
+                <div className="px-5 pt-4 pb-5 border-t border-border/60">
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">PPFD</span>
+                    <span className="font-mono text-sm font-semibold text-amber-500 dark:text-amber-400">{heroPpfd} µmol</span>
+                  </div>
+                  {ppfdSeries.length > 1 && (
+                    <svg viewBox="0 0 800 90" width="100%" height="64" preserveAspectRatio="none" className="block">
+                      {/* target band 600–900 µmol normalizado */}
+                      <rect x="0" y={90 - (900 / ppfdMax) * 90} width="800"
+                        height={((900 - 600) / ppfdMax) * 90} fill={phaseColorAlpha(currentPhase, 0.12)} />
+                      <polyline fill="none" stroke={phaseClr} strokeWidth="2.5"
+                        points={ppfdSeries.map((v, i) =>
+                          `${(i / (ppfdSeries.length - 1)) * 800},${90 - (v / ppfdMax) * 90}`).join(" ")} />
+                      <circle r="4" fill={phaseClr}
+                        cx="800" cy={90 - (ppfdSeries[ppfdSeries.length - 1] / ppfdMax) * 90} />
+                    </svg>
+                  )}
+                </div>
+              )}
+              {/* Linha secundária: pH · EC · Rega · Fotoperíodo + timestamp (preserva dados da linha compacta antiga) */}
+              {(heroPh != null || heroEc != null || heroWater != null || heroPhoto != null) && (
+                <div className="flex items-center gap-4 flex-wrap px-5 py-3 border-t border-border/60">
+                  {heroPh != null && (
+                    <span className="flex items-center gap-1.5 font-mono text-xs">
+                      <span className="text-muted-foreground tracking-wider uppercase">pH</span>
+                      <span className="font-semibold text-sky-500 dark:text-sky-300">{heroPh.toFixed(1)}</span>
+                    </span>
+                  )}
+                  {heroEc != null && (
+                    <span className="flex items-center gap-1.5 font-mono text-xs">
+                      <span className="text-muted-foreground tracking-wider uppercase">EC</span>
+                      <span className="font-semibold text-violet-500 dark:text-violet-300">{heroEc.toFixed(1)} mS</span>
+                    </span>
+                  )}
+                  {heroWater != null && (
+                    <span className="flex items-center gap-1.5 font-mono text-xs">
+                      <span className="text-muted-foreground tracking-wider uppercase">Rega</span>
+                      <span className="font-semibold text-cyan-500 dark:text-cyan-400">{heroWater}ml</span>
+                    </span>
+                  )}
+                  {heroPhoto != null && (
+                    <span className="flex items-center gap-1.5 font-mono text-xs">
+                      <span className="text-muted-foreground tracking-wider uppercase">Luz</span>
+                      <span className="font-semibold text-amber-500 dark:text-amber-400">{heroPhoto}h</span>
+                    </span>
+                  )}
+                  {heroDate && (
+                    <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground/60 ml-auto">
+                      <Clock className="w-2.5 h-2.5" />
+                      {format(new Date(heroDate), "dd/MM HH:mm", { locale: ptBR })}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Tabs principais — agrupa as 4 áreas da estufa numa nav só.
             Antes eram 4 cards empilhados (sensor / pair / cenas / plantas) +
             tabs internas de gráficos. Agora tudo em 4 tabs no mesmo nível,
@@ -2012,8 +2094,8 @@ export default function TentDetails() {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
-                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
-                        <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[15, 35]} />
+                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs font-mono" />
+                        <YAxis stroke="currentColor" className="opacity-40 text-xs font-mono" domain={[15, 35]} />
                         <Tooltip
                           contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
                           labelStyle={{ color: "var(--foreground)" }}
@@ -2060,8 +2142,8 @@ export default function TentDetails() {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
-                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
-                        <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[30, 90]} />
+                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs font-mono" />
+                        <YAxis stroke="currentColor" className="opacity-40 text-xs font-mono" domain={[30, 90]} />
                         <Tooltip
                           contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
                           labelStyle={{ color: "var(--foreground)" }}
@@ -2106,8 +2188,8 @@ export default function TentDetails() {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
-                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
-                        <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 1200]} />
+                        <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs font-mono" />
+                        <YAxis stroke="currentColor" className="opacity-40 text-xs font-mono" domain={[0, 1200]} />
                         <Tooltip
                           contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
                           labelStyle={{ color: "var(--foreground)" }}
@@ -2154,8 +2236,8 @@ export default function TentDetails() {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
-                          <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
-                          <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[4.5, 8]} tickCount={8} />
+                          <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs font-mono" />
+                          <YAxis stroke="currentColor" className="opacity-40 text-xs font-mono" domain={[4.5, 8]} tickCount={8} />
                           <Tooltip
                             contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
                             labelStyle={{ color: "var(--foreground)" }}
@@ -2204,8 +2286,8 @@ export default function TentDetails() {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
-                          <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs" />
-                          <YAxis stroke="currentColor" className="opacity-40 text-xs" domain={[0, 4]} tickCount={9} />
+                          <XAxis dataKey="date" stroke="currentColor" className="opacity-40 text-xs font-mono" />
+                          <YAxis stroke="currentColor" className="opacity-40 text-xs font-mono" domain={[0, 4]} tickCount={9} />
                           <Tooltip
                             contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "13px" }}
                             labelStyle={{ color: "var(--foreground)" }}
@@ -2253,9 +2335,9 @@ export default function TentDetails() {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} />
-                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} />
-                          <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="ml" width={48} />
-                          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5 }} tickLine={false} axisLine={false} unit="%" width={36} domain={[0, 100]} />
+                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5, fontFamily: "var(--font-mono)" }} tickLine={false} axisLine={false} />
+                          <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5, fontFamily: "var(--font-mono)" }} tickLine={false} axisLine={false} unit="ml" width={48} />
+                          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "currentColor", opacity: 0.5, fontFamily: "var(--font-mono)" }} tickLine={false} axisLine={false} unit="%" width={36} domain={[0, 100]} />
                           <Tooltip
                             contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
                             formatter={(value: any, name: any) => name === "Rega" ? [`${value} ml`, name] : [`${value}%`, name]}
@@ -2293,8 +2375,9 @@ export default function TentDetails() {
               </Card>
             ) : logs && logs.length > 0 ? (
               <div className="space-y-2">
-                {/* Toggle button for auto logs */}
-                <div className="flex justify-end pb-1">
+                {/* Header: pílula de contagem + toggle de auto logs */}
+                <div className="flex items-center justify-between pb-1">
+                  <LivePill count={historyLogs.length} label="REGISTROS" phase={currentPhase} pulse={false} />
                   <button
                     onClick={() => setShowAutoLogs(v => !v)}
                     className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${showAutoLogs ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-500' : 'border-border text-muted-foreground'}`}
@@ -2313,20 +2396,20 @@ export default function TentDetails() {
                         key={log.id}
                         className={`rounded-xl border border-border/20 bg-card/60 px-4 py-2.5 flex items-center gap-3 transition-opacity ${deletingLogId === log.id ? "opacity-40" : ""}`}
                       >
-                        <span className="text-xs text-muted-foreground/50 tabular-nums shrink-0">
+                        <span className="text-xs font-mono text-muted-foreground/50 tabular-nums shrink-0">
                           {format(new Date(log.logDate), "HH:mm", { locale: ptBR })}
                         </span>
-                        <span className="text-xs text-muted-foreground/50 capitalize shrink-0">
+                        <span className="text-xs font-mono text-muted-foreground/50 capitalize shrink-0">
                           {format(new Date(log.logDate), "EEE, dd MMM", { locale: ptBR })}
                         </span>
                         {log.tempC && (
-                          <span className="flex items-center gap-1 text-xs text-foreground/60">
+                          <span className="flex items-center gap-1 text-xs font-mono text-foreground/60">
                             <ThermometerSun className="w-3 h-3 text-orange-400 shrink-0" />
                             {log.tempC}°C
                           </span>
                         )}
                         {log.rhPct && (
-                          <span className="flex items-center gap-1 text-xs text-foreground/60">
+                          <span className="flex items-center gap-1 text-xs font-mono text-foreground/60">
                             <Droplets className="w-3 h-3 text-blue-400 shrink-0" />
                             {log.rhPct}%
                           </span>
@@ -2344,7 +2427,7 @@ export default function TentDetails() {
                   >
                     {/* Header — data full width */}
                     <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
-                      <span className="text-xs font-semibold text-foreground/70 capitalize">
+                      <span className="text-xs font-mono font-semibold text-foreground/70 capitalize">
                         {format(new Date(log.logDate), "EEE, dd MMM", { locale: ptBR })}
                       </span>
                       <span className={`text-xs font-semibold px-1.5 py-0.5 rounded leading-none ${
@@ -2381,21 +2464,21 @@ export default function TentDetails() {
                       <div className="grid grid-cols-3 divide-x divide-border/20 bg-white/[0.015]">
                         <div className="px-3 py-3 flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">Temp</span>
-                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                          <span className="flex items-center gap-1 text-sm font-mono font-medium text-foreground/80 leading-none">
                             <ThermometerSun className="w-3.5 h-3.5 text-orange-400 shrink-0" />
                             {log.tempC ? `${log.tempC}°C` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">Humidade</span>
-                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                          <span className="flex items-center gap-1 text-sm font-mono font-medium text-foreground/80 leading-none">
                             <Droplets className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                             {log.rhPct ? `${log.rhPct}%` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">PPFD</span>
-                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                          <span className="flex items-center gap-1 text-sm font-mono font-medium text-foreground/80 leading-none">
                             <Sun className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
                             {log.ppfd ? `${log.ppfd} µmol` : <span className="text-muted-foreground/20">—</span>}
                           </span>
@@ -2408,21 +2491,21 @@ export default function TentDetails() {
                       <div className="grid grid-cols-3 divide-x divide-border/20">
                         <div className="px-3 py-3 flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">pH</span>
-                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                          <span className="flex items-center gap-1 text-sm font-mono font-medium text-foreground/80 leading-none">
                             <FlaskConical className="w-3.5 h-3.5 text-teal-400 shrink-0" />
                             {log.ph ? `${log.ph}` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">EC</span>
-                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                          <span className="flex items-center gap-1 text-sm font-mono font-medium text-foreground/80 leading-none">
                             <Zap className="w-3.5 h-3.5 text-violet-400 shrink-0" />
                             {log.ec ? `${log.ec}` : <span className="text-muted-foreground/20">—</span>}
                           </span>
                         </div>
                         <div className="px-3 py-3 flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground/40 uppercase tracking-wider leading-none">Runoff</span>
-                          <span className="flex items-center gap-1 text-sm font-medium text-foreground/80 leading-none">
+                          <span className="flex items-center gap-1 text-sm font-mono font-medium text-foreground/80 leading-none">
                             <Droplets className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                             {log.runoffPercentage
                               ? `${log.runoffPercentage}%`
