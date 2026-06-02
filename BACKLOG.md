@@ -60,6 +60,12 @@ _Nenhum item P1 com critério suficientemente claro no momento._
 
 _Histórico dos últimos itens automatizados pelo orchestrador._
 
+### [2026-06-02] test-waitlist-routes (P2)
+- `server/_core/waitlistRoutes.test.ts` criado — 8 testes
+- Cobre: happy path, email inválido, email ausente, origin não autorizado, CORS, normalização, sendWelcomeEmail
+- `pnpm check && pnpm lint && pnpm test` passando (80 passed / 154 total)
+- Branch: `routine-cultivo-20260602-0000` — PR #48
+
 ### [2026-06-02] Bootstrap dos arquivos de orquestração
 - CLAUDE.md, PLAYBOOK.md, BACKLOG.md, STATUS.md, UI-SHARED-NOTES.md criados
 - Razão: primeira execução do orchestrador, arquivos não existiam
@@ -72,6 +78,8 @@ _Histórico dos últimos itens automatizados pelo orchestrador._
 _Itens sendo trabalhados agora (evitar conflito)._
 
 _Nenhum item em progresso._
+
+
 
 ---
 
