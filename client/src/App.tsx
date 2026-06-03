@@ -63,6 +63,7 @@ const PlantDetail          = lazy(() => import("./pages/PlantDetail"));
 const PlantTrainingPage    = lazy(() => import("./pages/PlantTrainingPage"));
 const NewPlant             = lazy(() => import("./pages/NewPlant"));
 const OnboardingWizard     = lazy(() => import("./components/onboarding/OnboardingWizard"));
+const OnboardingDemoLog    = lazy(() => import("./components/onboarding/OnboardingDemoLog"));
 const OnboardingTour       = lazy(() => import("./components/onboarding/OnboardingTour"));
 const PlantArchivePage     = lazy(() => import("./pages/PlantArchivePage"));
 const HarvestQueue         = lazy(() => import("./pages/HarvestQueue"));
@@ -145,6 +146,7 @@ function Router() {
         <Route path={"/help/:section"} component={Help} />
         <Route path={"/help"} component={Help} />
         <Route path={"/onboarding"} component={OnboardingWizard} />
+        <Route path={"/onboarding/demo"}>{() => <OnboardingDemoLog />}</Route>
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
       </Switch>
