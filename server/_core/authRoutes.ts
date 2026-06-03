@@ -221,23 +221,15 @@ export function registerAuthRoutes(app: Express) {
    * se email não existe — atacante não consegue descobrir emails válidos
    * fazendo POST com diferentes endereços.
    *
-   * STATE ATUAL (MVP): endpoint registra o pedido em log + console pra
-   * admin processar manualmente. Email service real (nodemailer/Resend)
-   * não está integrado — substituir os TODOs abaixo quando plugar.
-   *
-   * FLUXO COMPLETO (futuro):
+   * FLUXO ATUAL:
    *  1. User submete email
-   *  2. Backend gera reset_token (32 bytes hex), expira em 24h, salva no DB
-   *  3. Email enviado: "Clique aqui pra resetar: <link>?token=<X>"
-   *  4. User abre link → /reset-password/:token
-   *  5. Página valida token + permite definir nova senha
-   *  6. Backend valida token + atualiza passwordHash + invalida token
+   *  2. Backend gera JWT HS256 de curta duração (1h) — stateless, sem tabela extra
+   *  3. Email enviado via Resend: link com token → /reset-password?token=<X>
+   *  4. User abre link, define nova senha
+   *  5. Backend valida token + atualiza passwordHash
    *
-   * ATÉ LÁ:
-   *  - User submete pedido
-   *  - Admin vê notificação no log do servidor
-   *  - Admin manualmente atualiza senha do user via DB ou painel admin
-   *  - Admin avisa user (whatsapp/etc) com a senha temporária
+   * Limitação MVP: token JWT não é invalidado após uso (janela 1h).
+   * Se invalidação imediata for necessária, salvar token em DB/Redis com flag `used`.
    */
   app.post('/api/auth/forgot-password', forgotPasswordLimiter, async (req: Request, res: Response) => {
     try {
