@@ -41,7 +41,7 @@ export async function sendWelcomeEmail(email: string, locale: string = 'en'): Pr
         <p>Recebemos seu cadastro no <strong>Cultivo App</strong>. Avisaremos assim que seu acesso estiver disponível.</p>
         <p>Enquanto isso, dá uma olhada nas nossas calculadoras gratuitas:</p>
         <p style="margin:24px 0">
-          <a href="https://cultivo.pro/calculators/vpd"
+          <a href="https://cultivo.pro/pt/calculadoras/vpd"
              style="background:#22c55e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
             Calculadoras de Cultivo
           </a>
@@ -59,7 +59,7 @@ export async function sendWelcomeEmail(email: string, locale: string = 'en'): Pr
         <p>We've received your sign-up for <strong>Cultivo App</strong>. We'll let you know as soon as your access is ready.</p>
         <p>In the meantime, check out our free calculators:</p>
         <p style="margin:24px 0">
-          <a href="https://cultivo.pro/en/calculators/vpd"
+          <a href="https://cultivo.pro/calculators/vpd"
              style="background:#22c55e;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
             Growing Calculators
           </a>
