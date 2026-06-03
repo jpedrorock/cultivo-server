@@ -266,8 +266,9 @@ export default function OnboardingWizard() {
 
       markWizardDone();
       setStep("done");
-      // Navega pro detalhe da estufa criada (E5 refina ainda mais)
-      setTimeout(() => setLocation(`/tent/${tent.id}`), 1400);
+      // E5: encadeia wizard → tutorial demo (skippável) → detalhe da estufa criada.
+      // O demo lê ?then= e navega pra lá ao concluir/pular.
+      setTimeout(() => setLocation(`/onboarding/demo?then=/tent/${tent.id}`), 1400);
     } catch (e: any) {
       cultivoToast.error("Erro ao configurar", e?.message ?? String(e));
       setStep("plantCount"); // volta pra tentar de novo
@@ -460,9 +461,9 @@ export default function OnboardingWizard() {
               <div className="w-16 h-16 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
                 <Check className="w-8 h-8 text-primary" strokeWidth={2.5} />
               </div>
-              <p className="text-lg font-bold">Tudo pronto! 🎉</p>
+              <p className="text-lg font-bold">Estufa criada! 🎉</p>
               <p className="text-sm text-muted-foreground max-w-xs">
-                Sua estufa está configurada. Levando você pra ela...
+                Agora um exemplo rápido de como registrar o dia a dia...
               </p>
             </div>
           )}

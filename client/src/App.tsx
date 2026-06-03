@@ -97,7 +97,7 @@ function Redirect({ to }: { to: string }) {
 }
 
 function Router() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch key={location}>
@@ -146,7 +146,15 @@ function Router() {
         <Route path={"/help/:section"} component={Help} />
         <Route path={"/help"} component={Help} />
         <Route path={"/onboarding"} component={OnboardingWizard} />
-        <Route path={"/onboarding/demo"}>{() => <OnboardingDemoLog />}</Route>
+        <Route path={"/onboarding/demo"}>
+          {() => {
+            // Lê ?then= pra saber pra onde ir após concluir/pular (ex: a estufa
+            // recém-criada pelo wizard). Sem param → Home.
+            const then = new URLSearchParams(window.location.search).get("then") || "/";
+            const go = () => navigate(then);
+            return <OnboardingDemoLog onComplete={go} onSkip={go} />;
+          }}
+        </Route>
         <Route path={"/404"} component={NotFound} />
         <Route component={NotFound} />
       </Switch>
