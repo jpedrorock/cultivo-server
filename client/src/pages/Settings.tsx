@@ -156,7 +156,7 @@ export default function Settings() {
             <ListItemAnimation>
               <SettingsSection title="Suporte">
                 <SettingsRow href="/help" icon={<BookOpen className="w-4 h-4" />} label="Guia do Usuário" description="Como usar todas as funcionalidades" />
-                <SettingsRow href="/onboarding/demo" icon={<PlayCircle className="w-4 h-4" />} label="Ver tutorial de registro" description="Demonstração de como registrar Temp/RH/pH/EC (não salva nada)" />
+                <SettingsRow href="/quick-log?demo=1" icon={<PlayCircle className="w-4 h-4" />} label="Ver tutorial de registro" description="Demonstração de como registrar Temp/RH/pH/EC (não salva nada)" />
                 <SettingsRow href="/settings/about" icon={<Info className="w-4 h-4" />} label="Sobre" description="Versão, suporte e dados locais" />
                 {/* "Refazer tour" só faz sentido em mobile native — no web o tour
                     não roda (gated por isNative()), então esconde a opção. */}

@@ -294,8 +294,9 @@ export default function OnboardingWizard() {
 
       markWizardDone();
       setStep("done");
-      // E5: encadeia pro tutorial demo (skippável) → detalhe da estufa criada.
-      setTimeout(() => setLocation(`/onboarding/demo?then=/tent/${tent.id}`), 1300);
+      // E5: encadeia pro tutorial de registro (QuickLog real em modo demo, não
+      // persiste) → detalhe da estufa criada. O demo lê ?then=.
+      setTimeout(() => setLocation(`/quick-log?demo=1&then=${encodeURIComponent(`/tent/${tent.id}`)}`), 1300);
     } catch (e: any) {
       cultivoToast.error("Erro ao configurar", e?.message ?? String(e));
       setStep("plantCount");

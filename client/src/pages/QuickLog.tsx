@@ -39,13 +39,31 @@ export default function QuickLog() {
     return null;
   })();
 
-  const [currentStep, setCurrentStep] = useState(0);
-  const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(urlMode);
+  // ── Modo TUTORIAL/DEMO (?demo=1) ─────────────────────────────────────────────
+  // Mostra a tela REAL de registro pro user se familiarizar, mas NÃO salva nada
+  // (nenhuma query/mutation real). `then` = pra onde ir ao concluir/pular.
+  // Usado pelo onboarding (wizard → demo → estufa) e por Settings.
+  const isDemo = (() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('demo') === '1';
+  })();
+  const demoThen = (() => new URLSearchParams(window.location.search).get('then') || '/')();
+  const [demoComplete, setDemoComplete] = useState(false);
+
+  // No demo já entra no fluxo "status" e pula a seleção de estufa (step 0):
+  // usamos uma estufa de exemplo sintética, então começa no step 1 (Temperatura).
+  const [currentStep, setCurrentStep] = useState(isDemo ? 1 : 0);
+  const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(isDemo ? 'status' : urlMode);
   const [confirmClose, setConfirmClose] = useState(false);
   const stepScrollRef = useRef<HTMLDivElement>(null);
 
   // Fecha ou pede confirmação se o usuário está no meio de um fluxo
   const handleClose = () => {
+    // No tutorial não há dado pra perder — sai direto pro destino.
+    if (isDemo) {
+      setLocation(demoThen);
+      return;
+    }
     if (logMode !== null) {
       setConfirmClose(true);
     } else {
@@ -166,8 +184,10 @@ export default function QuickLog() {
   }>>(new Map());
 
   // Fetch tents for selection
-  const { data: tents = [], isLoading: tentsLoading } = trpc.tents.list.useQuery();
-  const selectedTent = tents.find((t: any) => t.id === tentId);
+  const { data: tents = [], isLoading: tentsLoading } = trpc.tents.list.useQuery(undefined, { enabled: !isDemo });
+  // No demo, estufa sintética de exemplo (mineral, mostra o fluxo completo).
+  const DEMO_TENT = { id: -1, name: "Estufa de exemplo", category: "VEGA", cultivationMethod: "MINERAL" } as any;
+  const selectedTent = isDemo ? DEMO_TENT : tents.find((t: any) => t.id === tentId);
   // Cultivo Orgânico: estufa orgânica não mede EC/runoff; pH é opcional/informativo.
   const isOrganicTent = (selectedTent as any)?.cultivationMethod === "ORGANIC";
   const isFloraPhase = selectedTent?.category === "FLORA";
@@ -481,6 +501,13 @@ export default function QuickLog() {
   };
 
   const handleSaveDailyLog = async () => {
+    // Modo tutorial: NÃO salva. Mostra celebração e sai pro destino (then).
+    if (isDemo) {
+      triggerHaptic('medium');
+      setDemoComplete(true);
+      setTimeout(() => setLocation(demoThen), 1600);
+      return;
+    }
     if (!tentId) {
       toast.error("Selecione uma estufa");
       return;
@@ -613,11 +640,36 @@ export default function QuickLog() {
           {/* Botão fechar — dentro do card, canto superior direito */}
           <button
             onClick={() => { triggerHaptic('light'); handleClose(); }}
-            aria-label="Cancelar registro"
+            aria-label={isDemo ? "Pular tutorial" : "Cancelar registro"}
             className="absolute top-4 right-4 z-[200] w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-sm text-white hover:bg-black/35 active:scale-95 transition-all"
           >
             <X className="w-5 h-5" />
           </button>
+
+          {/* Banner de tutorial — modo demo (nada é salvo) */}
+          {isDemo && !demoComplete && (
+            <div className="shrink-0 bg-amber-500/12 border-b border-amber-500/25 px-4 py-2 text-center z-[150]">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                <strong>Tutorial</strong> · este é um exemplo — nada é salvo. Brinque à vontade 😊
+              </p>
+            </div>
+          )}
+
+          {/* Tela de conclusão do tutorial */}
+          {isDemo && demoComplete && (
+            <div className="absolute inset-0 z-[300] bg-card flex flex-col items-center justify-center gap-4 text-center px-8 animate-[fade-in_0.3s_ease-out]">
+              <div className="w-20 h-20 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
+                <Check className="w-10 h-10 text-primary" strokeWidth={2.5} />
+              </div>
+              <div className="space-y-1.5">
+                <h2 className="text-xl font-bold text-foreground">Você fez seu primeiro registro! 🎉</h2>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  No dia a dia é só tocar no <strong>+</strong> da barra e escolher "Status da estufa".
+                </p>
+              </div>
+              <Loader2 className="w-5 h-5 text-muted-foreground/50 animate-spin mt-1" />
+            </div>
+          )}
           {/* Seleção de tipo — aparece antes do step 0 */}
           {logMode === null && (
             <QuickLogModeSelector
@@ -1256,8 +1308,9 @@ export default function QuickLog() {
             );
           })()}
           <div className="px-4 py-3 flex gap-3">
-        {/* Back button - only for daily log steps */}
-        {currentStep > 0 && currentStep < 9 && (
+        {/* Back button - only for daily log steps. No demo, piso no step 1 (step 0
+            de seleção de estufa é pulado, não dá pra voltar pra ele). */}
+        {(isDemo ? currentStep > 1 : currentStep > 0) && currentStep < 9 && (
           <Button
             variant="outline"
             onClick={goBack}

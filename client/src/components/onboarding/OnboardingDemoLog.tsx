@@ -1,4 +1,10 @@
 /**
+ * ⚠️ DEPRECADO (2026-06-02) — NÃO está mais em uso.
+ * João pediu que o tutorial de registro seja IGUAL à tela real do app pro user
+ * se familiarizar. Substituído por `QuickLog` em modo `?demo=1` (não persiste).
+ * Este componente standalone (que IMITAVA o QuickLog) ficou obsoleto. Mantido no
+ * repo só pra histórico — pode ser removido com segurança.
+ *
  * OnboardingDemoLog — tutorial guiado do primeiro registro (E4 do épico Onboarding).
  *
  * IMPORTANTE: este é um tutorial ILUSTRATIVO. **Nada é enviado ao servidor** —

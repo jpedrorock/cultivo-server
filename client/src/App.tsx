@@ -63,7 +63,6 @@ const PlantDetail          = lazy(() => import("./pages/PlantDetail"));
 const PlantTrainingPage    = lazy(() => import("./pages/PlantTrainingPage"));
 const NewPlant             = lazy(() => import("./pages/NewPlant"));
 const OnboardingWizard     = lazy(() => import("./components/onboarding/OnboardingWizard"));
-const OnboardingDemoLog    = lazy(() => import("./components/onboarding/OnboardingDemoLog"));
 const OnboardingTour       = lazy(() => import("./components/onboarding/OnboardingTour"));
 const PlantArchivePage     = lazy(() => import("./pages/PlantArchivePage"));
 const HarvestQueue         = lazy(() => import("./pages/HarvestQueue"));
@@ -97,7 +96,7 @@ function Redirect({ to }: { to: string }) {
 }
 
 function Router() {
-  const [location, navigate] = useLocation();
+  const [location] = useLocation();
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch key={location}>
@@ -146,13 +145,12 @@ function Router() {
         <Route path={"/help/:section"} component={Help} />
         <Route path={"/help"} component={Help} />
         <Route path={"/onboarding"} component={OnboardingWizard} />
+        {/* Tutorial de registro = QuickLog real em modo ?demo=1 (não persiste).
+            /onboarding/demo legado → redireciona preservando o ?then=. */}
         <Route path={"/onboarding/demo"}>
           {() => {
-            // Lê ?then= pra saber pra onde ir após concluir/pular (ex: a estufa
-            // recém-criada pelo wizard). Sem param → Home.
             const then = new URLSearchParams(window.location.search).get("then") || "/";
-            const go = () => navigate(then);
-            return <OnboardingDemoLog onComplete={go} onSkip={go} />;
+            return <Redirect to={`/quick-log?demo=1&then=${encodeURIComponent(then)}`} />;
           }}
         </Route>
         <Route path={"/404"} component={NotFound} />
