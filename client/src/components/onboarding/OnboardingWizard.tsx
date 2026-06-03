@@ -2,9 +2,9 @@
  * OnboardingWizard — fluxo conversacional do primeiro user (first-run).
  *
  * Estilo conversa app↔usuário (não formulário tradicional). 5 perguntas:
- *   1. Tipo de cultivo  → Orgânico / Mineral  (UX-only — NÃO persiste; app só faz
- *      mineral hoje. Decisão João 2026-06-01. Vira campo no schema quando o épico
- *      orgânico for feito — ver ORGANIC-CULTIVATION-RESEARCH.md.)
+ *   1. Tipo de cultivo  → Orgânico / Mineral  (persiste em tents.cultivationMethod
+ *      desde a Fase 1 do épico orgânico — ORGANIC-IMPLEMENTATION-PLAN.md. No modo
+ *      ORGANIC o app esconde EC/runoff e torna pH opcional.)
  *   2. Tamanho da estufa → 7 presets + Personalizar
  *   3. Strain            → busca (famosas + strains do user) ou cria custom
  *   4. Quantas plantas   → stepper 0–99
@@ -244,6 +244,7 @@ export default function OnboardingWizard() {
       const tent = await createTent.mutateAsync({
         name: tentName,
         category: "VEGA",
+        cultivationMethod: cultivo ?? "MINERAL",
         width: tentDims.width,
         depth: tentDims.depth,
         height: tentDims.height,

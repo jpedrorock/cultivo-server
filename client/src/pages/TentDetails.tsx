@@ -1179,6 +1179,8 @@ export default function TentDetails() {
 
   const utils = trpc.useUtils();
   const { data: tent, isLoading: tentLoading } = trpc.tents.getById.useQuery({ id: tentId });
+  // Cultivo Orgânico: estufa orgânica não mede EC de solução — esconder chip/chart de EC.
+  const isOrganic = (tent as any)?.cultivationMethod === "ORGANIC";
   const [, navigate] = useLocation();
 
   const deleteMutation = trpc.tents.delete.useMutation({
@@ -1901,6 +1903,12 @@ export default function TentDetails() {
                 <span className="flex items-center gap-2 font-bold tracking-wide">
                   <span className="inline-block w-3.5 h-3.5 rounded-[4px] border-2" style={{ borderColor: phaseClr }} />
                   {tent.name}
+                  {isOrganic && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                      <Sprout className="w-3 h-3" />
+                      Orgânico
+                    </span>
+                  )}
                 </span>
                 <LivePill
                   count={typeof tentId === "string" ? tentId : tent.id}
@@ -1960,7 +1968,7 @@ export default function TentDetails() {
                       <span className="font-semibold text-sky-500 dark:text-sky-300">{heroPh.toFixed(1)}</span>
                     </span>
                   )}
-                  {heroEc != null && (
+                  {heroEc != null && !isOrganic && (
                     <span className="flex items-center gap-1.5 font-mono text-xs">
                       <span className="text-muted-foreground tracking-wider uppercase">EC</span>
                       <span className="font-semibold text-violet-500 dark:text-violet-300">{heroEc.toFixed(1)} mS</span>
@@ -2265,8 +2273,8 @@ export default function TentDetails() {
                   </Card>
                 )}
 
-                {/* EC Chart */}
-                {chartData.some(d => d.ec !== null) && (
+                {/* EC Chart — oculto no modo orgânico (não se mede EC de solução) */}
+                {!isOrganic && chartData.some(d => d.ec !== null) && (
                   <Card className="bg-card/90 backdrop-blur-sm relative overflow-hidden group/chart">
                     <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover/chart:opacity-100 transition-opacity duration-500" style={{ boxShadow: '0 0 0 1px rgba(16,185,129,0.15) inset' }} />
                     <CardHeader>

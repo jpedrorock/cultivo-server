@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sprout, Leaf, Flower2, Wind } from "lucide-react";
+import { Sprout, Leaf, Flower2, Wind, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/lib/haptics";
 
@@ -35,6 +35,7 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     category: "VEGA" as "MAINTENANCE" | "VEGA" | "FLORA" | "DRYING",
+    cultivationMethod: "MINERAL" as "MINERAL" | "ORGANIC",
     width: "",
     depth: "",
     height: "",
@@ -51,6 +52,7 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
       setFormData({
         name: "",
         category: "VEGA",
+        cultivationMethod: "MINERAL",
         width: "",
         depth: "",
         height: "",
@@ -77,6 +79,7 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
     createTent.mutate({
       name: formData.name,
       category: formData.category,
+      cultivationMethod: formData.cultivationMethod,
       width: parseInt(formData.width),
       depth: parseInt(formData.depth),
       height: parseInt(formData.height),
@@ -129,6 +132,28 @@ export function CreateTentModal({ open, onOpenChange }: CreateTentModalProps) {
               </Select>
               <p className="text-xs text-muted-foreground">
                 Define os parâmetros e tarefas apropriadas para esta estufa
+              </p>
+            </div>
+
+            {/* Método de cultivo */}
+            <div className="grid gap-2">
+              <Label htmlFor="cultivationMethod">Método de cultivo *</Label>
+              <Select
+                value={formData.cultivationMethod}
+                onValueChange={(value: "MINERAL" | "ORGANIC") =>
+                  setFormData({ ...formData, cultivationMethod: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MINERAL"><span className="flex items-center gap-1"><FlaskConical className="w-3.5 h-3.5 text-violet-400"/>Mineral (sais solúveis · EC/pH)</span></SelectItem>
+                  <SelectItem value="ORGANIC"><span className="flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-emerald-400"/>Orgânico (super soil · living soil)</span></SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                No modo orgânico o app não pede EC nem runoff (pH fica opcional).
               </p>
             </div>
 

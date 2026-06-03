@@ -19,6 +19,7 @@ interface Tent {
   id: number;
   name: string;
   category: "MAINTENANCE" | "VEGA" | "FLORA" | "DRYING";
+  cultivationMethod?: "MINERAL" | "ORGANIC" | "COCO" | "HYDRO" | null;
   width: number;
   depth: number;
   height: number;
@@ -36,6 +37,7 @@ interface EditTentDialogProps {
 export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTentDialogProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<"MAINTENANCE" | "VEGA" | "FLORA" | "DRYING">("VEGA");
+  const [cultivationMethod, setCultivationMethod] = useState<"MINERAL" | "ORGANIC">("MINERAL");
   const [width, setWidth] = useState("");
   const [depth, setDepth] = useState("");
   const [height, setHeight] = useState("");
@@ -57,6 +59,7 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
     if (tent) {
       setName(tent.name);
       setCategory(tent.category);
+      setCultivationMethod(tent.cultivationMethod === "ORGANIC" ? "ORGANIC" : "MINERAL");
       setWidth(tent.width.toString());
       setDepth(tent.depth.toString());
       setHeight(tent.height.toString());
@@ -103,6 +106,7 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
       id: tent.id,
       name: name.trim(),
       category,
+      cultivationMethod,
       width: widthNum,
       depth: depthNum,
       height: heightNum,
@@ -148,6 +152,22 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
                   <SelectItem value="DRYING">Secagem</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="cultivationMethod">Método de cultivo</Label>
+              <Select value={cultivationMethod} onValueChange={(value: any) => setCultivationMethod(value)}>
+                <SelectTrigger id="cultivationMethod">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MINERAL">Mineral (sais · EC/pH)</SelectItem>
+                  <SelectItem value="ORGANIC">Orgânico (super soil · living soil)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                No modo orgânico o app não pede EC nem runoff (pH fica opcional).
+              </p>
             </div>
 
             <div className="grid grid-cols-3 gap-4">

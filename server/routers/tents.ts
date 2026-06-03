@@ -66,6 +66,7 @@ export const tentsRouter = router({
         z.object({
           name: z.string().min(1).max(50),
           category: z.enum(["MAINTENANCE", "VEGA", "FLORA", "DRYING"]),
+          cultivationMethod: z.enum(["MINERAL", "ORGANIC", "COCO", "HYDRO"]).optional(),
           width: z.number().int().positive(),
           depth: z.number().int().positive(),
           height: z.number().int().positive(),
@@ -119,6 +120,7 @@ export const tentsRouter = router({
           id: z.number(),
           name: z.string().min(1).max(50),
           category: z.enum(["MAINTENANCE", "VEGA", "FLORA", "DRYING"]),
+          cultivationMethod: z.enum(["MINERAL", "ORGANIC", "COCO", "HYDRO"]).optional(),
           width: z.number().int().positive(),
           depth: z.number().int().positive(),
           height: z.number().int().positive(),

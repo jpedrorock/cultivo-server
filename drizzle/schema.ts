@@ -83,6 +83,13 @@ export const tents = mysqlTable("tents", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 50 }).notNull(),
   category: mysqlEnum("category", ["MAINTENANCE", "VEGA", "FLORA", "DRYING"]).notNull(),
+  /**
+   * Método de cultivo da estufa. Driver do comportamento por modo (Cultivo Orgânico
+   * Fase 1 — ver ORGANIC-IMPLEMENTATION-PLAN.md). MINERAL é o default: todas as
+   * estufas existentes assumem mineral (app nasceu mineral). ORGANIC esconde
+   * EC/runoff e torna pH opcional. COCO/HYDRO reservados pra futuro (reusam o enum).
+   */
+  cultivationMethod: mysqlEnum("cultivationMethod", ["MINERAL", "ORGANIC", "COCO", "HYDRO"]).default("MINERAL").notNull(),
   width: int("width").notNull(),
   depth: int("depth").notNull(),
   height: int("height").notNull(),

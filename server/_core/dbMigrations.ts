@@ -753,6 +753,17 @@ const MIGRATIONS: Migration[] = [
       await c.query(`INSERT IGNORE INTO \`siteSettings\` (\`id\`) VALUES (1)`);
     },
   },
+  {
+    // Cultivo Orgânico Fase 1 — método de cultivo por estufa.
+    // DEFAULT 'MINERAL' cobre todas as estufas existentes (app nasceu mineral),
+    // então zero backfill manual. Driver do comportamento por modo no client
+    // (esconde EC/runoff, pH opcional). Ver ORGANIC-IMPLEMENTATION-PLAN.md.
+    id: 'add-tents-cultivationMethod',
+    description: 'Adiciona tents.cultivationMethod (MINERAL/ORGANIC/COCO/HYDRO, default MINERAL)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'tents', 'cultivationMethod', "VARCHAR(16) NOT NULL DEFAULT 'MINERAL' AFTER `category`");
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

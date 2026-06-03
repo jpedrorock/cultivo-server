@@ -816,7 +816,10 @@ export async function checkAlertsForTent(tentId: number): Promise<{
   }
 
   // Verificar pH (se houver margem definida para a fase)
-  if (margins.phMargin !== null && latestLog.ph !== null && idealValues.phMin !== null && idealValues.phMax !== null) {
+  // Cultivo Orgânico: pH é apenas informativo (a microbiologia do solo tampona),
+  // então NÃO disparamos alerta de pH fora-de-faixa em estufas orgânicas — senão
+  // geraria alerta/push falso. Ver ORGANIC-IMPLEMENTATION-PLAN.md.
+  if (tent.cultivationMethod !== "ORGANIC" && margins.phMargin !== null && latestLog.ph !== null && idealValues.phMin !== null && idealValues.phMax !== null) {
     const ph = parseFloat(String(latestLog.ph));
     const idealMin = idealValues.phMin - parseFloat(String(margins.phMargin));
     const idealMax = idealValues.phMax + parseFloat(String(margins.phMargin));

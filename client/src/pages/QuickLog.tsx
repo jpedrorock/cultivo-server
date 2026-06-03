@@ -80,19 +80,33 @@ export default function QuickLog() {
     }
   };
   
+  // Cultivo Orgânico: estufa orgânica não mede EC (step 6) nem runoff (step 4) —
+  // são conceitos de cultivo mineral/hidro. Pulamos esses steps na navegação.
+  // selectedTent é computado mais abaixo no render; goNext/goBack só executam em
+  // click (pós-render), quando selectedTent já está definido.
   const goNext = () => {
     triggerHaptic('medium');
+    const isOrganic = (selectedTent as any)?.cultivationMethod === 'ORGANIC';
     // Só pula temp/rh se a query já retornou (sensorReading !== undefined) e está fresca
     if (currentStep === 0 && sensorReading !== undefined && sensorReading?.isFresh && logMode === 'status') {
       return setCurrentStep(3);
+    }
+    if (logMode === 'status' && isOrganic) {
+      if (currentStep === 3) return setCurrentStep(5); // Rega → pH (pula Runoff)
+      if (currentStep === 5) return setCurrentStep(7); // pH → PPFD (pula EC)
     }
     setCurrentStep(prev => prev + 1);
   };
 
   const goBack = () => {
     triggerHaptic('light');
+    const isOrganic = (selectedTent as any)?.cultivationMethod === 'ORGANIC';
     if (currentStep === 3 && sensorReading !== undefined && sensorReading?.isFresh && logMode === 'status') {
       return setCurrentStep(0);
+    }
+    if (logMode === 'status' && isOrganic) {
+      if (currentStep === 7) return setCurrentStep(5); // PPFD → pH (pula EC)
+      if (currentStep === 5) return setCurrentStep(3); // pH → Rega (pula Runoff)
     }
     setCurrentStep(prev => prev - 1);
   };
@@ -154,6 +168,8 @@ export default function QuickLog() {
   // Fetch tents for selection
   const { data: tents = [], isLoading: tentsLoading } = trpc.tents.list.useQuery();
   const selectedTent = tents.find((t: any) => t.id === tentId);
+  // Cultivo Orgânico: estufa orgânica não mede EC/runoff; pH é opcional/informativo.
+  const isOrganicTent = (selectedTent as any)?.cultivationMethod === "ORGANIC";
   const isFloraPhase = selectedTent?.category === "FLORA";
   const floraTents = tents.filter((t: any) => t.category === "FLORA");
 
@@ -711,7 +727,7 @@ export default function QuickLog() {
                   {currentStep === 2 && "Qual a umidade relativa?"}
                   {currentStep === 3 && "Quanto de água foi aplicado?"}
                   {currentStep === 4 && "Quanto de runoff foi coletado?"}
-                  {currentStep === 5 && "Qual o pH da solução?"}
+                  {currentStep === 5 && (isOrganicTent ? "pH do solo (opcional)" : "Qual o pH da solução?")}
                   {currentStep === 6 && "Qual a condutividade elétrica?"}
                   {currentStep === 7 && "Qual a intensidade de luz?"}
                   {currentStep === 8 && "Revise os dados registrados"}
