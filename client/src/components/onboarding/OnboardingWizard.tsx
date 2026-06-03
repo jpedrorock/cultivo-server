@@ -1,201 +1,298 @@
 /**
- * OnboardingWizard — guia de 3 passos pro primeiro user.
+ * OnboardingWizard — fluxo conversacional do primeiro user (first-run).
  *
- * Trigger: Home detecta `tents.length === 0` + flag wizard_done não está
- * no localStorage. Se positivo, redireciona pra /onboarding.
+ * Estilo conversa app↔usuário (não formulário tradicional). 5 perguntas:
+ *   1. Tipo de cultivo  → Orgânico / Mineral  (UX-only — NÃO persiste; app só faz
+ *      mineral hoje. Decisão João 2026-06-01. Vira campo no schema quando o épico
+ *      orgânico for feito — ver ORGANIC-CULTIVATION-RESEARCH.md.)
+ *   2. Tamanho da estufa → 7 presets + Personalizar
+ *   3. Strain            → busca (famosas + strains do user) ou cria custom
+ *   4. Quantas plantas   → stepper 0–99
+ *   5. Nomes das plantas → 1 campo por planta (pré-preenchido com strain)
  *
- * Steps:
- *   1. Criar primeira estufa (com exemplo pré-preenchido)
- *   2. Cadastrar primeira strain (lista de famosas + opção custom)
- *   3. Adicionar primeira planta (auto-vincula estufa + strain criados)
+ * Ao finalizar: cria a estufa (nome auto = apelido do preset, categoria VEGA),
+ * resolve/cria a strain, e cria N plantas SEMPRE vinculadas à estufa
+ * (currentTentId) — planta nunca fica órfã. "Nenhuma por enquanto" pula a
+ * criação de plantas (estufa vazia é válida).
  *
- * Cada step tem botão "Pular tutorial" no canto que sai pra Home e marca
- * flag (não mostra de novo). User também pode pular individual passos
- * 2 e 3 — mas se pular passo 1, fica sem estufa nenhuma e o app fica
- * "vazio". Por isso passo 1 não tem skip, só "Pular tutorial todo".
+ * Botão "Pular tutorial" sempre visível no header → marca wizard_done e vai pra Home.
  *
- * Estado: useState local nos 3 passos. Não precisa de Redux/Context —
- * componente é self-contained e termina rápido.
+ * Reusa E1 (tentPresets) + E2 (WizardBubble/Chips/SearchInput).
  */
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cultivoToast } from "@/lib/cultivoToast";
-import {
-  Sprout, Leaf, Home, ChevronRight, ChevronLeft, X, Check,
-  Loader2, AlertCircle, Sparkles,
-} from "lucide-react";
+import { X, Loader2, Check, Minus, Plus, ChevronRight, Pencil, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { FAMOUS_STRAINS, type FamousStrain } from "./famousStrains";
 import { markWizardDone } from "@/lib/wizardStorage";
+import { haptics } from "@/lib/haptics";
+import { WizardBubble, WizardTyping } from "./WizardBubble";
+import { WizardChips, type WizardChipOption } from "./WizardChips";
+import { WizardSearchInput, type WizardSearchResult } from "./WizardSearchInput";
+import {
+  TENT_PRESETS,
+  presetLabel,
+  presetSublabel,
+  presetDimensions,
+  getPresetById,
+  type Locale,
+} from "./tentPresets";
+import { FAMOUS_STRAINS } from "./famousStrains";
 
-// Re-exporta para compatibilidade com imports externos existentes.
+// Re-exporta pra compat com imports externos antigos.
 export { markWizardDone, isWizardDone } from "@/lib/wizardStorage";
 
-// ─── Tipos de estado ──────────────────────────────────────────────────────────
+// ─── Tipos ──────────────────────────────────────────────────────────────────
 
-type Step = 1 | 2 | 3 | "done";
+type Step = "cultivo" | "size" | "strain" | "plantCount" | "plantNames" | "creating" | "done";
 
-interface TentDraft {
-  name: string;
-  category: "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
-  width: number;
-  depth: number;
-  height: number;
-}
+type CultivoType = "ORGANIC" | "MINERAL";
 
-interface StrainDraft {
-  name: string;
-  vegaWeeks: number;
-  floraWeeks: number;
-  origin: "FEMINIZED" | "AUTOFLOWER" | "CLONE";
-}
+/** Seleção de strain — discrimina como resolver o id no fim. */
+type StrainPick =
+  | { kind: "existing"; id: number; name: string }
+  | { kind: "famous"; name: string; vegaWeeks: number; floraWeeks: number }
+  | { kind: "custom"; name: string };
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+const LOCALE: Locale = "pt"; // app é PT-only por ora (ver tentPresets.ts)
+
+const CULTIVO_OPTIONS: WizardChipOption[] = [
+  { id: "MINERAL", label: "Mineral", sublabel: "Sais solúveis · EC/pH" },
+  { id: "ORGANIC", label: "Orgânico", sublabel: "Super soil · living soil" },
+];
+
+// ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function OnboardingWizard() {
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step>("cultivo");
 
-  // Estado dos 3 forms (cada step preenche o seu)
-  const [tentDraft, setTentDraft] = useState<TentDraft>({
-    name: "Estufa A",
-    category: "VEGA",
-    width: 80,
-    depth: 80,
-    height: 160,
-  });
+  // Respostas
+  const [cultivo, setCultivo] = useState<CultivoType | null>(null);
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const [customDims, setCustomDims] = useState({ width: 80, depth: 80, height: 160 });
+  const [showCustom, setShowCustom] = useState(false);
+  const [strainPick, setStrainPick] = useState<StrainPick | null>(null);
+  const [strainQuery, setStrainQuery] = useState("");
+  const [plantCount, setPlantCount] = useState(1);
+  const [plantNames, setPlantNames] = useState<string[]>([]);
 
-  const [strainDraft, setStrainDraft] = useState<StrainDraft>({
-    name: "",
-    vegaWeeks: 4,
-    floraWeeks: 8,
-    origin: "FEMINIZED",
-  });
-
-  const [plantDraft, setPlantDraft] = useState<{ name: string; code: string }>({
-    name: "Planta 1",
-    code: "",
-  });
-
-  // IDs criados nos passos anteriores (pra usar no step 3)
-  const [createdTentId, setCreatedTentId] = useState<number | null>(null);
-  const [createdStrainId, setCreatedStrainId] = useState<number | null>(null);
-
-  // tRPC mutations
+  // tRPC
+  const utils = trpc.useUtils();
   const createTent = trpc.tents.create.useMutation();
   const createStrain = trpc.strains.create.useMutation();
   const createPlant = trpc.plants.create.useMutation();
+  const { data: userStrains = [] } = trpc.strains.list.useQuery(undefined, {
+    enabled: step === "strain",
+  });
 
-  // Pra invalidar queries após criação
-  const utils = trpc.useUtils();
+  // Auto-scroll pro fim da conversa quando avança
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [step, showCustom]);
 
-  /** Pula tutorial todo — vai pra Home e nunca mostra de novo */
   function skipAll() {
+    haptics.light().catch(() => {});
     markWizardDone();
     setLocation("/");
   }
 
-  /** Submete passo atual e avança */
-  async function handleStep1Submit() {
-    if (!tentDraft.name.trim()) {
-      cultivoToast.error("Informe o nome da estufa");
+  // ── Derivados ──────────────────────────────────────────────────────────────
+  const selectedPreset = presetId && presetId !== "custom" ? getPresetById(presetId) : null;
+  const tentDims = selectedPreset
+    ? { width: selectedPreset.width, depth: selectedPreset.depth, height: selectedPreset.height }
+    : customDims;
+  const tentSizeLabel = selectedPreset
+    ? `${presetLabel(selectedPreset, LOCALE)} · ${presetDimensions(selectedPreset)}`
+    : `Personalizada · ${customDims.width}×${customDims.depth}×${customDims.height} cm`;
+  const strainName = strainPick?.name ?? "";
+
+  // ── Resultados de busca de strain (famosas + do user + criar custom) ─────────
+  function buildStrainResults(query: string): WizardSearchResult[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const results: WizardSearchResult[] = [];
+
+    // Strains do usuário (banco)
+    for (const s of userStrains as Array<{ id: number; name: string; vegaWeeks?: number; floraWeeks?: number }>) {
+      if (s.name.toLowerCase().includes(q)) {
+        results.push({
+          id: `user:${s.id}`,
+          label: s.name,
+          sublabel: "Sua strain",
+        });
+      }
+    }
+
+    // Strains famosas (constante) — evita duplicar nome já no banco
+    const userNames = new Set((userStrains as Array<{ name: string }>).map((s) => s.name.toLowerCase()));
+    for (const f of FAMOUS_STRAINS) {
+      if (f.name.toLowerCase().includes(q) && !userNames.has(f.name.toLowerCase())) {
+        results.push({
+          id: `famous:${f.name}`,
+          label: f.name,
+          sublabel: `${f.type} · Veg ${f.vegaWeeks}sem · Flora ${f.floraWeeks}sem`,
+        });
+      }
+    }
+
+    // Oferecer criar custom se não há match exato
+    const hasExact = results.some((r) => r.label.toLowerCase() === q);
+    if (!hasExact && query.trim().length >= 2) {
+      results.push({
+        id: `custom:${query.trim()}`,
+        label: `Criar "${query.trim()}"`,
+        sublabel: "Nova strain · tempos padrão (Veg 4 · Flora 8)",
+      });
+    }
+    return results;
+  }
+
+  function handleStrainSelect(r: WizardSearchResult) {
+    const [kind, ...rest] = r.id.split(":");
+    const val = rest.join(":");
+    if (kind === "user") {
+      const s = (userStrains as Array<{ id: number; name: string }>).find((x) => x.id === Number(val));
+      if (s) setStrainPick({ kind: "existing", id: s.id, name: s.name });
+    } else if (kind === "famous") {
+      const f = FAMOUS_STRAINS.find((x) => x.name === val);
+      if (f) setStrainPick({ kind: "famous", name: f.name, vegaWeeks: f.vegaWeeks, floraWeeks: f.floraWeeks });
+    } else if (kind === "custom") {
+      setStrainPick({ kind: "custom", name: val });
+    }
+    haptics.light().catch(() => {});
+    setStep("plantCount");
+  }
+
+  // ── Avanços de step ──────────────────────────────────────────────────────────
+  function handleCultivo(id: string) {
+    setCultivo(id as CultivoType);
+    setStep("size");
+  }
+
+  function handleSize(id: string) {
+    if (id === "custom") {
+      setShowCustom(true);
+      setPresetId("custom");
       return;
     }
+    setPresetId(id);
+    setShowCustom(false);
+    setStep("strain");
+  }
+
+  function confirmCustomSize() {
+    if (customDims.width < 1 || customDims.depth < 1 || customDims.height < 1) {
+      cultivoToast.error("Dimensões inválidas");
+      return;
+    }
+    setPresetId("custom");
+    setStep("strain");
+  }
+
+  function handlePlantCount(n: number) {
+    const count = Math.max(0, Math.min(99, n));
+    setPlantCount(count);
+    if (count === 0) {
+      finishWizard(0, []);
+      return;
+    }
+    // Pré-preenche nomes "Strain #1, #2..."
+    const base = strainName || "Planta";
+    setPlantNames(Array.from({ length: count }, (_, i) => `${base} #${i + 1}`));
+    setStep("plantNames");
+  }
+
+  // ── Criação final ──────────────────────────────────────────────────────────
+  async function resolveStrainId(): Promise<number> {
+    if (!strainPick) throw new Error("Strain não selecionada");
+    if (strainPick.kind === "existing") return strainPick.id;
+
+    // Pode já existir no banco (famosa criada antes) — checa primeiro
+    const existing = await utils.strains.list.fetch();
+    const found = (existing as Array<{ id: number; name: string }>).find(
+      (s) => s.name.toLowerCase() === strainPick.name.toLowerCase(),
+    );
+    if (found) return found.id;
+
+    // Cria
+    const weeks =
+      strainPick.kind === "famous"
+        ? { vegaWeeks: strainPick.vegaWeeks, floraWeeks: strainPick.floraWeeks }
+        : { vegaWeeks: 4, floraWeeks: 8 };
+    await createStrain.mutateAsync({
+      name: strainPick.name,
+      origin: "FEMINIZED",
+      ...weeks,
+    });
+    const after = await utils.strains.list.fetch();
+    const created = (after as Array<{ id: number; name: string }>).find(
+      (s) => s.name.toLowerCase() === strainPick.name.toLowerCase(),
+    );
+    if (!created) throw new Error("Falha ao criar strain");
+    return created.id;
+  }
+
+  async function finishWizard(count: number, names: string[]) {
+    setStep("creating");
     try {
-      const result = await createTent.mutateAsync(tentDraft);
-      setCreatedTentId(result.id);
+      // 1. Estufa — nome auto (apelido do preset ou "Minha Estufa"), categoria VEGA
+      const tentName = selectedPreset ? presetLabel(selectedPreset, LOCALE) : "Minha Estufa";
+      const tent = await createTent.mutateAsync({
+        name: tentName,
+        category: "VEGA",
+        width: tentDims.width,
+        depth: tentDims.depth,
+        height: tentDims.height,
+      });
       utils.tents.list.invalidate();
-      setStep(2);
-    } catch (e: any) {
-      cultivoToast.error("Erro ao criar estufa", e.message);
-    }
-  }
 
-  async function handleStep2Submit() {
-    if (!strainDraft.name.trim()) {
-      cultivoToast.error("Selecione ou informe uma strain");
-      return;
-    }
-    try {
-      await createStrain.mutateAsync({
-        name: strainDraft.name,
-        vegaWeeks: strainDraft.vegaWeeks,
-        floraWeeks: strainDraft.floraWeeks,
-        origin: strainDraft.origin,
-      });
-      // strains.create não retorna ID — busca pelo nome (recém-criado)
-      const allStrains = await utils.strains.list.fetch();
-      const created = (allStrains as any[])?.find(s => s.name === strainDraft.name);
-      if (created?.id) setCreatedStrainId(created.id);
-      utils.strains.list.invalidate();
-      setStep(3);
-    } catch (e: any) {
-      cultivoToast.error("Erro ao criar strain", e.message);
-    }
-  }
+      // 2. Plantas (se houver) — sempre vinculadas à estufa criada
+      if (count > 0 && strainPick) {
+        const strainId = await resolveStrainId();
+        utils.strains.list.invalidate();
+        for (const name of names) {
+          await createPlant.mutateAsync({
+            name: name.trim() || "Planta",
+            strainId,
+            currentTentId: tent.id,
+          });
+        }
+        utils.plants.list?.invalidate?.();
+      }
 
-  async function handleStep3Submit() {
-    if (!plantDraft.name.trim()) {
-      cultivoToast.error("Informe o nome da planta");
-      return;
-    }
-    if (!createdTentId || !createdStrainId) {
-      cultivoToast.error("Estado inválido — reinicie o wizard");
-      return;
-    }
-    try {
-      await createPlant.mutateAsync({
-        name: plantDraft.name,
-        code: plantDraft.code || undefined,
-        strainId: createdStrainId,
-        currentTentId: createdTentId,
-      });
-      utils.plants.list?.invalidate?.();
+      markWizardDone();
       setStep("done");
+      // Navega pro detalhe da estufa criada (E5 refina ainda mais)
+      setTimeout(() => setLocation(`/tent/${tent.id}`), 1400);
     } catch (e: any) {
-      cultivoToast.error("Erro ao criar planta", e.message);
+      cultivoToast.error("Erro ao configurar", e?.message ?? String(e));
+      setStep("plantCount"); // volta pra tentar de novo
     }
   }
 
-  function finish() {
-    markWizardDone();
-    setLocation("/");
-  }
-
-  function skipStep2() {
-    // Pular strain: wizard termina (não dá pra criar planta sem strain)
-    markWizardDone();
-    cultivoToast.info("Você pode criar strains e plantas depois em Estufas → Plantas");
-    setLocation("/");
-  }
-
-  function skipStep3() {
-    // Pular planta: estufa + strain criadas, só faltou planta
-    markWizardDone();
-    cultivoToast.info("Você pode adicionar plantas depois pelo botão + da estufa");
-    setLocation("/");
-  }
+  // ── Render ───────────────────────────────────────────────────────────────────
+  const stepIndex = ["cultivo", "size", "strain", "plantCount", "plantNames"].indexOf(step);
+  const progress = step === "done" || step === "creating" ? 5 : Math.max(0, stepIndex);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header com progress + skip */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border/30">
+      {/* Header */}
+      <header
+        className="sticky top-0 z-10 bg-background/90 backdrop-blur-md border-b border-border/30"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      >
         <div className="container mx-auto px-4 py-3 flex items-center justify-between max-w-2xl">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center">
+              <Sprout className="w-4 h-4 text-primary" strokeWidth={2.5} />
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground/70 font-semibold">
-                Configuração inicial
-              </p>
-              <p className="text-sm font-semibold">Bem-vindo ao Cultivo</p>
-            </div>
+            <p className="text-sm font-semibold">Cultivo</p>
           </div>
-          {step !== "done" && (
+          {step !== "done" && step !== "creating" && (
             <button
               onClick={skipAll}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted/50 transition-colors"
@@ -205,489 +302,288 @@ export default function OnboardingWizard() {
             </button>
           )}
         </div>
-
-        {/* Progress dots */}
-        <div className="container mx-auto px-4 pb-3 max-w-2xl">
-          <div className="flex items-center gap-2">
-            {[1, 2, 3].map((n) => {
-              const current = typeof step === "number" ? step : 4;
-              const active = current >= n;
-              const completed = current > n || step === "done";
-              return (
-                <div
-                  key={n}
-                  className={`h-1.5 flex-1 rounded-full transition-colors ${
-                    completed ? "bg-primary" : active ? "bg-primary/40" : "bg-muted"
-                  }`}
-                />
-              );
-            })}
+        {/* Progress */}
+        <div className="container mx-auto px-4 pb-2.5 max-w-2xl">
+          <div className="flex items-center gap-1.5">
+            {[0, 1, 2, 3, 4].map((n) => (
+              <div
+                key={n}
+                className={`h-1 flex-1 rounded-full transition-colors ${
+                  progress > n ? "bg-primary" : progress === n ? "bg-primary/40" : "bg-muted"
+                }`}
+              />
+            ))}
           </div>
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-2xl">
-        {step === 1 && (
-          <Step1Tent
-            draft={tentDraft}
-            onChange={setTentDraft}
-            onSubmit={handleStep1Submit}
-            submitting={createTent.isPending}
-          />
-        )}
-        {step === 2 && (
-          <Step2Strain
-            draft={strainDraft}
-            onChange={setStrainDraft}
-            onSubmit={handleStep2Submit}
-            onBack={() => setStep(1)}
-            onSkip={skipStep2}
-            submitting={createStrain.isPending}
-          />
-        )}
-        {step === 3 && (
-          <Step3Plant
-            draft={plantDraft}
-            tentName={tentDraft.name}
-            strainName={strainDraft.name}
-            onChange={setPlantDraft}
-            onSubmit={handleStep3Submit}
-            onBack={() => setStep(2)}
-            onSkip={skipStep3}
-            submitting={createPlant.isPending}
-          />
-        )}
-        {step === "done" && <DoneView onFinish={finish} />}
+      {/* Conversa */}
+      <main className="flex-1 container mx-auto px-4 py-6 max-w-2xl w-full">
+        <div className="space-y-4">
+          {/* Saudação */}
+          <WizardBubble from="app">
+            Bem-vindo ao Cultivo! 🌱 Vou te ajudar a montar sua primeira estufa em alguns toques.
+          </WizardBubble>
+
+          {/* ── Q1: tipo de cultivo ── */}
+          <WizardBubble from="app" delay={0.15}>
+            Pra começar — qual o seu tipo de cultivo?
+          </WizardBubble>
+          {cultivo && (
+            <WizardBubble from="user">
+              {cultivo === "MINERAL" ? "Mineral" : "Orgânico"}
+            </WizardBubble>
+          )}
+          {step === "cultivo" && (
+            <WizardChips options={CULTIVO_OPTIONS} onSelect={handleCultivo} delay={0.3} layout="grid" />
+          )}
+
+          {/* ── Q2: tamanho ── */}
+          {stepIndex >= 1 && (
+            <>
+              <WizardBubble from="app">Qual o tamanho da sua estufa?</WizardBubble>
+              {presetId && (step !== "size" || !showCustom) && stepIndex > 1 && (
+                <WizardBubble from="user">{tentSizeLabel}</WizardBubble>
+              )}
+            </>
+          )}
+          {step === "size" && (
+            <>
+              <WizardChips
+                layout="grid"
+                options={[
+                  ...TENT_PRESETS.map((p) => ({
+                    id: p.id,
+                    label: presetLabel(p, LOCALE),
+                    sublabel: presetSublabel(p, LOCALE),
+                    featured: p.featured,
+                  })),
+                  { id: "custom", label: "Personalizar", sublabel: "Digitar minhas medidas" },
+                ]}
+                selectedId={showCustom ? "custom" : null}
+                onSelect={handleSize}
+              />
+              {showCustom && (
+                <div className="bg-card border border-border rounded-2xl p-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Dimensões (cm)
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["width", "depth", "height"] as const).map((k) => (
+                      <div key={k}>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={customDims[k]}
+                          onChange={(e) =>
+                            setCustomDims({ ...customDims, [k]: Math.max(1, parseInt(e.target.value) || 0) })
+                          }
+                        />
+                        <p className="text-[11px] text-muted-foreground text-center mt-1">
+                          {k === "width" ? "Largura" : k === "depth" ? "Profund." : "Altura"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={confirmCustomSize} className="w-full" size="sm">
+                    Confirmar tamanho
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── Q3: strain ── */}
+          {stepIndex >= 2 && (
+            <>
+              <WizardBubble from="app">Qual strain você vai cultivar?</WizardBubble>
+              {strainPick && stepIndex > 2 && <WizardBubble from="user">{strainName}</WizardBubble>}
+            </>
+          )}
+          {step === "strain" && (
+            <div className="pl-10">
+              <WizardSearchInput
+                placeholder="Buscar strain (ex: Northern Lights)..."
+                results={buildStrainResults(strainQuery)}
+                onDebouncedChange={setStrainQuery}
+                onSelect={handleStrainSelect}
+                minChars={2}
+              />
+            </div>
+          )}
+
+          {/* ── Q4: quantas plantas ── */}
+          {stepIndex >= 3 && (
+            <>
+              <WizardBubble from="app">Quantas plantas você tem agora?</WizardBubble>
+              {step !== "plantCount" && stepIndex > 3 && (
+                <WizardBubble from="user">
+                  {plantCount === 0 ? "Nenhuma por enquanto" : `${plantCount} planta${plantCount > 1 ? "s" : ""}`}
+                </WizardBubble>
+              )}
+            </>
+          )}
+          {step === "plantCount" && (
+            <PlantCountControl
+              value={plantCount}
+              onChange={setPlantCount}
+              onConfirm={() => handlePlantCount(plantCount)}
+              onNone={() => handlePlantCount(0)}
+            />
+          )}
+
+          {/* ── Q5: nomes ── */}
+          {step === "plantNames" && (
+            <>
+              <WizardBubble from="app">Como você chama cada uma? (pode deixar o sugerido)</WizardBubble>
+              <PlantNamesControl
+                names={plantNames}
+                onChange={setPlantNames}
+                onConfirm={() => finishWizard(plantCount, plantNames)}
+                submitting={createTent.isPending || createPlant.isPending}
+              />
+            </>
+          )}
+
+          {/* ── Criando ── */}
+          {step === "creating" && (
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <p className="text-sm text-muted-foreground">Montando sua estufa...</p>
+            </div>
+          )}
+
+          {/* ── Done ── */}
+          {step === "done" && (
+            <div className="flex flex-col items-center justify-center py-10 gap-3 text-center animate-in fade-in zoom-in-95 duration-300">
+              <div className="w-16 h-16 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
+                <Check className="w-8 h-8 text-primary" strokeWidth={2.5} />
+              </div>
+              <p className="text-lg font-bold">Tudo pronto! 🎉</p>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Sua estufa está configurada. Levando você pra ela...
+              </p>
+            </div>
+          )}
+
+          {/* Typing indicator enquanto não respondeu o primeiro */}
+          {step === "cultivo" && !cultivo && <WizardTyping delay={0.5} />}
+
+          <div ref={bottomRef} />
+        </div>
       </main>
     </div>
   );
 }
 
-// ─── Step 1: Estufa ───────────────────────────────────────────────────────────
+// ─── Controle: contador de plantas ────────────────────────────────────────────
 
-function Step1Tent({
-  draft,
+function PlantCountControl({
+  value,
   onChange,
-  onSubmit,
+  onConfirm,
+  onNone,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  onConfirm: () => void;
+  onNone: () => void;
+}) {
+  const dec = () => {
+    haptics.light().catch(() => {});
+    onChange(Math.max(0, value - 1));
+  };
+  const inc = () => {
+    haptics.light().catch(() => {});
+    onChange(Math.min(99, value + 1));
+  };
+  return (
+    <div className="flex flex-col items-end gap-3">
+      <div className="flex items-center gap-4 bg-card border border-border rounded-2xl px-5 py-3">
+        <button
+          onClick={dec}
+          aria-label="Menos"
+          className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted active:scale-95 transition-[transform,background-color] disabled:opacity-40"
+          disabled={value <= 0}
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+        <span className="text-2xl font-bold tabular-nums w-10 text-center">{value}</span>
+        <button
+          onClick={inc}
+          aria-label="Mais"
+          className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted active:scale-95 transition-[transform,background-color] disabled:opacity-40"
+          disabled={value >= 99}
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onNone}
+          className="text-xs text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors"
+        >
+          Nenhuma por enquanto
+        </button>
+        <Button onClick={onConfirm} size="sm" disabled={value < 1}>
+          Continuar
+          <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Controle: nomes das plantas ──────────────────────────────────────────────
+
+function PlantNamesControl({
+  names,
+  onChange,
+  onConfirm,
   submitting,
 }: {
-  draft: TentDraft;
-  onChange: (d: TentDraft) => void;
-  onSubmit: () => void;
+  names: string[];
+  onChange: (n: string[]) => void;
+  onConfirm: () => void;
   submitting: boolean;
 }) {
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <div className="inline-flex w-14 h-14 rounded-2xl bg-emerald-500/15 items-center justify-center mb-2">
-          <Home className="w-7 h-7 text-emerald-400" />
-        </div>
-        <h1 className="text-2xl font-bold">Crie sua primeira estufa</h1>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          A estufa é onde suas plantas vivem. Você pode editar tudo depois — preenchemos com
-          um exemplo pra você só clicar e seguir.
-        </p>
-      </div>
-
-      <div className="bg-card border border-border/30 rounded-2xl p-5 space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="tent-name">Nome da estufa</Label>
-          <Input
-            id="tent-name"
-            value={draft.name}
-            onChange={(e) => onChange({ ...draft, name: e.target.value })}
-            placeholder="Ex: Estufa A"
-          />
-          <p className="text-xs text-muted-foreground/70">
-            Use algo curto. Ex: "Estufa A", "Veg 1", "Box flora".
-          </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Categoria</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {([
-              { v: "VEGA", l: "Vegetativa", d: "Crescimento (18/6h)" },
-              { v: "FLORA", l: "Floração", d: "Produção (12/12h)" },
-              { v: "MAINTENANCE", l: "Manutenção", d: "Mães + clones" },
-              { v: "DRYING", l: "Secagem", d: "Pós-colheita" },
-            ] as const).map((opt) => (
-              <button
-                key={opt.v}
-                type="button"
-                onClick={() => onChange({ ...draft, category: opt.v })}
-                className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
-                  draft.category === opt.v
-                    ? "bg-primary/10 border-primary text-foreground"
-                    : "bg-card border-border/30 hover:border-border/60"
-                }`}
-              >
-                <p className="text-sm font-semibold">{opt.l}</p>
-                <p className="text-xs text-muted-foreground">{opt.d}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Dimensões (cm)</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["width", "depth", "height"] as const).map((k) => (
-              <div key={k}>
-                <Input
-                  type="number"
-                  value={draft[k]}
-                  onChange={(e) =>
-                    onChange({ ...draft, [k]: Math.max(1, parseInt(e.target.value) || 0) })
-                  }
-                  min={1}
-                />
-                <p className="text-xs text-muted-foreground text-center mt-1">
-                  {k === "width" ? "Largura" : k === "depth" ? "Profundidade" : "Altura"}
-                </p>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground/70">
-            Volume calculado automaticamente.{" "}
-            <span title="PPFD = intensidade de luz em µmol/m²/s. O app calcula o ideal pela área da estufa.">
-              Usado pra calcular o PPFD ideal
+    <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+        {names.map((name, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+              {i + 1}
             </span>
-            <span className="text-muted-foreground/50"> (intensidade de luz).</span>
-          </p>
-        </div>
+            <div className="relative flex-1">
+              <Pencil className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/50 pointer-events-none" />
+              <Input
+                value={name}
+                onChange={(e) => {
+                  const next = [...names];
+                  next[i] = e.target.value;
+                  onChange(next);
+                }}
+                className="pl-8"
+                placeholder={`Planta ${i + 1}`}
+              />
+            </div>
+          </div>
+        ))}
       </div>
-
-      <Button onClick={onSubmit} disabled={submitting} className="w-full" size="lg">
+      <Button onClick={onConfirm} disabled={submitting} className="w-full" size="lg">
         {submitting ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            Criando estufa...
+            Criando...
           </>
         ) : (
           <>
-            Criar e continuar
-            <ChevronRight className="w-4 h-4 ml-1" />
+            Finalizar configuração
+            <Check className="w-4 h-4 ml-1.5" />
           </>
         )}
-      </Button>
-    </div>
-  );
-}
-
-// ─── Step 2: Strain ───────────────────────────────────────────────────────────
-
-function Step2Strain({
-  draft,
-  onChange,
-  onSubmit,
-  onBack,
-  onSkip,
-  submitting,
-}: {
-  draft: StrainDraft;
-  onChange: (d: StrainDraft) => void;
-  onSubmit: () => void;
-  onBack: () => void;
-  onSkip: () => void;
-  submitting: boolean;
-}) {
-  function pickFamous(s: FamousStrain) {
-    onChange({
-      name: s.name,
-      vegaWeeks: s.vegaWeeks,
-      floraWeeks: s.floraWeeks,
-      origin: "FEMINIZED",
-    });
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <div className="inline-flex w-14 h-14 rounded-2xl bg-green-500/15 items-center justify-center mb-2">
-          <Sprout className="w-7 h-7 text-green-400" />
-        </div>
-        <h1 className="text-2xl font-bold">Cadastre uma strain</h1>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Strain é a variedade genética. Selecione uma das populares pra preencher tempos
-          automaticamente, ou customize abaixo.
-        </p>
-      </div>
-
-      {/* Lista de strains famosas */}
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground/60 font-semibold px-1">
-          Strains populares
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {FAMOUS_STRAINS.map((s) => {
-            const selected = draft.name === s.name;
-            return (
-              <button
-                key={s.name}
-                type="button"
-                onClick={() => pickFamous(s)}
-                className={`text-left px-3.5 py-3 rounded-xl border transition-all ${
-                  selected
-                    ? "bg-primary/10 border-primary"
-                    : "bg-card border-border/30 hover:border-border/60"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="text-sm font-semibold">{s.name}</p>
-                  {selected && <Check className="w-4 h-4 text-primary shrink-0" />}
-                </div>
-                <p className="text-xs text-muted-foreground mb-1.5">
-                  {s.type} · Veg {s.vegaWeeks}sem · Flora {s.floraWeeks}sem
-                </p>
-                <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-snug">
-                  {s.description}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* OU customizado */}
-      <div className="bg-card border border-border/30 rounded-2xl p-5 space-y-4">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground/60 font-semibold">
-          Ou customize
-        </p>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="strain-name">Nome</Label>
-          <Input
-            id="strain-name"
-            value={draft.name}
-            onChange={(e) => onChange({ ...draft, name: e.target.value })}
-            placeholder="Ex: minha genética..."
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="strain-veg">Semanas de Vega</Label>
-            <Input
-              id="strain-veg"
-              type="number"
-              min={1}
-              max={12}
-              value={draft.vegaWeeks}
-              onChange={(e) =>
-                onChange({ ...draft, vegaWeeks: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) })
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="strain-flora">Semanas de Flora</Label>
-            <Input
-              id="strain-flora"
-              type="number"
-              min={1}
-              max={16}
-              value={draft.floraWeeks}
-              onChange={(e) =>
-                onChange({ ...draft, floraWeeks: Math.max(1, Math.min(16, parseInt(e.target.value) || 1)) })
-              }
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Origem</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["FEMINIZED", "AUTOFLOWER", "CLONE"] as const).map((opt) => {
-              const labels = { FEMINIZED: "Feminizada", AUTOFLOWER: "Auto", CLONE: "Clone" };
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => onChange({ ...draft, origin: opt })}
-                  className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-                    draft.origin === opt
-                      ? "bg-primary/10 border-primary text-foreground"
-                      : "bg-card border-border/30 hover:border-border/60"
-                  }`}
-                >
-                  {labels[opt]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={onBack} disabled={submitting}>
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Voltar
-        </Button>
-        <button
-          onClick={onSkip}
-          disabled={submitting}
-          className="text-xs text-muted-foreground hover:text-foreground px-3 py-2"
-        >
-          Pular este passo
-        </button>
-        <Button onClick={onSubmit} disabled={submitting} className="ml-auto" size="lg">
-          {submitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Criando...
-            </>
-          ) : (
-            <>
-              Criar e continuar
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </>
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 3: Planta ───────────────────────────────────────────────────────────
-
-function Step3Plant({
-  draft,
-  tentName,
-  strainName,
-  onChange,
-  onSubmit,
-  onBack,
-  onSkip,
-  submitting,
-}: {
-  draft: { name: string; code: string };
-  tentName: string;
-  strainName: string;
-  onChange: (d: { name: string; code: string }) => void;
-  onSubmit: () => void;
-  onBack: () => void;
-  onSkip: () => void;
-  submitting: boolean;
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <div className="inline-flex w-14 h-14 rounded-2xl bg-rose-500/15 items-center justify-center mb-2">
-          <Leaf className="w-7 h-7 text-rose-400" />
-        </div>
-        <h1 className="text-2xl font-bold">Adicione sua primeira planta</h1>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Vamos vincular automaticamente à <strong>{tentName}</strong> com strain{" "}
-          <strong>{strainName}</strong>. Você pode adicionar mais depois.
-        </p>
-      </div>
-
-      <div className="bg-card border border-border/30 rounded-2xl p-5 space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="plant-name">Nome da planta</Label>
-          <Input
-            id="plant-name"
-            value={draft.name}
-            onChange={(e) => onChange({ ...draft, name: e.target.value })}
-            placeholder="Ex: Planta 1, NL-1, Bonsai..."
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="plant-code">Código (opcional)</Label>
-          <Input
-            id="plant-code"
-            value={draft.code}
-            onChange={(e) => onChange({ ...draft, code: e.target.value })}
-            placeholder="Ex: NL-001, P1..."
-          />
-          <p className="text-xs text-muted-foreground/70">
-            Útil pra cultivos com muitas plantas. Pode deixar vazio.
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-primary/8 border border-primary/20 p-3 flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-          <p className="text-xs text-foreground/80 leading-relaxed">
-            Você pode iniciar um <strong>ciclo</strong> nesta estufa depois pra começar contagem
-            de semanas e gerar tarefas automáticas.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={onBack} disabled={submitting}>
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Voltar
-        </Button>
-        <button
-          onClick={onSkip}
-          disabled={submitting}
-          className="text-xs text-muted-foreground hover:text-foreground px-3 py-2"
-        >
-          Pular este passo
-        </button>
-        <Button onClick={onSubmit} disabled={submitting} className="ml-auto" size="lg">
-          {submitting ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Adicionando...
-            </>
-          ) : (
-            <>
-              Adicionar e finalizar
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </>
-          )}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Done ─────────────────────────────────────────────────────────────────────
-
-function DoneView({ onFinish }: { onFinish: () => void }) {
-  return (
-    <div className="space-y-6 text-center py-8">
-      <div className="inline-flex w-20 h-20 rounded-full bg-primary/15 items-center justify-center mb-2">
-        <Check className="w-10 h-10 text-primary" />
-      </div>
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Tudo pronto</h1>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Sua estufa, strain e primeira planta estão configuradas. Agora é só começar a registrar
-          dados diários pelo botão <strong>+</strong> da navegação.
-        </p>
-      </div>
-      <div className="bg-card border border-border/30 rounded-2xl p-4 text-left space-y-3 max-w-md mx-auto">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Próximos passos sugeridos
-        </p>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
-              1
-            </span>
-            <span>Inicie um ciclo na estufa pra começar a contagem de semanas</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
-              2
-            </span>
-            <span>Faça o primeiro registro pelo botão + → Status da estufa</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center mt-0.5 shrink-0">
-              3
-            </span>
-            <span>(Opcional) Conecte o SmartLife pra leituras automáticas de sensores</span>
-          </div>
-        </div>
-      </div>
-      <Button onClick={onFinish} size="lg" className="min-w-[200px]">
-        Ir pro app
-        <ChevronRight className="w-4 h-4 ml-1" />
       </Button>
     </div>
   );
