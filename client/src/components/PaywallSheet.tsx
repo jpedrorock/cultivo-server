@@ -18,10 +18,10 @@ interface PaywallSheetProps {
 }
 
 const PRO_BENEFITS = [
-  "Estufas ilimitadas",
-  "Todas as calculadoras (NPK, EC, pH, Rega Automática)",
+  "Estufas e ciclos ilimitados",
+  "Todas as 7 calculadoras (NPK, EC, pH, Rega Automática...)",
   "Fotos das plantas ilimitadas",
-  "Chat com IA especialista",
+  "Chat com IA especialista (Doctor Jáh)",
   "Integração Tuya / SmartLife / ESP32",
   "Histórico completo + export CSV",
   "Sem anúncios",
@@ -30,8 +30,9 @@ const PRO_BENEFITS = [
 type Period = "yearly" | "monthly";
 
 const MOCK_PRICES = {
-  pro:  { yearly: { total: "$99",  perMonth: "$8.25/mês",          discount: "17%" }, monthly: { total: "$10", subtitle: "Cobrança mensal" } },
-  team: { yearly: { total: "$200", perMonth: "$5.55/mês por pessoa", discount: "17%" }, monthly: { total: "$20", subtitle: "Cobrança mensal" } },
+  starter: { yearly: { total: "R$180", perMonth: "R$15/mês",          discount: "-22%" }, monthly: { total: "R$19", subtitle: "Cobrança mensal" } },
+  cloud:   { yearly: { total: "R$288", perMonth: "R$24/mês",          discount: "-17%" }, monthly: { total: "R$29", subtitle: "Cobrança mensal" } },
+  pro:     { yearly: { total: "R$888", perMonth: "R$74/mês",          discount: "-17%" }, monthly: { total: "R$89", subtitle: "Cobrança mensal" } },
 } as const;
 
 export function PaywallSheet({ open, onOpenChange, trigger }: PaywallSheetProps) {
@@ -210,15 +211,43 @@ export function PaywallSheet({ open, onOpenChange, trigger }: PaywallSheetProps)
                 </button>
               </div>
 
-              {/* Card Pro Individual */}
-              <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/5 p-4">
+              {/* Card Cloud — destaque */}
+              <div className="rounded-xl border-2 border-emerald-500/50 bg-emerald-500/5 p-4 relative">
+                <span className="absolute -top-2 right-3 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                  Popular
+                </span>
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
-                    <UserIcon className="w-4 h-4 text-emerald-400" />
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <span className="text-sm font-bold text-foreground">Pro Individual</span>
+                      <span className="text-sm font-bold text-foreground">Cloud</span>
+                      <span className="text-lg font-bold text-foreground">
+                        {period === "yearly" ? MOCK_PRICES.cloud.yearly.total : MOCK_PRICES.cloud.monthly.total}
+                        <span className="text-xs font-normal text-muted-foreground ml-1">
+                          /{period === "yearly" ? "ano" : "mês"}
+                        </span>
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {period === "yearly"
+                        ? `Equivale a ${MOCK_PRICES.cloud.yearly.perMonth}`
+                        : MOCK_PRICES.cloud.monthly.subtitle}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Pro — equipe */}
+              <div className="rounded-xl border border-violet-500/50 bg-gradient-to-br from-violet-500/10 to-transparent p-4 relative">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
+                    <Users className="w-4 h-4 text-violet-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="text-sm font-bold text-foreground">Pro · até 3 membros</span>
                       <span className="text-lg font-bold text-foreground">
                         {period === "yearly" ? MOCK_PRICES.pro.yearly.total : MOCK_PRICES.pro.monthly.total}
                         <span className="text-xs font-normal text-muted-foreground ml-1">
@@ -230,34 +259,6 @@ export function PaywallSheet({ open, onOpenChange, trigger }: PaywallSheetProps)
                       {period === "yearly"
                         ? `Equivale a ${MOCK_PRICES.pro.yearly.perMonth}`
                         : MOCK_PRICES.pro.monthly.subtitle}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card Pro Grupo */}
-              <div className="rounded-xl border-2 border-violet-500/50 bg-gradient-to-br from-violet-500/10 to-transparent p-4 relative">
-                <span className="absolute -top-2 right-3 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-500 text-white">
-                  Família
-                </span>
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0">
-                    <Users className="w-4 h-4 text-violet-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <span className="text-sm font-bold text-foreground">Pro Grupo · até 3</span>
-                      <span className="text-lg font-bold text-foreground">
-                        {period === "yearly" ? MOCK_PRICES.team.yearly.total : MOCK_PRICES.team.monthly.total}
-                        <span className="text-xs font-normal text-muted-foreground ml-1">
-                          /{period === "yearly" ? "ano" : "mês"}
-                        </span>
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {period === "yearly"
-                        ? `Equivale a ${MOCK_PRICES.team.yearly.perMonth}`
-                        : MOCK_PRICES.team.monthly.subtitle}
                     </p>
                   </div>
                 </div>

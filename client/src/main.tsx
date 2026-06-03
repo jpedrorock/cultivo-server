@@ -38,14 +38,14 @@ setKeyboardResize("body");
 // Disponível em mobile (Capacitor) APENAS quando VITE_ENABLE_TEST_ACCOUNTS=true.
 // Não expor em build de release (App Store / Play Store).
 if (import.meta.env.VITE_ENABLE_TEST_ACCOUNTS === "true" && isNative() && typeof window !== "undefined") {
-  (window as any).__setDevPlan = async (plan: "free" | "pro" | "team" | null) => {
+  (window as any).__setDevPlan = async (plan: "free" | "starter" | "cloud" | "pro" | null) => {
     const { Preferences } = await import("@capacitor/preferences");
     if (plan === null) {
       await Preferences.remove({ key: "dev_force_plan" });
-    } else if (plan === "free" || plan === "pro" || plan === "team") {
+    } else if (plan === "free" || plan === "starter" || plan === "cloud" || plan === "pro") {
       await Preferences.set({ key: "dev_force_plan", value: plan });
     } else {
-      console.error("Plano inválido. Use 'free', 'pro', 'team' ou null.");
+      console.error("Plano inválido. Use 'free', 'starter', 'cloud', 'pro' ou null.");
       return;
     }
     console.log(`✓ Plano dev = ${plan ?? "automático"} — recarregando...`);
