@@ -227,6 +227,7 @@ export default function Calculators() {
     "ph-adjust": "Calculadora de pH",
     "vpd": "Calculadora VPD",
     "living-soil": "Construtor de Solo Vivo",
+    "organic-maintenance": "Manutenção do Solo Vivo",
   };
 
   return (
@@ -268,6 +269,7 @@ export default function Calculators() {
         {calculatorId === "ph-adjust" && <PHAdjustCalculator />}
         {calculatorId === "vpd" && <VPDCalculator />}
         {calculatorId === "living-soil" && <LivingSoilCalculator />}
+        {calculatorId === "organic-maintenance" && <OrganicMaintenanceCalculator />}
       </main>
     </div>
     </PageTransition>
@@ -1510,6 +1512,165 @@ function LivingSoilCalculator() {
           Valores de referência da receita <strong>Clackamas Coots</strong> (comunidade living soil). A densidade dos pós varia — ajuste ao seu gosto. Cups são aproximados (1 pé³ = 28,3 L).
         </p>
       </div>
+    </div>
+  );
+}
+
+// ─── Manutenção do Solo Vivo (Cultivo Orgânico Fase 3) ─────────────────────────
+// 2 abas: Chá de Compostagem (AACT, escalado pelo balde) + Top Dressing (guia +
+// quantidades por vaso). Valores de referência da comunidade (AACT + Coots) —
+// ver ORGANIC-AMENDMENTS-REFERENCES.md. NÃO é prescrição.
+function OrganicMaintenanceCalculator() {
+  const haptic = useTactileFeedback();
+  const [tab, setTab] = useState<"tea" | "topdress">("tea");
+
+  // ── Chá de compostagem (AACT) — base por balde de 19 L (5 gal) ──────────────
+  const [bucketL, setBucketL] = useState<number>(19);
+  const teaScale = bucketL / 19;
+  const tea = {
+    castings: 225 * teaScale, // g de húmus de minhoca
+    molasses: 45 * teaScale, // ml de melaço (blackstrap)
+    kelp: 15 * teaScale, // g de farinha de alga
+  };
+
+  // ── Top dressing — por vaso ──────────────────────────────────────────────────
+  const [potL, setPotL] = useState<number>(30);
+  const [phase, setPhase] = useState<"veg" | "flora">("veg");
+  // Referência: top dress leve a cada 2-3 semanas. Veg = N (alfafa/húmus),
+  // Flora = P-K (kelp/guano). ~g por litro de vaso (conservador).
+  const topdress = phase === "veg"
+    ? [
+        { name: "Húmus de minhoca", gPerL: 8, hint: "camada fina na superfície" },
+        { name: "Farinha de alfafa", gPerL: 0.6, hint: "N + triacontanol" },
+        { name: "Farinha de neem", gPerL: 0.5, hint: "N + proteção" },
+      ]
+    : [
+        { name: "Húmus de minhoca", gPerL: 8, hint: "camada fina na superfície" },
+        { name: "Farinha de alga (kelp)", gPerL: 1.0, hint: "K + floração" },
+        { name: "Guano de morcego (flora)", gPerL: 0.8, hint: "P-K alto" },
+      ];
+
+  const fmtG = (g: number) => (g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${Math.round(g)} g`);
+  const fmtMl = (ml: number) => `${Math.round(ml)} ml`;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <CalcEyebrow text="Solo Vivo · Manutenção" />
+        <h2 className="text-2xl font-bold text-foreground">Manutenção do Solo Vivo</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Depois do solo montado, você alimenta o solo (não a planta): chá de compostagem + top dressing.
+        </p>
+      </div>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "tea" | "topdress")}>
+        <TabsList className="grid grid-cols-2 w-full">
+          <TabsTrigger value="tea">Chá de Compostagem</TabsTrigger>
+          <TabsTrigger value="topdress">Top Dressing</TabsTrigger>
+        </TabsList>
+
+        {/* ── Aba: Chá de compostagem ── */}
+        <TabsContent value="tea" className="space-y-5 mt-4">
+          <Card className="relative overflow-hidden">
+            <CalcRunning />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Droplets className="w-4 h-4 text-primary" /> Volume do balde
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <CalcSlider label="Volume de água" value={bucketL} setValue={(v) => { haptic.tap(); setBucketL(v); }} min={5} max={100} step={1} suffix="L" accent="var(--color-primary, #22c55e)" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Receita (AACT) para {bucketL} L</CardTitle>
+              <CardDescription>Chá aerado — vida microbiana viva.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y divide-border">
+                {[
+                  { n: "Húmus de minhoca (em saquinho)", v: fmtG(tea.castings), h: "fonte de micróbios" },
+                  { n: "Melaço (blackstrap, sem enxofre)", v: fmtMl(tea.molasses), h: "alimenta os micróbios" },
+                  { n: "Farinha de alga (kelp)", v: fmtG(tea.kelp), h: "hormônios + micronutrientes" },
+                ].map((r) => (
+                  <div key={r.n} className="flex items-center justify-between py-2.5 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{r.n}</p>
+                      <p className="text-[11px] text-muted-foreground">{r.h}</p>
+                    </div>
+                    <span className="mono text-base font-bold text-foreground shrink-0">{r.v}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="rounded-xl bg-muted/40 border border-border p-4 space-y-2 text-sm text-muted-foreground">
+            <p className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <span><strong className="text-foreground">Aere 24–48h</strong> com bomba de ar + pedra porosa. <strong className="text-foreground">Use em até 36h</strong> após o fim (os micróbios morrem sem oxigênio). Regue o solo direto.</span>
+            </p>
+            <p className="text-xs">Não use água clorada (mata a vida). Deixe descansar 24h ou use filtro.</p>
+          </div>
+        </TabsContent>
+
+        {/* ── Aba: Top dressing ── */}
+        <TabsContent value="topdress" className="space-y-5 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Mountain className="w-4 h-4 text-primary" /> Vaso e fase
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <CalcSlider label="Tamanho do vaso" value={potL} setValue={(v) => { haptic.tap(); setPotL(v); }} min={5} max={100} step={1} suffix="L" accent="var(--color-primary, #22c55e)" />
+              <div className="grid grid-cols-2 gap-2">
+                {([["veg", "Vegetativa"], ["flora", "Floração"]] as const).map(([k, label]) => (
+                  <button
+                    key={k}
+                    onClick={() => { haptic.tap(); setPhase(k); }}
+                    className={`px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                      phase === k ? "bg-primary/15 border-primary/50 text-primary" : "bg-card border-border text-muted-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Top dress por vaso ({potL} L · {phase === "veg" ? "Veg" : "Flora"})</CardTitle>
+              <CardDescription>Espalhe na superfície e regue. Repita a cada 2–3 semanas.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y divide-border">
+                {topdress.map((a) => (
+                  <div key={a.name} className="flex items-center justify-between py-2.5 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{a.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{a.hint}</p>
+                    </div>
+                    <span className="mono text-base font-bold text-foreground shrink-0">{fmtG(a.gPerL * potL)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="rounded-xl bg-muted/40 border border-border p-4 space-y-2 text-sm text-muted-foreground">
+            <p className="flex items-start gap-2">
+              <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <span>Veg pede mais <strong className="text-foreground">N</strong>; flora pede mais <strong className="text-foreground">P-K</strong>. <strong className="text-foreground">Pare na semana 4–5 de flora</strong> (deixa ~1 mês pro solo consumir antes da colheita).</span>
+            </p>
+            <p className="text-xs">Cubra o top dress com uma fina camada de palha/mulch pra proteger os micróbios. Valores de referência — ajuste à resposta da planta.</p>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

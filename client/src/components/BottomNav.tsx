@@ -238,6 +238,7 @@ export function BottomNav() {
     { id: "irrigation-schedule", title: "Rega Automática",  desc: "Cronograma por bomba gotejadora",   icon: Timer,       color: "bg-blue-600" },
     { id: "nutrients",           title: "Fertilização",     desc: "Receitas por fase e semana",        icon: FlaskConical,color: "bg-emerald-600" },
     { id: "living-soil",         title: "Solo Vivo",        desc: "Receita de super soil orgânico",    icon: Sprout,      color: "bg-green-600" },
+    { id: "organic-maintenance", title: "Manutenção Orgânica",desc: "Chá de compostagem + top dressing", icon: Droplets,    color: "bg-lime-600" },
     { id: "lux-ppfd",            title: "Lux → PPFD",       desc: "Converta leitura de luxímetro",     icon: Sun,         color: "bg-amber-600" },
     { id: "ppm-ec",              title: "PPM ↔ EC",          desc: "Converta condutividade elétrica",   icon: Calculator,  color: "bg-violet-600" },
     { id: "ph-adjust",           title: "pH",               desc: "Quanto ácido/base para ajustar",    icon: TestTube,    color: "bg-rose-600" },
