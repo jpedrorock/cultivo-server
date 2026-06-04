@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calculator, Droplets, Download, AlertCircle, CheckCircle2, Target, Lightbulb } from "lucide-react";
+import { Calculator, Droplets, Download, AlertCircle, CheckCircle2, Target, Lightbulb, Sprout, Mountain, FlaskConical } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PageTransition } from "@/components/PageTransition";
 import { CalcSlider } from "@/components/ui/calc-slider";
@@ -226,6 +226,7 @@ export default function Calculators() {
     "ppm-ec": "Conversor PPM ↔ EC",
     "ph-adjust": "Calculadora de pH",
     "vpd": "Calculadora VPD",
+    "living-soil": "Construtor de Solo Vivo",
   };
 
   return (
@@ -266,6 +267,7 @@ export default function Calculators() {
         {calculatorId === "ppm-ec" && <PPMECConverter />}
         {calculatorId === "ph-adjust" && <PHAdjustCalculator />}
         {calculatorId === "vpd" && <VPDCalculator />}
+        {calculatorId === "living-soil" && <LivingSoilCalculator />}
       </main>
     </div>
     </PageTransition>
@@ -1380,6 +1382,134 @@ function VPDCalculator() {
       </div>
 
       <CalcHistoryPanel entries={vpdHistory} onClear={clearVpd} />
+    </div>
+  );
+}
+
+// ─── Construtor de Solo Vivo (Cultivo Orgânico Fase 2) ─────────────────────────
+// Receita Clackamas Coots (living soil) escalada pelo volume total de solo.
+// Mostra base mix (turfa/aeração/húmus) + amendments em GRAMAS e em CUPS/pé³.
+// Valores de referência da comunidade (clackamascoots.com) — ver
+// ORGANIC-AMENDMENTS-REFERENCES.md. NÃO são prescrição: o grower ajusta.
+function LivingSoilCalculator() {
+  const haptic = useTactileFeedback();
+  const [potSize, setPotSize] = useState<number>(30); // litros por vaso
+  const [numPots, setNumPots] = useState<number>(4);
+
+  const volumeL = Math.max(1, potSize * numPots);
+  const FT3_L = 28.3168; // litros por pé cúbico
+  const ft3 = volumeL / FT3_L;
+
+  // Base mix Coots: 1/3 turfa + 1/3 aeração + 1/3 húmus (do volume total).
+  const baseThird = volumeL / 3;
+
+  // Amendments por pé³ (cups) + densidade aproximada (g/cup) pra converter.
+  const AMENDMENTS = [
+    { name: "Farinha de alga (kelp)", cupsPerFt3: 1, gPerCup: 60, hint: "K + micronutrientes" },
+    { name: "Farinha de neem", cupsPerFt3: 1, gPerCup: 60, hint: "N + proteção" },
+    { name: "Calcário / casca de ostra", cupsPerFt3: 1, gPerCup: 200, hint: "Cálcio · pH" },
+    { name: "Gesso agrícola (gypsum)", cupsPerFt3: 0.5, gPerCup: 200, hint: "Ca + enxofre" },
+    { name: "Pó de rocha (basalto)", cupsPerFt3: 3, gPerCup: 250, hint: "Remineralização" },
+  ];
+
+  const fmtG = (g: number) => (g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${Math.round(g)} g`);
+  const fmtCups = (c: number) => (c < 0.1 ? "—" : c < 1 ? `${c.toFixed(2)}` : c.toFixed(1));
+
+  return (
+    <div className="space-y-6">
+      {/* Headline editorial */}
+      <div>
+        <CalcEyebrow text="Solo Vivo · Receita Coots" />
+        <h2 className="text-2xl font-bold text-foreground">Construtor de Solo Vivo</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Monte seu super soil / living soil de uma vez. Informe o volume e veja a lista de compras
+          escalada — em gramas e em cups (pé³).
+        </p>
+      </div>
+
+      {/* Entrada: vaso × quantidade */}
+      <Card className="relative overflow-hidden">
+        <CalcRunning />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Mountain className="w-4 h-4 text-primary" /> Volume de solo
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <CalcSlider label="Tamanho do vaso" value={potSize} setValue={(v) => { haptic.tap(); setPotSize(v); }} min={1} max={100} step={1} suffix="L" accent="var(--color-primary, #22c55e)" />
+          <CalcSlider label="Número de vasos" value={numPots} setValue={(v) => { haptic.tap(); setNumPots(v); }} min={1} max={50} step={1} suffix="vasos" accent="var(--color-primary, #22c55e)" />
+          <div className="flex items-baseline justify-between rounded-xl bg-primary/8 border border-primary/20 px-4 py-3">
+            <span className="text-sm text-muted-foreground">Volume total de solo</span>
+            <span className="mono text-2xl font-bold text-primary">{volumeL.toLocaleString("pt-BR")} L</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Base mix */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sprout className="w-4 h-4 text-emerald-500" /> Base do solo (⅓ cada)
+          </CardTitle>
+          <CardDescription>Misture por volume — é a estrutura "viva" do solo.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { n: "Turfa (peat)", d: "retém água" },
+              { n: "Aeração", d: "pumice/perlita" },
+              { n: "Húmus", d: "vermicomposto" },
+            ].map((b) => (
+              <div key={b.n} className="rounded-xl border border-border bg-card px-3 py-3 text-center">
+                <div className="mono text-xl font-bold text-foreground">{Math.round(baseThird)} L</div>
+                <div className="text-xs font-medium text-foreground mt-1">{b.n}</div>
+                <div className="text-[10px] text-muted-foreground">{b.d}</div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Amendments */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FlaskConical className="w-4 h-4 text-amber-500" /> Amendments (misturar tudo)
+          </CardTitle>
+          <CardDescription>Para {volumeL} L de solo ({ft3.toFixed(1)} pé³).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y divide-border">
+            {AMENDMENTS.map((a) => {
+              const cups = a.cupsPerFt3 * ft3;
+              const grams = cups * a.gPerCup;
+              return (
+                <div key={a.name} className="flex items-center justify-between py-2.5 gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{a.name}</p>
+                    <p className="text-[11px] text-muted-foreground">{a.hint}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="mono text-base font-bold text-foreground">{fmtG(grams)}</span>
+                    <span className="mono text-xs text-muted-foreground ml-1.5">≈ {fmtCups(cups)} cup</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Como usar + disclaimer */}
+      <div className="rounded-xl bg-muted/40 border border-border p-4 space-y-2.5 text-sm text-muted-foreground">
+        <p className="flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <span>Misture base + amendments e deixe <strong className="text-foreground">curtir 2–4 semanas</strong> úmido antes de plantar. Depois é só manter com top dressing + chá de compostagem.</span>
+        </p>
+        <p className="text-xs leading-relaxed">
+          Valores de referência da receita <strong>Clackamas Coots</strong> (comunidade living soil). A densidade dos pós varia — ajuste ao seu gosto. Cups são aproximados (1 pé³ = 28,3 L).
+        </p>
+      </div>
     </div>
   );
 }

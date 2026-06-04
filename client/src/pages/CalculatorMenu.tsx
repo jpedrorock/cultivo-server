@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight, Wind, Lock, Sparkles, Play } from "lucide-react";
+import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight, Wind, Lock, Sparkles, Play, Sprout } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { usePlan } from "@/_core/hooks/usePlan";
 import { usePaywall } from "@/components/PaywallGate";
@@ -171,6 +171,19 @@ export default function CalculatorMenu() {
       shadowColor: "shadow-emerald-900/20",
       badge: "Popular",
       badgeStyle: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25",
+    },
+    {
+      id: "living-soil",
+      title: "Solo Vivo (Orgânico)",
+      description: "Receita de super soil / living soil escalada pelo volume",
+      icon: Sprout,
+      gradient: "bg-green-600",
+      border: "border-green-500/20",
+      glow: "rgba(34,197,94,0.09)",
+      accentColor: "text-green-400",
+      shadowColor: "shadow-green-900/20",
+      badge: "Orgânico",
+      badgeStyle: "bg-green-500/15 text-green-300 border border-green-500/25",
     },
     {
       id: "lux-ppfd",
