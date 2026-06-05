@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Plus, Edit, Trash2, Loader2, Search, ListChecks } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, Search, ListChecks, Sprout } from "lucide-react";
 import { toast } from "sonner";
+import { ORGANIC_TASK_LIBRARY } from "@/components/onboarding/organicTaskLibrary";
 
 type Phase = "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
 type Context = "TENT_A" | "TENT_BC";
@@ -84,6 +85,38 @@ export function TaskTemplatesManager() {
     },
     onError: (error) => toast.error(`Erro ao atualizar template: ${error.message}`),
   });
+
+  // Mutation "crua" pra bulk-add da biblioteca orgânica (sem o toast/close por item)
+  const bulkCreateMutation = trpc.taskTemplates.create.useMutation();
+  const [addingLibrary, setAddingLibrary] = useState(false);
+
+  const handleAddOrganicLibrary = async () => {
+    const existingTitles = new Set((templates ?? []).map((t: TaskTemplate) => t.title));
+    const toAdd = ORGANIC_TASK_LIBRARY.filter((t) => !existingTitles.has(t.title));
+    if (toAdd.length === 0) {
+      toast.info("Suas tarefas orgânicas já estão na lista 🌱");
+      return;
+    }
+    setAddingLibrary(true);
+    try {
+      for (const t of toAdd) {
+        await bulkCreateMutation.mutateAsync({
+          title: t.title,
+          description: t.description,
+          phase: t.phase,
+          weekNumber: t.weekNumber,
+          context: getContextFromPhase(t.phase),
+        });
+      }
+      utils.taskTemplates.list.invalidate();
+      utils.tasks.getTasksByTent.invalidate();
+      toast.success(`${toAdd.length} tarefa${toAdd.length > 1 ? "s" : ""} de cultivo orgânico adicionada${toAdd.length > 1 ? "s" : ""}!`);
+    } catch (error: any) {
+      toast.error(`Erro ao adicionar tarefas: ${error.message}`);
+    } finally {
+      setAddingLibrary(false);
+    }
+  };
 
   const deleteMutation = trpc.taskTemplates.delete.useMutation({
     onSuccess: () => {
@@ -204,6 +237,22 @@ export function TaskTemplatesManager() {
           className="pl-10 h-11"
         />
       </div>
+
+      {/* Biblioteca de tarefas orgânicas — adiciona com 1 toque */}
+      <button
+        onClick={handleAddOrganicLibrary}
+        disabled={addingLibrary}
+        className="w-full flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/8 px-4 py-3 text-left hover:bg-green-500/12 active:scale-[0.99] transition-[transform,background-color] disabled:opacity-60"
+      >
+        <span className="w-9 h-9 rounded-lg bg-green-500/15 border border-green-500/25 flex items-center justify-center shrink-0">
+          {addingLibrary ? <Loader2 className="w-4 h-4 text-green-500 animate-spin" /> : <Sprout className="w-4 h-4 text-green-500" />}
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-foreground">Tarefas de cultivo orgânico</span>
+          <span className="block text-xs text-muted-foreground">Adicione {ORGANIC_TASK_LIBRARY.length} tarefas prontas: top dressing, chá de compostagem, umidade do solo…</span>
+        </span>
+        <Plus className="w-4 h-4 text-green-500 shrink-0" />
+      </button>
 
       {/* Lista agrupada por fase */}
       {groupedTemplates && Object.keys(groupedTemplates).length > 0 ? (
