@@ -32,12 +32,13 @@ const PLANS: PlanCardData[] = [
     tier: "free",
     label: "Free",
     tagline: "Pra começar",
-    monthly: "$0",
+    monthly: "R$0",
     yearly: null,
     features: [
       "1 estufa",
-      "3 calculadoras (LUX/PPFD, Rega, VPD)",
+      "4 calculadoras (LUX/PPFD, Rega, VPD, pH)",
       "Registro diário básico",
+      "Histórico de 7 dias",
       "Com anúncios",
     ],
     cta: "Plano atual",
@@ -45,40 +46,59 @@ const PLANS: PlanCardData[] = [
     accentClass: "border-border bg-card",
   },
   {
-    tier: "pro",
-    label: "Pro Individual",
-    tagline: "Pra quem cultiva sozinho",
-    monthly: "$10",
-    yearly: "$99",
-    perCapita: "$8.25/mês",
+    tier: "starter",
+    label: "Starter",
+    tagline: "Pro hobbyista sério",
+    monthly: "R$19",
+    yearly: "R$180",
+    perCapita: "R$15/mês no anual",
     features: [
-      "Estufas ilimitadas",
+      "Até 3 estufas",
       "Todas as 7 calculadoras",
       "Fotos das plantas",
-      "Chat com IA especialista",
-      "Integração Tuya / SmartLife / ESP32",
+      "Presets de fertilização",
+      "Alertas customizados",
+      "Histórico de 30 dias",
       "Sem anúncios",
     ],
-    cta: "Assinar Pro",
+    cta: "Assinar Starter",
     icon: Sparkles,
-    accentClass: "border-emerald-500/50 bg-gradient-to-br from-emerald-500/10 to-transparent",
+    accentClass: "border-blue-500/50 bg-gradient-to-br from-blue-500/10 to-transparent",
   },
   {
-    tier: "team",
-    label: "Pro Grupo",
-    tagline: "Compartilhe com até 3 pessoas",
-    highlight: "Melhor pra famílias",
-    monthly: "$20",
-    yearly: "$200",
-    perCapita: "$5.55/mês por pessoa",
+    tier: "cloud",
+    label: "Cloud",
+    tagline: "Para o cultivador avançado",
+    highlight: "Mais popular",
+    monthly: "R$29",
+    yearly: "R$288",
+    perCapita: "R$24/mês no anual",
     features: [
-      "Tudo do Pro Individual",
-      "Até 3 membros no mesmo grupo",
+      "Estufas ilimitadas",
+      "Histórico completo",
+      "AI Chat — Doctor Jáh",
+      "Integração Tuya / SmartLife / ESP32",
+      "Tudo do Starter incluído",
+    ],
+    cta: "Assinar Cloud",
+    icon: Sparkles,
+    accentClass: "border-emerald-500/50 bg-gradient-to-br from-emerald-500/15 to-transparent",
+  },
+  {
+    tier: "pro",
+    label: "Pro",
+    tagline: "Cloud + equipe",
+    monthly: "R$89",
+    yearly: "R$888",
+    perCapita: "R$74/mês no anual",
+    features: [
+      "Tudo do Cloud",
+      "Até 3 membros no grupo",
       "Estufas compartilhadas",
       "Convites por código",
       "Ideal pra casais / família",
     ],
-    cta: "Assinar Pro Grupo",
+    cta: "Assinar Pro",
     icon: Users,
     accentClass: "border-violet-500/50 bg-gradient-to-br from-violet-500/15 to-transparent",
   },
@@ -144,7 +164,8 @@ export default function Subscription() {
   };
 
   const currentPlanLabel =
-    tier === "team" ? "Pro Grupo" : tier === "pro" ? "Pro Individual" : "Free";
+    tier === "pro" ? "Pro" : tier === "cloud" ? "Cloud" :
+    tier === "starter" ? "Starter" : "Free";
 
   return (
     <PageTransition>
@@ -202,7 +223,7 @@ export default function Subscription() {
                       }`}
                     >
                       {plan.highlight && !isCurrent && (
-                        <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-500 text-white">
+                        <span className="absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-600 text-white">
                           {plan.highlight}
                         </span>
                       )}
@@ -250,7 +271,7 @@ export default function Subscription() {
                         <Button
                           onClick={() => paywall.open(`Cultivo ${plan.label}`)}
                           className={`w-full ${
-                            plan.tier === "team" ? "bg-violet-500 hover:bg-violet-600" : "bg-emerald-500 hover:bg-emerald-600"
+                            plan.tier === "pro" ? "bg-violet-500 hover:bg-violet-600" : "bg-emerald-500 hover:bg-emerald-600"
                           } text-white`}
                           size="sm"
                         >

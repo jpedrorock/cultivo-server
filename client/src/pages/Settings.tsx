@@ -54,7 +54,7 @@ export default function Settings() {
 
             {/* Card de assinatura — destaque grande */}
             <ListItemAnimation>
-              {tier === "team" ? (
+              {tier === "pro" ? (
                 <Link href="/settings/subscription" className="block">
                   <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/15 via-violet-500/5 to-transparent p-4 active:scale-[0.98] transition-transform">
                     <div className="flex items-center gap-3">
@@ -62,14 +62,14 @@ export default function Settings() {
                         <Users className="w-5 h-5 text-violet-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-foreground">Cultivo Pro Grupo</p>
+                        <p className="text-sm font-bold text-foreground">Cultivo Pro</p>
                         <p className="text-xs text-muted-foreground">Sua assinatura está ativa</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                     </div>
                   </div>
                 </Link>
-              ) : tier === "pro" ? (
+              ) : tier === "cloud" ? (
                 <Link href="/settings/subscription" className="block">
                   <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent p-4 active:scale-[0.98] transition-transform">
                     <div className="flex items-center gap-3">
@@ -77,7 +77,22 @@ export default function Settings() {
                         <Sparkles className="w-5 h-5 text-emerald-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-foreground">Cultivo Pro</p>
+                        <p className="text-sm font-bold text-foreground">Cultivo Cloud</p>
+                        <p className="text-xs text-muted-foreground">Sua assinatura está ativa</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                    </div>
+                  </div>
+                </Link>
+              ) : tier === "starter" ? (
+                <Link href="/settings/subscription" className="block">
+                  <div className="rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-500/15 via-blue-500/5 to-transparent p-4 active:scale-[0.98] transition-transform">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground">Cultivo Starter</p>
                         <p className="text-xs text-muted-foreground">Sua assinatura está ativa</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />

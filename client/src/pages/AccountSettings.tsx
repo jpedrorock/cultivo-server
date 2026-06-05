@@ -277,7 +277,10 @@ function SubscriptionCard() {
   const paywall = usePaywall();
   const [restoring, setRestoring] = useState(false);
 
-  const planLabel = tier === 'team' ? 'Pro Grupo' : tier === 'pro' ? 'Pro' : 'Free';
+  const planLabel =
+    tier === 'pro'     ? 'Pro' :
+    tier === 'cloud'   ? 'Cloud' :
+    tier === 'starter' ? 'Starter' : 'Free';
 
   async function handleRestore() {
     haptics.light();
