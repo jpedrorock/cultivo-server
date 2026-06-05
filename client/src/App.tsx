@@ -25,6 +25,10 @@ import { initAndroidBackButton, pushBackHandler } from "./lib/androidBackButton"
 import { initDeepLinks } from "./lib/deepLinks";
 import { trpc } from "./lib/trpc";
 import { NetworkStatusBanner } from "./components/NetworkStatusBanner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { prefetchRoutes } from "./lib/prefetchRoutes";
 
@@ -308,6 +312,8 @@ function AuthenticatedApp() {
 }
 
 function App() {
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
+
   // Esconde o splash nativo assim que o React começa a renderizar.
   // Independente de auth/loading — queremos que o user veja a tela de login
   // ou home rapidinho. O loading state interno (spinner em AuthenticatedAppInner)
@@ -324,7 +330,7 @@ function App() {
   // Hardware back button do Android. Inicializa listener global + registra
   // handler root que faz:
   //   1. Tenta history.back() — wouter navega pra rota anterior
-  //   2. Se não tem histórico (entrada na home), pergunta "Sair do app?"
+  //   2. Se não tem histórico (entrada na home), abre dialog de confirmação
   // Handlers de modais/sheets fazem push em cima desse e tem prioridade.
   useEffect(() => {
     initAndroidBackButton();
@@ -335,18 +341,19 @@ function App() {
         window.history.back();
         return true;
       }
-      // Está na raiz — pergunta antes de sair
-      const confirmExit = window.confirm("Sair do aplicativo?");
-      if (confirmExit) {
-        // Minimiza/encerra. import dinâmico pra não puxar @capacitor/app no web.
-        import("@capacitor/app").then(({ App }) => {
-          App.exitApp().catch(() => {});
-        }).catch(() => {});
-      }
+      // Está na raiz — abre dialog (setExitConfirmOpen é referência estável)
+      setExitConfirmOpen(true);
       return true;
     });
     return removeRoot;
   }, []);
+
+  function handleConfirmExit() {
+    // Minimiza/encerra. import dinâmico pra não puxar @capacitor/app no web.
+    import("@capacitor/app").then(({ App }) => {
+      App.exitApp().catch(() => {});
+    }).catch(() => {});
+  }
 
   return (
     <ErrorBoundary>
@@ -356,6 +363,20 @@ function App() {
       >
         <TooltipProvider>
           <Toaster />
+          <AlertDialog open={exitConfirmOpen} onOpenChange={setExitConfirmOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Sair do aplicativo?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Deseja encerrar o App Cultivo?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmExit}>Sair</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Switch>
             <Route path="/login" component={Login} />
             <Route path="/register" component={Register} />
