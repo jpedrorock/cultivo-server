@@ -9,8 +9,7 @@
  */
 
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 import { getDb, applyPhaseTransitionLimits } from "../db";
@@ -92,10 +91,10 @@ export const cyclesRouter = router({
         const startDate = new Date(cycle.startDate);
         const daysSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
         
-        let currentWeek = 1;
-        let totalWeeks = cycle.vegaWeeks || 4;
-        let phase: 'MAINTENANCE' | 'CLONING' | 'VEGA' | 'FLORA' = 'VEGA';
-        let daysUntilHarvest = 0;
+        let currentWeek: number;
+        let totalWeeks: number;
+        let phase: 'MAINTENANCE' | 'CLONING' | 'VEGA' | 'FLORA';
+        let daysUntilHarvest: number;
         
         // Detectar fase baseado nos campos de data
         if (cycle.tentCategory === 'MAINTENANCE') {
@@ -675,10 +674,8 @@ export const cyclesRouter = router({
           throw new Error("Ciclo não encontrado");
         }
 
-        // Usar motherPlantId e clonesProduced dos inputs
         const motherPlantId = input.motherPlantId;
-        const clonesProduced = input.clonesProduced || input.seedlingCount || 10;
-        
+
         // Buscar planta-mãe
         const [motherPlant] = await database
           .select()
