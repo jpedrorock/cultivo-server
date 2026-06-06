@@ -764,6 +764,40 @@ const MIGRATIONS: Migration[] = [
       await addColumnIfNotExists(c, 'tents', 'cultivationMethod', "VARCHAR(16) NOT NULL DEFAULT 'MINERAL' AFTER `category`");
     },
   },
+  {
+    // Pricing 4-tier — migra enum users.plan de free/pro/team → free/starter/cloud/pro.
+    // Grandfather: 'pro' antigo → 'cloud' (tier destaque, tem tudo que o pro antigo tinha);
+    //              'team' antigo → 'pro' (Pro é o novo topo, com equipe).
+    // Ordem importa: expandir o enum (superset com os 5 valores temporários) ANTES de
+    // remapear os dados, senão o UPDATE pra 'cloud'/'starter' falha (valor inválido no enum antigo).
+    // Idempotente: confere se 'cloud' já está no enum antes de mexer.
+    id: 'users-plan-4tier',
+    description: 'Migra users.plan para 4 tiers (free/starter/cloud/pro) + grandfather pro→cloud, team→pro',
+    run: async (c) => {
+      // Lê a definição atual da coluna pra checar idempotência
+      const [colRows] = await c.query(
+        `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'plan'`
+      ) as [Array<{ COLUMN_TYPE: string }>, unknown];
+      const colType = colRows?.[0]?.COLUMN_TYPE ?? '';
+      // Se já tem 'cloud' e NÃO tem 'team', a migração já rodou — sai.
+      if (colType.includes("'cloud'") && !colType.includes("'team'")) return;
+
+      // 1. Enum transitório com TODOS os valores (antigos + novos), pra permitir o remap.
+      await c.query(
+        `ALTER TABLE \`users\` MODIFY COLUMN \`plan\` ENUM('free','pro','team','starter','cloud') NOT NULL DEFAULT 'free'`
+      );
+      // 2. Grandfather dos dados existentes (ordem: team→pro depois pro→cloud não pode
+      //    ser na ordem inversa senão 'team' viraria 'cloud'. Fazemos team→pro primeiro
+      //    com um valor sentinela pra evitar colisão).
+      await c.query(`UPDATE \`users\` SET \`plan\` = 'starter' WHERE \`plan\` = 'team'`); // sentinela temporária
+      await c.query(`UPDATE \`users\` SET \`plan\` = 'cloud'   WHERE \`plan\` = 'pro'`);  // pro antigo → cloud
+      await c.query(`UPDATE \`users\` SET \`plan\` = 'pro'     WHERE \`plan\` = 'starter'`); // sentinela → pro (era team)
+      // 3. Enum final, só com os 4 valores válidos.
+      await c.query(
+        `ALTER TABLE \`users\` MODIFY COLUMN \`plan\` ENUM('free','starter','cloud','pro') NOT NULL DEFAULT 'free'`
+      );
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

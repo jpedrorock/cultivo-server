@@ -16,11 +16,15 @@ import {
 } from "../../drizzle/schema";
 import type { User } from "../../drizzle/schema";
 
-/** Mapeamento de plano → maxTents (null = ilimitado) */
+/** Mapeamento de plano → maxTents (null = ilimitado). Alinhado com STORE-LISTING §9.
+ *  Mantém pro/team (tiers antigos) como fallback durante a migração — após o
+ *  grandfather (pro→cloud, team→pro) nenhum user fica nesses, mas não custa cobrir. */
 const MAX_TENTS_BY_PLAN: Record<string, number | null> = {
-  free: 1,
-  pro:  null,
-  team: null,
+  free:    1,
+  starter: 3,
+  cloud:   null,
+  pro:     null,
+  team:    null, // legado (pré-migração 4-tier)
 };
 import { validateTentOwnership, validateCycleOwnership } from "./_helpers";
 
