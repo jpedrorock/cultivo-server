@@ -73,7 +73,7 @@ describe('emailService', () => {
       const call = mockSend.mock.calls[0][0];
       expect(call.to).toEqual(['joao@cultivo.pro']);
       expect(call.subject).toContain('lista');          // assunto PT
-      expect(call.html).toContain('cultivo.pro/calculators/vpd'); // link PT
+      expect(call.html).toContain('cultivo.pro/pt/calculadoras'); // link PT
     });
 
     it('deve enviar email com assunto em EN quando locale=en', async () => {
@@ -83,7 +83,7 @@ describe('emailService', () => {
       const call = mockSend.mock.calls[0][0];
       expect(call.to).toEqual(['john@example.com']);
       expect(call.subject).toContain("You're on the list"); // assunto EN
-      expect(call.html).toContain('en/calculators/vpd');    // link EN
+      expect(call.html).toContain('cultivo.pro/calculators');  // link EN
     });
 
     it('deve usar locale EN como padrão (sem segundo argumento)', async () => {
