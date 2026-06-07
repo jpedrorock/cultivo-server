@@ -3092,6 +3092,16 @@ static void netTaskFn(void *param) {
       logIfSlow("refreshTuya", t0, 9000);
     }
 
+    // Tela apagada (screensaver) → pula TODOS os fetches periódicos.
+    // Ninguém está olhando, então não faz sentido gastar rede/bateria nem
+    // (no caso do /scenes) quota Tuya. WiFi retry e refresh manual acima
+    // continuam funcionando. Ao acordar (touch), os intervalos disparam o
+    // próximo fetch normalmente. Pedido do João: "tela desligada = zero requisição".
+    if (screenAsleep) {
+      vTaskDelay(pdMS_TO_TICKS(500));
+      continue;
+    }
+
     if (millis() - lastFetch >= FETCH_INTERVAL) {
       lastFetch = millis();
       uint32_t t0 = millis();
@@ -3107,8 +3117,20 @@ static void netTaskFn(void *param) {
       logIfSlow("history-all", t0, 6000);
     }
 
-    // Cenas Tuya — refresh ocasional (cenas raramente mudam)
-    if (millis() - lastScenesFetch >= SCENES_FETCH_INTERVAL) {
+    // Cenas Tuya — só busca quando o user ESTÁ na tela de Cenas (activeScreen==4)
+    // E a tela está acordada. Cada fetchScenes consulta a Tuya pelo estado on/off
+    // dos devices vinculados; rodar isso a cada 30s 24h/dia (mesmo tela apagada,
+    // mesmo em outra aba) estourava a cota da API Tuya. Agora só consome quota
+    // enquanto o user realmente olha os dispositivos. Fora da tela Cenas: zero Tuya.
+    //
+    // netWasOnScenes detecta a TRANSIÇÃO pra tela Cenas → fetch imediato (UX:
+    // não esperar até 30s pra ver o estado dos devices ao abrir a aba).
+    static bool netWasOnScenes = false;
+    const bool onScenes = (activeScreen == 4 && !screenAsleep);
+    const bool justEnteredScenes = onScenes && !netWasOnScenes;
+    netWasOnScenes = onScenes;
+    if (onScenes &&
+        (justEnteredScenes || millis() - lastScenesFetch >= SCENES_FETCH_INTERVAL)) {
       lastScenesFetch = millis();
       uint32_t t0 = millis();
       fetchScenes();
