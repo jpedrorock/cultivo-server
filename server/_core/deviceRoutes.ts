@@ -31,6 +31,24 @@ import type { TuyaRegion } from "../lib/tuya";
 
 const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
 
+// ─── Cache do /api/device/scenes ────────────────────────────────────────────
+// O ESP32 chama /scenes a cada ~30s pra atualizar a tela. Cada chamada
+// consultava a Tuya AO VIVO (listTuyaScenesIoTCore + getTuyaDeviceSwitchState
+// por device), o que estourava a cota da API Tuya (~15k chamadas/dia com 3
+// devices → trial de 26k/mês morria em ~2 dias).
+//
+// Solução: cachear a resposta montada por tentId. O estado on/off de um device
+// raramente muda em 90s, e quando o user dá toggle pelo app/display nós
+// invalidamos o cache explicitamente (invalidateScenesCache) pra refletir na hora.
+// Corta ~95% das chamadas Tuya mantendo a tela responsiva.
+const SCENES_CACHE_TTL_MS = 90 * 1000;
+const scenesCache = new Map<number, { at: number; payload: unknown }>();
+
+/** Invalida o cache de /scenes de uma estufa — chamar após toggle/trigger. */
+function invalidateScenesCache(tentId: number): void {
+  scenesCache.delete(tentId);
+}
+
 // Sharp via createRequire pra resolver módulo nativo no bundle ESM
 // (mesmo padrão de uploadRouter.ts). Usado pelo /plant/:id/photo pra
 // resizar a foto de saúde antes de enviar pro ESP32 — se falhar, o
@@ -812,6 +830,8 @@ function registerDeviceRoutes(app: express.Application) {
       const result = await triggerTuyaScene(homeId, sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
       console.log(`[Device] scene slot=${slotIdx} -> ${result.success ? 'OK' : 'FAIL'} (${result.msg ?? ''})`);
       if (!result.success) return res.status(502).json({ error: result.msg ?? 'Tuya retornou falha' });
+      // Cena pode ligar/desligar devices → invalida cache pro display refletir
+      invalidateScenesCache(device.tentId);
       res.json({ success: true, slotIdx });
     } catch (err: any) {
       console.error('[Device] scene trigger error:', err?.message);
@@ -832,6 +852,13 @@ function registerDeviceRoutes(app: express.Application) {
     try {
       const device = await validateDeviceToken(req);
       if (!device) return res.status(401).json({ error: 'Token inválido' });
+
+      // Cache hit? Evita martelar a Tuya a cada poll do ESP32 (~30s).
+      // TTL curto (90s) + invalidação no toggle mantém a tela responsiva.
+      const cached = scenesCache.get(device.tentId);
+      if (cached && Date.now() - cached.at < SCENES_CACHE_TTL_MS) {
+        return res.json(cached.payload);
+      }
 
       // 1) Carrega vínculos da estufa.
       // SELECT inclui iconHint + type + executionSec pra cenas. ESP usa pra:
@@ -861,7 +888,9 @@ function registerDeviceRoutes(app: express.Application) {
             .slice(0, 6)
             .map(s => ({ id: s.sceneId, name: s.name }));
           console.log(`[Device] /scenes (legacy) group=${device.groupId} -> ${scenes.length} cenas`);
-          return res.json({ scenes });
+          const legacyPayload = { scenes };
+          scenesCache.set(device.tentId, { at: Date.now(), payload: legacyPayload });
+          return res.json(legacyPayload);
         } catch (e: any) {
           console.warn('[Device] /scenes legacy:', e?.message);
           return res.json({ scenes: [] });
@@ -932,7 +961,9 @@ function registerDeviceRoutes(app: express.Application) {
       const limited = items.slice(0, 6);
 
       console.log(`[Device] /scenes tent=${device.tentId} -> ${limited.length} items (${tentSceneRows.length}s+${tentDeviceRows.length}d)`);
-      res.json({ items: limited });
+      const itemsPayload = { items: limited };
+      scenesCache.set(device.tentId, { at: Date.now(), payload: itemsPayload });
+      res.json(itemsPayload);
     } catch (err: any) {
       console.error('[Device] scenes list error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao listar itens' });
@@ -1020,6 +1051,9 @@ function registerDeviceRoutes(app: express.Application) {
         console.warn(`[Device] device-toggle re-confirm failed device=${deviceId}: ${e?.message}`);
       }
 
+      // Estado mudou → invalida o cache do /scenes pra próxima leitura refletir na hora
+      invalidateScenesCache(device.tentId);
+
       res.json({ success: true, deviceId, state: confirmedState });
     } catch (err: any) {
       console.error('[Device] device-toggle error:', err?.message);
@@ -1048,6 +1082,8 @@ function registerDeviceRoutes(app: express.Application) {
       const result = await triggerTuyaScene(homeId, sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
       console.log(`[Device] scene-by-id ${sceneId} -> ${result.success ? 'OK' : 'FAIL'} (${result.msg ?? ''})`);
       if (!result.success) return res.status(502).json({ error: result.msg ?? 'Tuya retornou falha' });
+      // Cena pode ligar/desligar devices → invalida cache pro display refletir
+      invalidateScenesCache(device.tentId);
       res.json({ success: true, sceneId });
     } catch (err: any) {
       console.error('[Device] scene-by-id trigger error:', err?.message);
