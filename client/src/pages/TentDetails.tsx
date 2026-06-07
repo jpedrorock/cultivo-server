@@ -309,18 +309,17 @@ function DeviceToggleButton({
 }) {
   const utils = trpc.useUtils();
 
-  // refetchOnWindowFocus garante que ao voltar pra tab a app capta mudancas
-  // feitas pelo display ESP / pelo SmartLife app sem esperar o intervalo.
-  // refetchInterval cobre o caso da tab ficar aberta sem foco.
-  // QUOTA: Tuya Trial = 26k calls/mes. Era 30s aqui — quebrava em <2 semanas.
+  // QUOTA Tuya: só consulta o estado on/off ao ABRIR a tela de dispositivos
+  // (mount) e ao VOLTAR o foco pra aba. SEM polling em intervalo — pedido do
+  // João: "só chama Tuya se eu entrar na página de dispositivos". O refetch
+  // periódico foi removido (era 5min, antes 30s) pra não gastar quota com a
+  // tela aberta parada. Após um toggle, invalidamos manualmente (onSuccess).
   const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId },
     {
-      refetchInterval: 5 * 60_000,             // 5min (era 30s)
-      refetchIntervalInBackground: false,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: true,   // volta o foco → capta mudança feita fora do app
       retry: false,
-      staleTime: 60_000,                       // confiável por 1min (era 5s)
+      staleTime: 60_000,            // confiável por 1min (evita refetch em re-render)
     }
   );
 
