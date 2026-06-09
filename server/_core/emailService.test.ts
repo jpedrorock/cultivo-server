@@ -31,7 +31,7 @@ vi.mock('./env', () => ({ ENV: mockENV }));
 
 // ── Import após mocks (vitest hoista vi.mock, então a ordem no source não importa,
 //    mas é boa prática deixar depois para deixar a intenção clara) ────────────
-import { sendWelcomeEmail, sendPasswordResetEmail } from './emailService';
+import { sendWelcomeEmail, sendPasswordResetEmail, sendNurtureEmail1, sendNurtureEmail2 } from './emailService';
 
 // =============================================================================
 describe('emailService', () => {
@@ -144,6 +144,94 @@ describe('emailService', () => {
       mockSend.mockRejectedValue(new Error('Timeout'));
 
       await expect(sendPasswordResetEmail('user@test.com', 'token')).resolves.toBeUndefined();
+    });
+  });
+
+  // ── sendNurtureEmail1 (D+3) ────────────────────────────────────────────────
+  describe('sendNurtureEmail1', () => {
+    it('não deve chamar o SDK quando RESEND_API_KEY não está configurado', async () => {
+      mockENV.resendApiKey = undefined as any;
+
+      await expect(sendNurtureEmail1('user@test.com', 'pt')).resolves.toBeUndefined();
+
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it('deve enviar email com assunto em PT quando locale=pt', async () => {
+      await sendNurtureEmail1('joao@cultivo.pro', 'pt');
+
+      expect(mockSend).toHaveBeenCalledOnce();
+      const call = mockSend.mock.calls[0][0];
+      expect(call.to).toEqual(['joao@cultivo.pro']);
+      expect(call.subject).toContain('práticas');   // assunto PT
+      expect(call.html).toContain('cultivo.pro/pt/blog'); // link PT
+    });
+
+    it('deve enviar email com assunto em EN quando locale=en', async () => {
+      await sendNurtureEmail1('john@example.com', 'en');
+
+      expect(mockSend).toHaveBeenCalledOnce();
+      const call = mockSend.mock.calls[0][0];
+      expect(call.to).toEqual(['john@example.com']);
+      expect(call.subject).toContain('practices');   // assunto EN
+      expect(call.html).toContain('cultivo.pro/blog'); // link EN
+    });
+
+    it('deve usar locale EN como padrão (sem segundo argumento)', async () => {
+      await sendNurtureEmail1('anon@test.com');
+
+      const call = mockSend.mock.calls[0][0];
+      expect(call.subject).toContain('practices'); // EN por padrão
+    });
+
+    it('não deve lançar exceção quando o SDK lança um erro', async () => {
+      mockSend.mockRejectedValue(new Error('SMTP error'));
+
+      await expect(sendNurtureEmail1('user@test.com', 'en')).resolves.toBeUndefined();
+    });
+  });
+
+  // ── sendNurtureEmail2 (D+14) ───────────────────────────────────────────────
+  describe('sendNurtureEmail2', () => {
+    it('não deve chamar o SDK quando RESEND_API_KEY não está configurado', async () => {
+      mockENV.resendApiKey = undefined as any;
+
+      await expect(sendNurtureEmail2('user@test.com', 'en')).resolves.toBeUndefined();
+
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it('deve enviar email com assunto em PT quando locale=pt', async () => {
+      await sendNurtureEmail2('joao@cultivo.pro', 'pt');
+
+      expect(mockSend).toHaveBeenCalledOnce();
+      const call = mockSend.mock.calls[0][0];
+      expect(call.to).toEqual(['joao@cultivo.pro']);
+      expect(call.subject).toContain('diagnóstico');    // assunto PT
+      expect(call.html).toContain('Cultivo Advisor');   // conteúdo PT
+    });
+
+    it('deve enviar email com assunto em EN quando locale=en', async () => {
+      await sendNurtureEmail2('john@example.com', 'en');
+
+      expect(mockSend).toHaveBeenCalledOnce();
+      const call = mockSend.mock.calls[0][0];
+      expect(call.to).toEqual(['john@example.com']);
+      expect(call.subject).toContain('diagnosis');      // assunto EN
+      expect(call.html).toContain('Cultivo Advisor');   // conteúdo EN
+    });
+
+    it('deve usar locale EN como padrão (sem segundo argumento)', async () => {
+      await sendNurtureEmail2('anon@test.com');
+
+      const call = mockSend.mock.calls[0][0];
+      expect(call.subject).toContain('diagnosis'); // EN por padrão
+    });
+
+    it('não deve lançar exceção quando o SDK lança um erro', async () => {
+      mockSend.mockRejectedValue(new Error('Rate limit'));
+
+      await expect(sendNurtureEmail2('user@test.com', 'pt')).resolves.toBeUndefined();
     });
   });
 });
