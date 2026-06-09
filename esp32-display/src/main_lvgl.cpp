@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.0"
+#define FW_VERSION "0.5.1"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -279,15 +279,15 @@ static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
   uint32_t t0 = micros();
   // src: LVGL render buf (LW=480 LH=320 landscape, RGB565 = 2 bytes/px)
   // dst: canvas framebuffer (PW=320 PH=480 portrait)
-  // LVGL ROTATION_270 e' direcao oposta da nossa rotacao manual antiga;
-  // ROTATION_90 reproduz o mesmo mapping pixel-a-pixel:
-  //   src (lx, ly) -> dst (ly, LW-1-lx)  (matches manual rotate_270_to_canvas)
-  // Touch mapping em hal_map_touch foi calibrado p/ esse layout, manter aqui.
+  // ROTATION_270: imagem landscape virada 180deg em relacao ao ROTATION_90
+  // (orientacao anterior). Usado quando o display foi montado de cabeca pra
+  // baixo (cabo USB sai pelo lado oposto). O touch em hal_map_touch foi
+  // invertido junto (180deg nos dois eixos) — os dois SEMPRE andam juntos.
   lv_draw_sw_rotate(px_map, canvas->getFramebuffer(),
                     (int32_t)w, (int32_t)h,
                     (int32_t)(w * 2),    // src_stride
                     320 * 2,              // dest_stride (canvas width * bpp)
-                    LV_DISPLAY_ROTATION_90,
+                    LV_DISPLAY_ROTATION_270,
                     LV_COLOR_FORMAT_RGB565);
   uint32_t t1 = micros();
   canvas->flush();

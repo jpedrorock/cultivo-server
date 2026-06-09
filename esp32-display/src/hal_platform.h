@@ -177,11 +177,13 @@ static inline bool hal_touch_read(int *rx, int *ry) {
 // Wokwi (FT6336 simulado): rotaciona 90 graus + escala pro display 320x240.
 static inline void hal_map_touch(int rx, int ry, int *outX, int *outY) {
 #ifdef REAL_HARDWARE
-  // FORMULA confirmada por teste de 4 cantos (8 nov 2026), validada
-  // matematicamente: TL/TR/BL/BR raw values produzem 0/479,0/319 logicals.
+  // Base (ROTATION_90, validada por teste de 4 cantos 8 nov 2026):
+  //   outX = 479 - ry; outY = rx
+  // Tela girada 180deg (ROTATION_270 em disp_flush) → touch tambem vira 180deg
+  // nos dois eixos: outX' = 479 - outX = ry; outY' = 319 - outY = 319 - rx.
   // LVGL configurada em landscape 480x320 — esta e' a coord que ele espera.
-  *outX = 479 - ry;
-  *outY = rx;
+  *outX = ry;
+  *outY = 319 - rx;
   if (*outX < 0) *outX = 0; if (*outX > 479) *outX = 479;
   if (*outY < 0) *outY = 0; if (*outY > 319) *outY = 319;
 #else
