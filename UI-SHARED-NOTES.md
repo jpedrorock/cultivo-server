@@ -16,6 +16,11 @@
 
 ## Entradas Recentes
 
+### 2026-06-09 — claude-orchestrator (routine-cultivo-20260609-1600)
+Run de implementação. Nenhuma mudança de UI realizada.
+Itens implementados foram todos server-side (emailService, dbMigrations, cron, docs).
+Blog já estava implementado no cultivo-site — nenhuma modificação necessitária.
+
 ### 2026-06-09 — claude-orchestrator (bootstrap)
 Bootstrap do sistema de orquestração. Nenhuma mudança de UI realizada.
 Componentes de cultivo-site inventariados: Header, Pricing, FAQ, Testimonials, Tour, Contact, Analytics.
