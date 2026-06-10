@@ -580,8 +580,10 @@ export async function listTuyaScenes(
   for (const path of attempts) {
     try {
       const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
-          if (data.success) {
-        const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
+      const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
+      // DIAG temporário: mostra resposta crua de cada endpoint de cena Smart Home
+      console.log(`[Tuya] listTuyaScenes ${path}: success=${data.success} code=${data.code ?? '-'} msg="${data.msg ?? '-'}" count=${Array.isArray(list) ? list.length : 0}`);
+      if (data.success) {
         return (list as any[]).map((s: any) => ({
           sceneId: s.scene_id ?? s.id,
           name: s.name ?? s.scene_name ?? "Cena",
@@ -591,6 +593,7 @@ export async function listTuyaScenes(
       lastError = `${data.msg ?? data.code}`;
     } catch (e: any) {
       lastError = e?.message ?? String(e);
+      console.warn(`[Tuya] listTuyaScenes ${path} exception: ${lastError}`);
     }
   }
   throw new Error(`listTuyaScenes: ${lastError}`);

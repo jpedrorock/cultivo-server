@@ -472,11 +472,13 @@ const tuyaRouter = router({
     // homeId salvo OU auto-detecta via listTuyaHomes (alguns users têm homeId NULL).
     const { listTuyaScenes, listTuyaAutomations, listTuyaHomes } = await import("./lib/tuya");
     let homeId = cfg.homeId ? Number(cfg.homeId) : 0;
-    if (!homeId) {
-      try {
-        const homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
-        homeId = homes?.[0]?.homeId ? Number(homes[0].homeId) : 0;
-      } catch { /* segue pro fallback */ }
+    // DIAG: sempre lista as casas reais pra comparar com o homeId salvo
+    try {
+      const allHomes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+      console.log(`[Tuya] listScenes DIAG: homeId salvo=${homeId || 'NULL'}, casas reais=${JSON.stringify(allHomes)}`);
+      if (!homeId) homeId = allHomes?.[0]?.homeId ? Number(allHomes[0].homeId) : 0;
+    } catch (e: any) {
+      console.warn(`[Tuya] listScenes DIAG listTuyaHomes falhou: ${e?.message}`);
     }
     if (homeId) {
       try {
