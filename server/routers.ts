@@ -466,14 +466,47 @@ const tuyaRouter = router({
    *  Caso contrário, tenta auto-detectar as casas via API. */
   listScenes: protectedProcedure.query(async ({ ctx }) => {
     const cfg = await getTuyaConfig(ctx.user.id);
-    const { listTuyaScenesIoTCore } = await import("./lib/tuya");
 
-    // ── Tentativa 1: IoT Core (/v2.0/cloud/scene/rule) ─────────────────────────
+    // ── Tentativa 1: Smart Home (/v1.0/homes/{homeId}/scenes) ──────────────────
+    // PRINCIPAL — serviço "Smart Home Scene Linkage" é permanente. Resolve o
+    // homeId salvo OU auto-detecta via listTuyaHomes (alguns users têm homeId NULL).
+    const { listTuyaScenes, listTuyaAutomations, listTuyaHomes } = await import("./lib/tuya");
+    let homeId = cfg.homeId ? Number(cfg.homeId) : 0;
+    if (!homeId) {
+      try {
+        const homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+        homeId = homes?.[0]?.homeId ? Number(homes[0].homeId) : 0;
+      } catch { /* segue pro fallback */ }
+    }
+    if (homeId) {
+      try {
+        const [scenes, automations] = await Promise.allSettled([
+          listTuyaScenes(homeId, cfg.accessId, cfg.accessSecret, cfg.region),
+          listTuyaAutomations(homeId, cfg.accessId, cfg.accessSecret, cfg.region),
+        ]);
+        const result: any[] = [];
+        if (scenes.status === "fulfilled") {
+          result.push(...scenes.value.map(s => ({ ...s, homeName: "Minha Casa", conditions: [] })));
+        }
+        if (automations.status === "fulfilled" && automations.value.length > 0) {
+          result.push(...automations.value.map(a => ({ ...a, homeName: "Automações", conditions: a.conditions })));
+        }
+        if (result.length > 0) {
+          console.log(`[Tuya] listScenes: Smart Home home=${homeId} retornou ${result.length}`);
+          return result;
+        }
+      } catch (e: any) {
+        console.warn(`[Tuya] listScenes Smart Home home=${homeId}: ${e?.message}`);
+      }
+    }
+
+    // ── Tentativa 2: IoT Core (DEPRECATED pela Tuya — só último recurso) ────────
     let iotCoreError = "";
     try {
+      const { listTuyaScenesIoTCore } = await import("./lib/tuya");
       const iotScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
       if (iotScenes.length > 0) {
-        console.log(`[Tuya] listScenes: IoT Core retornou ${iotScenes.length} cenas`);
+        console.log(`[Tuya] listScenes: IoT Core (fallback deprecated) retornou ${iotScenes.length}`);
         return iotScenes.map(s => ({
           sceneId: s.sceneId,
           name: s.name,
@@ -488,33 +521,9 @@ const tuyaRouter = router({
       console.warn(`[Tuya] listScenes IoT Core falhou: ${iotCoreError}`);
     }
 
-    // ── Tentativa 2: Smart Home com homeId manual ───────────────────────────────
-    if (cfg.homeId) {
-      const { listTuyaScenes, listTuyaAutomations } = await import("./lib/tuya");
-      try {
-        const [scenes, automations] = await Promise.allSettled([
-          listTuyaScenes(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region),
-          listTuyaAutomations(Number(cfg.homeId), cfg.accessId, cfg.accessSecret, cfg.region),
-        ]);
-
-        const result: any[] = [];
-
-        if (scenes.status === "fulfilled") {
-          result.push(...scenes.value.map(s => ({ ...s, homeName: "Minha Casa", conditions: [] })));
-        }
-        if (automations.status === "fulfilled" && automations.value.length > 0) {
-          result.push(...automations.value.map(a => ({ ...a, homeName: "Automações", conditions: a.conditions })));
-        }
-
-        if (result.length > 0) return result;
-      } catch (e: any) {
-        console.warn(`[Tuya] listScenes Smart Home homeId=${cfg.homeId}: ${e?.message}`);
-      }
-    }
-
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
-      message: `IoT Core: ${iotCoreError}. Verifique se a região na aba Config está correta (Europa/América/China) e se o serviço "Scene Linkage Rules" está ativo no projeto Tuya.`,
+      message: `Não foi possível listar cenas. Confira se o homeId está configurado e a região correta (aba Config). Smart Home não retornou cenas e o IoT Core (legado) falhou: ${iotCoreError}.`,
     });
   }),
 

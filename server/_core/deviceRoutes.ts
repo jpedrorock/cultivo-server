@@ -103,13 +103,13 @@ async function validateDeviceToken(req: express.Request): Promise<{ tentId: numb
  * endpoint retorna 502, ESP reverte UI ("liga e apaga"). Bug descoberto em
  * prod apos 3 re-pairs nao resolverem.
  */
-async function getTuyaCfgForDevice(device: { groupId: number; ownerUserId: number | null }): Promise<{ accessId: string; accessSecret: string; region: TuyaRegion } | null> {
+async function getTuyaCfgForDevice(device: { groupId: number; ownerUserId: number | null }): Promise<{ accessId: string; accessSecret: string; region: TuyaRegion; homeId: string | null; userId: number } | null> {
   const pool = getMysqlPool();
-  let row: { accessId: string; accessSecret: string; region: TuyaRegion; userId: number } | null = null;
+  let row: { accessId: string; accessSecret: string; region: TuyaRegion; homeId: string | null; userId: number } | null = null;
 
   if (device.ownerUserId) {
     const [rows]: any = await pool.execute(
-      `SELECT accessId, accessSecret, region, userId FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
+      `SELECT accessId, accessSecret, region, homeId, userId FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
       [device.ownerUserId]
     );
     if (rows.length > 0) row = rows[0];
@@ -117,7 +117,7 @@ async function getTuyaCfgForDevice(device: { groupId: number; ownerUserId: numbe
   }
   if (!row) {
     const [rows]: any = await pool.execute(
-      `SELECT tc.accessId, tc.accessSecret, tc.region, tc.userId
+      `SELECT tc.accessId, tc.accessSecret, tc.region, tc.homeId, tc.userId
        FROM tuyaConfig tc INNER JOIN users u ON u.id = tc.userId
        WHERE tc.enabled = 1 AND u.groupId = ? LIMIT 1`,
       [device.groupId]
@@ -138,7 +138,32 @@ async function getTuyaCfgForDevice(device: { groupId: number; ownerUserId: numbe
     console.error('[Device] getTuyaCfgForDevice decrypt failed:', err?.message);
     return null;
   }
-  return { accessId: row.accessId, accessSecret: row.accessSecret, region: row.region };
+  return { accessId: row.accessId, accessSecret: row.accessSecret, region: row.region, homeId: row.homeId ?? null, userId: row.userId };
+}
+
+/**
+ * Resolve o homeId pra cenas Smart Home. Usa o salvo na config; se NULL,
+ * auto-detecta via listTuyaHomes (1ª casa). Cacheado em memória por accessId
+ * pra não chamar a Tuya toda vez. Retorna 0 se não conseguir (cai no fallback).
+ */
+const homeIdCache = new Map<string, { at: number; homeId: number }>();
+const HOMEID_CACHE_TTL_MS = 30 * 60 * 1000; // 30min — casa raramente muda
+async function resolveHomeId(cfg: { accessId: string; accessSecret: string; region: TuyaRegion; homeId: string | null }): Promise<number> {
+  const saved = cfg.homeId ? parseInt(cfg.homeId) : 0;
+  if (saved) return saved;
+  // homeId NULL no DB → tenta auto-detectar (com cache)
+  const cached = homeIdCache.get(cfg.accessId);
+  if (cached && Date.now() - cached.at < HOMEID_CACHE_TTL_MS) return cached.homeId;
+  try {
+    const { listTuyaHomes } = await import('../lib/tuya');
+    const homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+    const first = homes?.[0]?.homeId ? Number(homes[0].homeId) : 0;
+    if (first) homeIdCache.set(cfg.accessId, { at: Date.now(), homeId: first });
+    return first;
+  } catch (e: any) {
+    console.warn('[Device] resolveHomeId falhou:', e?.message);
+    return 0;
+  }
 }
 
 function registerDeviceRoutes(app: express.Application) {
@@ -880,21 +905,35 @@ function registerDeviceRoutes(app: express.Application) {
         const cfg = await getTuyaCfgForDevice(device);
         if (!cfg) return res.json({ scenes: [] });
 
-        const { listTuyaScenesIoTCore } = await import('../lib/tuya');
-        try {
-          const allScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
-          const scenes = allScenes
-            .filter(s => s.type === 'scene')
-            .slice(0, 6)
-            .map(s => ({ id: s.sceneId, name: s.name }));
-          console.log(`[Device] /scenes (legacy) group=${device.groupId} -> ${scenes.length} cenas`);
-          const legacyPayload = { scenes };
-          scenesCache.set(device.tentId, { at: Date.now(), payload: legacyPayload });
-          return res.json(legacyPayload);
-        } catch (e: any) {
-          console.warn('[Device] /scenes legacy:', e?.message);
-          return res.json({ scenes: [] });
+        // Smart Home (/v1.0/homes/{homeId}/scenes) PRIMEIRO — serviço permanente.
+        // IoT Core (/v2.0/cloud/scene/rule) é DEPRECATED pela Tuya (só trial),
+        // fica só como último recurso.
+        let scenes: Array<{ id: string; name: string }> = [];
+        const homeId = await resolveHomeId(cfg);
+        if (homeId) {
+          try {
+            const { listTuyaScenes } = await import('../lib/tuya');
+            const sh = await listTuyaScenes(homeId, cfg.accessId, cfg.accessSecret, cfg.region);
+            scenes = sh.slice(0, 6).map(s => ({ id: s.sceneId, name: s.name }));
+            console.log(`[Device] /scenes (SmartHome) home=${homeId} -> ${scenes.length} cenas`);
+          } catch (e: any) {
+            console.warn('[Device] /scenes SmartHome:', e?.message);
+          }
         }
+        // Fallback IoT Core deprecated (só se Smart Home não trouxe nada)
+        if (scenes.length === 0) {
+          try {
+            const { listTuyaScenesIoTCore } = await import('../lib/tuya');
+            const allScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
+            scenes = allScenes.filter(s => s.type === 'scene').slice(0, 6).map(s => ({ id: s.sceneId, name: s.name }));
+            console.log(`[Device] /scenes (IoTCore fallback) group=${device.groupId} -> ${scenes.length} cenas`);
+          } catch (e: any) {
+            console.warn('[Device] /scenes IoTCore fallback:', e?.message);
+          }
+        }
+        const legacyPayload = { scenes };
+        scenesCache.set(device.tentId, { at: Date.now(), payload: legacyPayload });
+        return res.json(legacyPayload);
       }
 
       // 3) Tem vínculos: monta itens, busca state dos devices em paralelo
