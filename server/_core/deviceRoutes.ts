@@ -1059,6 +1059,17 @@ function registerDeviceRoutes(app: express.Application) {
         out.iotCoreScenes = { count: iot.length, scenes: iot };
       } catch (e: any) { out.iotCoreScenes_ERRO = e?.message; }
 
+      // 4) RAW: testa cada versão de endpoint diretamente pra ver QUAL funciona
+      const hid = cfg.homeId ?? '41147406';
+      out.rawTest = await tuya.diagRawPaths([
+        `/v1.1/users/${user.id}/homes?page_no=1&page_size=20`,  // placeholder — uid real abaixo
+        `/v1.0/homes/${hid}/scenes?page_no=1&page_size=50`,
+        `/v1.1/homes/${hid}/scenes?page_no=1&page_size=50`,
+        `/v2.0/homes/${hid}/scenes?page_no=1&page_size=50`,
+        `/v1.1/homes/${hid}/automations?page_no=1&page_size=50`,
+        `/v2.0/cloud/scene/rule?space_id=${hid}&page_size=50`,
+      ], cfg.accessId, secret, cfg.region);
+
       res.json(out);
     } catch (err: any) {
       res.status(500).json({ error: err?.message ?? 'Erro no diag', stack: err?.stack });

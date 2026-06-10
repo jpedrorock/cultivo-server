@@ -565,6 +565,37 @@ export async function listTuyaHomes(
  * Lista cenas de uma casa.
  * Tenta v1.0 primeiro (compatível com [Deprecate]Smart Home Scene Linkage).
  */
+
+/**
+ * DIAGNÓSTICO RAW — testa uma lista de paths e devolve a resposta crua de cada um.
+ * Usa getToken + tuyaGet internos (não exportados). REMOVER após diagnóstico.
+ */
+export async function diagRawPaths(
+  paths: string[],
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<Array<{ path: string; success?: boolean; code?: any; msg?: string; count?: number; error?: string }>> {
+  const out: Array<{ path: string; success?: boolean; code?: any; msg?: string; count?: number; error?: string }> = [];
+  let accessToken = "";
+  try {
+    const tok = await getToken(accessId, accessSecret, region);
+    accessToken = tok.accessToken;
+  } catch (e: any) {
+    return [{ path: "getToken", error: e?.message }];
+  }
+  for (const path of paths) {
+    try {
+      const data = await tuyaGet(path, accessId, accessSecret, accessToken, region);
+      const list = data.result?.list ?? (Array.isArray(data.result) ? data.result : []);
+      out.push({ path, success: data.success, code: data.code, msg: data.msg, count: Array.isArray(list) ? list.length : 0 });
+    } catch (e: any) {
+      out.push({ path, error: e?.message });
+    }
+  }
+  return out;
+}
+
 export async function listTuyaScenes(
   homeId: number,
   accessId: string,
