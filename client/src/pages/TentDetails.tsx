@@ -52,10 +52,11 @@ function TentSensorCard({ tentId }: { tentId: number }) {
   const { data: reading, refetch: refetchReading } = trpc.tuya.getLatestReadingForTent.useQuery(
     { tentId },
     {
-      // Polling reduzido pra 5min (era 60s) — Tuya Trial tem quota de 26k calls/mês
-      // e camera+sensor polling juntos estavam comendo tudo em <2 semanas.
-      refetchInterval: 5 * 60_000,
-      refetchIntervalInBackground: false,
+      // Leitura do banco (sensorLatestReadings) — NÃO bate Tuya ao vivo. Sem
+      // polling: busca ao abrir a estufa e ao voltar o foco. A Tuya só é lida
+      // pelo poller de 8h ou quando o user clica em atualizar.
+      refetchOnWindowFocus: true,
+      staleTime: 5 * 60_000,
     }
   );
   const { data: devices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
@@ -429,7 +430,7 @@ function AutomationToggleButton({ automationId, automationName }: { automationId
 
   const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
     { automationId },
-    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
+    { refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
   );
 
   const toggle = trpc.tuya.toggleAutomation.useMutation({
@@ -506,7 +507,7 @@ function PreviewDeviceSlot({ slot, Icon, iconColorClass, ringColorClass }: Previ
   const utils = trpc.useUtils();
   const { data: status, isLoading } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId: slot.refId },
-    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 60_000 }
+    { refetchOnWindowFocus: true, retry: false, staleTime: 60_000 }
   );
   const cmd = trpc.tuya.sendDeviceCommand.useMutation({
     onSuccess: () => setTimeout(() => utils.tuya.getDeviceCurrentStatus.invalidate({ deviceId: slot.refId }), 600),
@@ -579,7 +580,7 @@ function PreviewAutomationSlot({ slot, Icon, iconColorClass, ringColorClass }: P
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.tuya.getAutomationEnabled.useQuery(
     { automationId: slot.refId },
-    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
+    { refetchOnWindowFocus: true, retry: false, staleTime: 2 * 60_000 }
   );
   const toggle = trpc.tuya.toggleAutomation.useMutation({
     onSuccess: ({ enabled }) => {

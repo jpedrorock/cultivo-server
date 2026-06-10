@@ -38,7 +38,9 @@ export default function DisplayMode() {
   const [now, setNow]             = useState(new Date());
   const [landscape, setLandscape] = useState(() => window.innerWidth > window.innerHeight);
 
-  const { data: logs  } = trpc.dailyLogs.list.useQuery({ tentId, limit: 10 }, { refetchInterval: 30000 });
+  // Sensor é escrito pelo poller (8h) — 30s era desperdício. 5min é de sobra
+  // pra um monitor sempre-ligado, e corta ~90% das chamadas.
+  const { data: logs  } = trpc.dailyLogs.list.useQuery({ tentId, limit: 10 }, { refetchInterval: 5 * 60_000 });
   const { data: tent  } = trpc.tents.getById.useQuery({ id: tentId });
   const { data: cycle } = trpc.cycles.getByTent.useQuery({ tentId });
 

@@ -41,9 +41,11 @@ export function WeatherWidget() {
     }
   }, []);
 
+  // Clima muda devagar — busca só ao montar. staleTime longo evita refetch ao
+  // navegar entre telas. Sem polling por timer (pedido do João).
   const { data: weather, isLoading, error } = trpc.weather.getCurrent.useQuery(
     { lat: location?.lat ?? 0, lon: location?.lon ?? 0 },
-    { enabled: !!location, refetchInterval: 10 * 60 * 1000 } // Atualizar a cada 10 minutos
+    { enabled: !!location, staleTime: 30 * 60 * 1000 }
   );
 
   if (isLoading || !location) {

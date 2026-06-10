@@ -1,30 +1,21 @@
-import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 
 /**
  * Hook compartilhado para badges de navegação (alertas + fila de secagem).
  * - React Query deduplica as queries: BottomNav e Sidebar usam o mesmo cache.
- * - Polling pausado automaticamente quando a aba fica em segundo plano
- *   (Page Visibility API), economizando rede e bateria.
+ * - SEM polling por timer (pedido do João: pouquíssimas chamadas). Busca só
+ *   ao montar e ao voltar o foco pro app. Alertas urgentes chegam por push,
+ *   então o badge não precisa de poll contínuo.
  */
 export function useNavBadges() {
-  const [isVisible, setIsVisible] = useState(() => document.visibilityState === "visible");
-
-  useEffect(() => {
-    const handler = () => setIsVisible(document.visibilityState === "visible");
-    document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
-  }, []);
-
-  const refetchInterval = isVisible ? 30_000 : false;
-
   const { data: alertCount } = trpc.alerts.getNewCount.useQuery(
     {},
-    { refetchInterval }
+    { refetchOnWindowFocus: true, staleTime: 60_000 }
   );
 
   const { data: harvestQueuePlants } = trpc.harvestQueue.list.useQuery(undefined, {
-    refetchInterval: isVisible ? 60_000 : false,
+    refetchOnWindowFocus: true,
+    staleTime: 5 * 60_000,
   });
 
   return {

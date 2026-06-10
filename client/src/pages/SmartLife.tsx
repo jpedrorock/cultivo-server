@@ -677,9 +677,12 @@ const SWIPE_DELETE_WIDTH = 80;
 const SWIPE_THRESHOLD = 50;
 
 function DeviceToggle({ mapping, onRemove }: { mapping: DeviceMapping; onRemove: () => void }) {
+  // Estado on/off vem da Tuya AO VIVO — então busca SÓ ao abrir a página
+  // (mount) e depois de um toggle (refetch no onSuccess). Sem polling: antes
+  // batia na Tuya a cada 5min com a página aberta, queimando cota à toa.
   const { data: status, isLoading, refetch } = trpc.tuya.getDeviceCurrentStatus.useQuery(
     { deviceId: mapping.deviceId },
-    { refetchInterval: 5 * 60_000, refetchIntervalInBackground: false, retry: false }
+    { refetchInterval: false, refetchOnWindowFocus: false, retry: false, staleTime: 10 * 60_000 }
   );
 
   const cmd = trpc.tuya.sendDeviceCommand.useMutation({
