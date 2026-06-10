@@ -1474,12 +1474,19 @@ function ScenesTab({ onConfigureClick }: { onConfigureClick: () => void }) {
           </div>
         )}
 
-        {/* Erro */}
-        {isError && !isLoading && (
+        {/* Aviso sobre cenas tap-to-run: a API de listagem da Tuya foi
+            descontinuada (serviço "Smart Home Scene Linkage" [Deprecate]/trial).
+            Automações listam normal; tap-to-run precisam ser adicionadas manualmente.
+            Mostra o aviso quando não há nenhuma cena tap-to-run listada. */}
+        {!isLoading && Object.keys(tapToRunGrouped).length === 0 && (
           <div className="rounded-2xl bg-amber-500/8 border border-amber-500/20 p-4 space-y-2">
-            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Listagem automática indisponível</p>
+            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+              {automationList.length > 0 ? 'Cenas tap-to-run: adicione manualmente' : 'Listagem automática de cenas indisponível'}
+            </p>
             <p className="text-xs text-muted-foreground">
-              A API Tuya não conseguiu listar suas cenas. Use o formulário manual abaixo com o <strong>scene_id</strong> obtido no API Explorer do portal Tuya.
+              A Tuya descontinuou a API que lista cenas <strong>tap-to-run</strong> (one-shot).
+              {automationList.length > 0 ? ' Suas automações aparecem abaixo normalmente. ' : ' '}
+              Pra usar uma cena tap-to-run, adicione-a manualmente com o <strong>scene_id</strong> (o disparo funciona normal). Toque em "Adicionar manualmente" abaixo.
             </p>
           </div>
         )}

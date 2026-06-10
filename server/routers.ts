@@ -466,67 +466,42 @@ const tuyaRouter = router({
    *  Caso contrário, tenta auto-detectar as casas via API. */
   listScenes: protectedProcedure.query(async ({ ctx }) => {
     const cfg = await getTuyaConfig(ctx.user.id);
-
-    // ── Tentativa 1: Smart Home (/v1.0/homes/{homeId}/scenes) ──────────────────
-    // PRINCIPAL — serviço "Smart Home Scene Linkage" é permanente. Resolve o
-    // homeId salvo OU auto-detecta via listTuyaHomes (alguns users têm homeId NULL).
     const { listTuyaScenes, listTuyaAutomations, listTuyaHomes } = await import("./lib/tuya");
+
+    // Resolve homeId (salvo ou auto-detect)
     let homeId = cfg.homeId ? Number(cfg.homeId) : 0;
-    // DIAG: sempre lista as casas reais pra comparar com o homeId salvo
-    try {
-      const allHomes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
-      console.log(`[Tuya] listScenes DIAG: homeId salvo=${homeId || 'NULL'}, casas reais=${JSON.stringify(allHomes)}`);
-      if (!homeId) homeId = allHomes?.[0]?.homeId ? Number(allHomes[0].homeId) : 0;
-    } catch (e: any) {
-      console.warn(`[Tuya] listScenes DIAG listTuyaHomes falhou: ${e?.message}`);
-    }
-    if (homeId) {
+    if (!homeId) {
       try {
-        const [scenes, automations] = await Promise.allSettled([
-          listTuyaScenes(homeId, cfg.accessId, cfg.accessSecret, cfg.region),
-          listTuyaAutomations(homeId, cfg.accessId, cfg.accessSecret, cfg.region),
-        ]);
-        const result: any[] = [];
-        if (scenes.status === "fulfilled") {
-          result.push(...scenes.value.map(s => ({ ...s, homeName: "Minha Casa", conditions: [] })));
-        }
-        if (automations.status === "fulfilled" && automations.value.length > 0) {
-          result.push(...automations.value.map(a => ({ ...a, homeName: "Automações", conditions: a.conditions })));
-        }
-        if (result.length > 0) {
-          console.log(`[Tuya] listScenes: Smart Home home=${homeId} retornou ${result.length}`);
-          return result;
-        }
-      } catch (e: any) {
-        console.warn(`[Tuya] listScenes Smart Home home=${homeId}: ${e?.message}`);
+        const homes = await listTuyaHomes(cfg.accessId, cfg.accessSecret, cfg.region);
+        homeId = homes?.[0]?.homeId ? Number(homes[0].homeId) : 0;
+      } catch { /* segue */ }
+    }
+
+    const result: any[] = [];
+    if (homeId) {
+      // Tap-to-run (cenas manuais) E automações — independentes (allSettled).
+      // IMPORTANTE: tap-to-run depende do serviço "Smart Home Scene Linkage",
+      // que a Tuya marcou [Deprecate]/trial. Quando ele falha (28841101 not
+      // subscribed), AINDA mostramos as automações, que usam serviço permanente.
+      const [scenes, automations] = await Promise.allSettled([
+        listTuyaScenes(homeId, cfg.accessId, cfg.accessSecret, cfg.region),
+        listTuyaAutomations(homeId, cfg.accessId, cfg.accessSecret, cfg.region),
+      ]);
+      if (scenes.status === "fulfilled") {
+        result.push(...scenes.value.map(s => ({ ...s, homeName: "Cenas", conditions: [] })));
+      } else {
+        console.warn(`[Tuya] listScenes tap-to-run falhou (esperado se serviço não assinado): ${scenes.reason?.message}`);
+      }
+      if (automations.status === "fulfilled" && automations.value.length > 0) {
+        result.push(...automations.value.map(a => ({ ...a, homeName: "Automações", conditions: a.conditions })));
       }
     }
 
-    // ── Tentativa 2: IoT Core (DEPRECATED pela Tuya — só último recurso) ────────
-    let iotCoreError = "";
-    try {
-      const { listTuyaScenesIoTCore } = await import("./lib/tuya");
-      const iotScenes = await listTuyaScenesIoTCore(cfg.accessId, cfg.accessSecret, cfg.region);
-      if (iotScenes.length > 0) {
-        console.log(`[Tuya] listScenes: IoT Core (fallback deprecated) retornou ${iotScenes.length}`);
-        return iotScenes.map(s => ({
-          sceneId: s.sceneId,
-          name: s.name,
-          homeId: 0,
-          homeName: s.type === "automation" ? "Automações" : "Cenas",
-          conditions: s.conditions ?? [],
-        }));
-      }
-      iotCoreError = "IoT Core retornou 0 cenas";
-    } catch (e: any) {
-      iotCoreError = e?.message ?? String(e);
-      console.warn(`[Tuya] listScenes IoT Core falhou: ${iotCoreError}`);
-    }
-
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `Não foi possível listar cenas. Confira se o homeId está configurado e a região correta (aba Config). Smart Home não retornou cenas e o IoT Core (legado) falhou: ${iotCoreError}.`,
-    });
+    // Retorna o que conseguiu (pode ser só automações, ou vazio).
+    // NÃO lança erro: a tela mostra o que veio + o "Adicionar manualmente"
+    // pras tap-to-run (cujo trigger funciona mesmo sem listagem).
+    console.log(`[Tuya] listScenes: home=${homeId} retornou ${result.length} item(ns)`);
+    return result;
   }),
 
   /** Lista cenas salvas manualmente */
