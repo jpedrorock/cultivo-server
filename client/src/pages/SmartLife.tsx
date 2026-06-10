@@ -1282,14 +1282,19 @@ function ManualSceneForm({ onSaved }: { onSaved: () => void }) {
       </div>
       <div className="px-4 py-4 space-y-3">
         {/* Como encontrar o Scene ID */}
-        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 p-3 space-y-1.5">
-          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Como encontrar o Scene ID</p>
-          <ol className="text-xs text-muted-foreground space-y-0.5 list-decimal list-inside leading-relaxed">
-            <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> → seu projeto</li>
-            <li>Menu lateral → <strong>API Explorer</strong></li>
-            <li>Busque <span className="font-mono">Get Scene List</span> ou <span className="font-mono">scenes</span></li>
-            <li>Execute → copie o campo <span className="font-mono">scene_id</span> de cada cena</li>
+        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 p-3 space-y-2">
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">📋 Como pegar o Scene ID (passo a passo)</p>
+          <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
+            <li>Acesse <span className="font-mono text-foreground">iot.tuya.com</span> e faça login → abra <strong>seu projeto</strong> (Cloud → Development)</li>
+            <li>No menu lateral esquerdo, abra <strong>Cloud → API Explorer</strong></li>
+            <li>No topo, em "Select API", escolha <span className="font-mono text-foreground">Smart Home Scene Linkage</span></li>
+            <li>Na lista, clique em <span className="font-mono text-foreground">Query the List of Scenes</span> (tap-to-run) ou <span className="font-mono">Query the List of Automation Scenes</span></li>
+            <li>Preencha <span className="font-mono">home_id</span> (o seu é <span className="font-mono text-foreground">{`<copie da aba Config>`}</span>) e clique <strong>Submit Request</strong></li>
+            <li>Na resposta, cada cena tem um campo <span className="font-mono text-foreground">id</span> ou <span className="font-mono">scene_id</span> — copie ele e cole abaixo ⬇️</li>
           </ol>
+          <p className="text-[11px] text-muted-foreground/70 leading-relaxed pt-1 border-t border-blue-500/15">
+            💡 Você só faz isso <strong>1 vez por cena</strong>. Depois de adicionada, o disparo no app/display funciona normalmente. Isso é necessário porque a Tuya descontinuou a listagem automática de cenas tap-to-run.
+          </p>
         </div>
 
         <div>
