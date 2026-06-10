@@ -1009,6 +1009,62 @@ function registerDeviceRoutes(app: express.Application) {
     }
   });
 
+  // GET /api/device/diag-scenes — DIAGNÓSTICO TEMPORÁRIO (autenticado via cookie JWT).
+  // Testa TODOS os caminhos de cena Tuya com as credenciais do user logado e
+  // devolve a resposta crua no navegador. Pra entender por que cenas não listam.
+  // REMOVER após o diagnóstico.
+  app.get('/api/device/diag-scenes', async (req, res) => {
+    try {
+      const { authenticateRequest } = await import('./auth');
+      const user = await authenticateRequest(req);
+      if (!user) return res.status(401).json({ error: 'Não autenticado — faça login no app primeiro' });
+
+      // Pega config Tuya do user
+      const [cfgRows]: any = await pool.execute(
+        `SELECT accessId, accessSecret, region, homeId FROM tuyaConfig WHERE userId = ? AND enabled = 1 LIMIT 1`,
+        [user.id]
+      );
+      if (cfgRows.length === 0) return res.json({ error: 'Sem config Tuya ativa pra este user', userId: user.id });
+      const cfg = cfgRows[0];
+
+      const { decryptAndMigrate } = await import('../aiCrypto');
+      const secret = await decryptAndMigrate(cfg.accessSecret, async (n: string) => {
+        await pool.execute(`UPDATE tuyaConfig SET accessSecret = ? WHERE userId = ?`, [n, user.id]);
+      });
+
+      const out: any = { userId: user.id, region: cfg.region, homeIdSalvo: cfg.homeId };
+      const tuya = await import('../lib/tuya');
+
+      // 1) Casas reais
+      try {
+        out.casasReais = await tuya.listTuyaHomes(cfg.accessId, secret, cfg.region);
+      } catch (e: any) { out.casasReais_ERRO = e?.message; }
+
+      // 2) Smart Home scenes por cada home encontrada
+      out.smartHomeScenes = {};
+      const homeIds = [
+        ...(cfg.homeId ? [Number(cfg.homeId)] : []),
+        ...((out.casasReais ?? []).map((h: any) => Number(h.homeId))),
+      ].filter((v, i, a) => v && a.indexOf(v) === i);
+      for (const hid of homeIds) {
+        try {
+          const sc = await tuya.listTuyaScenes(hid, cfg.accessId, secret, cfg.region);
+          out.smartHomeScenes[hid] = { count: sc.length, scenes: sc };
+        } catch (e: any) { out.smartHomeScenes[hid] = { ERRO: e?.message }; }
+      }
+
+      // 3) IoT Core (deprecated) — pra comparar
+      try {
+        const iot = await tuya.listTuyaScenesIoTCore(cfg.accessId, secret, cfg.region);
+        out.iotCoreScenes = { count: iot.length, scenes: iot };
+      } catch (e: any) { out.iotCoreScenes_ERRO = e?.message; }
+
+      res.json(out);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message ?? 'Erro no diag', stack: err?.stack });
+    }
+  });
+
   // POST /api/device/device-toggle — liga/desliga um dispositivo Tuya vinculado
   // à estufa deste display. Body: {deviceId, state: boolean}.
   // Valida que o deviceId pertence à tentId do device antes de comandar.
