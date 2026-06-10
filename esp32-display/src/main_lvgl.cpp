@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.2"
+#define FW_VERSION "0.5.3"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -254,7 +254,11 @@ static int           histPeriodVal     = 0;
 // TENT_NAME, FASE, tempC, rh, vpd, phv, ecv, semana, totalSem, wifiOk,
 // currentLux, currentPpfd, targetPpfd, luxMode, activeScreen.
 static unsigned long lastFetch = 0;
-static const unsigned long FETCH_INTERVAL = 30000;
+// Display (temp/RH/VPD) vem do nosso banco — o sensor só atualiza no poller
+// (8h) ou refresh manual. Ao ACORDAR a tela o netTask fetcha na hora (lastFetch
+// fica velho durante o sleep); este intervalo é só pra quando a tela fica acesa
+// muito tempo. 10min = pouquíssimas chamadas sem ficar com dado velho na cara.
+static const unsigned long FETCH_INTERVAL = 10UL * 60UL * 1000UL;  // 10 min (era 30s)
 
 // netTask → loop: seta quando ha' dados novos. loop() chama refreshHomeValues()
 // no thread principal (LVGL nao e thread-safe). atomic volatile basta, flag simples.
@@ -2077,7 +2081,7 @@ static inline void logIfSlow(const char *label, uint32_t t0, uint32_t thresholdM
 // pontos ASC por tempo; usamos os ultimos 24 (mais recentes -> direita do chart).
 static volatile bool histNeedsRefresh = false;
 static unsigned long lastHistFetch = 0;
-static const unsigned long HIST_FETCH_INTERVAL = 5UL * 60UL * 1000UL;  // 5 min
+static const unsigned long HIST_FETCH_INTERVAL = 30UL * 60UL * 1000UL;  // 30 min (era 5 min)
 
 static bool fetchHistoryAll(const char *period = "24h") {
   if (!wifiOk) return false;
@@ -2238,7 +2242,7 @@ static int       plantCountLocal = 0;
 static volatile bool plantsNeedsRefresh = false;
 static unsigned long lastPlantsFetch = 0;
 // 10min — lista de plantas muda pouco (user adiciona/remove no app raro)
-static const unsigned long PLANTS_FETCH_INTERVAL = 10UL * 60UL * 1000UL;
+static const unsigned long PLANTS_FETCH_INTERVAL = 30UL * 60UL * 1000UL;  // 30 min (era 10 min)
 
 // Buffer pra foto. Agora recebemos RGB565 raw do server (fmt=rgb565):
 // 320x240x2 = 153600 bytes. Buffer 160KB cobre + margem.
@@ -2672,7 +2676,7 @@ static bool     taskOverdueLocal [TASKS_LOCAL_MAX] = {false};
 static int      taskCountLocal = 0;
 static volatile bool tasksNeedsRefresh = false;
 static unsigned long lastTasksFetch = 0;
-static const unsigned long TASKS_FETCH_INTERVAL = 60UL * 1000UL;  // 1 min
+static const unsigned long TASKS_FETCH_INTERVAL = 30UL * 60UL * 1000UL;  // 30 min (era 1 min)
 // Range atual da fetchTasks. UI toggle Lista/Semana chama com mode 0|1.
 static int      tasksRangeIdx = 0;  // 0=current, 1=7d
 
