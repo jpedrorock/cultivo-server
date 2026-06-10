@@ -1072,28 +1072,14 @@ function registerDeviceRoutes(app: express.Application) {
       console.log(`[Device] device-toggle device=${deviceId} switchCode=${switchCode} -> ${desired} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''})`);
       if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
 
-      // Re-consulta após o toggle pra confirmar estado real (Tuya às vezes leva
-      // ~500ms-2s pra propagar). Se a re-consulta falhar (timeout/erro), devolve
-      // o desired como best-effort — comando foi aceito, só não confirmamos.
-      let confirmedState: boolean = desired;
-      try {
-        // Pequeno delay pra dar tempo do estado propagar no cloud Tuya
-        await new Promise(r => setTimeout(r, 500));
-        const after = await getTuyaDeviceSwitchState(deviceId, cfg.accessId, cfg.accessSecret, cfg.region);
-        if (after.switchOn !== null) {
-          confirmedState = after.switchOn;
-          if (after.switchOn !== desired) {
-            console.warn(`[Device] device-toggle device=${deviceId} switchCode=${switchCode} desired=${desired} but Tuya reports ${after.switchOn} (propagation lag?)`);
-          }
-        }
-      } catch (e: any) {
-        console.warn(`[Device] device-toggle re-confirm failed device=${deviceId}: ${e?.message}`);
-      }
-
-      // Estado mudou → invalida o cache do /scenes pra próxima leitura refletir na hora
+      // NÃO re-consultamos a Tuya aqui — economiza 1 chamada por toggle.
+      // O ESP é optimistic (mostra o estado desejado na hora) e o próximo poll
+      // de /scenes (cache invalidado abaixo) confirma o estado REAL em ~30s,
+      // revertendo se a Tuya não executou. A re-consulta imediata de 500ms era
+      // desperdiçada: o firmware ignorava o resultado de qualquer forma.
       invalidateScenesCache(device.tentId);
 
-      res.json({ success: true, deviceId, state: confirmedState });
+      res.json({ success: true, deviceId, state: desired });
     } catch (err: any) {
       console.error('[Device] device-toggle error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao alternar device' });
