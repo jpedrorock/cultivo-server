@@ -534,8 +534,10 @@ export async function listTuyaHomes(
     }
   } catch {}
 
-  // Endpoints em ordem de prioridade
+  // Endpoints em ordem de prioridade. v1.0 estava dando "uri path invalid" (1108)
+  // em alguns projetos — adicionado /v1.1 (endpoint atual) como 1ª tentativa.
   const attempts = [
+    { path: `/v1.1/users/${userUid}/homes?page_no=1&page_size=20`, extract: (r: any) => Array.isArray(r) ? r : (r?.list ?? []) },
     { path: `/v1.0/users/${userUid}/homes?page_no=1&page_size=20`, extract: (r: any) => Array.isArray(r) ? r : (r?.list ?? []) },
     { path: `/v2.0/homes?uid=${userUid}&page_no=1&page_size=20`, extract: (r: any) => Array.isArray(r) ? r : (r?.list ?? []) },
   ];
@@ -572,6 +574,9 @@ export async function listTuyaScenes(
   const { accessToken } = await getToken(accessId, accessSecret, region);
 
   const attempts = [
+    // v1.1 é o endpoint ATUAL (doc oficial Tuya). v1.0 retorna "uri path invalid"
+    // (1108) — foi descontinuado pra cenas. v2.0 fica só como fallback.
+    `/v1.1/homes/${homeId}/scenes?page_no=1&page_size=50`,
     `/v1.0/homes/${homeId}/scenes?page_no=1&page_size=50`,
     `/v2.0/homes/${homeId}/scenes?page_no=1&page_size=50`,
   ];
@@ -612,6 +617,8 @@ export async function listTuyaAutomations(
   const { accessToken } = await getToken(accessId, accessSecret, region);
 
   const attempts = [
+    // v1.1 é o endpoint atual (doc oficial); v2.0/v1.0 ficam como fallback.
+    `/v1.1/homes/${homeId}/automations?page_no=1&page_size=100`,
     `/v2.0/homes/${homeId}/automations?page_no=1&page_size=100`,
     `/v1.0/homes/${homeId}/automations?page_no=1&page_size=50`,
   ];
