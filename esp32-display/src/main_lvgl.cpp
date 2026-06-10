@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.3"
+#define FW_VERSION "0.5.4"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -1806,6 +1806,7 @@ cmcvMAoGCCqGSM49BAMDA2gAMGUCMQClsUNJdX36GE+o2yDf7L02m3P3ElVWRLls
 static WiFiClient       httpPlainClient;
 static WiFiClientSecure httpSecureClient;     // usado por netTask + boot/pairing
 static WiFiClientSecure httpSecureClientTap;  // dedicado ao tapTask (anti-race TLS)
+static WiFiClientSecure httpGitHubClient;     // OTA: GitHub usa DigiCert (não LE) → setInsecure
 static bool httpClientsInited = false;
 
 static bool httpBegin(HTTPClient &http, const char *url) {
@@ -1828,6 +1829,17 @@ static bool httpBegin(HTTPClient &http, const char *url) {
     return http.begin(isTap ? httpSecureClientTap : httpSecureClient, url);
   }
   return http.begin(httpPlainClient, url);
+}
+
+// httpBegin pro OTA (GitHub). NÃO usa o bundle Let's Encrypt: api.github.com e
+// objects.githubusercontent.com têm cert DigiCert/Sectigo — validar contra o
+// LE_ROOTS REJEITA a conexão (foi o que quebrou o OTA na v0.5.0). setInsecure
+// reproduz o design original (o .bin nem tem signature check, mesmo trust model).
+// Cliente próprio: o OTA roda no tapTask e não overlapa com toggle/foto (mesma
+// task, serializado), mas mantemos separado pra clareza.
+static bool httpBeginGitHub(HTTPClient &http, const char *url) {
+  httpGitHubClient.setInsecure();
+  return http.begin(httpGitHubClient, url);
 }
 
 // Parse de JSON robusto ao chunked transfer-encoding do Cloudflare.
@@ -2814,7 +2826,9 @@ static void processTaskTap() {
 // Limitacoes:
 // - Sem signature check (qualquer commit malicioso no repo poderia flashar firmware)
 //   Mitigado pq repo e' do owner. Sem TUF/cosign por simplicidade.
-// - HTTPS sem CA pinning (setInsecure no httpBegin). Same trust model do API.
+// - HTTPS sem CA pinning: GitHub usa cert DigiCert (não Let's Encrypt), então
+//   o OTA usa httpBeginGitHub (setInsecure) em vez de httpBegin (LE_ROOTS). Sem
+//   isso, o check/download falham por cert rejeitado — bug que travou OTA na v0.5.0.
 static const char *GITHUB_RELEASES_URL =
     "https://api.github.com/repos/jpedrorock/cultivo-server/releases/latest";
 
@@ -2835,7 +2849,7 @@ static int compareVersions(const char *latest, const char *current) {
 static bool fetchLatestRelease(char *outVer, size_t verSz, char *outUrl, size_t urlSz) {
   if (!wifiOk) return false;
   HTTPClient http;
-  httpBegin(http, GITHUB_RELEASES_URL);
+  httpBeginGitHub(http, GITHUB_RELEASES_URL);  // GitHub = DigiCert → setInsecure
   http.addHeader("User-Agent", "Cultivo-ESP32-Display");
   http.addHeader("Accept", "application/vnd.github+json");
   http.setTimeout(8000);
@@ -2882,7 +2896,8 @@ static bool fetchLatestRelease(char *outVer, size_t verSz, char *outUrl, size_t 
 // caller deve chamar ESP.restart() (nao fazemos aqui pra permitir UI feedback).
 static bool downloadAndFlash(const char *url) {
   HTTPClient http;
-  httpBegin(http, url);
+  httpBeginGitHub(http, url);  // GitHub (DigiCert) → setInsecure
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);  // browser_download_url → 302 → CDN
   http.addHeader("User-Agent", "Cultivo-ESP32-Display");
   http.setTimeout(60000);  // 60s — firmware ~1.5MB pode levar tempo
   int code = http.GET();
