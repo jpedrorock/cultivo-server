@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.4"
+#define FW_VERSION "0.5.5"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -62,6 +62,13 @@ static uint32_t screenSleepMs = 30000;  // default 30s
 // habilita via cfg modal Display. Sem hardware solderdo, no-op silencioso.
 static bool buzzerEnabled = false;
 
+// Orientacao da tela (runtime, salvo em NVS). true = 180° (ROTATION_270),
+// false = natural (ROTATION_90). Lido por disp_flush E hal_map_touch (touch
+// acompanha). Default true porque a frota foi montada de cabeca pra baixo —
+// devices existentes mantem a orientacao atual ao atualizar. NAO-static:
+// hal_platform.h declara `extern bool g_rotate180` pra usar no touch.
+bool g_rotate180 = true;
+
 static void loadConfigFromNVS() {
   prefs.begin("cultivo", true);
   prefs.getString("ssid",   WIFI_SSID,    sizeof(WIFI_SSID));
@@ -73,10 +80,11 @@ static void loadConfigFromNVS() {
   int sleepSec = prefs.getInt("sleepSec", 30);
   screenSleepMs = (sleepSec <= 0) ? UINT32_MAX : (uint32_t)sleepSec * 1000UL;
   buzzerEnabled = prefs.getBool("buzzer", false);  // default OFF (opt-in)
+  g_rotate180   = prefs.getBool("rot180", true);   // default 180° (frota montada invertida)
   prefs.end();
-  Serial.printf("[cfg] ssid=%s url=%s tent=%d sleep=%ds buzzer=%s\n",
+  Serial.printf("[cfg] ssid=%s url=%s tent=%d sleep=%ds buzzer=%s rot180=%s\n",
                 WIFI_SSID, SERVER_URL, TENT_ID, sleepSec,
-                buzzerEnabled ? "on" : "off");
+                buzzerEnabled ? "on" : "off", g_rotate180 ? "on" : "off");
 }
 
 static void saveSleepTimeoutNVS(int sleepSec) {
@@ -93,6 +101,18 @@ static void saveBuzzerEnabledNVS(bool enabled) {
   prefs.end();
   buzzerEnabled = enabled;
   Serial.printf("[cfg] buzzer: %s\n", enabled ? "on" : "off");
+}
+
+// Salva a orientacao da tela e REINICIA pra aplicar. O reboot evita qualquer
+// artefato de re-render parcial (display + touch trocam juntos de forma limpa).
+// É um ajuste de "montagem" — feito 1x, reboot de ~2s é aceitavel.
+static void saveRotate180NVS(bool enabled) {
+  prefs.begin("cultivo", false);
+  prefs.putBool("rot180", enabled);
+  prefs.end();
+  Serial.printf("[cfg] rotate180: %s -> reboot pra aplicar\n", enabled ? "on" : "off");
+  delay(350);          // deixa o switch visualmente "assentar" antes do reboot
+  ESP.restart();
 }
 
 static void saveConfigToNVS(const char* ssid, const char* pass, const char* url,
@@ -283,15 +303,15 @@ static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
   uint32_t t0 = micros();
   // src: LVGL render buf (LW=480 LH=320 landscape, RGB565 = 2 bytes/px)
   // dst: canvas framebuffer (PW=320 PH=480 portrait)
-  // ROTATION_270: imagem landscape virada 180deg em relacao ao ROTATION_90
-  // (orientacao anterior). Usado quando o display foi montado de cabeca pra
-  // baixo (cabo USB sai pelo lado oposto). O touch em hal_map_touch foi
-  // invertido junto (180deg nos dois eixos) — os dois SEMPRE andam juntos.
+  // Rotacao escolhida em runtime pelo flag g_rotate180 (toggle "Girar tela" no
+  // cfg modal Display, salvo em NVS): ROTATION_270 = 180° (montado invertido),
+  // ROTATION_90 = natural. O touch em hal_map_touch le o MESMO flag — os dois
+  // sempre andam juntos.
   lv_draw_sw_rotate(px_map, canvas->getFramebuffer(),
                     (int32_t)w, (int32_t)h,
                     (int32_t)(w * 2),    // src_stride
                     320 * 2,              // dest_stride (canvas width * bpp)
-                    LV_DISPLAY_ROTATION_270,
+                    g_rotate180 ? LV_DISPLAY_ROTATION_270 : LV_DISPLAY_ROTATION_90,
                     LV_COLOR_FORMAT_RGB565);
   uint32_t t1 = micros();
   canvas->flush();
@@ -1003,7 +1023,19 @@ static void buildPageDisplay(lv_obj_t *page) {
     if (on) { ledcWriteTone(BUZZER_CH, 1500); ledcWrite(BUZZER_CH, 128); delay(80); ledcWrite(BUZZER_CH, 0); }
   }, LV_EVENT_VALUE_CHANGED, NULL);
 
-  makeLabel(body, "Salva automaticamente ao mudar.", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
+  // Girar tela 180° — pra display montado de cabeca pra baixo. Salva em NVS e
+  // reinicia pra aplicar (display + touch trocam juntos, limpo).
+  makeLabel(body, "Girar tela 180 graus:", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
+  lv_obj_t *swRotate = lv_switch_create(body);
+  if (g_rotate180) lv_obj_add_state(swRotate, LV_STATE_CHECKED);
+  lv_obj_set_style_bg_color(swRotate, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR | LV_STATE_CHECKED);
+  lv_obj_add_event_cb(swRotate, [](lv_event_t *e) {
+    lv_obj_t *sw = (lv_obj_t*)lv_event_get_target(e);
+    bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    saveRotate180NVS(on);  // salva + reinicia
+  }, LV_EVENT_VALUE_CHANGED, NULL);
+
+  makeLabel(body, "Salva automaticamente. Girar tela reinicia o ESP.", COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, sh(8));
   makeLabel(body, "Buzzer: solder piezo em GPIO 38 + GND.",
             COL_DIM, FONT_CAPTION, LV_ALIGN_TOP_LEFT, 0, 0);
 }

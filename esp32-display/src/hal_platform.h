@@ -169,21 +169,29 @@ static inline bool hal_touch_read(int *rx, int *ry) {
 #endif
 }
 
+// Orientacao da tela em runtime (salvo em NVS, definido em main_lvgl.cpp):
+//   true  = 180° (ROTATION_270 em disp_flush) — display montado de cabeca pra baixo
+//   false = orientacao natural (ROTATION_90)
+// O touch SEMPRE acompanha o display (os dois leem este flag juntos).
+extern bool g_rotate180;
+
 // Mapeia coords brutas do controlador pra coords de tela do alvo.
 // Real: AXS15231B reporta touch em panel native portrait (rx 0..319, ry 0..479).
-//   LVGL configurada em portrait (320x480) com lv_display_set_rotation
-//   ROTATION_90 — LVGL aplica rotacao tanto no display QUANTO nas coords
-//   do touch automaticamente. Aqui so passa identity (rx, ry).
+//   LVGL espera coords landscape 480x320. O mapeamento depende da rotacao:
+//   - ROTATION_90  (base, validada por teste de 4 cantos 8 nov 2026):
+//       outX = 479 - ry; outY = rx
+//   - ROTATION_270 (girado 180°): inverte os dois eixos →
+//       outX = ry;       outY = 319 - rx
 // Wokwi (FT6336 simulado): rotaciona 90 graus + escala pro display 320x240.
 static inline void hal_map_touch(int rx, int ry, int *outX, int *outY) {
 #ifdef REAL_HARDWARE
-  // Base (ROTATION_90, validada por teste de 4 cantos 8 nov 2026):
-  //   outX = 479 - ry; outY = rx
-  // Tela girada 180deg (ROTATION_270 em disp_flush) → touch tambem vira 180deg
-  // nos dois eixos: outX' = 479 - outX = ry; outY' = 319 - outY = 319 - rx.
-  // LVGL configurada em landscape 480x320 — esta e' a coord que ele espera.
-  *outX = ry;
-  *outY = 319 - rx;
+  if (g_rotate180) {
+    *outX = ry;
+    *outY = 319 - rx;
+  } else {
+    *outX = 479 - ry;
+    *outY = rx;
+  }
   if (*outX < 0) *outX = 0; if (*outX > 479) *outX = 479;
   if (*outY < 0) *outY = 0; if (*outY > 319) *outY = 319;
 #else
