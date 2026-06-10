@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.1"
+#define FW_VERSION "0.5.2"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -1800,7 +1800,8 @@ cmcvMAoGCCqGSM49BAMDA2gAMGUCMQClsUNJdX36GE+o2yDf7L02m3P3ElVWRLls
 // setCACert(LE_ROOTS) valida o cert do servidor contra o bundle X1+X2+E8.
 // Para servidores self-hosted com outra CA, adicione o PEM ao bundle LE_ROOTS acima.
 static WiFiClient       httpPlainClient;
-static WiFiClientSecure httpSecureClient;
+static WiFiClientSecure httpSecureClient;     // usado por netTask + boot/pairing
+static WiFiClientSecure httpSecureClientTap;  // dedicado ao tapTask (anti-race TLS)
 static bool httpClientsInited = false;
 
 static bool httpBegin(HTTPClient &http, const char *url) {
@@ -1808,12 +1809,32 @@ static bool httpBegin(HTTPClient &http, const char *url) {
     // Bundle inclui ISRG Root X1, Root X2 e intermediate E8 — cobre Cloudflare
     // (app.cultivo.pro) que nao envia o intermediate na chain TLS.
     httpSecureClient.setCACert(LE_ROOTS);
+    httpSecureClientTap.setCACert(LE_ROOTS);
     httpClientsInited = true;
   }
   if (strncmp(url, "https://", 8) == 0) {
-    return http.begin(httpSecureClient, url);
+    // tapTask (toggle/foto/OTA) usa um WiFiClientSecure DEDICADO pra NUNCA
+    // compartilhar o mesmo objeto TLS com o netTask (poll de /display,
+    // /scenes, /plants...). Uso concorrente do mesmo WiFiClientSecure por
+    // duas tasks corrompe o contexto mbedTLS → reboot do ESP. O sseTask ja'
+    // tem cliente proprio (setInsecure). Contextos de boot/pairing (antes das
+    // tasks subirem) caem no cliente compartilhado — single-thread, seguro.
+    const char *taskName = pcTaskGetName(NULL);
+    bool isTap = (taskName && strcmp(taskName, "tapTask") == 0);
+    return http.begin(isTap ? httpSecureClientTap : httpSecureClient, url);
   }
   return http.begin(httpPlainClient, url);
+}
+
+// Parse de JSON robusto ao chunked transfer-encoding do Cloudflare.
+// http.getStream() entrega o stream CRU: se a resposta vier "Transfer-Encoding:
+// chunked" (Cloudflare faz isso pra respostas maiores, ex: /plants com varias
+// plantas), os marcadores de tamanho de chunk (hex + CRLF) entram no meio do
+// body e o ArduinoJson falha com "InvalidInput". http.getString() desfaz o
+// chunked corretamente antes do parse. Use SEMPRE este helper pra body JSON.
+static DeserializationError deserializeJsonChunked(JsonDocument &doc, HTTPClient &http) {
+  String body = http.getString();
+  return deserializeJson(doc, body);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -1856,7 +1877,7 @@ static bool postPairInit(PairInitResult *out) {
     return false;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) {
     Serial.printf("[pair] pair-init JSON parse err: %s\n", err.c_str());
@@ -1892,7 +1913,7 @@ static void getPairStatus(const char *code, PairStatusResult *out) {
     return;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) return;
   const char *st = doc["status"];
@@ -1930,7 +1951,7 @@ static bool refreshTuyaNow() {
   if (code != 200) { http.end(); return false; }
 
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) return false;
   if (!doc["tempC"].isNull()) tempC = doc["tempC"].as<float>();
@@ -1956,7 +1977,7 @@ static bool fetchDisplayData() {
   }
 
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) return false;
   if (!doc["tempC"].isNull())    tempC    = doc["tempC"].as<float>();
@@ -2074,7 +2095,7 @@ static bool fetchHistoryAll(const char *period = "24h") {
     return false;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) return false;
 
@@ -2270,7 +2291,7 @@ static bool fetchPlants() {
     return false;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) {
     Serial.printf("[net] plants JSON err: %s\n", err.c_str());
@@ -2524,7 +2545,7 @@ static bool fetchPlantPhotosList(int plantId) {
     return false;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) return false;
   JsonArray arr = doc["photos"].as<JsonArray>();
@@ -2672,7 +2693,7 @@ static bool fetchTasks() {
     return false;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) {
     Serial.printf("[net] tasks JSON err: %s\n", err.c_str());
@@ -2732,7 +2753,7 @@ static bool postTaskComplete(int taskId, bool *outDone) {
     return false;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) return true;  // assume OK
   if (outDone) *outDone = doc["feito"] | false;
@@ -2941,7 +2962,7 @@ static bool fetchScenes() {
     return false;
   }
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  DeserializationError err = deserializeJsonChunked(doc, http);
   http.end();
   if (err != DeserializationError::Ok) {
     Serial.printf("[net] scenes JSON err: %s\n", err.c_str());
