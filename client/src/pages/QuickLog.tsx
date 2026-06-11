@@ -1373,10 +1373,10 @@ export default function QuickLog() {
             </AnimatedButton>
             <AnimatedButton
               onClick={handleSavePlantHealth}
-              disabled={savePlantHealthMutation.isPending || uploadPhotoMutation.isPending || !hasDetail}
+              disabled={savePlantHealthMutation.isPending || uploadProgress.isUploading || !hasDetail}
               className="flex-1 h-14 text-lg font-medium rounded-xl"
             >
-              {(savePlantHealthMutation.isPending || uploadPhotoMutation.isPending) ? (
+              {(savePlantHealthMutation.isPending || uploadProgress.isUploading) ? (
                 <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Salvando...</>
               ) : currentPlantIndex < plants.length - 1 ? (
                 <><Check className="mr-2 h-5 w-5" />Próxima Planta</>
