@@ -4,15 +4,14 @@
  */
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and, or, desc, asc, sql, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, sql, isNotNull } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 import { getDb } from "../db";
 import {
   tents, cycles, dailyLogs, plants, plantTentHistory,
   alerts, alertSettings, alertHistory, recipes, taskInstances,
-  cloningEvents, tentAState, weeklyTargets, strains,
-  nutrientApplications, wateringApplications,
+  cloningEvents, tentAState,
 } from "../../drizzle/schema";
 import type { User } from "../../drizzle/schema";
 
@@ -26,7 +25,7 @@ const MAX_TENTS_BY_PLAN: Record<string, number | null> = {
   pro:     null,
   team:    null, // legado (pré-migração 4-tier)
 };
-import { validateTentOwnership, validateCycleOwnership } from "./_helpers";
+import { validateTentOwnership } from "./_helpers";
 
 export const tentsRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
@@ -283,14 +282,6 @@ export const tentsRouter = router({
         if (plantsInTent.length > 0) {
           throw new Error(`Não é possível excluir uma estufa com ${plantsInTent.length} planta(s). Mova ou finalize as plantas primeiro.`);
         }
-        
-        // Buscar todos os ciclos da estufa (ativos e finalizados)
-        const allCycles = await database
-          .select({ id: cycles.id })
-          .from(cycles)
-          .where(eq(cycles.tentId, input.id));
-        
-        const cycleIds = allCycles.map((c: any) => c.id);
         
         // Tudo dentro de uma transação — se qualquer delete falhar,
         // o banco volta ao estado original automaticamente.
