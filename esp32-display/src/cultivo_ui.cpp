@@ -1607,6 +1607,8 @@ static int sceneCount = 0;  // mantem nome legado p/ minimizar diff
 // Refs aos botoes pra updates pontuais (toggle visual sem rebuild full)
 static lv_obj_t *itemBtns[SCENES_MAX]  = {nullptr};
 static lv_obj_t *itemIcons[SCENES_MAX] = {nullptr};
+// Label de contador regressivo (M:SS) — visivel so' enquanto a cena executa.
+static lv_obj_t *itemTimers[SCENES_MAX] = {nullptr};
 
 // Tab pai dos botoes — guardado pra rebuild quando dados chegam do server
 static lv_obj_t *sceneTab = nullptr;
@@ -1777,27 +1779,50 @@ static void sceneClickCb(lv_event_t *e) {
 // Reset visual do card scene apos timeout do "executando"
 static lv_timer_t *sceneActiveTimer = nullptr;
 static int         sceneActiveIdx   = -1;
+static int32_t     sceneSecsLeft    = 0;  // segundos restantes do countdown
 static const uint32_t SCENE_ACTIVE_MS_DEFAULT = 5000;  // fallback se server nao enviou executionSec
 
-static void sceneActiveResetCb(lv_timer_t *t) {
-  lv_timer_del(t);
-  if (sceneActiveTimer == t) sceneActiveTimer = nullptr;
-  int idx = sceneActiveIdx;
-  sceneActiveIdx = -1;
+// Volta o card ao visual neutro e esconde o contador.
+static void sceneResetVisual(int idx) {
   if (idx < 0 || idx >= SCENES_MAX || !itemBtns[idx]) return;
-  // Volta ao visual neutro (sem aceso)
   lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_shadow_width(itemBtns[idx], 0, 0);
+  if (itemTimers[idx]) {
+    lv_label_set_text(itemTimers[idx], "");
+    lv_obj_add_flag(itemTimers[idx], LV_OBJ_FLAG_HIDDEN);
+  }
+  // Remostra o ícone (escondido durante o countdown pra dar lugar ao número)
+  if (itemIcons[idx]) lv_obj_clear_flag(itemIcons[idx], LV_OBJ_FLAG_HIDDEN);
+}
+
+// Tick de 1s — atualiza o contador M:SS; ao zerar, reseta o card.
+static void sceneCountdownCb(lv_timer_t *t) {
+  int idx = sceneActiveIdx;
+  sceneSecsLeft--;
+  if (sceneSecsLeft <= 0) {
+    lv_timer_del(t);
+    if (sceneActiveTimer == t) sceneActiveTimer = nullptr;
+    sceneActiveIdx = -1;
+    sceneResetVisual(idx);
+    return;
+  }
+  if (idx >= 0 && idx < SCENES_MAX && itemTimers[idx]) {
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d:%02d", sceneSecsLeft / 60, sceneSecsLeft % 60);
+    lv_label_set_text(itemTimers[idx], buf);
+  }
 }
 
 static void sceneActivePulse(int idx) {
   if (idx < 0 || idx >= SCENES_MAX || !itemBtns[idx]) return;
-  // Cancela pulse anterior (se outra cena estava "executando")
+  // Cancela pulse anterior (se outra cena estava "executando") e limpa o card
+  // antigo pra não ficar preso aceso/com número.
   if (sceneActiveTimer) {
     lv_timer_del(sceneActiveTimer);
     sceneActiveTimer = nullptr;
+    if (sceneActiveIdx != idx) sceneResetVisual(sceneActiveIdx);
   }
   sceneActiveIdx = idx;
   // Pinta card aceso (mesmo visual de device ON)
@@ -1808,13 +1833,21 @@ static void sceneActivePulse(int idx) {
   lv_obj_set_style_shadow_width(itemBtns[idx], 12, 0);
   lv_obj_set_style_shadow_opa(itemBtns[idx],   LV_OPA_30, 0);
   lv_obj_set_style_shadow_spread(itemBtns[idx], 0, 0);
-  // Timer one-shot pra voltar ao normal. Duracao vem do server (executionSec
-  // — campo configurado pelo user em /tent/X). Fallback 5s se ausente/0.
-  uint32_t durMs = items[idx].executionSec > 0
-                   ? (uint32_t)items[idx].executionSec * 1000UL
-                   : SCENE_ACTIVE_MS_DEFAULT;
-  sceneActiveTimer = lv_timer_create(sceneActiveResetCb, durMs, NULL);
-  lv_timer_set_repeat_count(sceneActiveTimer, 1);
+  // Countdown M:SS. Duracao vem do server (executionSec — configurado em /tent/X).
+  // Fallback 5s. Timer repete a cada 1s; sceneCountdownCb reseta ao zerar.
+  uint32_t durSec = items[idx].executionSec > 0
+                    ? (uint32_t)items[idx].executionSec
+                    : (SCENE_ACTIVE_MS_DEFAULT / 1000);
+  sceneSecsLeft = (int32_t)durSec;
+  if (itemTimers[idx]) {
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%d:%02d", sceneSecsLeft / 60, sceneSecsLeft % 60);
+    lv_label_set_text(itemTimers[idx], buf);
+    lv_obj_clear_flag(itemTimers[idx], LV_OBJ_FLAG_HIDDEN);
+  }
+  // Esconde o ícone enquanto conta (dá lugar ao número, card pequeno)
+  if (itemIcons[idx]) lv_obj_add_flag(itemIcons[idx], LV_OBJ_FLAG_HIDDEN);
+  sceneActiveTimer = lv_timer_create(sceneCountdownCb, 1000, NULL);
 }
 
 // Constroi (ou reconstroi) o grid de cenas. Chamado em buildTarefas (1a vez)
@@ -1883,7 +1916,7 @@ static void rebuildSceneGrid() {
   int btnH  = (gridH - (ROWS - 1) * gap) / ROWS;
 
   // Reset refs antigos (botoes vao ser recriados)
-  for (int i = 0; i < SCENES_MAX; i++) { itemBtns[i] = nullptr; itemIcons[i] = nullptr; }
+  for (int i = 0; i < SCENES_MAX; i++) { itemBtns[i] = nullptr; itemIcons[i] = nullptr; itemTimers[i] = nullptr; }
 
   for (int i = 0; i < sceneCount && i < SCENES_MAX; i++) {
     int row = i / COLS;
@@ -1928,9 +1961,20 @@ static void rebuildSceneGrid() {
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
 
+    // Contador regressivo (M:SS) — sobreposto ao ícone, escondido por padrão.
+    // Aparece só enquanto a cena executa (sceneActivePulse liga via itemTimers).
+    lv_obj_t *tmr = lv_label_create(btn);
+    lv_label_set_text(tmr, "");
+    lv_obj_set_style_text_color(tmr, lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_text_font(tmr, FONT_CAPTION, 0);
+    lv_obj_set_style_text_align(tmr, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(tmr, LV_ALIGN_TOP_MID, 0, sh(14));
+    lv_obj_add_flag(tmr, LV_OBJ_FLAG_HIDDEN);
+
     // Salva refs + aplica estado on/off (so' efetivo em devices)
     itemBtns[i]  = btn;
     itemIcons[i] = ico;
+    itemTimers[i] = tmr;
     if (!isScene) paintDeviceState(i);
   }
 }
