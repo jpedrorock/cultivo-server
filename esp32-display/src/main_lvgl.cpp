@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.7"
+#define FW_VERSION "0.5.8"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -1882,7 +1882,14 @@ static bool httpBegin(HTTPClient &http, const char *url) {
 // Cliente próprio: o OTA roda no tapTask e não overlapa com toggle/foto (mesma
 // task, serializado), mas mantemos separado pra clareza.
 static bool httpBeginGitHub(HTTPClient &http, const char *url) {
+  // stop() força um handshake TLS NOVO. Sem isso, reusar o cliente após a
+  // chamada de check (api.github.com) deixava o contexto mbedTLS "sujo", e
+  // o download (que segue 302 → objects.githubusercontent.com, host/cert
+  // diferente) falhava com HTTP -1 (connection lost). Cada chamada GitHub
+  // começa do zero.
+  httpGitHubClient.stop();
   httpGitHubClient.setInsecure();
+  httpGitHubClient.setHandshakeTimeout(15);  // CDN pode demorar no TLS
   return http.begin(httpGitHubClient, url);
 }
 
@@ -2939,13 +2946,43 @@ static bool fetchLatestRelease(char *outVer, size_t verSz, char *outUrl, size_t 
 // Baixa .bin e flasha via Update.writeStream. Em sucesso, retorna true e
 // caller deve chamar ESP.restart() (nao fazemos aqui pra permitir UI feedback).
 static bool downloadAndFlash(const char *url) {
+  // PASSO 1: resolve o redirect manualmente. O browser_download_url do GitHub
+  // responde 302 → objects.githubusercontent.com (host/cert diferente). Deixar
+  // o HTTPClient seguir sozinho (setFollowRedirects) reusa o mesmo contexto TLS
+  // e falha com HTTP -1 quando o host muda. Pegamos o Location com uma conexão
+  // e baixamos com OUTRA, limpa.
+  char finalUrl[300] = {0};
+  {
+    HTTPClient httpRedir;
+    httpBeginGitHub(httpRedir, url);  // stop() + setInsecure (handshake novo)
+    httpRedir.addHeader("User-Agent", "Cultivo-ESP32-Display");
+    httpRedir.setTimeout(15000);
+    const char *hdrs[] = { "Location" };
+    httpRedir.collectHeaders(hdrs, 1);
+    int rc = httpRedir.GET();  // SEM setFollowRedirects → para no 302
+    if (rc == HTTP_CODE_FOUND || rc == HTTP_CODE_MOVED_PERMANENTLY ||
+        rc == HTTP_CODE_TEMPORARY_REDIRECT || rc == 308) {
+      String loc = httpRedir.header("Location");
+      strncpy(finalUrl, loc.c_str(), sizeof(finalUrl) - 1);
+      Serial.printf("[ota] redirect -> %s\n", finalUrl);
+    } else if (rc == 200) {
+      // Sem redirect (raro) — baixa direto desta URL
+      strncpy(finalUrl, url, sizeof(finalUrl) - 1);
+    } else {
+      Serial.printf("[ota] redirect resolve HTTP %d\n", rc);
+      httpRedir.end();
+      return false;
+    }
+    httpRedir.end();
+  }
+  if (!finalUrl[0]) { Serial.println("[ota] sem URL final"); return false; }
+
+  // PASSO 2: baixa da URL final do CDN com conexão TLS limpa.
   HTTPClient http;
-  httpBeginGitHub(http, url);  // GitHub (DigiCert) → setInsecure
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);  // browser_download_url → 302 → CDN
+  httpBeginGitHub(http, finalUrl);  // stop() força handshake novo pro CDN
   http.addHeader("User-Agent", "Cultivo-ESP32-Display");
   http.setTimeout(60000);  // 60s — firmware ~1.5MB pode levar tempo
   int code = http.GET();
-  // GitHub release redirect 302 pra CDN; HTTPClient segue por default
   if (code != 200) {
     Serial.printf("[ota] download HTTP %d\n", code);
     http.end();
