@@ -228,6 +228,11 @@ void cultivoUI_tickIdleOverlay(void);
 // metric: "TEMP" | "RH" | "PPFD" | "PH"
 void cultivoUI_showAlert(int alertId, const char *type, const char *metric, const char *message);
 
+// Overlay de feedback do OTA ("Verificar atualizacao"). msg = texto a mostrar;
+// autoHideMs > 0 → some sozinho após o tempo (sucesso/erro/já atualizado);
+// autoHideMs = 0 → fica até a próxima chamada (progresso). Thread: chamar do loop().
+void cultivoUI_showOtaStatus(const char *msg, int autoHideMs);
+
 typedef void (*CultivoAlertAckFn)(int alertId);
 void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb);
 

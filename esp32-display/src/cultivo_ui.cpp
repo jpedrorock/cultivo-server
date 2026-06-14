@@ -542,6 +542,58 @@ extern "C" void cultivoUI_showAlert(int alertId, const char *type, const char *m
   lv_anim_start(&a);
 }
 
+// ── Overlay de OTA (feedback do "Verificar atualizacao") ──────────────────────
+// Banner central com texto atualizavel. Mostra progresso do update, que antes
+// so' ia pro Serial (user via "nada acontece" na tela).
+static lv_obj_t *otaOverlay = nullptr;
+static lv_obj_t *otaLabel   = nullptr;
+
+extern "C" void cultivoUI_showOtaStatus(const char *msg, int autoHideMs) {
+  if (!otaOverlay) {
+    otaOverlay = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(otaOverlay);
+    lv_obj_set_size(otaOverlay, SCREEN_W - sw(40), sh(80));
+    lv_obj_align(otaOverlay, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(otaOverlay, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(otaOverlay, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(otaOverlay, RADIUS_LG, 0);
+    lv_obj_set_style_border_color(otaOverlay, lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_border_width(otaOverlay, sw(2), 0);
+    lv_obj_set_style_shadow_width(otaOverlay, 24, 0);
+    lv_obj_set_style_shadow_color(otaOverlay, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_shadow_opa(otaOverlay, LV_OPA_50, 0);
+    lv_obj_set_style_pad_all(otaOverlay, sw(12), 0);
+    lv_obj_clear_flag(otaOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *hdr = lv_label_create(otaOverlay);
+    lv_label_set_text(hdr, "ATUALIZACAO");
+    lv_obj_set_style_text_color(hdr, lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_text_font(hdr, FONT_CAPTION, 0);
+    lv_obj_align(hdr, LV_ALIGN_TOP_MID, 0, 0);
+
+    otaLabel = lv_label_create(otaOverlay);
+    lv_label_set_long_mode(otaLabel, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(otaLabel, SCREEN_W - sw(64));
+    lv_obj_set_style_text_color(otaLabel, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_font(otaLabel, FONT_BODY, 0);
+    lv_obj_set_style_text_align(otaLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(otaLabel, LV_ALIGN_CENTER, 0, sh(8));
+  }
+  if (otaLabel) lv_label_set_text(otaLabel, msg ? msg : "");
+
+  // autoHideMs > 0 → some sozinho (sucesso/erro/já atualizado).
+  // Cancela timer anterior pra não fechar no meio.
+  static lv_timer_t *otaHideTimer = nullptr;
+  if (otaHideTimer) { lv_timer_del(otaHideTimer); otaHideTimer = nullptr; }
+  if (autoHideMs > 0) {
+    otaHideTimer = lv_timer_create([](lv_timer_t *t) {
+      lv_timer_del(t);
+      if (otaOverlay) { lv_obj_del(otaOverlay); otaOverlay = nullptr; otaLabel = nullptr; }
+    }, autoHideMs, NULL);
+    lv_timer_set_repeat_count(otaHideTimer, 1);
+  }
+}
+
 extern "C" void cultivoUI_tickIdleOverlay(void) {
   if (!idleOverlay || !idleClockLbl) return;
   // Le time corrente. configTime no firmware seta TZ BRT-3.
