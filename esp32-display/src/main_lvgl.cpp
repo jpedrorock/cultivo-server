@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.6"
+#define FW_VERSION "0.5.7"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -283,6 +283,18 @@ static const unsigned long FETCH_INTERVAL = 10UL * 60UL * 1000UL;  // 10 min (er
 // netTask → loop: seta quando ha' dados novos. loop() chama refreshHomeValues()
 // no thread principal (LVGL nao e thread-safe). atomic volatile basta, flag simples.
 static volatile bool uiNeedsRefresh = false;
+
+// OTA (core 0) → loop (core 1): status do update pra mostrar na tela. O OTA roda
+// no tapTask e NAO pode tocar LVGL direto. Escreve aqui; loop() empurra pro overlay.
+static volatile bool otaStatusPending = false;
+static volatile int  otaStatusHideMs  = 0;   // >0 = some sozinho (sucesso/erro)
+static char          otaStatusMsg[96]  = {0};
+static void setOtaStatus(const char *msg, int hideMs) {
+  strncpy(otaStatusMsg, msg, sizeof(otaStatusMsg) - 1);
+  otaStatusMsg[sizeof(otaStatusMsg) - 1] = '\0';
+  otaStatusHideMs = hideMs;
+  otaStatusPending = true;
+}
 
 // tapTask → loop: seta quando histPeriodHandler refetcha. loop() chama
 // cultivoUI_applyHistory no thread principal (LVGL nao e thread-safe).
@@ -2975,24 +2987,32 @@ static void processOtaCheck() {
   // Serial.print e o user ve no display via outras heuristicas (futuro:
   // adicionar um statusOverlay similar ao idleOverlay pra esses casos).
   Serial.println("[ota] check started");
+  setOtaStatus("Verificando atualizacao...", 0);
   char ver[32] = {0}, url[256] = {0};
   if (!fetchLatestRelease(ver, sizeof(ver), url, sizeof(url))) {
     Serial.println("[ota] sem release valida ou falha de rede");
+    setOtaStatus("Falha ao verificar.\nCheque o WiFi e tente de novo.", 5000);
     return;
   }
   int cmp = compareVersions(ver, FW_VERSION);
   Serial.printf("[ota] latest=%s current=%s cmp=%d\n", ver, FW_VERSION, cmp);
   if (cmp <= 0) {
     Serial.println("[ota] ja na versao mais recente");
+    setOtaStatus("Voce ja esta na versao\nmais recente (" FW_VERSION ").", 4000);
     return;
   }
   Serial.printf("[ota] atualizando %s -> %s\n", FW_VERSION, ver);
+  char buf[96];
+  snprintf(buf, sizeof(buf), "Baixando v%s...\nNao desligue o display.", ver);
+  setOtaStatus(buf, 0);
   if (downloadAndFlash(url)) {
     Serial.println("[ota] sucesso, rebootando em 2s");
+    setOtaStatus("Atualizado! Reiniciando...", 0);
     delay(2000);
     ESP.restart();
   } else {
     Serial.println("[ota] falha no update — firmware nao alterado");
+    setOtaStatus("Falha ao instalar.\nTente novamente.", 5000);
   }
 }
 
@@ -4048,6 +4068,11 @@ void loop() {
   if (uiNeedsRefresh) {
     uiNeedsRefresh = false;
     refreshHomeValues();
+  }
+  // OTA status (core 0 → UI): mostra/atualiza o overlay de atualizacao.
+  if (otaStatusPending) {
+    otaStatusPending = false;
+    cultivoUI_showOtaStatus(otaStatusMsg, otaStatusHideMs);
   }
   if (histNeedsRefresh) {
     histNeedsRefresh = false;
