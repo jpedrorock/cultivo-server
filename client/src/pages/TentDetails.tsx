@@ -633,6 +633,11 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const [selectedSceneId, setSelectedSceneId] = useState<string>('');
   const [selectedSceneIconHint, setSelectedSceneIconHint] = useState<string>('pump'); // default droplet (rega)
   const [selectedSceneExecSec, setSelectedSceneExecSec] = useState<number>(5);  // duração padrão 5s
+  // Form "colar scene_id manual" embutido no seletor (pras cenas tap-to-run
+  // que a Tuya não lista mais — ver SmartLife)
+  const [showManualScene, setShowManualScene] = useState(false);
+  const [manualSceneId, setManualSceneId] = useState('');
+  const [manualSceneName, setManualSceneName] = useState('');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [selectedIconHint, setSelectedIconHint] = useState<string>('other');
 
@@ -640,10 +645,33 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
   const { data: items = [] } = trpc.tentDisplay.listItems.useQuery({ tentId });
 
   // Listas globais Tuya (só busca quando user abre os dropdowns)
-  const { data: allScenes = [], isLoading: scenesLoading } = trpc.tuya.listScenes.useQuery(
+  const { data: apiScenes = [], isLoading: scenesLoading } = trpc.tuya.listScenes.useQuery(
     undefined,
     { enabled: showSceneAdd, retry: false }
   );
+  // Cenas adicionadas manualmente (tap-to-run que a Tuya não lista mais).
+  // Mescladas com as da API pra aparecerem no seletor do display.
+  const { data: manualScenes = [] } = trpc.tuya.listManualScenes.useQuery(
+    undefined,
+    { enabled: showSceneAdd }
+  );
+  // Une API + manuais, normalizando o formato (manual usa type tap/automation;
+  // a API usa homeName === 'Automações'). Dedup por sceneId.
+  const allScenes = (() => {
+    const fromApi = (apiScenes as any[]).map((s: any) => ({
+      sceneId: s.sceneId, name: s.name,
+      homeName: s.homeName ?? 'Cenas',
+    }));
+    const apiIds = new Set(fromApi.map(s => s.sceneId));
+    const fromManual = (manualScenes as any[])
+      .filter((m: any) => !apiIds.has(m.sceneId))
+      .map((m: any) => ({
+        sceneId: m.sceneId,
+        name: `${m.name} (manual)`,
+        homeName: m.type === 'automation' ? 'Automações' : 'Cenas',
+      }));
+    return [...fromApi, ...fromManual];
+  })();
   const { data: allDevices = [], isLoading: devicesLoading } = trpc.tuya.listDevices.useQuery(
     undefined,
     { enabled: showDeviceAdd, retry: false }
@@ -665,6 +693,21 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
     onSuccess: () => { toast.success('Cena adicionada'); invalidateAll(); setSelectedSceneId(''); setSelectedSceneIconHint('pump'); setSelectedSceneExecSec(5); setShowSceneAdd(false); },
     onError: (e) => toast.error(e.message),
   });
+  // Salva cena manual (scene_id colado) → vira opção no seletor acima na hora
+  const saveManualScene = trpc.tuya.saveManualScene.useMutation({
+    onSuccess: () => {
+      utils.tuya.listManualScenes.invalidate();
+      // Pré-seleciona a cena recém-colada no dropdown
+      setSelectedSceneId(manualSceneId);
+      toast.success('Cena manual salva — agora escolha o ícone e Adicionar');
+      setShowManualScene(false); setManualSceneId(''); setManualSceneName('');
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const handleSaveManualScene = () => {
+    if (!manualSceneId.trim() || !manualSceneName.trim()) return;
+    saveManualScene.mutate({ sceneId: manualSceneId.trim(), name: manualSceneName.trim(), type: 'tap' });
+  };
   const removeScene = trpc.tentScenes.remove.useMutation({
     onSuccess: () => { invalidateAll(); toast.success('Removida'); },
     onError: (e) => toast.error(e.message),
@@ -905,6 +948,44 @@ function TentDisplayItemsCard({ tentId }: { tentId: number }) {
                       </option>
                     ))}
                 </select>
+
+                {/* Não achou a cena? Tap-to-run que a Tuya não lista mais →
+                    cola o scene_id aqui. Vira opção no dropdown acima na hora. */}
+                {!showManualScene ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowManualScene(true)}
+                    className="text-xs text-primary underline-offset-2 hover:underline self-start"
+                  >
+                    Não achou a cena? Colar scene_id manualmente
+                  </button>
+                ) : (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-2">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Cole o <strong>scene_id</strong> da cena tap-to-run (pegue em iot.tuya.com → API Explorer → Smart Home Scene Linkage → Query List of Scenes).
+                    </p>
+                    <input
+                      type="text"
+                      value={manualSceneId}
+                      onChange={e => setManualSceneId(e.target.value.trim())}
+                      placeholder="scene_id (ex: dYNQ16951...)"
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                    <input
+                      type="text"
+                      value={manualSceneName}
+                      onChange={e => setManualSceneName(e.target.value)}
+                      placeholder="Nome (ex: Ligar tudo)"
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" className="flex-1" onClick={() => { setShowManualScene(false); setManualSceneId(''); setManualSceneName(''); }}>Cancelar</Button>
+                      <Button size="sm" className="flex-1" disabled={!manualSceneId.trim() || !manualSceneName.trim() || saveManualScene.isPending} onClick={handleSaveManualScene}>
+                        {saveManualScene.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Salvar cena'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 {/* Dropdown de iconHint — escolhe ícone que aparece no display ESP
                     e na lista. Default 'pump' (gota) porque maioria das cenas
                     vinculadas é rega manual. */}
