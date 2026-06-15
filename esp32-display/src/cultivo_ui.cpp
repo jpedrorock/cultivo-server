@@ -1660,7 +1660,6 @@ static int sceneCount = 0;  // mantem nome legado p/ minimizar diff
 static lv_obj_t *itemBtns[SCENES_MAX]  = {nullptr};
 static lv_obj_t *itemIcons[SCENES_MAX] = {nullptr};
 // Label de contador regressivo (M:SS) — visivel so' enquanto a cena executa.
-static lv_obj_t *itemTimers[SCENES_MAX] = {nullptr};
 
 // Tab pai dos botoes — guardado pra rebuild quando dados chegam do server
 static lv_obj_t *sceneTab = nullptr;
@@ -1828,78 +1827,104 @@ static void sceneClickCb(lv_event_t *e) {
   sceneActivePulse(idx);
 }
 
-// Reset visual do card scene apos timeout do "executando"
-static lv_timer_t *sceneActiveTimer = nullptr;
-static int         sceneActiveIdx   = -1;
-static int32_t     sceneSecsLeft    = 0;  // segundos restantes do countdown
 static const uint32_t SCENE_ACTIVE_MS_DEFAULT = 5000;  // fallback se server nao enviou executionSec
 
-// Volta o card ao visual neutro e esconde o contador.
-static void sceneResetVisual(int idx) {
-  if (idx < 0 || idx >= SCENES_MAX || !itemBtns[idx]) return;
-  lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_BORDER), 0);
-  lv_obj_set_style_shadow_width(itemBtns[idx], 0, 0);
-  if (itemTimers[idx]) {
-    lv_label_set_text(itemTimers[idx], "");
-    lv_obj_add_flag(itemTimers[idx], LV_OBJ_FLAG_HIDDEN);
-  }
-  // Remostra o ícone (escondido durante o countdown pra dar lugar ao número)
-  if (itemIcons[idx]) lv_obj_clear_flag(itemIcons[idx], LV_OBJ_FLAG_HIDDEN);
+// ── Overlay de countdown da cena ──────────────────────────────────────────────
+// Tela dedicada que abre ao tocar uma cena com duração (ex: rega 240s). Vive no
+// lv_layer_top, então SOBREVIVE ao rebuildSceneGrid (que roda no refresh de 30s
+// e destruía o contador antigo do card — bug reportado pelo João). Enquanto
+// aberto, o fetchScenes é pausado (cultivoUI_isCountdownActive). Contador grande
+// M:SS + barra de progresso esvaziando. Fecha ao zerar ou no botão.
+static lv_obj_t  *cdOverlay   = nullptr;
+static lv_obj_t  *cdTimeLabel = nullptr;
+static lv_obj_t  *cdBar       = nullptr;
+static lv_timer_t *cdTimer    = nullptr;
+static int32_t   cdSecsLeft   = 0;
+static int32_t   cdSecsTotal  = 0;
+
+static void cdClose() {
+  if (cdTimer) { lv_timer_del(cdTimer); cdTimer = nullptr; }
+  if (cdOverlay) { lv_obj_del(cdOverlay); cdOverlay = nullptr; }
+  cdTimeLabel = nullptr; cdBar = nullptr;
+  cdSecsLeft = cdSecsTotal = 0;
 }
 
-// Tick de 1s — atualiza o contador M:SS; ao zerar, reseta o card.
-static void sceneCountdownCb(lv_timer_t *t) {
-  int idx = sceneActiveIdx;
-  sceneSecsLeft--;
-  if (sceneSecsLeft <= 0) {
-    lv_timer_del(t);
-    if (sceneActiveTimer == t) sceneActiveTimer = nullptr;
-    sceneActiveIdx = -1;
-    sceneResetVisual(idx);
-    return;
-  }
-  if (idx >= 0 && idx < SCENES_MAX && itemTimers[idx]) {
+// Exposto pro main_lvgl: pausa o fetchScenes enquanto o countdown está na tela.
+extern "C" bool cultivoUI_isCountdownActive(void) { return cdOverlay != nullptr; }
+
+static void cdUpdateLabel() {
+  if (cdTimeLabel) {
     char buf[8];
-    snprintf(buf, sizeof(buf), "%d:%02d", sceneSecsLeft / 60, sceneSecsLeft % 60);
-    lv_label_set_text(itemTimers[idx], buf);
+    snprintf(buf, sizeof(buf), "%d:%02d", cdSecsLeft / 60, cdSecsLeft % 60);
+    lv_label_set_text(cdTimeLabel, buf);
   }
+  if (cdBar && cdSecsTotal > 0) {
+    lv_bar_set_value(cdBar, (cdSecsLeft * 100) / cdSecsTotal, LV_ANIM_ON);
+  }
+}
+
+static void cdTickCb(lv_timer_t *) {
+  cdSecsLeft--;
+  if (cdSecsLeft <= 0) { cdClose(); return; }
+  cdUpdateLabel();
 }
 
 static void sceneActivePulse(int idx) {
-  if (idx < 0 || idx >= SCENES_MAX || !itemBtns[idx]) return;
-  // Cancela pulse anterior (se outra cena estava "executando") e limpa o card
-  // antigo pra não ficar preso aceso/com número.
-  if (sceneActiveTimer) {
-    lv_timer_del(sceneActiveTimer);
-    sceneActiveTimer = nullptr;
-    if (sceneActiveIdx != idx) sceneResetVisual(sceneActiveIdx);
-  }
-  sceneActiveIdx = idx;
-  // Pinta card aceso (mesmo visual de device ON)
-  lv_obj_set_style_bg_color(itemBtns[idx],     lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_bg_opa(itemBtns[idx],       LV_OPA_30, 0);
-  lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_shadow_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_shadow_width(itemBtns[idx], 12, 0);
-  lv_obj_set_style_shadow_opa(itemBtns[idx],   LV_OPA_30, 0);
-  lv_obj_set_style_shadow_spread(itemBtns[idx], 0, 0);
-  // Countdown M:SS. Duracao vem do server (executionSec — configurado em /tent/X).
-  // Fallback 5s. Timer repete a cada 1s; sceneCountdownCb reseta ao zerar.
+  if (idx < 0 || idx >= sceneCount) return;
+  cdClose();  // fecha countdown anterior se houver
+
   uint32_t durSec = items[idx].executionSec > 0
                     ? (uint32_t)items[idx].executionSec
                     : (SCENE_ACTIVE_MS_DEFAULT / 1000);
-  sceneSecsLeft = (int32_t)durSec;
-  if (itemTimers[idx]) {
-    char buf[8];
-    snprintf(buf, sizeof(buf), "%d:%02d", sceneSecsLeft / 60, sceneSecsLeft % 60);
-    lv_label_set_text(itemTimers[idx], buf);
-    lv_obj_clear_flag(itemTimers[idx], LV_OBJ_FLAG_HIDDEN);
-  }
-  // Esconde o ícone enquanto conta (dá lugar ao número, card pequeno)
-  if (itemIcons[idx]) lv_obj_add_flag(itemIcons[idx], LV_OBJ_FLAG_HIDDEN);
-  sceneActiveTimer = lv_timer_create(sceneCountdownCb, 1000, NULL);
+  cdSecsTotal = cdSecsLeft = (int32_t)durSec;
+
+  // Overlay full-screen no layer top (sobrevive a rebuilds do grid)
+  cdOverlay = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(cdOverlay);
+  lv_obj_set_size(cdOverlay, SCREEN_W, SCREEN_H);
+  lv_obj_set_style_bg_color(cdOverlay, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(cdOverlay, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(cdOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Nome da cena (topo)
+  lv_obj_t *nm = lv_label_create(cdOverlay);
+  lv_label_set_text(nm, items[idx].name);
+  lv_label_set_long_mode(nm, LV_LABEL_LONG_DOT);
+  lv_obj_set_width(nm, SCREEN_W - sw(40));
+  lv_obj_set_style_text_color(nm, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_text_font(nm, FONT_TITLE, 0);
+  lv_obj_set_style_text_align(nm, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_align(nm, LV_ALIGN_TOP_MID, 0, sh(40));
+
+  // Contador grande (centro)
+  cdTimeLabel = lv_label_create(cdOverlay);
+  lv_obj_set_style_text_color(cdTimeLabel, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(cdTimeLabel, FONT_VALUE, 0);
+  lv_obj_align(cdTimeLabel, LV_ALIGN_CENTER, 0, -sh(10));
+
+  // Barra de progresso (abaixo do contador)
+  cdBar = lv_bar_create(cdOverlay);
+  lv_obj_set_size(cdBar, SCREEN_W - sw(80), sh(10));
+  lv_obj_align(cdBar, LV_ALIGN_CENTER, 0, sh(40));
+  lv_obj_set_style_bg_color(cdBar, lv_color_hex(COL_CARD), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(cdBar, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  lv_obj_set_style_radius(cdBar, sh(5), LV_PART_MAIN);
+  lv_obj_set_style_radius(cdBar, sh(5), LV_PART_INDICATOR);
+  lv_bar_set_range(cdBar, 0, 100);
+  lv_bar_set_value(cdBar, 100, LV_ANIM_OFF);
+
+  // Botão fechar (rodapé) — toca em qualquer lugar do overlay fecha
+  lv_obj_t *hint = lv_label_create(cdOverlay);
+  lv_label_set_text(hint, "Toque para fechar");
+  lv_obj_set_style_text_color(hint, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(hint, FONT_CAPTION, 0);
+  lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -sh(20));
+
+  lv_obj_add_flag(cdOverlay, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(cdOverlay, [](lv_event_t *) { cdClose(); }, LV_EVENT_CLICKED, NULL);
+
+  cdUpdateLabel();
+  cdTimer = lv_timer_create(cdTickCb, 1000, NULL);
 }
 
 // Constroi (ou reconstroi) o grid de cenas. Chamado em buildTarefas (1a vez)
@@ -1968,7 +1993,7 @@ static void rebuildSceneGrid() {
   int btnH  = (gridH - (ROWS - 1) * gap) / ROWS;
 
   // Reset refs antigos (botoes vao ser recriados)
-  for (int i = 0; i < SCENES_MAX; i++) { itemBtns[i] = nullptr; itemIcons[i] = nullptr; itemTimers[i] = nullptr; }
+  for (int i = 0; i < SCENES_MAX; i++) { itemBtns[i] = nullptr; itemIcons[i] = nullptr; }
 
   for (int i = 0; i < sceneCount && i < SCENES_MAX; i++) {
     int row = i / COLS;
@@ -2013,20 +2038,11 @@ static void rebuildSceneGrid() {
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
 
-    // Contador regressivo (M:SS) — sobreposto ao ícone, escondido por padrão.
-    // Aparece só enquanto a cena executa (sceneActivePulse liga via itemTimers).
-    lv_obj_t *tmr = lv_label_create(btn);
-    lv_label_set_text(tmr, "");
-    lv_obj_set_style_text_color(tmr, lv_color_hex(COL_PRIMARY), 0);
-    lv_obj_set_style_text_font(tmr, FONT_CAPTION, 0);
-    lv_obj_set_style_text_align(tmr, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(tmr, LV_ALIGN_TOP_MID, 0, sh(14));
-    lv_obj_add_flag(tmr, LV_OBJ_FLAG_HIDDEN);
-
-    // Salva refs + aplica estado on/off (so' efetivo em devices)
+    // Salva refs + aplica estado on/off (so' efetivo em devices).
+    // Contador de cena não vive mais no card (overlay dedicado sobrevive ao
+    // rebuild do grid no refresh de 30s) — ver sceneActivePulse.
     itemBtns[i]  = btn;
     itemIcons[i] = ico;
-    itemTimers[i] = tmr;
     if (!isScene) paintDeviceState(i);
   }
 }

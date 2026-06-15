@@ -233,6 +233,10 @@ void cultivoUI_showAlert(int alertId, const char *type, const char *metric, cons
 // autoHideMs = 0 → fica até a próxima chamada (progresso). Thread: chamar do loop().
 void cultivoUI_showOtaStatus(const char *msg, int autoHideMs);
 
+// true enquanto o overlay de countdown de cena está na tela. O netTask usa pra
+// pausar o fetchScenes (não rebuildar o grid nem gastar quota Tuya durante o timer).
+bool cultivoUI_isCountdownActive(void);
+
 typedef void (*CultivoAlertAckFn)(int alertId);
 void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb);
 
