@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.9"
+#define FW_VERSION "0.5.10"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -2951,7 +2951,10 @@ static bool downloadAndFlash(const char *url) {
   // o HTTPClient seguir sozinho (setFollowRedirects) reusa o mesmo contexto TLS
   // e falha com HTTP -1 quando o host muda. Pegamos o Location com uma conexão
   // e baixamos com OUTRA, limpa.
-  char finalUrl[300] = {0};
+  // String dinâmica: a URL do CDN (release-assets.githubusercontent.com) vem
+  // com token de assinatura SAS gigante (400-600+ chars). Buffer fixo truncava
+  // a URL → assinatura inválida → CDN recusa → HTTP -1. String cresce sozinha.
+  String finalUrl;
   {
     HTTPClient httpRedir;
     httpBeginGitHub(httpRedir, url);  // stop() + setInsecure (handshake novo)
@@ -2962,12 +2965,11 @@ static bool downloadAndFlash(const char *url) {
     int rc = httpRedir.GET();  // SEM setFollowRedirects → para no 302
     if (rc == HTTP_CODE_FOUND || rc == HTTP_CODE_MOVED_PERMANENTLY ||
         rc == HTTP_CODE_TEMPORARY_REDIRECT || rc == 308) {
-      String loc = httpRedir.header("Location");
-      strncpy(finalUrl, loc.c_str(), sizeof(finalUrl) - 1);
-      Serial.printf("[ota] redirect -> %s\n", finalUrl);
+      finalUrl = httpRedir.header("Location");
+      Serial.printf("[ota] redirect -> %s (len=%d)\n", finalUrl.c_str(), finalUrl.length());
     } else if (rc == 200) {
       // Sem redirect (raro) — baixa direto desta URL
-      strncpy(finalUrl, url, sizeof(finalUrl) - 1);
+      finalUrl = url;
     } else {
       Serial.printf("[ota] redirect resolve HTTP %d\n", rc);
       httpRedir.end();
@@ -2975,11 +2977,11 @@ static bool downloadAndFlash(const char *url) {
     }
     httpRedir.end();
   }
-  if (!finalUrl[0]) { Serial.println("[ota] sem URL final"); return false; }
+  if (finalUrl.isEmpty()) { Serial.println("[ota] sem URL final"); return false; }
 
   // PASSO 2: baixa da URL final do CDN com conexão TLS limpa.
   HTTPClient http;
-  httpBeginGitHub(http, finalUrl);  // stop() força handshake novo pro CDN
+  httpBeginGitHub(http, finalUrl.c_str());  // stop() força handshake novo pro CDN
   http.addHeader("User-Agent", "Cultivo-ESP32-Display");
   http.setTimeout(60000);  // 60s — firmware ~1.5MB pode levar tempo
   int code = http.GET();
