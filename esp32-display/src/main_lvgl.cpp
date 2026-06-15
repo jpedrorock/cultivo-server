@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.8"
+#define FW_VERSION "0.5.9"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -3254,8 +3254,11 @@ static void netTaskFn(void *param) {
     //
     // netWasOnScenes detecta a TRANSIÇÃO pra tela Cenas → fetch imediato (UX:
     // não esperar até 30s pra ver o estado dos devices ao abrir a aba).
+    // Pausa o fetch enquanto o overlay de countdown está na tela: o rebuild do
+    // grid destruiria a tela do timer, e não faz sentido gastar quota Tuya
+    // checando estado de botões que nem estão visíveis (pedido do João).
     static bool netWasOnScenes = false;
-    const bool onScenes = (activeScreen == 4 && !screenAsleep);
+    const bool onScenes = (activeScreen == 4 && !screenAsleep && !cultivoUI_isCountdownActive());
     const bool justEnteredScenes = onScenes && !netWasOnScenes;
     netWasOnScenes = onScenes;
     if (onScenes &&
