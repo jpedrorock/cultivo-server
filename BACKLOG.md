@@ -1,6 +1,6 @@
 # BACKLOG — App Cultivo
 
-Backlog gerenciado pela routine autônoma. Atualizado em: 2026-06-16 (sessão 2).
+Backlog gerenciado pela routine autônoma. Atualizado em: 2026-06-16 (sessão 3).
 
 ---
 
