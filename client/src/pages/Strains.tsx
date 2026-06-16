@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { Loader2, Plus, Pencil, Trash2, Sprout, Search, Flower2, Timer, Leaf } f
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
+import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 
 export default function Strains() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -462,31 +462,20 @@ export default function Strains() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm Dialog */}
-      <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, id: null, name: "" })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="w-5 h-5" />
-              Excluir Strain
-            </DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir a strain{" "}
-              <span className="font-semibold text-foreground">"{deleteConfirm.name}"</span>?
-              Esta ação não pode ser desfeita.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, id: null, name: "" })}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              <Trash2 className="w-4 h-4 mr-2" />
-              Excluir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) => !open && setDeleteConfirm({ open: false, id: null, name: "" })}
+        title="Excluir Strain"
+        description={
+          <>
+            Tem certeza que deseja excluir a strain{" "}
+            <span className="font-semibold text-foreground">"{deleteConfirm.name}"</span>?
+            Esta ação não pode ser desfeita.
+          </>
+        }
+        onConfirm={confirmDelete}
+        confirmLabel="Excluir"
+      />
     </div>
   );
 }
