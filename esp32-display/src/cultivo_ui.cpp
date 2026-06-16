@@ -1792,27 +1792,115 @@ extern "C" void cultivoUI_stopItemSpin(int idx) {
 // Forward decl — definida apos sceneClickCb
 static void sceneActivePulse(int idx);
 
+// ── Confirmação de cena ───────────────────────────────────────────────────────
+// Modal full-screen no layer top que pergunta "Iniciar X?" antes de disparar uma
+// cena. Resolve dois problemas reportados pelo João: (1) clique que "não vai na
+// 1a vez" e (2) duplo-clique disparando a cena 2x. A cena SÓ dispara no "Sim".
+// Vive no lv_layer_top → fica por cima do grid e some ao escolher.
+static lv_obj_t *confirmOverlay = nullptr;
+
+static void confirmClose() {
+  if (confirmOverlay) { lv_obj_del(confirmOverlay); confirmOverlay = nullptr; }
+}
+
+// Dispara a cena de fato (chamado no "Sim") — POSTa no app + abre o countdown.
+static void sceneDoTrigger(int idx) {
+  if (idx < 0 || idx >= sceneCount) return;
+  if (onSceneTrigger) onSceneTrigger(idx);
+  sceneActivePulse(idx);
+}
+
+static void confirmYesCb(lv_event_t *e) {
+  int idx = (int)(intptr_t)lv_event_get_user_data(e);
+  confirmClose();
+  sceneDoTrigger(idx);
+}
+
+static void sceneConfirm(int idx) {
+  if (idx < 0 || idx >= sceneCount) return;
+  confirmClose();  // fecha modal anterior se houver (defesa contra duplo-clique)
+
+  confirmOverlay = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(confirmOverlay);
+  lv_obj_set_size(confirmOverlay, SCREEN_W, SCREEN_H);
+  lv_obj_set_style_bg_color(confirmOverlay, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(confirmOverlay, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(confirmOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Pergunta (centro-acima)
+  lv_obj_t *q = lv_label_create(confirmOverlay);
+  char buf[80];
+  snprintf(buf, sizeof(buf), "Iniciar\n%s?", items[idx].name);
+  lv_label_set_text(q, buf);
+  lv_label_set_long_mode(q, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(q, SCREEN_W - sw(40));
+  lv_obj_set_style_text_align(q, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(q, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(q, FONT_TITLE, 0);
+  lv_obj_align(q, LV_ALIGN_CENTER, 0, -sh(45));
+
+  const lv_coord_t bw = (SCREEN_W - sw(60)) / 2;
+  const lv_coord_t bh = sh(54);
+
+  // Botão "Não" (esquerda, neutro)
+  lv_obj_t *no = lv_obj_create(confirmOverlay);
+  lv_obj_remove_style_all(no);
+  lv_obj_set_size(no, bw, bh);
+  lv_obj_align(no, LV_ALIGN_CENTER, -(bw / 2 + sw(8)), sh(40));
+  lv_obj_set_style_bg_color(no, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_bg_opa(no, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(no, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(no, 1, 0);
+  lv_obj_set_style_radius(no, RADIUS_LG, 0);
+  lv_obj_clear_flag(no, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(no, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(no, [](lv_event_t *) { confirmClose(); }, LV_EVENT_CLICKED, NULL);
+  lv_obj_t *noL = lv_label_create(no);
+  lv_label_set_text(noL, "Nao");
+  lv_obj_center(noL);
+  lv_obj_set_style_text_color(noL, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(noL, FONT_TITLE, 0);
+
+  // Botão "Sim" (direita, primary)
+  lv_obj_t *yes = lv_obj_create(confirmOverlay);
+  lv_obj_remove_style_all(yes);
+  lv_obj_set_size(yes, bw, bh);
+  lv_obj_align(yes, LV_ALIGN_CENTER, (bw / 2 + sw(8)), sh(40));
+  lv_obj_set_style_bg_color(yes, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(yes, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(yes, RADIUS_LG, 0);
+  lv_obj_clear_flag(yes, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(yes, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(yes, confirmYesCb, LV_EVENT_CLICKED, (void *)(intptr_t)idx);
+  lv_obj_t *yesL = lv_label_create(yes);
+  lv_label_set_text(yesL, "Sim");
+  lv_obj_center(yesL);
+  lv_obj_set_style_text_color(yesL, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_text_font(yesL, FONT_TITLE, 0);
+}
+
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   if (idx < 0 || idx >= sceneCount) return;
   printf("[ui] item tap idx=%d type=%d (%s)\n",
          idx, items[idx].type, items[idx].name);
-  if (onSceneTrigger) onSceneTrigger(idx);
 
-  // Refresh/sensor — animacao de rotacao no icone enquanto refresh roda.
-  // Seta isRefreshing=true pra que refreshHomeValues mostre toast "Atualizado"
-  // quando dados frescos chegarem (mesmo mecanismo do botao header antigo).
-  // App vai chamar cultivoUI_stopItemSpin quando dados frescos chegarem.
+  // Refresh/sensor — leitura inofensiva, dispara imediato (sem confirmacao).
+  // Animacao de rotacao no icone enquanto refresh roda; isRefreshing=true pra
+  // refreshHomeValues mostrar toast "Atualizado" quando dados frescos chegarem.
+  // App chama cultivoUI_stopItemSpin quando dados frescos chegarem.
   if (!strcmp(items[idx].iconHint, "refresh") ||
       !strcmp(items[idx].iconHint, "sensor")) {
+    if (onSceneTrigger) onSceneTrigger(idx);
     isRefreshing = true;
     cultivoUI_startItemSpin(idx);
     return;
   }
 
   if (items[idx].type == 1 || items[idx].type == 2) {
-    // Device OU automation — feedback "carregando" sem mudar state local.
-    // Border primary + opacidade reduzida. setDeviceState restaura full opa.
+    // Device OU automation — dispara imediato com feedback "carregando" sem
+    // mudar state local. Border primary + opa reduzida; setDeviceState restaura.
+    if (onSceneTrigger) onSceneTrigger(idx);
     if (itemBtns[idx]) {
       lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
       lv_obj_set_style_opa(itemBtns[idx], LV_OPA_70, 0);
@@ -1820,11 +1908,9 @@ static void sceneClickCb(lv_event_t *e) {
     return;
   }
 
-  // Scene — visual "executando" por SCENE_ACTIVE_MS (5s default). Card
-  // fica aceso (igual device ON) e volta ao normal apos timeout. Sem
-  // checar state real (Tuya nao expoe). Quando outra IA implementar
-  // executionSec em tentScenes, basta sobrescrever esse default.
-  sceneActivePulse(idx);
+  // Scene (rega etc.) — pede confirmacao antes de disparar. So' dispara no
+  // "Sim" (sceneDoTrigger), que entao chama onSceneTrigger + sceneActivePulse.
+  sceneConfirm(idx);
 }
 
 static const uint32_t SCENE_ACTIVE_MS_DEFAULT = 5000;  // fallback se server nao enviou executionSec
