@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { SelectMotherPlantDialog } from "@/components/SelectMotherPlantDialog";
-import { Button } from "@/components/ui/button";
+import { PressButton } from "@/components/PressButton";
 import {
   Dialog,
   DialogContent,
@@ -234,16 +234,16 @@ export function EditCycleModal({
             </div>
           </div>
           <DialogFooter>
-            <Button
+            <PressButton
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
               Cancelar
-            </Button>
-            <Button type="submit" disabled={edit.isPending}>
+            </PressButton>
+            <PressButton type="submit" disabled={edit.isPending}>
               {edit.isPending ? "Salvando..." : "Salvar Alterações"}
-            </Button>
+            </PressButton>
           </DialogFooter>
         </form>
       </DialogContent>
