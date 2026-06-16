@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.11"
+#define FW_VERSION "0.5.12"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -3002,8 +3002,47 @@ static bool downloadAndFlash(const char *url) {
     http.end();
     return false;
   }
+
+  // Download MANUAL em blocos (em vez de Update.writeStream bloqueante).
+  // writeStream lê tudo de uma vez sem ceder CPU → o stream do CDN engasga, o
+  // WiFi/TLS não é alimentado e o device reseta no meio. Aqui lemos 1KB por vez,
+  // alimentando o watchdog (delay(1)) e tolerando pausas do CDN (espera dados
+  // chegarem por até 10s antes de desistir, em vez de abortar no 1º hiccup).
   WiFiClient *stream = http.getStreamPtr();
-  size_t written = Update.writeStream(*stream);
+  uint8_t buf[1024];
+  size_t written = 0;
+  uint32_t lastData = millis();
+  const uint32_t STALL_TIMEOUT = 10000;  // 10s sem nenhum byte = conexão morta
+  while (written < (size_t)contentLen) {
+    size_t avail = stream->available();
+    if (avail) {
+      size_t toRead = avail > sizeof(buf) ? sizeof(buf) : avail;
+      int n = stream->readBytes(buf, toRead);
+      if (n > 0) {
+        if (Update.write(buf, n) != (size_t)n) {
+          Serial.printf("[ota] Update.write fail: %s\n", Update.errorString());
+          Update.abort(); http.end(); return false;
+        }
+        written += n;
+        lastData = millis();
+        // Log de progresso a cada ~256KB
+        if ((written % (256 * 1024)) < 1024)
+          Serial.printf("[ota] %u/%d bytes\n", (unsigned)written, contentLen);
+      }
+    } else {
+      // Sem dados no momento: cede CPU pro WiFi/TLS e checa se travou de vez.
+      if (!stream->connected() && !stream->available()) {
+        Serial.println("[ota] conexao caiu durante download");
+        break;
+      }
+      if (millis() - lastData > STALL_TIMEOUT) {
+        Serial.println("[ota] stream travou (timeout)");
+        break;
+      }
+      delay(5);  // alimenta watchdog + dá tempo do TLS bufferizar
+    }
+    delay(1);  // yield a cada bloco — mantém WiFi/sistema vivos
+  }
   http.end();
   if (written != (size_t)contentLen) {
     Serial.printf("[ota] short write %u/%d\n", (unsigned)written, contentLen);
@@ -3042,7 +3081,8 @@ static void processOtaCheck() {
   }
   Serial.printf("[ota] atualizando %s -> %s\n", FW_VERSION, ver);
   char buf[96];
-  snprintf(buf, sizeof(buf), "Baixando v%s...\nNao desligue o display.", ver);
+  // ver já vem com 'v' (tag_name = "v0.5.11") — não dobrar o v
+  snprintf(buf, sizeof(buf), "Baixando %s...\nNao desligue o display.", ver);
   setOtaStatus(buf, 0);
   if (downloadAndFlash(url)) {
     Serial.println("[ota] sucesso, rebootando em 2s");
