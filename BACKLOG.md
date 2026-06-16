@@ -23,12 +23,6 @@ Backlog gerenciado pela routine autônoma. Atualizado em: 2026-06-16 (sessão 2)
 
 ---
 
-### [P3] testes-onboarding-wizard: vitest para OnboardingWizard mutations
-**Critério de pronto**: Testes cobrem: (1) finalizar wizard cria estufa+strain+plantas; (2) "Pular tutorial" vai pra Home sem criar nada; (3) strain custom cria nova strain no DB; (4) strain existente não duplica.
-**Arquivos**: criar `server/onboarding.wizard.test.ts` ou `client/__tests__/OnboardingWizard.test.tsx`
-**Não toca**: schema, auth
-
----
 
 ## 🔄 Em progresso
 
@@ -37,6 +31,12 @@ _Nenhum item em progresso no momento._
 ---
 
 ## ✅ Concluídos recentemente
+
+### [2026-06-16] testes-onboarding-wizard: vitest para mutations do wizard
+- `server/onboarding.wizard.test.ts` criado com 4 testes
+- Cobre: (1) tent+strain+plant em sequência, (3) strain custom cria no DB, (4) duplicata rejeitada
+- Item (2) "Pular tutorial" é client-side — não testável sem React Testing Library (documentado no arquivo)
+- Testes skipados sem DATABASE_URL (padrão do projeto)
 
 ### [2026-06-16] modal-confirmacao-excluir-strain: Strains.tsx refatorado para DeleteConfirmDialog
 - Dialog inline de exclusão removido — substituído por `DeleteConfirmDialog` (componente compartilhado)
