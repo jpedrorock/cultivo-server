@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { PressButton } from "@/components/PressButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -239,13 +239,13 @@ export function EditTentDialog({ tent, open, onOpenChange, onSuccess }: EditTent
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={updateMutation.isPending}>
+            <PressButton type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={updateMutation.isPending}>
               Cancelar
-            </Button>
-            <Button type="submit" disabled={updateMutation.isPending}>
+            </PressButton>
+            <PressButton type="submit" disabled={updateMutation.isPending}>
               {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar Alterações
-            </Button>
+            </PressButton>
           </DialogFooter>
         </form>
       </DialogContent>

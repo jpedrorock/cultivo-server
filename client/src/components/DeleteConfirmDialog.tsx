@@ -1,5 +1,5 @@
 import { Loader2, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { PressButton } from "@/components/PressButton";
 import {
   Dialog,
   DialogContent,
@@ -41,15 +41,16 @@ export function DeleteConfirmDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2">
-          <Button
+          <PressButton
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isPending}
           >
             Cancelar
-          </Button>
-          <Button
+          </PressButton>
+          <PressButton
             variant="destructive"
+            pressIntensity="strong"
             onClick={onConfirm}
             disabled={isPending}
           >
@@ -64,7 +65,7 @@ export function DeleteConfirmDialog({
                 {confirmLabel}
               </>
             )}
-          </Button>
+          </PressButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
