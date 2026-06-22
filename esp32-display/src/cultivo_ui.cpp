@@ -1783,12 +1783,12 @@ extern "C" void cultivoUI_stopItemSpin(int idx) {
 
 // Feedback de tap:
 //   scene  : flash border primary (one-shot) — sem state, so' confirma trigger
-//   device : NAO inverte state localmente (era "optimistic toggle" e gerava
-//            "pisca acende-apaga" quando server respondia diferente). Em vez
-//            disso, mostra estado "carregando" (border primary fixo + opa
-//            reduzido) e aguarda cultivoUI_setDeviceState do app pra pintar
-//            estado real. App garante chamar setDeviceState mesmo em falha
-//            (com state antigo).
+//   device : OTIMISTA — inverte items[idx].state + paintDeviceState na hora do
+//            toque (resposta instantânea). O "pisca acende-apaga" de antes era
+//            culpa da re-consulta do server (devolvia state stale 500ms depois);
+//            essa re-consulta foi REMOVIDA (server devolve o desejado na hora),
+//            então o setDeviceState que volta confirma o otimista sem piscar.
+//            O poll de /scenes reconcilia com a Tuya real se algo divergir.
 // Forward decl — definida apos sceneClickCb
 static void sceneActivePulse(int idx);
 
@@ -1898,13 +1898,15 @@ static void sceneClickCb(lv_event_t *e) {
   }
 
   if (items[idx].type == 1 || items[idx].type == 2) {
-    // Device OU automation — dispara imediato com feedback "carregando" sem
-    // mudar state local. Border primary + opa reduzida; setDeviceState restaura.
+    // Device/automation — FEEDBACK OTIMISTA: inverte o state e pinta ON/OFF na
+    // HORA do toque (a rede roda no fundo, no tapTask). O servidor agora devolve
+    // o estado desejado imediatamente (sem re-consulta — removida no fix de cota),
+    // então o cultivoUI_setDeviceState que volta BATE com o otimista → não pisca.
+    // Se a Tuya não executou de fato, o próximo poll de /scenes corrige sozinho.
+    // Resolve "parece travado / tenho que clicar de novo": resposta instantânea.
+    items[idx].state = !items[idx].state;
+    paintDeviceState(idx);
     if (onSceneTrigger) onSceneTrigger(idx);
-    if (itemBtns[idx]) {
-      lv_obj_set_style_border_color(itemBtns[idx], lv_color_hex(COL_PRIMARY), 0);
-      lv_obj_set_style_opa(itemBtns[idx], LV_OPA_70, 0);
-    }
     return;
   }
 

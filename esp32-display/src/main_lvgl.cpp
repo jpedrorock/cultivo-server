@@ -251,8 +251,14 @@ static volatile bool otaCheckPending = false;
 // Result flow p/ device toggle: sceneTapPending=true → netTask faz POST →
 // escreve deviceToggleRes* + deviceTogglePendingUI=true → loop() consome e
 // chama cultivoUI_setDeviceState (LVGL safe).
-static volatile bool sceneTapPending      = false;
-static int           sceneTapIdx          = -1;
+// Fila de toques (cenas/devices) — ring buffer. Antes era um único
+// sceneTapPending/sceneTapIdx que DESCARTAVA o 2º toque enquanto o 1º
+// processava (João: "tenho que clicar 2x"). Agora cada toque enfileira e o
+// tapTask processa em ordem. 8 slots cobrem qualquer rajada de toques.
+#define SCENE_TAP_QUEUE_SZ 8
+static volatile int  sceneTapQueue[SCENE_TAP_QUEUE_SZ] = {0};
+static volatile int  sceneTapQHead = 0;  // próximo a ler (tapTask)
+static volatile int  sceneTapQTail = 0;  // próximo a escrever (handler do toque)
 static volatile bool deviceTogglePendingUI = false;
 static int           deviceToggleResIdx    = -1;
 static bool          deviceToggleResState  = false;
@@ -3145,7 +3151,7 @@ static bool fetchScenes() {
 }
 
 // Forward declaration — definido logo abaixo (depois do netTaskFn)
-static void processSceneTap();
+static void processSceneTap(int idx);
 // Forward declarations dos workers de HTTP (definidos depois do tapTaskFn).
 static void doAlertAck();
 static void doHistPeriod();
@@ -3156,9 +3162,13 @@ static void doHistPeriod();
 // ~50ms (vTaskDelay) + tempo do POST HTTPS (500ms-2s).
 static void tapTaskFn(void *param) {
   for (;;) {
-    if (sceneTapPending && wifiOk) {
+    // Drena a fila de toques — processa TODOS os pendentes em ordem (não
+    // descarta mais o 2º toque enquanto o 1º roda).
+    while (sceneTapQHead != sceneTapQTail && wifiOk) {
+      int tapIdx = sceneTapQueue[sceneTapQHead];
+      sceneTapQHead = (sceneTapQHead + 1) % SCENE_TAP_QUEUE_SZ;
       uint32_t t0 = millis();
-      processSceneTap();
+      processSceneTap(tapIdx);
       logIfSlow("sceneTap", t0, 9000);
     }
     if (taskTapPending && wifiOk) {
@@ -3704,21 +3714,18 @@ static void sceneTriggerHandler(int idx) {
     Serial.printf("[tap] idx=%d fora do range (count=%d)\n", idx, sceneCountLocal);
     return;
   }
-  if (sceneTapPending) {
-    Serial.println("[tap] outro tap pending — ignorado");
+  int nextTail = (sceneTapQTail + 1) % SCENE_TAP_QUEUE_SZ;
+  if (nextTail == sceneTapQHead) {
+    Serial.println("[tap] fila cheia — toque ignorado");  // só em rajada absurda
     return;
   }
-  sceneTapIdx = idx;
-  sceneTapPending = true;  // netTask processa
+  sceneTapQueue[sceneTapQTail] = idx;
+  sceneTapQTail = nextTail;  // tapTask drena a fila em ordem
 }
 
-// Executa o tap pendente — chamado APENAS de netTaskFn (core 0, stack OK).
+// Processa UM toque da fila — chamado pelo tapTask (core 0, stack OK).
 // Faz HTTP/TLS, atualiza storage, sinaliza loop() pra atualizar UI se device.
-static void processSceneTap() {
-  if (!sceneTapPending) return;
-  int idx = sceneTapIdx;
-  sceneTapPending = false;
-
+static void processSceneTap(int idx) {
   if (idx < 0 || idx >= sceneCountLocal) return;
   const char *id   = sceneIdsLocal[idx];
   const char *name = sceneNamesLocal[idx];
