@@ -385,22 +385,18 @@ export const weeklyTargetsRouter = router({
         
         // Se não encontrar targets específicos, retorna valores padrão
         if (targets.length === 0) {
-          // Curva de EC do relatório técnico: na flora o EC sobe até o pico na
-          // semana 5 (bulking peak) e cai até o flush — NÃO é monotônica.
-          const FLORA_EC: Record<number, number> = {
-            1: 1.7, 2: 1.9, 3: 2.1, 4: 2.3, 5: 2.5,
-            6: 2.3, 7: 2.1, 8: 1.7, 9: 0.4, 10: 0.4,
-          };
+          // EC alvo Kroma (@kromafarms) — planilha do João. Flora em 3 blocos:
+          // 1–3 = 2,67 · 4–7 = 2,28 · finalização (8+) = 2,00. Vega = 2,49.
           let defaultEC: number;
           if (input.phase === "vega") {
-            defaultEC = Math.min(1.0 + (input.weekNumber - 1) * 0.2, 2.0); // Vega: 1.0 a 2.0
+            defaultEC = 2.49;
           } else {
-            const w = Math.min(Math.max(input.weekNumber, 1), 10);
-            defaultEC = FLORA_EC[w] ?? 2.5;
+            const w = Math.max(input.weekNumber, 1);
+            defaultEC = w <= 3 ? 2.67 : w <= 7 ? 2.28 : 2.00;
           }
 
           return {
-            targetEC: defaultEC.toFixed(1),
+            targetEC: defaultEC.toFixed(2),
             phase: phaseUpper,
             weekNumber: input.weekNumber,
           };
