@@ -62,91 +62,48 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
     { name: "Sulfato de Magnésio",          gPerLiter: 0.2,  npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
   ];
   if (phase === "VEGA") {
-    const m = 0.7 + (Math.min(week, 4) / 4) * 0.3;
+    // Receita Vega Kroma (@kromafarms) — planilha do João. Receita única.
     return [
-      { name: "Nitrato de Cálcio",           gPerLiter: 0.9  * m, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-      { name: "Nitrato de Potássio",          gPerLiter: 0.4  * m, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.19 * m, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-      { name: "Sulfato de Magnésio",          gPerLiter: 0.64 * m, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-      { name: "Micronutrientes",              gPerLiter: 0.05 * m, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
+      { name: "Nitrato de Cálcio",           gPerLiter: 1.12, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+      { name: "Nitrato de Potássio",          gPerLiter: 0.50, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.24, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "Sulfato de Magnésio",          gPerLiter: 0.80, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+      { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
     ];
   }
   if (phase === "FLORA") {
-    // Curva de EC por semana de floração — baseada no relatório técnico do João.
-    // Semanas 5–8 são as receitas validadas por ele; 1–4 foram interpoladas para
-    // atingir os alvos de EC do relatório (curva sobe até o pico na semana 5);
-    // 9–10 = flush (só água). O MKP é o motor da flora: sobe até 1,0 g/L na
-    // semana 5 (pico de bulking) e cai semana a semana. Sem Óxido de Cálcio —
-    // na finalização basta reduzir o Nitrato de Cálcio (óxido é cáustico/pico pH).
-    const w = Math.min(Math.max(week, 1), 10);
-    if (w >= 9) return []; // s9–s10: flush — água pura
-    const FLORA: Record<number, Array<{ name: string; gPerLiter: number; npk: string; ca: number; mg: number; fe: number; s: number }>> = {
-      // s1 — Transição (EC ~1,7): ainda com N razoável, PK iniciando
-      1: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.55, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-        { name: "Nitrato de Potássio",          gPerLiter: 0.45, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.35, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "Sulfato de Magnésio",          gPerLiter: 0.45, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-        { name: "Micronutrientes",              gPerLiter: 0.05, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-      // s2 — Early flower (EC ~1,9): PK subindo, N caindo
-      2: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.50, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+    // Receitas Flora Kroma (@kromafarms) — planilha do João, fonte da verdade.
+    // 3 blocos: Flora 1–3 (stretch), Flora 4–7 (bulking) e Finalização.
+    // A semana selecionada carrega o bloco Kroma correspondente.
+    if (week <= 3) {
+      // Flora 1–3 (EC Kroma 2,67)
+      return [
+        { name: "Nitrato de Cálcio",           gPerLiter: 1.12, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
         { name: "Nitrato de Potássio",          gPerLiter: 0.50, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.55, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "Sulfato de Magnésio",          gPerLiter: 0.50, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-        { name: "Micronutrientes",              gPerLiter: 0.05, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-      // s3 — Stretch (EC ~2,1): pico de fósforo subindo, K crescendo
-      3: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.45, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-        { name: "Nitrato de Potássio",          gPerLiter: 0.55, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.75, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "Sulfato de Magnésio",          gPerLiter: 0.60, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-        { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-      // s4 — Início de bulking (EC ~2,3): PK dominante, N mínimo
-      4: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.40, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-        { name: "Nitrato de Potássio",          gPerLiter: 0.60, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.90, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "Sulfato de Magnésio",          gPerLiter: 0.65, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-        { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-      // s5 — Pico de bulking (EC ~2,5): P e K máximos [relatório §3.1]
-      5: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.35, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-        { name: "Nitrato de Potássio",          gPerLiter: 0.60, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 1.00, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.50, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
         { name: "Sulfato de Magnésio",          gPerLiter: 0.80, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
         { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-      // s6 — Swelling (EC ~2,3): manter PK, Mg crucial [relatório §3.2]
-      6: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.30, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-        { name: "Nitrato de Potássio",          gPerLiter: 0.55, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.90, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      ];
+    }
+    if (week <= 7) {
+      // Flora 4–7 (EC Kroma 2,28) — Nitrato de Cálcio em 0,70 (não reduzir!)
+      return [
+        { name: "Nitrato de Cálcio",           gPerLiter: 0.70, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+        { name: "Nitrato de Potássio",          gPerLiter: 0.50, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.50, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
         { name: "Sulfato de Magnésio",          gPerLiter: 0.80, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
         { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-      // s7 — Late flower (EC ~2,1): começar redução geral [relatório §3.3]
-      7: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.25, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-        { name: "Nitrato de Potássio",          gPerLiter: 0.50, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.80, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "Sulfato de Magnésio",          gPerLiter: 0.70, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-        { name: "Micronutrientes",              gPerLiter: 0.05, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-      // s8 — Ripening (EC ~1,7): PK caindo, preparar flush [relatório §3.4]
-      8: [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.20, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
-        { name: "Nitrato de Potássio",          gPerLiter: 0.40, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.60, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
-        { name: "Sulfato de Magnésio",          gPerLiter: 0.60, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
-        { name: "Micronutrientes",              gPerLiter: 0.04, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
-      ],
-    };
-    return FLORA[w] ?? FLORA[5];
+      ];
+    }
+    // Finalização (EC Kroma 2,00) — entra Óxido de Cálcio (receita Kroma)
+    return [
+      { name: "Nitrato de Cálcio",           gPerLiter: 0.15, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+      { name: "Óxido de Cálcio",             gPerLiter: 0.45, npk: "0-0-0",    ca: 71, mg: 0,  fe: 0, s: 0  },
+      { name: "Nitrato de Potássio",          gPerLiter: 0.55, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.55, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "Sulfato de Magnésio",          gPerLiter: 0.80, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+      { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
+    ];
   }
   if (phase === "MAINTENANCE") return [
     { name: "Nitrato de Cálcio",           gPerLiter: 0.5,  npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
@@ -490,41 +447,19 @@ function CompareTab() {
   );
 }
 
-// Alvo de EC por semana de floração (mS/cm) — curva do relatório técnico:
-// sobe até o pico na semana 5 (bulking peak) e cai até o flush. Reutilizado
-// pelo seletor, pela receita e pelo painel de alertas de EC.
-const FLORA_EC_TARGET: Record<number, { mid: number; min: number; max: number }> = {
-  1:  { mid: 1.7, min: 1.6, max: 1.8 },
-  2:  { mid: 1.9, min: 1.8, max: 2.0 },
-  3:  { mid: 2.1, min: 2.0, max: 2.2 },
-  4:  { mid: 2.3, min: 2.2, max: 2.4 },
-  5:  { mid: 2.5, min: 2.4, max: 2.6 },
-  6:  { mid: 2.3, min: 2.2, max: 2.4 },
-  7:  { mid: 2.1, min: 2.0, max: 2.2 },
-  8:  { mid: 1.7, min: 1.6, max: 1.8 },
-  9:  { mid: 0.4, min: 0.0, max: 0.5 },
-  10: { mid: 0.4, min: 0.0, max: 0.5 },
-};
-
-function floraTarget(week: number) {
-  return FLORA_EC_TARGET[Math.min(Math.max(week, 1), 10)];
+// Alvo de EC por bloco de flora Kroma (mS/cm) — direto da planilha do João.
+// 3 blocos: Flora 1–3 (2,67), Flora 4–7 (2,28), Finalização (2,00).
+// Reutilizado pelo seletor, pela receita e pelo painel de alertas de EC.
+function floraTarget(week: number): { mid: number; min: number; max: number } {
+  if (week <= 3) return { mid: 2.67, min: 2.5, max: 2.8 };
+  if (week <= 7) return { mid: 2.28, min: 2.1, max: 2.4 };
+  return { mid: 2.00, min: 1.8, max: 2.1 };
 }
 
 function getFloraSubphase(week: number): { label: string; ecTarget: string } {
-  const w = Math.min(Math.max(week, 1), 10);
-  const t = FLORA_EC_TARGET[w];
-  const label =
-    w === 1 ? "Transição" :
-    w === 2 ? "Early Flower" :
-    w === 3 ? "Stretch" :
-    w === 4 ? "Bulking" :
-    w === 5 ? "Bulking Peak" :
-    w === 6 ? "Swelling" :
-    w === 7 ? "Late Flower" :
-    w === 8 ? "Ripening" :
-              "Flush";
-  const ecTarget = w >= 9 ? "< 0,5 EC" : `${t.min.toFixed(1)}–${t.max.toFixed(1)} EC`;
-  return { label, ecTarget };
+  if (week <= 3) return { label: "Flora 1–3 (Stretch)", ecTarget: "EC 2,67" };
+  if (week <= 7) return { label: "Flora 4–7 (Bulking)", ecTarget: "EC 2,28" };
+  return { label: "Finalização", ecTarget: "EC 2,00" };
 }
 
 export default function Nutrients() {
@@ -579,18 +514,18 @@ export default function Nutrients() {
   const products = getProductsByPhaseWeek(phase, week);
   const calculatedProducts = products.map(p => ({ ...p, totalG: p.gPerLiter * volumeL }));
 
-  // EC estimado — modelo linear empírico: a condutividade real em solução é
-  // ~proporcional à massa total de sais por litro. Fator 0,91 calibrado contra
-  // os alvos do relatório (ex: receita s5 = 2,81 g/L → EC 2,56 ≈ alvo 2,5).
-  // Reproduz a curva inteira do relatório (s5→s8: 2,56 / 2,38 / 2,09 / 1,67).
+  // EC de referência — vem direto da planilha Kroma (não é recalculado do zero).
+  // Cada bloco de receita Kroma tem seu EC medido. Fases sem receita Kroma
+  // (Clonagem/Manutenção) caem no modelo linear (Σg/L × 0,91) como fallback.
   const calculateEC = () => {
+    if (phase === "VEGA") return 2.49;
+    if (phase === "FLORA") return week <= 3 ? 2.67 : week <= 7 ? 2.28 : 2.00;
     const totalGPerL = products.reduce((sum, p) => sum + p.gPerLiter, 0);
     return Math.round(totalGPerL * 0.91 * 100) / 100;
   };
 
   const ecEstimated = calculateEC();
-  // PPM com fator 500 (escala Hanna/EUA — padrão em medidores de cannabis,
-  // conforme §4.3 do relatório: EC 2,5 → ~1250 ppm).
+  // PPM com fator 500 (igual à planilha Kroma: ppm = EC/2 × 1000 = EC × 500).
   const ppmApprox = Math.round(ecEstimated * 500);
 
   // EC medido (opcional) — parse seguro
@@ -599,48 +534,24 @@ export default function Nutrients() {
     return !isNaN(n) && n > 0 ? n : null;
   })();
 
-  // ── Alertas de EC (seção 5 do relatório) ──────────────────────────────────
-  // Compara o EC de referência (medido se houver, senão o calculado) com o alvo
-  // da semana de flora. Só roda em FLORA, fase onde a curva de EC é definida.
+  // ── Alertas de EC ─────────────────────────────────────────────────────────
+  // Compara o EC medido (se informado) com o alvo Kroma do bloco de flora.
+  // Só roda em FLORA, onde os alvos Kroma estão definidos.
   type EcAlert = { sev: "high" | "warn" | "info"; msg: string };
   const ecAlerts: EcAlert[] = (() => {
-    if (phase !== "FLORA") return [];
+    if (phase !== "FLORA" || ecMeasured === null) return [];
     const t = floraTarget(week);
     const alerts: EcAlert[] = [];
-    const ref = ecMeasured ?? ecEstimated;
 
-    // EC-003: calculado vs medido divergem > 20%
-    if (ecMeasured !== null && ecEstimated > 0 &&
-        Math.abs(ecMeasured - ecEstimated) / ecEstimated > 0.2) {
-      alerts.push({ sev: "warn",
-        msg: `EC medido (${ecMeasured.toFixed(2)}) difere do calculado (${ecEstimated.toFixed(2)}). Confira a calibragem do medidor ou a pesagem dos sais.` });
-    }
-
-    if (week >= 9) {
-      // Flush — EC deve estar baixo
-      if (ref > 0.8) alerts.push({ sev: "warn",
-        msg: `Flush: EC ${ref.toFixed(2)} ainda alto. O alvo é < 0,5 (água pura) para limpar os nutrientes.` });
-      return alerts;
-    }
-
-    // EC-001 / EC-002: fora da faixa do alvo da semana
-    if (ref < t.mid * 0.8) {
+    if (ecMeasured < t.mid * 0.8) {
       alerts.push({ sev: "high",
-        msg: `EC ${ref.toFixed(2)} baixo para a semana ${week} (alvo ${t.min.toFixed(1)}–${t.max.toFixed(1)}). Buds podem não engordar — considere +10g de MKP.` });
-    } else if (ref > t.mid * 1.2) {
+        msg: `EC medido ${ecMeasured.toFixed(2)} baixo para a fase (alvo Kroma ${t.mid.toFixed(2)}). Reforce a receita.` });
+    } else if (ecMeasured > t.mid * 1.2) {
       alerts.push({ sev: "high",
-        msg: `EC ${ref.toFixed(2)} alto para a semana ${week} (alvo ${t.min.toFixed(1)}–${t.max.toFixed(1)}). Risco de queimadura — dilua ~20% ou reduza o Nitrato de Cálcio.` });
-    }
-
-    // FASE-001: semana 5 é o pico de bulking
-    if (week === 5 && ref < 2.0) {
-      alerts.push({ sev: "warn",
-        msg: "Semana 5 é o pico de bulking. EC abaixo de 2,0 pode limitar o tamanho dos buds." });
-    }
-    // FASE-002: reta final com EC ainda alto
-    if (week >= 7 && week <= 8 && ref > 2.2) {
-      alerts.push({ sev: "warn",
-        msg: "Colheita se aproxima — comece a reduzir o EC. Nutrientes em excesso prejudicam sabor e queima." });
+        msg: `EC medido ${ecMeasured.toFixed(2)} alto para a fase (alvo Kroma ${t.mid.toFixed(2)}). Risco de queimadura — dilua a solução.` });
+    } else {
+      alerts.push({ sev: "info",
+        msg: `EC medido ${ecMeasured.toFixed(2)} dentro da faixa do alvo Kroma (${t.mid.toFixed(2)}).` });
     }
 
     return alerts;
@@ -800,10 +711,7 @@ export default function Nutrients() {
                     <Select value={week.toString()} onValueChange={(v) => setWeek(Number(v))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {(phase === "FLORA"
-                          ? [1,2,3,4,5,6,7,8,9,10]
-                          : [1,2,3,4,5,6,7,8]
-                        ).map(w => (
+                        {[1,2,3,4,5,6,7,8].map(w => (
                           <SelectItem key={w} value={w.toString()}>
                             Semana {w}{phase === "FLORA" ? ` — ${getFloraSubphase(w).label}` : ""}
                           </SelectItem>
@@ -930,20 +838,12 @@ export default function Nutrients() {
                   </div>
                 )}
 
-                {/* Nota de Finalização / Flush */}
-                {phase === "FLORA" && week === 8 && (
+                {/* Nota de Finalização (Kroma) */}
+                {phase === "FLORA" && week >= 8 && (
                   <div className="rounded-xl border border-amber-400/30 bg-amber-500/8 px-3 py-2.5 flex items-start gap-2">
                     <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-200/80 leading-snug">
-                      <span className="font-semibold text-amber-300">Ripening:</span> PK caindo, preparando o flush. Cheque os tricomas — se ~70% leitosos, inicie o flush (semana 9). Strains de flora longa (sativa) podem manter esta receita por mais 1–2 semanas.
-                    </p>
-                  </div>
-                )}
-                {phase === "FLORA" && week >= 9 && (
-                  <div className="rounded-xl border border-sky-400/30 bg-sky-500/8 px-3 py-2.5 flex items-start gap-2">
-                    <Droplets className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-sky-200/80 leading-snug">
-                      <span className="font-semibold text-sky-300">Flush:</span> Só água pura (EC &lt; 0,5) para limpar os nutrientes e suavizar o sabor. Opcional: 1/4 de dose ou um leve Sulfato de Magnésio (0,2 g/L). Sativas de flora longa podem ainda estar em flora — nesse caso use a receita da semana 7.
+                      <span className="font-semibold text-amber-300">Finalização:</span> Receita Kroma de finalização (EC 2,0) — entra o Óxido de Cálcio e o Nitrato de Cálcio cai. Cheque os tricomas para decidir o ponto de colheita / flush.
                     </p>
                   </div>
                 )}
