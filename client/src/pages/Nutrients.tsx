@@ -25,11 +25,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { CalcEyebrow, CalcRunning } from "@/components/ui/calc-helpers";
 import { PageTransition } from "@/components/PageTransition";
 
-type Phase = "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
+type Phase = "CLONING" | "VEGA" | "PRE_FLORA" | "FLORA" | "MAINTENANCE" | "DRYING";
 
 const PHASE_NAMES: Record<Phase, string> = {
   CLONING: "Clonagem",
   VEGA: "Vegetativa",
+  PRE_FLORA: "Pré-flora",
   FLORA: "Floração",
   MAINTENANCE: "Manutenção",
   DRYING: "Secagem",
@@ -38,6 +39,7 @@ const PHASE_NAMES: Record<Phase, string> = {
 const PHASE_ICONS: Record<Phase, React.ReactElement> = {
   CLONING: <Sprout className="w-4 h-4 text-green-400 inline"/>,
   VEGA: <Leaf className="w-4 h-4 text-emerald-400 inline"/>,
+  PRE_FLORA: <Flower2 className="w-4 h-4 text-fuchsia-300 inline"/>,
   FLORA: <Flower2 className="w-4 h-4 text-purple-400 inline"/>,
   MAINTENANCE: <Wrench className="w-4 h-4 text-blue-400 inline"/>,
   DRYING: <Wind className="w-4 h-4 text-amber-400 inline"/>,
@@ -67,6 +69,17 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
       { name: "Nitrato de Cálcio",           gPerLiter: 1.12, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
       { name: "Nitrato de Potássio",          gPerLiter: 0.50, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
       { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.24, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "Sulfato de Magnésio",          gPerLiter: 0.80, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
+      { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
+    ];
+  }
+  if (phase === "PRE_FLORA") {
+    // Pré-flora = transição Vega → Flora. Receita intermediária pra não estressar:
+    // só o MKP sobe pela metade (0,24 → 0,37 → 0,50), Ca/Mg/micros iguais. EC ~2,58.
+    return [
+      { name: "Nitrato de Cálcio",           gPerLiter: 1.12, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+      { name: "Nitrato de Potássio",          gPerLiter: 0.50, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
+      { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.37, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
       { name: "Sulfato de Magnésio",          gPerLiter: 0.80, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
       { name: "Micronutrientes",              gPerLiter: 0.06, npk: "0-0-0",    ca: 0,  mg: 0,  fe: 6, s: 0  },
     ];
@@ -113,6 +126,16 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
   ];
   return []; // DRYING — flush
 };
+
+// EC de referência da receita — vem da planilha Kroma (Vega/Pré-flora/Flora);
+// fases sem receita Kroma usam o modelo linear (Σg/L × 0,91) como fallback.
+function recipeEC(phase: Phase, week: number, products: { gPerLiter: number }[]): number {
+  if (phase === "VEGA") return 2.49;
+  if (phase === "PRE_FLORA") return 2.58;
+  if (phase === "FLORA") return week <= 3 ? 2.67 : week <= 7 ? 2.28 : 2.00;
+  const totalGPerL = products.reduce((s, p) => s + p.gPerLiter, 0);
+  return Math.round(totalGPerL * 0.91 * 100) / 100;
+}
 
 // ── Gera PNG da nota fiscal via Canvas API puro otimizado para 58mm ──
 function generateReceiptImage(
@@ -297,6 +320,7 @@ function RecipeSelector({ label, phase, week, onPhase, onWeek }: {
         <SelectContent>
           <SelectItem value="CLONING">Clonagem</SelectItem>
           <SelectItem value="VEGA">Vegetativa</SelectItem>
+          <SelectItem value="PRE_FLORA">Pré-flora</SelectItem>
           <SelectItem value="FLORA">Floração</SelectItem>
           <SelectItem value="MAINTENANCE">Manutenção</SelectItem>
           <SelectItem value="DRYING">Secagem</SelectItem>
@@ -417,17 +441,8 @@ function CompareTab() {
 
           {/* EC comparison */}
           {(() => {
-            const calcEC = (prods: typeof leftProds) => {
-              let ppm = 0;
-              prods.forEach(p => {
-                const [n, ph, k] = p.npk.split("-").map(Number);
-                ppm += ((n + ph + k) / 100) * p.gPerLiter * 1000;
-                ppm += (p.ca / 100) * p.gPerLiter * 1000;
-                ppm += (p.mg / 100) * p.gPerLiter * 1000;
-              });
-              return Math.round((ppm / 700) * 100) / 100;
-            };
-            const ecL = calcEC(leftProds), ecR = calcEC(rightProds);
+            const ecL = recipeEC(leftPhase, leftWeek, leftProds);
+            const ecR = recipeEC(rightPhase, rightWeek, rightProds);
             return (
               <div className="mx-4 mt-3 grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 px-3 py-2 text-center">
@@ -487,13 +502,21 @@ export default function Nutrients() {
     const cycle = activeCycles.find((c: any) => c.tentId === tentIdNum) ?? activeCycles[0];
     if (!cycle) return;
 
-    // Detectar fase
-    const detectedPhase: Phase = cycle.floraStartDate ? "FLORA" : "VEGA";
+    // Detectar fase (flora > pré-flora > vega)
+    const detectedPhase: Phase = cycle.floraStartDate
+      ? "FLORA"
+      : cycle.preFloraStartDate
+      ? "PRE_FLORA"
+      : "VEGA";
     setPhase(detectedPhase);
 
-    // Calcular semana atual
+    // Calcular semana atual (a partir da data da fase detectada)
     const now = new Date();
-    const refDate = cycle.floraStartDate ? new Date(cycle.floraStartDate) : new Date(cycle.startDate);
+    const refDate = cycle.floraStartDate
+      ? new Date(cycle.floraStartDate)
+      : cycle.preFloraStartDate
+      ? new Date(cycle.preFloraStartDate)
+      : new Date(cycle.startDate);
     if (!isNaN(refDate.getTime())) {
       const weeks = Math.max(1, Math.floor((now.getTime() - refDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
       setWeek(weeks);
@@ -514,17 +537,8 @@ export default function Nutrients() {
   const products = getProductsByPhaseWeek(phase, week);
   const calculatedProducts = products.map(p => ({ ...p, totalG: p.gPerLiter * volumeL }));
 
-  // EC de referência — vem direto da planilha Kroma (não é recalculado do zero).
-  // Cada bloco de receita Kroma tem seu EC medido. Fases sem receita Kroma
-  // (Clonagem/Manutenção) caem no modelo linear (Σg/L × 0,91) como fallback.
-  const calculateEC = () => {
-    if (phase === "VEGA") return 2.49;
-    if (phase === "FLORA") return week <= 3 ? 2.67 : week <= 7 ? 2.28 : 2.00;
-    const totalGPerL = products.reduce((sum, p) => sum + p.gPerLiter, 0);
-    return Math.round(totalGPerL * 0.91 * 100) / 100;
-  };
-
-  const ecEstimated = calculateEC();
+  // EC de referência — Kroma (ver recipeEC). Não recalcula do zero.
+  const ecEstimated = recipeEC(phase, week, products);
   // PPM com fator 500 (igual à planilha Kroma: ppm = EC/2 × 1000 = EC × 500).
   const ppmApprox = Math.round(ecEstimated * 500);
 
@@ -700,6 +714,7 @@ export default function Nutrients() {
                       <SelectContent>
                         <SelectItem value="CLONING"><span className="flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-green-400"/>Clonagem</span></SelectItem>
                         <SelectItem value="VEGA"><span className="flex items-center gap-1"><Leaf className="w-3.5 h-3.5 text-emerald-400"/>Vegetativa</span></SelectItem>
+                        <SelectItem value="PRE_FLORA"><span className="flex items-center gap-1"><Flower2 className="w-3.5 h-3.5 text-fuchsia-300"/>Pré-flora</span></SelectItem>
                         <SelectItem value="FLORA"><span className="flex items-center gap-1"><Flower2 className="w-3.5 h-3.5 text-purple-400"/>Floração</span></SelectItem>
                         <SelectItem value="MAINTENANCE"><span className="flex items-center gap-1"><Wrench className="w-3.5 h-3.5 text-blue-400"/>Manutenção</span></SelectItem>
                         <SelectItem value="DRYING"><span className="flex items-center gap-1"><Wind className="w-3.5 h-3.5 text-amber-400"/>Secagem</span></SelectItem>

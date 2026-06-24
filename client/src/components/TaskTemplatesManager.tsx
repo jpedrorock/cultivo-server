@@ -15,7 +15,7 @@ import { Plus, Edit, Trash2, Loader2, Search, ListChecks, Sprout } from "lucide-
 import { toast } from "sonner";
 import { ORGANIC_TASK_LIBRARY } from "@/components/onboarding/organicTaskLibrary";
 
-type Phase = "CLONING" | "VEGA" | "FLORA" | "MAINTENANCE" | "DRYING";
+type Phase = "CLONING" | "VEGA" | "PRE_FLORA" | "FLORA" | "MAINTENANCE" | "DRYING";
 type Context = "TENT_A" | "TENT_BC";
 
 // O context é derivado automaticamente da fase — o usuário não precisa escolher
@@ -36,6 +36,7 @@ interface TaskTemplate {
 const PHASE_LABELS: Record<Phase, string> = {
   CLONING: "Clonagem",
   VEGA: "Vegetativo",
+  PRE_FLORA: "Pré-flora",
   FLORA: "Floração",
   MAINTENANCE: "Manutenção",
   DRYING: "Secagem",
@@ -44,6 +45,7 @@ const PHASE_LABELS: Record<Phase, string> = {
 const PHASE_COLORS: Record<Phase, string> = {
   CLONING: "bg-blue-500/10 text-blue-700 border-blue-200",
   VEGA: "bg-green-500/10 text-green-700 border-green-200",
+  PRE_FLORA: "bg-fuchsia-500/10 text-fuchsia-700 border-fuchsia-200",
   FLORA: "bg-purple-500/10 text-purple-700 border-purple-200",
   MAINTENANCE: "bg-amber-500/10 text-amber-700 border-amber-200",
   DRYING: "bg-orange-500/10 text-orange-700 border-orange-200",

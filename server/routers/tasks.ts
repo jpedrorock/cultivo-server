@@ -498,7 +498,7 @@ export const taskTemplatesRouter = router({
         z.object({
           title: z.string().min(1),
           description: z.string().max(2000).optional(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })
@@ -525,7 +525,7 @@ export const taskTemplatesRouter = router({
           id: z.number(),
           title: z.string().min(1),
           description: z.string().max(2000).optional(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]),
           context: z.enum(["TENT_A", "TENT_BC"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
         })

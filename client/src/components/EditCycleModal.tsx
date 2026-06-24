@@ -46,7 +46,7 @@ export function EditCycleModal({
   const [startDate, setStartDate] = useState(
     currentStartDate.toISOString().split("T")[0]
   );
-  const [phase, setPhase] = useState<"CLONING" | "MAINTENANCE" | "VEGA" | "FLORA" | "DRYING">("VEGA");
+  const [phase, setPhase] = useState<"CLONING" | "MAINTENANCE" | "VEGA" | "PRE_FLORA" | "FLORA" | "DRYING">("VEGA");
   const [weekNumber, setWeekNumber] = useState(1);
   const [strainId, setStrainId] = useState<number | null>(null);
   const [motherPlantId, setMotherPlantId] = useState<number | null>(null);
@@ -135,6 +135,8 @@ export function EditCycleModal({
         return 1;
       case "VEGA":
         return 6;
+      case "PRE_FLORA":
+        return 2;
       case "FLORA":
         return 8;
       case "DRYING":
@@ -194,6 +196,7 @@ export function EditCycleModal({
                   <SelectItem value="CLONING">Clonagem</SelectItem>
                   <SelectItem value="MAINTENANCE">Manutenção</SelectItem>
                   <SelectItem value="VEGA">Vegetativa</SelectItem>
+                  <SelectItem value="PRE_FLORA">Pré-flora</SelectItem>
                   <SelectItem value="FLORA">Floração</SelectItem>
                   <SelectItem value="DRYING"><span className="flex items-center gap-1"><Wind className="w-3 h-3 text-amber-500"/>Secagem (2 semanas)</span></SelectItem>
                 </SelectContent>
