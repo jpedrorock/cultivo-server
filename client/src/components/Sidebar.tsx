@@ -38,19 +38,36 @@ function UserAvatar({ name, email }: { name: string | null; email: string }) {
 
 // ─── Nav data ────────────────────────────────────────────────────────────────
 
-const PRIMARY_NAV = [
-  { href: "/",        icon: TentIcon,     label: "Estufas",   isAlerts: false },
-  { href: "/plants",  icon: Sprout,       label: "Plantas",   isAlerts: false },
-  { href: "/alerts",  icon: Bell,         label: "Alertas",   isAlerts: true  },
-  { href: "/tarefas", icon: CheckSquare,  label: "Tarefas",   isAlerts: false },
-];
-
-const SECONDARY_NAV = [
-  { href: "/smartlife",      icon: Wifi,       label: "SmartLife"          },
-  { href: "/calculators",    icon: Calculator, label: "Calculadoras"       },
-  { href: "/manage-strains", icon: Leaf,       label: "Strains"            },
-  { href: "/harvest-queue",  icon: Wind,       label: "Aguardando Secagem" },
-  { href: "/chat",           icon: Bot,        label: "Doctor Jáh"    },
+// Nav agrupado por contexto (proposta #1 do audit de UX) — o usuário entende
+// "o que faço todo dia" (Monitoramento) vs "ferramentas" vs "cultivo".
+const NAV_GROUPS: {
+  label: string;
+  items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; isAlerts?: boolean }[];
+}[] = [
+  {
+    label: "Monitoramento",
+    items: [
+      { href: "/",        icon: TentIcon,    label: "Estufas",  isAlerts: false },
+      { href: "/plants",  icon: Sprout,      label: "Plantas",  isAlerts: false },
+      { href: "/alerts",  icon: Bell,        label: "Alertas",  isAlerts: true  },
+      { href: "/tarefas", icon: CheckSquare, label: "Tarefas",  isAlerts: false },
+    ],
+  },
+  {
+    label: "Ferramentas",
+    items: [
+      { href: "/calculators", icon: Calculator, label: "Calculadoras" },
+      { href: "/chat",        icon: Bot,        label: "Doctor Jáh"   },
+      { href: "/smartlife",   icon: Wifi,       label: "SmartLife"    },
+    ],
+  },
+  {
+    label: "Cultivo",
+    items: [
+      { href: "/manage-strains", icon: Leaf, label: "Strains"            },
+      { href: "/harvest-queue",  icon: Wind, label: "Aguardando Secagem" },
+    ],
+  },
 ];
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
@@ -250,27 +267,31 @@ export function Sidebar() {
 
         {/* ── Nav ── */}
         <nav className={cn("flex-1 py-3 space-y-0.5 overflow-y-auto", isIconOnly ? "px-2" : "px-3")}>
-          {PRIMARY_NAV.map((item) => (
-            <NavLink
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              label={item.label}
-              badge={item.isAlerts ? (alertCount || 0) : 0}
-              isAlerts={item.isAlerts}
-            />
-          ))}
-
-          <div className="my-2 mx-1 border-t border-sidebar-border/60" />
-
-          {SECONDARY_NAV.map((item) => (
-            <NavLink
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              label={item.label}
-              badge={item.href === "/harvest-queue" ? (harvestQueueCount || 0) : 0}
-            />
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={group.label} className="space-y-0.5">
+              {isIconOnly
+                ? gi > 0 && <div className="my-2 mx-1 border-t border-sidebar-border/60" />
+                : (
+                  <p className={cn(
+                    "px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40",
+                    gi > 0 ? "pt-3" : "pt-1"
+                  )}>
+                    {group.label}
+                  </p>
+                )}
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  badge={item.isAlerts
+                    ? (alertCount || 0)
+                    : item.href === "/harvest-queue" ? (harvestQueueCount || 0) : 0}
+                  isAlerts={item.isAlerts}
+                />
+              ))}
+            </div>
           ))}
         </nav>
 
