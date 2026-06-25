@@ -3,9 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Bell, BellOff, Check, Smartphone, Wifi } from "lucide-react";
+import { Bell, BellOff, Check, Smartphone, Wifi, Share, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { isIOS, isPWAStandalone, isNative } from "@/lib/platform";
 
 const LS_KEY = "notificationSettings";
 import {
@@ -206,6 +207,38 @@ export default function NotificationSettings() {
           subtitle="Configure lembretes e alertas para não perder nenhum registro ou problema nas estufas"
         />
         <div className="container py-8 pb-28 sm:pb-8 space-y-6">
+
+      {/* iOS 16.4+: push só funciona com o PWA na Tela de Início (standalone).
+          Em Safari aba normal, guia o usuário a instalar ANTES de tentar (T31). */}
+      {isIOS() && !isPWAStandalone() && !isNative() && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
+              <Smartphone className="w-5 h-5" />
+              Ative as notificações no iPhone
+            </CardTitle>
+            <CardDescription className="text-blue-700 dark:text-blue-300">
+              No iPhone, as notificações só funcionam com o app <strong>adicionado à Tela de Início</strong> (exigência do iOS 16.4+). Leva 10 segundos:
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+              <li className="flex items-center gap-2">
+                <span className="font-bold">1.</span>
+                <span>Toque em <Share className="inline w-4 h-4 mx-0.5" /> <strong>Compartilhar</strong> na barra do Safari</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="font-bold">2.</span>
+                <span>Escolha <Plus className="inline w-4 h-4 mx-0.5" /> <strong>Adicionar à Tela de Início</strong></span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="font-bold">3.</span>
+                <span>Abra o app pelo ícone novo e volte aqui pra ativar</span>
+              </li>
+            </ol>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status de Permissão */}
       <Card>
