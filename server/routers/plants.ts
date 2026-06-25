@@ -1653,6 +1653,19 @@ export const plantTrichomesRouter = router({
         notes: z.string().optional(),
         photoUrl: z.string().optional(),  // URL ou caminho relativo da foto enviada via /api/upload/image
         photoBase64: z.string().optional(),     // Legado: base64 (compatibilidade)
+      }).superRefine((data, ctx) => {
+        // Quando os 3 percentuais são informados, devem somar ~100% (tolerância 1).
+        const { clearPercent: c, cloudyPercent: m, amberPercent: a } = data;
+        if (c != null && m != null && a != null) {
+          const sum = c + m + a;
+          if (Math.abs(sum - 100) > 1) {
+            ctx.addIssue({
+              code: "custom",
+              message: `A soma dos tricomas (clear+cloudy+amber) deve ser 100% — recebido ${sum}%.`,
+              path: ["amberPercent"],
+            });
+          }
+        }
       }))
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
