@@ -8,6 +8,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerAppleAuthRoutes } from "./appleAuthRoutes";
 import { registerDeviceRoutes } from "./deviceRoutes";
+import { registerWebhookRoutes } from "./webhookRoutes";
 import { registerWaitlistRoutes } from "./waitlistRoutes";
 import { registerLegalRoutes } from "./legalRoutes";
 import { registerSiteSettingsRoutes } from "./siteSettingsRoutes";
@@ -242,6 +243,9 @@ async function startServer() {
 
   // Rotas REST p/ ESP32 display (X-Device-Token auth, sem JWT)
   registerDeviceRoutes(app);
+
+  // Webhooks externos (RevenueCat → sincroniza users.plan)
+  registerWebhookRoutes(app);
 
   // Captura de email do site público cultivo.pro (POST /api/waitlist)
   registerWaitlistRoutes(app);
