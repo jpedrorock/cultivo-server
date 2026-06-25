@@ -1312,7 +1312,9 @@ export default function TentDetails() {
   const { data: cycle } = trpc.cycles.getByTent.useQuery({ tentId });
 
   // Fase e semana atuais para buscar targets
-  const currentPhase = cycle ? (cycle.floraStartDate ? "FLORA" : "VEGA") : null;
+  const currentPhase = cycle
+    ? (cycle.floraStartDate ? "FLORA" : cycle.preFloraStartDate ? "PRE_FLORA" : "VEGA")
+    : null;
   const currentWeek = cycle ? (() => {
     const now = new Date();
     const start = new Date(cycle.startDate);
@@ -1320,6 +1322,10 @@ export default function TentDetails() {
     const floraStart = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
     if (floraStart && !isNaN(floraStart.getTime()) && now >= floraStart) {
       return Math.max(1, Math.floor((now.getTime() - floraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
+    }
+    const preFloraStart = cycle.preFloraStartDate ? new Date(cycle.preFloraStartDate) : null;
+    if (preFloraStart && !isNaN(preFloraStart.getTime()) && now >= preFloraStart) {
+      return Math.max(1, Math.floor((now.getTime() - preFloraStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
     }
     return Math.max(1, Math.floor((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1);
   })() : null;
@@ -1384,7 +1390,7 @@ export default function TentDetails() {
 
   const getPhaseInfo = () => {
     if (!cycle) return { phase: "Inativo", badgeStyle: {} as React.CSSProperties };
-    const phase = resolvePhase(tent.category, cycle.floraStartDate, true);
+    const phase = resolvePhase(tent.category, cycle.floraStartDate, true, cycle.preFloraStartDate);
     return {
       phase: PHASE_LABELS[phase],
       badgeStyle: {
@@ -1396,7 +1402,7 @@ export default function TentDetails() {
 
   const phaseInfo = getPhaseInfo();
   // Fase resolvida como enum value — usada para o phase-aware tint
-  const resolvedPhase = cycle ? resolvePhase(tent.category, cycle.floraStartDate, true) : null;
+  const resolvedPhase = cycle ? resolvePhase(tent.category, cycle.floraStartDate, true, cycle.preFloraStartDate) : null;
 
   const handlePrint = () => {
     const phase = getPhaseInfo().phase;
@@ -1754,7 +1760,7 @@ export default function TentDetails() {
                   <div className="flex items-center gap-1 mt-0.5">
                     <Calendar className="w-3 h-3 text-primary/60 shrink-0" />
                     <span className="text-xs font-semibold text-primary/80">
-                      Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : "Vega"}
+                      Sem {currentWeek} de {currentPhase === "FLORA" ? "Flora" : currentPhase === "PRE_FLORA" ? "Pré-flora" : "Vega"}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       · início {format(new Date(cycle.startDate), "dd/MM", { locale: ptBR })}
@@ -1942,7 +1948,7 @@ export default function TentDetails() {
                   onOpenChange={setPromotePhaseOpen}
                   cycleId={cycle.id}
                   tentId={tentId}
-                  currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
+                  currentPhase={cycle.floraStartDate ? "FLORA" : cycle.preFloraStartDate ? "PRE_FLORA" : "VEGA"}
                   currentTentName={tent.name}
                 />
                 <MoveToHarvestQueueDialog

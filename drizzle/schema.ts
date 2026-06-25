@@ -138,6 +138,7 @@ export const cycles = mysqlTable(
       .references(() => strains.id, { onDelete: "set null" }), // Opcional: ciclo pode ter múltiplas strains via plantas individuais
     startDate: timestamp("startDate").notNull(),
     cloningStartDate: timestamp("cloningStartDate"),
+    preFloraStartDate: timestamp("preFloraStartDate"), // Início da pré-flora (stretch pós-flip, ~2 semanas antes da flora)
     floraStartDate: timestamp("floraStartDate"),
     motherPlantId: int("motherPlantId")
       .references(() => plants.id, { onDelete: "set null" }), // Planta-mãe usada para clonagem (quando fase = CLONING)
@@ -208,7 +209,7 @@ export const weeklyTargets = mysqlTable(
     strainId: int("strainId")
       .notNull()
       .references(() => strains.id, { onDelete: "cascade" }),
-    phase: mysqlEnum("phase", ["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
+    phase: mysqlEnum("phase", ["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
     weekNumber: int("weekNumber").notNull(),
     tempMin: decimal("tempMin", { precision: 4, scale: 1 }),
     tempMax: decimal("tempMax", { precision: 4, scale: 1 }),
@@ -309,7 +310,7 @@ export type InsertRecipe = typeof recipes.$inferInsert;
 export const recipeTemplates = mysqlTable("recipeTemplates", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
-  phase: mysqlEnum("phase", ["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
+  phase: mysqlEnum("phase", ["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
   weekNumber: int("weekNumber"),
   volumeTotalL: decimal("volumeTotalL", { precision: 6, scale: 2 }),
   ecTarget: decimal("ecTarget", { precision: 4, scale: 2 }),
@@ -331,7 +332,7 @@ export type InsertRecipeTemplate = typeof recipeTemplates.$inferInsert;
 export const taskTemplates = mysqlTable("taskTemplates", {
   id: int("id").autoincrement().primaryKey(),
   context: mysqlEnum("context", ["TENT_A", "TENT_BC"]).notNull(),
-  phase: mysqlEnum("phase", ["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
+  phase: mysqlEnum("phase", ["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
   weekNumber: int("weekNumber"),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
@@ -434,7 +435,7 @@ export const safetyLimits = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     context: mysqlEnum("context", ["TENT_A", "TENT_BC"]).notNull(),
-    phase: mysqlEnum("phase", ["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
+    phase: mysqlEnum("phase", ["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
     metric: mysqlEnum("metric", ["TEMP", "RH", "PPFD", "PH"]).notNull(),
     minValue: decimal("minValue", { precision: 10, scale: 2 }),
     maxValue: decimal("maxValue", { precision: 10, scale: 2 }),
@@ -517,7 +518,7 @@ export type InsertAlertHistory = typeof alertHistory.$inferInsert;
  */
 export const phaseAlertMargins = mysqlTable("phaseAlertMargins", {
   id: int("id").autoincrement().primaryKey(),
-  phase: mysqlEnum("phase", ["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]).notNull().unique(),
+  phase: mysqlEnum("phase", ["MAINTENANCE", "CLONING", "VEGA", "PRE_FLORA", "FLORA", "DRYING"]).notNull().unique(),
   tempMargin: decimal("tempMargin", { precision: 3, scale: 1 }).notNull(), // ±°C
   rhMargin: decimal("rhMargin", { precision: 3, scale: 1 }).notNull(), // ±%
   ppfdMargin: int("ppfdMargin").notNull(), // ±PPFD
@@ -801,7 +802,7 @@ export const fertilizationPresets = mysqlTable("fertilizationPresets", {
   name: varchar("name", { length: 100 }).notNull(),
   waterVolume: decimal("waterVolume", { precision: 10, scale: 2 }).notNull(),
   targetEC: decimal("targetEC", { precision: 10, scale: 2 }).notNull(),
-  phase: mysqlEnum("phase", ["VEGA", "FLORA"]),
+  phase: mysqlEnum("phase", ["VEGA", "PRE_FLORA", "FLORA"]),
   weekNumber: int("weekNumber"),
   irrigationsPerWeek: decimal("irrigationsPerWeek", { precision: 10, scale: 1 }),
   calculationMode: mysqlEnum("calculationMode", ["per-irrigation", "per-week"]).notNull(),
@@ -822,7 +823,7 @@ export const wateringPresets = mysqlTable("wateringPresets", {
   plantCount: int("plantCount").notNull(),
   potSize: decimal("potSize", { precision: 10, scale: 1 }).notNull(),
   targetRunoff: decimal("targetRunoff", { precision: 10, scale: 1 }).notNull(),
-  phase: mysqlEnum("phase", ["VEGA", "FLORA"]),
+  phase: mysqlEnum("phase", ["VEGA", "PRE_FLORA", "FLORA"]),
   weekNumber: int("weekNumber"),
   groupId: int("groupId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -931,7 +932,7 @@ export const nutrientApplications = mysqlTable("nutrientApplications", {
   
   // Dados da receita aplicada (snapshot)
   recipeName: varchar("recipeName", { length: 100 }).notNull(),
-  phase: mysqlEnum("phase", ["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
+  phase: mysqlEnum("phase", ["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]).notNull(),
   weekNumber: int("weekNumber"),
   
   // Volume e targets

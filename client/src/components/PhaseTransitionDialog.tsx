@@ -27,7 +27,7 @@ interface PhaseTransitionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cycleId: number;
-  currentPhase: "MAINTENANCE" | "CLONING" | "VEGA" | "FLORA";
+  currentPhase: "MAINTENANCE" | "CLONING" | "VEGA" | "PRE_FLORA" | "FLORA";
   tentId: number;
   tentName: string;
 }
@@ -84,6 +84,20 @@ export function PhaseTransitionDialog({
     },
     onError: (error) => {
       toast.error(`Erro ao retornar para manutenção: ${error.message}`);
+    },
+  });
+
+  const transitionToPreFlora = trpc.cycles.transitionToPreFlora.useMutation({
+    onSuccess: () => {
+      toast.success("Pré-flora iniciada com sucesso!");
+      utils.cycles.getActiveCyclesWithProgress.invalidate();
+      utils.tents.list.invalidate();
+      utils.plants.list.invalidate();
+      onOpenChange(false);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao iniciar pré-flora: ${error.message}`);
     },
   });
 
@@ -156,6 +170,14 @@ export function PhaseTransitionDialog({
         });
         break;
 
+      case "PRE_FLORA":
+        transitionToPreFlora.mutate({
+          cycleId,
+          preFloraStartDate: new Date(transitionDate),
+          targetTentId: targetTent,
+        });
+        break;
+
       case "FLORA":
         transitionToFlora.mutate({
           cycleId,
@@ -210,12 +232,21 @@ export function PhaseTransitionDialog({
         };
       case "VEGA":
         return {
+          label: "Pré-flora",
+          value: "PRE_FLORA",
+          icon: Flower2,
+          color: "text-fuchsia-500",
+          bgColor: "bg-fuchsia-50 dark:bg-fuchsia-950/20",
+          description: "Flip 12/12 — inicia a pré-flora (stretch, ~2 semanas)",
+        };
+      case "PRE_FLORA":
+        return {
           label: "Floração",
           value: "FLORA",
           icon: Flower2,
           color: "text-purple-600",
           bgColor: "bg-purple-50 dark:bg-purple-950/20",
-          description: "Avançar para fase de floração (12/12)",
+          description: "Avançar da pré-flora para a floração plena",
         };
       case "FLORA":
         return {
@@ -241,6 +272,7 @@ export function PhaseTransitionDialog({
   const isLoading =
     transitionToCloning.isPending ||
     transitionToMaintenance.isPending ||
+    transitionToPreFlora.isPending ||
     transitionToFlora.isPending ||
     transitionToDrying.isPending;
 
@@ -274,7 +306,7 @@ export function PhaseTransitionDialog({
           </div>
 
           {/* Date Input (for CLONING, FLORA, DRYING) */}
-          {(currentPhase === "MAINTENANCE" || currentPhase === "VEGA" || currentPhase === "FLORA") && (
+          {(currentPhase === "MAINTENANCE" || currentPhase === "VEGA" || currentPhase === "PRE_FLORA" || currentPhase === "FLORA") && (
             <div className="space-y-2">
               <Label htmlFor="transitionDate">Data de Início</Label>
               <Input

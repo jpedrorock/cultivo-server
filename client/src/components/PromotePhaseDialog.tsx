@@ -26,9 +26,15 @@ interface PromotePhaseDialogProps {
   onOpenChange: (open: boolean) => void;
   cycleId: number;
   tentId: number;
-  currentPhase: "VEGA" | "FLORA";
+  currentPhase: "VEGA" | "PRE_FLORA" | "FLORA";
   currentTentName: string;
 }
+
+const PROMOTE_LABEL: Record<string, string> = {
+  PRE_FLORA: "Pré-flora",
+  FLORA: "Floração",
+  DRYING: "Secagem",
+};
 
 export function PromotePhaseDialog({
   open,
@@ -42,8 +48,12 @@ export function PromotePhaseDialog({
   const [selectedTentId, setSelectedTentId] = useState<string>("");
   const utils = trpc.useUtils();
 
-  // Determinar fase destino
-  const targetPhase = currentPhase === "VEGA" ? "FLORA" : "DRYING";
+  // Determinar fase destino (VEGA → Pré-flora → Flora → Secagem)
+  const targetPhase: "PRE_FLORA" | "FLORA" | "DRYING" =
+    currentPhase === "VEGA" ? "PRE_FLORA" : currentPhase === "PRE_FLORA" ? "FLORA" : "DRYING";
+  const currentPhaseLabel =
+    currentPhase === "VEGA" ? "Vegetativa" : currentPhase === "PRE_FLORA" ? "Pré-flora" : "Floração";
+  const targetPhaseLabel = PROMOTE_LABEL[targetPhase];
 
   // Buscar estufas disponíveis (sem ciclo ativo)
   const { data: allTents } = trpc.tents.list.useQuery();
@@ -95,10 +105,10 @@ export function PromotePhaseDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ArrowRight className="h-5 w-5 text-blue-500" />
-            Promover para {targetPhase === "FLORA" ? "Floração" : "Secagem"}
+            Promover para {targetPhaseLabel}
           </DialogTitle>
           <DialogDescription>
-            Avançar o ciclo de {currentPhase === "VEGA" ? "Vegetativa" : "Floração"} para {targetPhase === "FLORA" ? "Floração" : "Secagem"}
+            Avançar o ciclo de {currentPhaseLabel} para {targetPhaseLabel}
           </DialogDescription>
         </DialogHeader>
 
@@ -184,7 +194,7 @@ export function PromotePhaseDialog({
             {promotePhaseMutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Promover para {targetPhase === "FLORA" ? "Floração" : "Secagem"}
+            Promover para {targetPhaseLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

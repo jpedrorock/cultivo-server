@@ -40,6 +40,7 @@ export const cyclesRouter = router({
           tentId: cycles.tentId,
           tentGroupId: tents.groupId,
           startDate: cycles.startDate,
+          preFloraStartDate: cycles.preFloraStartDate,
           floraStartDate: cycles.floraStartDate,
           cloningStartDate: cycles.cloningStartDate,
         })
@@ -71,6 +72,7 @@ export const cyclesRouter = router({
           strainName: strains.name,
           startDate: cycles.startDate,
           cloningStartDate: cycles.cloningStartDate,
+          preFloraStartDate: cycles.preFloraStartDate,
           floraStartDate: cycles.floraStartDate,
           status: cycles.status,
           vegaWeeks: strains.vegaWeeks,
@@ -94,9 +96,11 @@ export const cyclesRouter = router({
         
         let currentWeek = 1;
         let totalWeeks = cycle.vegaWeeks || 4;
-        let phase: 'MAINTENANCE' | 'CLONING' | 'VEGA' | 'FLORA' = 'VEGA';
+        let phase: 'MAINTENANCE' | 'CLONING' | 'VEGA' | 'PRE_FLORA' | 'FLORA' = 'VEGA';
         let daysUntilHarvest = 0;
-        
+        const preFloraWeeks = 2; // duração de referência da pré-flora
+        const floraWeeks = cycle.floraWeeks || 8;
+
         // Detectar fase baseado nos campos de data
         if (cycle.tentCategory === 'MAINTENANCE') {
           // Ciclo de manutenção/clonagem
@@ -117,15 +121,24 @@ export const cyclesRouter = router({
           const floraStartDate = new Date(cycle.floraStartDate);
           const daysSinceFlora = Math.floor((now.getTime() - floraStartDate.getTime()) / (1000 * 60 * 60 * 24));
           currentWeek = Math.floor(daysSinceFlora / 7) + 1;
-          totalWeeks = cycle.floraWeeks || 8;
+          totalWeeks = floraWeeks;
           phase = 'FLORA';
           daysUntilHarvest = Math.max(0, (totalWeeks * 7) - daysSinceFlora);
+        } else if (cycle.preFloraStartDate) {
+          // Ciclo em pré-flora (stretch pós-flip)
+          const preFloraStartDate = new Date(cycle.preFloraStartDate);
+          const daysSincePreFlora = Math.floor((now.getTime() - preFloraStartDate.getTime()) / (1000 * 60 * 60 * 24));
+          currentWeek = Math.floor(daysSincePreFlora / 7) + 1;
+          totalWeeks = preFloraWeeks;
+          phase = 'PRE_FLORA';
+          // Harvest = restante da pré-flora + flora inteira
+          daysUntilHarvest = Math.max(0, (preFloraWeeks * 7) - daysSincePreFlora) + (floraWeeks * 7);
         } else {
           // Ciclo em vegetação
           currentWeek = Math.floor(daysSinceStart / 7) + 1;
           totalWeeks = cycle.vegaWeeks || 4;
           phase = 'VEGA';
-          daysUntilHarvest = ((cycle.vegaWeeks || 4) * 7) + ((cycle.floraWeeks || 8) * 7) - daysSinceStart;
+          daysUntilHarvest = ((cycle.vegaWeeks || 4) * 7) + (preFloraWeeks * 7) + (floraWeeks * 7) - daysSinceStart;
         }
         
         const progress = Math.min(100, (currentWeek / totalWeeks) * 100);
@@ -242,6 +255,57 @@ export const cyclesRouter = router({
           await applyPhaseTransitionLimits(cycle.tentId, "FLORA");
         }
         
+        return { success: true };
+      }),
+    transitionToPreFlora: protectedProcedure
+      .input(
+        z.object({
+          cycleId: z.number(),
+          preFloraStartDate: z.date(),
+          targetTentId: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) {
+          throw new Error("Banco de dados não inicializado. Execute 'pnpm db:push' para criar as tabelas.");
+        }
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+
+        const [cycle] = await database
+          .select()
+          .from(cycles)
+          .where(eq(cycles.id, input.cycleId));
+
+        if (!cycle) throw new Error("Ciclo não encontrado");
+        if (cycle.floraStartDate) throw new Error("Ciclo já está em floração");
+        if (cycle.preFloraStartDate) throw new Error("Ciclo já está em pré-flora");
+
+        await database
+          .update(cycles)
+          .set({ preFloraStartDate: input.preFloraStartDate })
+          .where(eq(cycles.id, input.cycleId));
+
+        // O flip pra 12/12 (ambiente de flora) acontece na pré-flora — por isso
+        // o move/recategorização e as margens de FLORA são aplicados aqui.
+        if (input.targetTentId) {
+          await database
+            .update(plants)
+            .set({ currentTentId: input.targetTentId })
+            .where(eq(plants.currentTentId, cycle.tentId));
+          await database
+            .update(cycles)
+            .set({ tentId: input.targetTentId })
+            .where(eq(cycles.id, input.cycleId));
+          await database
+            .update(tents)
+            .set({ category: "FLORA" })
+            .where(eq(tents.id, input.targetTentId));
+          await applyPhaseTransitionLimits(input.targetTentId, "FLORA");
+        } else {
+          await applyPhaseTransitionLimits(cycle.tentId, "FLORA");
+        }
+
         return { success: true };
       }),
     finalize: protectedProcedure
@@ -487,7 +551,7 @@ export const cyclesRouter = router({
           tentId: z.number(),
           strainId: z.number().optional().nullable(),
           startDate: z.date(),
-          phase: z.enum(["CLONING", "MAINTENANCE", "VEGA", "FLORA", "DRYING"]),
+          phase: z.enum(["CLONING", "MAINTENANCE", "VEGA", "PRE_FLORA", "FLORA", "DRYING"]),
           weekNumber: z.number().min(1),
         })
       )
@@ -533,11 +597,15 @@ export const cyclesRouter = router({
         // Ajustar margens de alerta automaticamente para a fase inicial do ciclo
         const initPhase = (input.phase === "CLONING" || input.phase === "MAINTENANCE")
           ? "MAINTENANCE"
+          : input.phase === "PRE_FLORA"
+          ? "FLORA" // pré-flora já é ambiente 12/12 → usa margens de flora
           : input.phase as "VEGA" | "FLORA" | "DRYING";
         await applyPhaseTransitionLimits(input.tentId, initPhase);
 
         // D3 — seed task instances for the current week immediately
-        await seedWeekTasks(database, input.tentId, category, input.phase, input.weekNumber);
+        // (pré-flora reusa os templates de flora para tarefas)
+        const seedPhase = input.phase === "PRE_FLORA" ? "FLORA" : input.phase;
+        await seedWeekTasks(database, input.tentId, category, seedPhase, input.weekNumber);
 
         return { success: true };
       }),
@@ -548,7 +616,7 @@ export const cyclesRouter = router({
           strainId: z.number().optional(),
           startDate: z.date().optional(),
           floraStartDate: z.date().optional().nullable(),
-          phase: z.enum(["CLONING", "MAINTENANCE", "VEGA", "FLORA", "DRYING"]).optional(),
+          phase: z.enum(["CLONING", "MAINTENANCE", "VEGA", "PRE_FLORA", "FLORA", "DRYING"]).optional(),
           weekNumber: z.number().min(1).optional(),
           motherPlantId: z.number().optional(),
           clonesProduced: z.number().optional(),
@@ -575,11 +643,15 @@ export const cyclesRouter = router({
           console.log('[cycles.edit] Calculated new startDate:', startDate.toISOString());
           updates.startDate = startDate;
           
-          // Se fase for FLORA, definir floraStartDate
+          // Definir datas de fase conforme a fase escolhida
           if (input.phase === "FLORA") {
             updates.floraStartDate = new Date(input.startDate);
+          } else if (input.phase === "PRE_FLORA") {
+            updates.preFloraStartDate = new Date(input.startDate);
+            updates.floraStartDate = null;
           } else {
             updates.floraStartDate = null;
+            updates.preFloraStartDate = null;
           }
         } else if (input.startDate) {
           updates.startDate = input.startDate;
@@ -785,7 +857,7 @@ export const cyclesRouter = router({
       .input(
         z.object({
           cycleId: z.number(),
-          targetPhase: z.enum(["FLORA", "DRYING"]),
+          targetPhase: z.enum(["PRE_FLORA", "FLORA", "DRYING"]),
           moveToTent: z.boolean(),
           targetTentId: z.number().optional(),
         })
@@ -869,24 +941,26 @@ export const cyclesRouter = router({
           
           if (input.targetPhase === "FLORA") {
             newCycleData.floraStartDate = new Date();
+          } else if (input.targetPhase === "PRE_FLORA") {
+            newCycleData.preFloraStartDate = new Date();
           }
-          
+
           await database.insert(cycles).values(newCycleData);
-          
-          // Atualizar categoria da estufa destino
-          const targetCategory = input.targetPhase === "FLORA" ? "FLORA" : "DRYING";
+
+          // Atualizar categoria da estufa destino (pré-flora já é ambiente de flora)
+          const targetCategory = input.targetPhase === "DRYING" ? "DRYING" : "FLORA";
           await database
             .update(tents)
             .set({ category: targetCategory })
             .where(eq(tents.id, input.targetTentId));
-          
-          // Aplicar limites de alerta para a nova fase na estufa destino
-          await applyPhaseTransitionLimits(input.targetTentId, input.targetPhase);
-          
-          // Resetar categoria da estufa original para VEGA (vazia, disponível)
-          // Se estava em VEGA e foi para FLORA, a estufa original fica como VEGA vazia
-          // Se estava em FLORA e foi para DRYING, a estufa original fica como FLORA vazia
-          const sourceCategory = input.targetPhase === "FLORA" ? "VEGA" : "FLORA";
+
+          // Aplicar limites de alerta (pré-flora usa margens de flora)
+          const limitsPhase = input.targetPhase === "PRE_FLORA" ? "FLORA" : input.targetPhase;
+          await applyPhaseTransitionLimits(input.targetTentId, limitsPhase);
+
+          // Resetar categoria da estufa original (vazia, disponível)
+          // VEGA→PRE_FLORA/FLORA: original fica VEGA. FLORA→DRYING: original fica FLORA.
+          const sourceCategory = input.targetPhase === "DRYING" ? "FLORA" : "VEGA";
           await database
             .update(tents)
             .set({ category: sourceCategory })
@@ -906,25 +980,28 @@ export const cyclesRouter = router({
         } else {
           // Promover fase na mesma estufa
           const updates: any = {};
-          
+
           if (input.targetPhase === "FLORA") {
             updates.floraStartDate = new Date();
+          } else if (input.targetPhase === "PRE_FLORA") {
+            updates.preFloraStartDate = new Date();
           }
-          
+
           await database
             .update(cycles)
             .set(updates)
             .where(eq(cycles.id, input.cycleId));
-          
-          // Atualizar categoria da estufa
-          const targetCategory = input.targetPhase === "FLORA" ? "FLORA" : "DRYING";
+
+          // Atualizar categoria da estufa (pré-flora já é ambiente de flora)
+          const targetCategory = input.targetPhase === "DRYING" ? "DRYING" : "FLORA";
           await database
             .update(tents)
             .set({ category: targetCategory })
             .where(eq(tents.id, cycle.tentId));
-          
-          // Aplicar limites de alerta para a nova fase
-          await applyPhaseTransitionLimits(cycle.tentId, input.targetPhase);
+
+          // Aplicar limites de alerta (pré-flora usa margens de flora)
+          const limitsPhase = input.targetPhase === "PRE_FLORA" ? "FLORA" : input.targetPhase;
+          await applyPhaseTransitionLimits(cycle.tentId, limitsPhase);
           
           return {
             success: true,

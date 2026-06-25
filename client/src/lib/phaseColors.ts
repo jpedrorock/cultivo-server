@@ -35,6 +35,7 @@
 export type Phase =
   | "SEEDLING"
   | "VEGA"
+  | "PRE_FLORA"
   | "FLORA"
   | "FLUSHING"
   | "HARVEST"
@@ -61,6 +62,7 @@ export type Phase =
 export const PHASE_COLORS = {
   SEEDLING:    "#72db4a",  // lime — muda / germinação         (hue 130)
   VEGA:        "#40c057",  // verde-floresta — vegetativa       (hue 145, = site)
+  PRE_FLORA:   "#b57edc",  // lavanda — pré-flora / stretch     (violeta claro, começo da flora)
   FLORA:       "#c44bdb",  // violeta — floração                (hue 305, = site)
   FLUSHING:    "#20c897",  // teal — flush pré-colheita         (hue 185)
   HARVEST:     "#f57230",  // laranja — colheita                (hue 38)
@@ -74,6 +76,7 @@ export const PHASE_COLORS = {
 export const PHASE_LABELS: Record<Phase, string> = {
   SEEDLING:    "Muda",
   VEGA:        "Vegetativa",
+  PRE_FLORA:   "Pré-flora",
   FLORA:       "Floração",
   FLUSHING:    "Flush",
   HARVEST:     "Colheita",
@@ -91,11 +94,13 @@ export function resolvePhase(
   tentCategory: string | null | undefined,
   floraStartDate: string | Date | null | undefined,
   hasCycle: boolean,
+  preFloraStartDate?: string | Date | null | undefined,
 ): Phase {
   if (!hasCycle) return "VEGA";
   const cat = (tentCategory ?? "VEGA") as Phase;
   if (cat === "MAINTENANCE" || cat === "DRYING" || cat === "CURING" || cat === "CLONING") return cat;
   if (floraStartDate) return "FLORA";
+  if (preFloraStartDate) return "PRE_FLORA";
   return "VEGA";
 }
 

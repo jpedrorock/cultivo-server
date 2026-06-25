@@ -22,6 +22,7 @@ interface PhaseBadgeProps {
 const PHASE_LABELS: Record<Phase, string> = {
   SEEDLING:    "Muda",
   VEGA:        "Vegetativa",
+  PRE_FLORA:   "Pré-flora",
   FLORA:       "Floração",
   FLUSHING:    "Flush",
   HARVEST:     "Colheita",

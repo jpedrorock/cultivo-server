@@ -643,7 +643,7 @@ export function TentCard({
           onOpenChange={setPromotePhaseOpen}
           cycleId={cycle.id}
           tentId={cycle.tentId}
-          currentPhase={cycle.floraStartDate ? "FLORA" : "VEGA"}
+          currentPhase={cycle.floraStartDate ? "FLORA" : cycle.preFloraStartDate ? "PRE_FLORA" : "VEGA"}
           currentTentName={tent.name}
         />
       )}

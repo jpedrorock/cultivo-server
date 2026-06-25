@@ -203,7 +203,7 @@ export const alertsRouter = router({
     updatePhaseMargin: protectedProcedure
       .input(
         z.object({
-          phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]),
+          phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "PRE_FLORA", "FLORA", "DRYING"]),
           tempMargin: z.number().optional(),
           rhMargin: z.number().optional(),
           ppfdMargin: z.number().optional(),
@@ -235,7 +235,7 @@ export const alertsRouter = router({
     resetPhaseMarginToDefault: protectedProcedure
       .input(
         z.object({
-          phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "FLORA", "DRYING"]),
+          phase: z.enum(["MAINTENANCE", "CLONING", "VEGA", "PRE_FLORA", "FLORA", "DRYING"]),
         })
       )
       .mutation(async ({ input }) => {
@@ -417,7 +417,7 @@ export const weeklyTargetsRouter = router({
       .input(
         z.object({
           strainId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE"]),
           weekNumber: z.number(),
         })
       )
@@ -444,7 +444,7 @@ export const weeklyTargetsRouter = router({
       .input(
         z.object({
           tentId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE"]),
           weekNumber: z.number(),
         })
       )
@@ -623,7 +623,7 @@ export const weeklyTargetsRouter = router({
       .input(
         z.object({
           strainId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE"]),
           weekNumber: z.number(),
           tempMin: z.string().optional(),
           tempMax: z.string().optional(),
@@ -653,7 +653,7 @@ export const weeklyTargetsRouter = router({
       .input(
         z.object({
           strainId: z.number(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE"]),
           weekNumber: z.number(),
           tempMin: z.string().optional(),
           tempMax: z.string().optional(),

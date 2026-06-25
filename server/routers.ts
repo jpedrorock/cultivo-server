@@ -1275,7 +1275,7 @@ export const appRouter = router({
         name: z.string(),
         waterVolume: z.number(),
         targetEC: z.number(),
-        phase: z.enum(["VEGA", "FLORA"]).optional(),
+        phase: z.enum(["VEGA", "PRE_FLORA", "FLORA"]).optional(),
         weekNumber: z.number().optional(),
         irrigationsPerWeek: z.number().optional(),
         calculationMode: z.enum(["per-irrigation", "per-week"]),
@@ -1341,7 +1341,7 @@ export const appRouter = router({
         name: z.string(),
         waterVolume: z.number(),
         targetEC: z.number(),
-        phase: z.enum(["VEGA", "FLORA"]).optional(),
+        phase: z.enum(["VEGA", "PRE_FLORA", "FLORA"]).optional(),
         weekNumber: z.number().optional(),
         irrigationsPerWeek: z.number().optional(),
         calculationMode: z.enum(["per-irrigation", "per-week"]),
@@ -1375,7 +1375,7 @@ export const appRouter = router({
         plantCount: z.number(),
         potSize: z.number(),
         targetRunoff: z.number(),
-        phase: z.enum(["VEGA", "FLORA"]).optional(),
+        phase: z.enum(["VEGA", "PRE_FLORA", "FLORA"]).optional(),
         weekNumber: z.number().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1438,7 +1438,7 @@ export const appRouter = router({
         plantCount: z.number(),
         potSize: z.number(),
         targetRunoff: z.number(),
-        phase: z.enum(["VEGA", "FLORA"]).optional(),
+        phase: z.enum(["VEGA", "PRE_FLORA", "FLORA"]).optional(),
         weekNumber: z.number().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1532,7 +1532,7 @@ export const appRouter = router({
   nutrients: router({
     // Listar templates de receitas
     listTemplates: protectedProcedure
-      .input(z.object({ phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).optional() }).optional())
+      .input(z.object({ phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]).optional() }).optional())
       .query(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
@@ -1563,7 +1563,7 @@ export const appRouter = router({
       .input(
         z.object({
           name: z.string().min(1),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]),
           weekNumber: z.number().int().min(1).max(12).nullable(),
           volumeTotalL: z.number().positive(),
           ecTarget: z.number().nonnegative().nullable(),
@@ -1608,7 +1608,7 @@ export const appRouter = router({
           cycleId: z.number().nullable(),
           recipeTemplateId: z.number().nullable(),
           recipeName: z.string(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]),
           weekNumber: z.number().nullable(),
           volumeTotalL: z.number().positive(),
           ecTarget: z.number().nullable(),
@@ -1658,7 +1658,7 @@ export const appRouter = router({
         z.object({
           tentId: z.number().optional(),
           cycleId: z.number().optional(),
-          phase: z.enum(["CLONING", "VEGA", "FLORA", "MAINTENANCE", "DRYING"]).optional(),
+          phase: z.enum(["CLONING", "VEGA", "PRE_FLORA", "FLORA", "MAINTENANCE", "DRYING"]).optional(),
           limit: z.number().int().positive().default(50),
         }).optional()
       )
