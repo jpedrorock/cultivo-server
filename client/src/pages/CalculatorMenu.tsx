@@ -155,7 +155,7 @@ export default function CalculatorMenu() {
       accentColor: "text-teal-400",
       shadowColor: "shadow-teal-900/20",
       badge: "Popular",
-      badgeStyle: "bg-teal-500/15 text-teal-300 border border-teal-500/25",
+      badgeStyle: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
     },
     {
       id: "irrigation-schedule",
@@ -168,7 +168,7 @@ export default function CalculatorMenu() {
       accentColor: "text-blue-400",
       shadowColor: "shadow-blue-900/20",
       badge: "Novo",
-      badgeStyle: "bg-blue-500/15 text-blue-300 border border-blue-500/25",
+      badgeStyle: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
     },
     {
       id: "nutrients",
@@ -181,7 +181,7 @@ export default function CalculatorMenu() {
       accentColor: "text-emerald-400",
       shadowColor: "shadow-emerald-900/20",
       badge: "Popular",
-      badgeStyle: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25",
+      badgeStyle: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
     },
     {
       id: "living-soil",
@@ -194,7 +194,7 @@ export default function CalculatorMenu() {
       accentColor: "text-green-400",
       shadowColor: "shadow-green-900/20",
       badge: "Orgânico",
-      badgeStyle: "bg-green-500/15 text-green-300 border border-green-500/25",
+      badgeStyle: "bg-muted text-muted-foreground",
     },
     {
       id: "organic-maintenance",
@@ -207,7 +207,7 @@ export default function CalculatorMenu() {
       accentColor: "text-lime-400",
       shadowColor: "shadow-lime-900/20",
       badge: "Orgânico",
-      badgeStyle: "bg-green-500/15 text-green-300 border border-green-500/25",
+      badgeStyle: "bg-muted text-muted-foreground",
     },
     {
       id: "lux-ppfd",
@@ -246,7 +246,7 @@ export default function CalculatorMenu() {
       accentColor: "text-rose-400",
       shadowColor: "shadow-rose-900/20",
       badge: "Novo",
-      badgeStyle: "bg-rose-500/15 text-rose-300 border border-rose-500/25",
+      badgeStyle: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
     },
     {
       id: "vpd",
@@ -259,7 +259,7 @@ export default function CalculatorMenu() {
       accentColor: "text-indigo-400",
       shadowColor: "shadow-indigo-900/20",
       badge: "Novo",
-      badgeStyle: "bg-indigo-500/15 text-indigo-300 border border-indigo-500/25",
+      badgeStyle: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
     },
   ];
 
