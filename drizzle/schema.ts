@@ -408,8 +408,8 @@ export const alerts = mysqlTable(
     tentId: int("tentId")
       .notNull()
       .references(() => tents.id, { onDelete: "cascade" }),
-    alertType: mysqlEnum("alertType", ["OUT_OF_RANGE", "SAFETY_LIMIT", "TREND"]).notNull(),
-    metric: mysqlEnum("metric", ["TEMP", "RH", "PPFD", "PH"]).notNull(),
+    alertType: mysqlEnum("alertType", ["OUT_OF_RANGE", "SAFETY_LIMIT", "TREND", "PLANT_HEALTH"]).notNull(),
+    metric: mysqlEnum("metric", ["TEMP", "RH", "PPFD", "PH", "HEALTH"]).notNull(),
     logDate: timestamp("logDate").notNull(),
     turn: mysqlEnum("turn", ["AM", "PM"]),
     value: decimal("value", { precision: 10, scale: 2 }),
@@ -739,6 +739,7 @@ export const plantTrichomeLogs = mysqlTable(
       .references(() => plants.id, { onDelete: "cascade" }),
     logDate: timestamp("logDate").defaultNow().notNull(),
     trichomeStatus: mysqlEnum("trichomeStatus", ["CLEAR", "CLOUDY", "AMBER", "MIXED"]).notNull(),
+    weekNumber: int("weekNumber"), // Semana do ciclo no momento da leitura
     clearPercent: int("clearPercent"), // % transparentes
     cloudyPercent: int("cloudyPercent"), // % leitosos
     amberPercent: int("amberPercent"), // % âmbar

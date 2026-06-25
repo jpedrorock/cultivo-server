@@ -35,6 +35,7 @@ import {
   cycles,
   strains,
   dailyLogs,
+  alerts,
 } from "../../drizzle/schema";
 import { validatePlantOwnership, validateTentOwnership } from "./_helpers";
 
@@ -1522,6 +1523,27 @@ export const plantHealthRouter = router({
           photoKey,
         });
 
+        // T17 — planta marcada como doente gera alerta na estufa, pra o problema
+        // aparecer no feed central de alertas e não ficar só no log da planta.
+        if (input.healthStatus === "SICK") {
+          const [plant] = await database
+            .select({ name: plants.name, tentId: plants.currentTentId })
+            .from(plants)
+            .where(eq(plants.id, input.plantId))
+            .limit(1);
+          if (plant?.tentId) {
+            const detalhe = input.symptoms ? `: ${input.symptoms}` : "";
+            await database.insert(alerts).values({
+              tentId: plant.tentId,
+              alertType: "PLANT_HEALTH",
+              metric: "HEALTH",
+              logDate: new Date(),
+              message: `🌿 Planta "${plant.name}" marcada como DOENTE${detalhe}`,
+              status: "NEW",
+            });
+          }
+        }
+
         return { success: true };
       }),
 
@@ -1663,10 +1685,9 @@ export const plantTrichomesRouter = router({
           photoKey = resolvedPhotoUrl.replace(/^\/uploads\//, '');
         }
 
-        // Nota: weekNumber não é persistido (schema não tem essa coluna).
-        // Pode ser derivado de logDate vs cycle.startDate quando precisar.
         await database.insert(plantTrichomeLogs).values({
           plantId: input.plantId,
+          weekNumber: input.weekNumber,
           trichomeStatus: input.trichomeStatus,
           clearPercent: input.clearPercent,
           cloudyPercent: input.cloudyPercent,
