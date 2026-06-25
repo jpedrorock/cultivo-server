@@ -15,9 +15,10 @@
  */
 
 import { useState, useEffect } from "react";
-import { Trash2, AlertTriangle, Loader2, Eye, EyeOff } from "lucide-react";
+import { Trash2, AlertTriangle, Loader2, Eye, EyeOff, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useBackButton } from "@/lib/androidBackButton";
+import { trpc } from "@/lib/trpc";
 
 import {
   Dialog,
@@ -60,6 +61,32 @@ export function DeleteAccountDialog({
   const [confirmText, setConfirmText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+
+  // Export de backup (reusa o backup.export já existente) — pra o usuário salvar
+  // os dados antes de apagar tudo.
+  const backupExport = trpc.backup.export.useQuery(undefined, { enabled: false });
+  const downloadBackup = async () => {
+    setDownloadingBackup(true);
+    try {
+      const result = await backupExport.refetch();
+      if (!result.data) throw new Error("sem dados");
+      const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `cultivo-backup-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Backup baixado.");
+    } catch (e: any) {
+      toast.error(`Erro ao baixar backup: ${e?.message ?? e}`);
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
 
   // Android: back button fecha o dialog em vez de sair do app/voltar rota.
   // Intercepta ENQUANTO `open=true`. Quando dialog fecha (open=false),
@@ -220,6 +247,22 @@ export function DeleteAccountDialog({
               )}
             </div>
           ) : null}
+
+          {/* Salvar dados antes de apagar tudo (só quando é o último do grupo) */}
+          {preview?.isLastInGroup && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={downloadBackup}
+              disabled={downloadingBackup || submitting}
+            >
+              {downloadingBackup ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Gerando backup...</>
+              ) : (
+                <><Download className="w-4 h-4 mr-2" />Baixar backup antes de excluir</>
+              )}
+            </Button>
+          )}
 
           {/* Confirm text */}
           <div>
