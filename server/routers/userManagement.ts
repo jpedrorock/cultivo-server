@@ -154,7 +154,7 @@ export const adminRouter = router({
     const database = await getDb();
     if (!database) throw new Error('Banco indisponível');
     const result = await database
-      .select({ id: users.id, email: users.email, name: users.name, role: users.role, approved: users.approved, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
+      .select({ id: users.id, email: users.email, name: users.name, role: users.role, plan: users.plan, approved: users.approved, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn })
       .from(users)
       .orderBy(users.createdAt);
     return result;
@@ -196,6 +196,17 @@ export const adminRouter = router({
       const database = await getDb();
       if (!database) throw new Error('Banco indisponível');
       await database.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
+
+  // Grant manual de plano (enquanto não há pagamento real). planExpiresAt=null
+  // = não expira (promo/lifetime). Quando houver RevenueCat, o webhook assume.
+  setPlan: adminProcedure
+    .input(z.object({ userId: z.number(), plan: z.enum(['free', 'starter', 'cloud', 'pro']) }))
+    .mutation(async ({ input }) => {
+      const database = await getDb();
+      if (!database) throw new Error('Banco indisponível');
+      await database.update(users).set({ plan: input.plan, planExpiresAt: null }).where(eq(users.id, input.userId));
       return { success: true };
     }),
 });

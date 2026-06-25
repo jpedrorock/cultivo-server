@@ -30,6 +30,10 @@ export default function AdminUsers() {
     onSuccess: () => refetch(),
     onError: (e) => toast.error(`Erro ao alterar role: ${e.message}`),
   });
+  const setPlan = trpc.admin.setPlan.useMutation({
+    onSuccess: () => { refetch(); toast.success('Plano atualizado'); },
+    onError: (e) => toast.error(`Erro ao alterar plano: ${e.message}`),
+  });
   const approveUser = trpc.admin.approveUser.useMutation({
     onSuccess: () => refetch(),
     onError: (e) => toast.error(`Erro ao aprovar usuário: ${e.message}`),
@@ -137,6 +141,17 @@ export default function AdminUsers() {
                       </div>
                       {u.id !== user?.id ? (
                         <div className="flex items-center gap-2 shrink-0">
+                          <select
+                            value={u.plan ?? 'free'}
+                            onChange={(e) => setPlan.mutate({ userId: u.id, plan: e.target.value as 'free' | 'starter' | 'cloud' | 'pro' })}
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            title="Plano do usuário"
+                          >
+                            <option value="free">Free</option>
+                            <option value="starter">Starter</option>
+                            <option value="cloud">Cloud</option>
+                            <option value="pro">Pro</option>
+                          </select>
                           <Button
                             variant="ghost"
                             size="icon"
