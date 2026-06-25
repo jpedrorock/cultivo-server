@@ -192,7 +192,7 @@ function ActionMenu({ node, actions, onClose, onAction }: MenuProps) {
               <span className="text-sm font-bold">N{node.nodeNumber}</span>
               <span className="text-xs text-muted-foreground ml-1.5">{node.type === 'top' && node.state === 'active' ? '★ top bud' : node.state}</span>
             </div>
-            <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0">
+            <button onClick={onClose} aria-label="Fechar" className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -930,6 +930,7 @@ export default function Plant3DView({
         <button
           onClick={() => dolly(0.8)}
           className="w-9 h-9 rounded-lg bg-card/80 backdrop-blur border border-border/60 hover:bg-card flex items-center justify-center text-foreground/80 hover:text-foreground transition-colors shadow-md"
+          aria-label="Aproximar (zoom in)"
           title="Aproximar (zoom in)"
         >
           <ZoomIn className="w-4 h-4" />
@@ -937,6 +938,7 @@ export default function Plant3DView({
         <button
           onClick={fitToPlant}
           className="w-9 h-9 rounded-lg bg-card/80 backdrop-blur border border-border/60 hover:bg-card flex items-center justify-center text-foreground/80 hover:text-foreground transition-colors shadow-md"
+          aria-label="Enquadrar planta"
           title="Enquadrar planta"
         >
           <Maximize2 className="w-4 h-4" />
@@ -944,6 +946,7 @@ export default function Plant3DView({
         <button
           onClick={() => dolly(1.25)}
           className="w-9 h-9 rounded-lg bg-card/80 backdrop-blur border border-border/60 hover:bg-card flex items-center justify-center text-foreground/80 hover:text-foreground transition-colors shadow-md"
+          aria-label="Afastar (zoom out)"
           title="Afastar (zoom out)"
         >
           <ZoomOut className="w-4 h-4" />
@@ -951,6 +954,7 @@ export default function Plant3DView({
         <button
           onClick={resetCamera}
           className="w-9 h-9 rounded-lg bg-card/80 backdrop-blur border border-border/60 hover:bg-card flex items-center justify-center text-foreground/80 hover:text-foreground transition-colors shadow-md"
+          aria-label="Resetar câmera"
           title="Resetar câmera"
         >
           <RotateCcw className="w-4 h-4" />
@@ -958,6 +962,7 @@ export default function Plant3DView({
         <button
           onClick={resetPositions}
           className="w-9 h-9 rounded-lg bg-card/80 backdrop-blur border border-border/60 hover:bg-card flex items-center justify-center text-red-400/90 hover:text-red-300 transition-colors shadow-md"
+          aria-label="Resetar posições dos nós (limpa drags)"
           title="Resetar posições dos nós (limpa drags)"
         >
           <Trash2 className="w-4 h-4" />

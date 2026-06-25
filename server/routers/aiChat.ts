@@ -100,10 +100,23 @@ const PROVIDER_FALLBACKS: Record<string, string[]> = {
   kimi:      ["moonshot-v1-8k"],
 };
 
+// Timeout de 30s nas chamadas aos providers de IA — sem isso, se um provider
+// ficar lento/offline a request fica pendurada pra sempre (T20 da auditoria).
+const AI_FETCH_TIMEOUT_MS = 30_000;
+async function aiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
+  try {
+    return await globalThis.fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Busca modelos disponíveis do Gemini via ListModels API */
 async function fetchGeminiModels(apiKey: string): Promise<string[]> {
   try {
-    const res = await fetch(
+    const res = await aiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
     );
     if (!res.ok) return [];
@@ -175,7 +188,7 @@ async function callAiProvider(opts: {
           : message,
       },
     ];
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await aiFetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, messages, max_tokens: 1500 }),
@@ -197,7 +210,7 @@ async function callAiProvider(opts: {
       ...history.map(h => ({ role: h.role, content: h.content })),
       { role: "user" as const, content: userContent },
     ];
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await aiFetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -220,7 +233,7 @@ async function callAiProvider(opts: {
       ...history.map(h => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.content }] })),
       { role: "user", parts },
     ];
-    const res = await fetch(
+    const res = await aiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: "POST",
@@ -256,7 +269,7 @@ async function callAiProvider(opts: {
           : message, // Kimi não suporta visão por base64 na v1
       },
     ];
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await aiFetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model, messages, max_tokens: 1500 }),
