@@ -798,6 +798,51 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+
+  // ─── Auditoria 2026-06: pré-flora, tricomas weekNumber, alerta de planta doente ─
+  {
+    id: 'add-cycles-preFloraStartDate',
+    description: 'Adiciona cycles.preFloraStartDate (fase pré-flora)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'cycles', 'preFloraStartDate', 'TIMESTAMP NULL');
+    },
+  },
+  {
+    id: 'extend-phase-enums-pre-flora',
+    description: 'Adiciona PRE_FLORA aos enums de fase',
+    run: async (c) => {
+      for (const t of ['weeklyTargets', 'recipeTemplates', 'taskTemplates', 'safetyLimits', 'nutrientApplications']) {
+        if (await tableExists(c, t)) {
+          await c.query(`ALTER TABLE \`${t}\` MODIFY COLUMN \`phase\` ENUM('CLONING','VEGA','PRE_FLORA','FLORA','MAINTENANCE','DRYING') NOT NULL`);
+        }
+      }
+      if (await tableExists(c, 'phaseAlertMargins')) {
+        await c.query(`ALTER TABLE \`phaseAlertMargins\` MODIFY COLUMN \`phase\` ENUM('MAINTENANCE','CLONING','VEGA','PRE_FLORA','FLORA','DRYING') NOT NULL`);
+      }
+      for (const t of ['fertilizationPresets', 'wateringPresets']) {
+        if (await tableExists(c, t)) {
+          await c.query(`ALTER TABLE \`${t}\` MODIFY COLUMN \`phase\` ENUM('VEGA','PRE_FLORA','FLORA')`);
+        }
+      }
+    },
+  },
+  {
+    id: 'add-plantTrichomeLogs-weekNumber',
+    description: 'Adiciona plantTrichomeLogs.weekNumber',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'plantTrichomeLogs', 'weekNumber', 'INT NULL');
+    },
+  },
+  {
+    id: 'extend-alerts-enums-plant-health',
+    description: 'Adiciona PLANT_HEALTH/HEALTH aos enums de alerts (alerta de planta doente)',
+    run: async (c) => {
+      if (await tableExists(c, 'alerts')) {
+        await c.query(`ALTER TABLE \`alerts\` MODIFY COLUMN \`alertType\` ENUM('OUT_OF_RANGE','SAFETY_LIMIT','TREND','PLANT_HEALTH') NOT NULL`);
+        await c.query(`ALTER TABLE \`alerts\` MODIFY COLUMN \`metric\` ENUM('TEMP','RH','PPFD','PH','HEALTH') NOT NULL`);
+      }
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────
