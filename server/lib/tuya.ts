@@ -121,6 +121,41 @@ async function getToken(
   return { accessToken: result.access_token, uid: result.uid };
 }
 
+// ─── Retry com backoff exponencial + timeout (T24) ────────────────────────────
+// A assinatura Tuya inclui o timestamp, então cada tentativa REGERA o fetch
+// (sign novo) via makeFetch(signal). Retenta erros de rede e respostas 5xx/429
+// (transitórios). 3 tentativas, backoff 150ms→300ms, timeout de 10s por tentativa.
+const tuyaSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+async function tuyaFetchWithRetry(
+  makeFetch: (signal: AbortSignal) => Promise<Response>,
+  maxAttempts = 3
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const res = await makeFetch(controller.signal);
+      clearTimeout(timer);
+      if ((res.status >= 500 || res.status === 429) && attempt < maxAttempts - 1) {
+        await tuyaSleep(150 * 2 ** attempt);
+        continue;
+      }
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (attempt < maxAttempts - 1) {
+        await tuyaSleep(150 * 2 ** attempt);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
 // ─── Authenticated GET ────────────────────────────────────────────────────────
 
 async function tuyaGet(
@@ -130,19 +165,21 @@ async function tuyaGet(
   accessToken: string,
   region: TuyaRegion
 ): Promise<any> {
-  const t = Date.now().toString();
-  const nonce = "";
-  const signature = buildSign(accessId, accessSecret, t, nonce, pathAndQuery, accessToken);
-
-  const res = await fetch(`${BASE_URLS[region]}${pathAndQuery}`, {
-    headers: {
-      client_id: accessId,
-      access_token: accessToken,
-      sign: signature,
-      t,
-      sign_method: "HMAC-SHA256",
-      nonce,
-    },
+  const res = await tuyaFetchWithRetry((signal) => {
+    const t = Date.now().toString();
+    const nonce = "";
+    const signature = buildSign(accessId, accessSecret, t, nonce, pathAndQuery, accessToken);
+    return fetch(`${BASE_URLS[region]}${pathAndQuery}`, {
+      signal,
+      headers: {
+        client_id: accessId,
+        access_token: accessToken,
+        sign: signature,
+        t,
+        sign_method: "HMAC-SHA256",
+        nonce,
+      },
+    });
   });
   return res.json();
 }
@@ -157,23 +194,25 @@ async function tuyaPost(
   accessToken: string,
   region: TuyaRegion
 ): Promise<any> {
-  const t = Date.now().toString();
-  const nonce = "";
   const bodyStr = JSON.stringify(body);
-  const signature = buildSign(accessId, accessSecret, t, nonce, pathAndQuery, accessToken, "POST", bodyStr);
-
-  const res = await fetch(`${BASE_URLS[region]}${pathAndQuery}`, {
-    method: "POST",
-    headers: {
-      client_id: accessId,
-      access_token: accessToken,
-      sign: signature,
-      t,
-      sign_method: "HMAC-SHA256",
-      nonce,
-      "Content-Type": "application/json",
-    },
-    body: bodyStr,
+  const res = await tuyaFetchWithRetry((signal) => {
+    const t = Date.now().toString();
+    const nonce = "";
+    const signature = buildSign(accessId, accessSecret, t, nonce, pathAndQuery, accessToken, "POST", bodyStr);
+    return fetch(`${BASE_URLS[region]}${pathAndQuery}`, {
+      method: "POST",
+      signal,
+      headers: {
+        client_id: accessId,
+        access_token: accessToken,
+        sign: signature,
+        t,
+        sign_method: "HMAC-SHA256",
+        nonce,
+        "Content-Type": "application/json",
+      },
+      body: bodyStr,
+    });
   });
   return res.json();
 }
@@ -200,7 +239,29 @@ export async function testTuyaConnection(
  * 2. /v1.2/iot-03/devices  → versão mais nova
  * 3. /v1.0/users/{uid}/devices → fallback legado
  */
+// Cache de listagem de devices por conta Tuya (TTL 5min) — evita martelar a API
+// (e queimar quota Trial) a cada chamada do app/poll (T25). Em memória.
+const TUYA_DEVICES_CACHE_TTL_MS = 5 * 60 * 1000;
+const tuyaDevicesCache = new Map<string, { devices: TuyaDevice[]; expiry: number }>();
+
 export async function listTuyaDevices(
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion,
+  homeId?: number
+): Promise<TuyaDevice[]> {
+  const key = `${accessId}:${region}:${homeId ?? ""}`;
+  const cached = tuyaDevicesCache.get(key);
+  if (cached && cached.expiry > Date.now()) return cached.devices;
+  const devices = await listTuyaDevicesUncached(accessId, accessSecret, region, homeId);
+  // Só cacheia resultado não-vazio (lista vazia costuma ser falha transitória)
+  if (devices.length > 0) {
+    tuyaDevicesCache.set(key, { devices, expiry: Date.now() + TUYA_DEVICES_CACHE_TTL_MS });
+  }
+  return devices;
+}
+
+async function listTuyaDevicesUncached(
   accessId: string,
   accessSecret: string,
   region: TuyaRegion,
