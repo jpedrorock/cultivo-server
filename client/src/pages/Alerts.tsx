@@ -332,15 +332,10 @@ export default function Alerts() {
                                     {alert.message}
                                   </p>
                                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    {/* Severidade */}
-                                    <span className={cn(
-                                      "text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full",
-                                      alertSeverity(alert) === "CRITICAL"
-                                        ? "bg-red-500/15 text-red-600 dark:text-red-400"
-                                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                                    )}>
+                                    {/* Severidade — componente Badge unificado (design system) */}
+                                    <Badge variant={alertSeverity(alert) === "CRITICAL" ? "danger" : "warning"}>
                                       {alertSeverity(alert) === "CRITICAL" ? "Crítico" : "Atenção"}
-                                    </span>
+                                    </Badge>
                                     {!selectedTentId && (
                                       <Badge variant="outline" className="text-xs">
                                         {tents?.find(t => t.id === alert.tentId)?.name ?? `Estufa #${alert.tentId}`}
