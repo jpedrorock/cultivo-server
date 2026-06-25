@@ -83,33 +83,31 @@ export function InstallPWA() {
   // Banner flutuante de instalação
   if (showInstallBanner && deferredPrompt) {
     return (
-      <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-primary text-primary-foreground rounded-lg shadow-2xl p-4 z-50 animate-in slide-in-from-bottom-5">
+      <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-primary text-primary-foreground rounded-lg shadow-2xl p-3 z-50 animate-in slide-in-from-bottom-5">
         <button
           onClick={handleDismiss}
-          className="absolute top-2 right-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+          className="absolute top-1.5 right-1.5 p-1 hover:bg-white/20 rounded-full transition-colors"
           aria-label="Fechar"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
-        
-        <div className="flex items-start gap-3 pr-6">
-          <div className="bg-white/20 p-2 rounded-lg">
-            <Download className="w-6 h-6" />
+
+        {/* Layout compacto em linha única (~60px) em vez de card alto (~140px) */}
+        <div className="flex items-center gap-3 pr-5">
+          <div className="bg-white/20 p-1.5 rounded-lg shrink-0">
+            <Download className="w-5 h-5" />
           </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-lg mb-1">Instalar App Cultivo</h3>
-            <p className="text-sm text-white/90 mb-3">
-              Acesse offline e receba notificações de alertas diretamente no seu dispositivo!
-            </p>
-            <Button
-              onClick={handleInstallClick}
-              className="w-full bg-white text-emerald-600 hover:bg-card/90"
-              size="sm"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Instalar Agora
-            </Button>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm leading-tight">Instalar o App Cultivo</h3>
+            <p className="text-xs text-white/85 leading-tight">Offline + notificações de alerta</p>
           </div>
+          <Button
+            onClick={handleInstallClick}
+            className="bg-white text-emerald-600 hover:bg-card/90 shrink-0"
+            size="sm"
+          >
+            Instalar
+          </Button>
         </div>
       </div>
     );
