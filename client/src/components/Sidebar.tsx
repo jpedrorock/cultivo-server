@@ -1,6 +1,6 @@
 import {
   Calculator, Bell, Sprout, Leaf, Settings, CheckSquare, BookOpen,
-  AlertTriangle, Wind, Wifi, Plus, Bot, PanelLeftClose, PanelLeftOpen, X,
+  AlertTriangle, Wind, Wifi, Plus, Bot, PanelLeftClose, PanelLeftOpen, X, BarChart3,
 } from "lucide-react";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
@@ -51,6 +51,7 @@ const NAV_GROUPS: {
       { href: "/plants",  icon: Sprout,      label: "Plantas",  isAlerts: false },
       { href: "/alerts",  icon: Bell,        label: "Alertas",  isAlerts: true  },
       { href: "/tarefas", icon: CheckSquare, label: "Tarefas",  isAlerts: false },
+      { href: "/analytics", icon: BarChart3, label: "Analytics", isAlerts: false },
     ],
   },
   {

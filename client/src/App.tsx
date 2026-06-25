@@ -46,6 +46,7 @@ const ManageStrains        = lazy(() => import("./pages/ManageStrains"));
 const Calculators          = lazy(() => import("./pages/Calculators"));
 const CalculatorMenu       = lazy(() => import("./pages/CalculatorMenu"));
 const Alerts               = lazy(() => import("./pages/Alerts"));
+const Analytics            = lazy(() => import("./pages/Analytics"));
 const HistoryTable         = lazy(() => import("./pages/HistoryTable"));
 const Settings             = lazy(() => import("./pages/Settings"));
 const AccountSettings      = lazy(() => import("./pages/AccountSettings"));
@@ -108,6 +109,7 @@ function Router() {
           <Redirect to="/strains" />
         </Route>
         <Route path={"/tarefas"} component={Tarefas} />
+        <Route path={"/analytics"} component={Analytics} />
         <Route path={"/calculators"} component={CalculatorMenu} />
         <Route path={"/calculators/:id"} component={Calculators} />
         <Route path={"/nutrients"} component={Nutrients} />
