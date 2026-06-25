@@ -667,6 +667,32 @@ export async function getIdealValuesByTent(tentId: number): Promise<{
 }
 
 /**
+ * Decide se o alerta de pH deve ser avaliado para uma estufa.
+ *
+ * Cultivo Orgânico: pH é apenas informativo (a microbiologia do solo tampona),
+ * então NUNCA disparamos alerta de pH fora-de-faixa em estufas orgânicas — senão
+ * geraria alerta/push falso. Os demais métodos (MINERAL/COCO/HYDRO) avaliam
+ * normalmente, desde que haja margem, leitura e faixa ideal definidas.
+ *
+ * Extraído de checkAlertsForTent para ser testável sem banco.
+ */
+export function shouldEvaluatePhAlert(args: {
+  cultivationMethod: string | null | undefined;
+  phMargin: number | string | null;
+  latestPh: number | string | null;
+  phMin: number | null;
+  phMax: number | null;
+}): boolean {
+  return (
+    args.cultivationMethod !== "ORGANIC" &&
+    args.phMargin !== null &&
+    args.latestPh !== null &&
+    args.phMin !== null &&
+    args.phMax !== null
+  );
+}
+
+/**
  * Verifica alertas para uma estufa comparando valores reais vs ideais com margens da fase
  * Gera alertas contextuais e salva no banco
  */
@@ -819,13 +845,16 @@ export async function checkAlertsForTent(tentId: number): Promise<{
   // Cultivo Orgânico: pH é apenas informativo (a microbiologia do solo tampona),
   // então NÃO disparamos alerta de pH fora-de-faixa em estufas orgânicas — senão
   // geraria alerta/push falso. Ver ORGANIC-IMPLEMENTATION-PLAN.md.
-  if (tent.cultivationMethod !== "ORGANIC" && margins.phMargin !== null && latestLog.ph !== null && idealValues.phMin !== null && idealValues.phMax !== null) {
+  if (shouldEvaluatePhAlert({ cultivationMethod: tent.cultivationMethod, phMargin: margins.phMargin, latestPh: latestLog.ph, phMin: idealValues.phMin, phMax: idealValues.phMax })) {
+    // shouldEvaluatePhAlert já garantiu que phMin/phMax não são null
+    const phMin = idealValues.phMin!;
+    const phMax = idealValues.phMax!;
     const ph = parseFloat(String(latestLog.ph));
-    const idealMin = idealValues.phMin - parseFloat(String(margins.phMargin));
-    const idealMax = idealValues.phMax + parseFloat(String(margins.phMargin));
+    const idealMin = phMin - parseFloat(String(margins.phMargin));
+    const idealMax = phMax + parseFloat(String(margins.phMargin));
     
     if (ph < idealMin) {
-      const message = `${tent.name}: pH ${ph.toFixed(1)} abaixo do ideal ${idealValues.phMin.toFixed(1)} (±${margins.phMargin}) para ${strainName}`;
+      const message = `${tent.name}: pH ${ph.toFixed(1)} abaixo do ideal ${phMin.toFixed(1)} (±${margins.phMargin}) para ${strainName}`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -838,7 +867,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
         status: "NEW",
       });
     } else if (ph > idealMax) {
-      const message = `${tent.name}: pH ${ph.toFixed(1)} acima do ideal ${idealValues.phMax.toFixed(1)} (±${margins.phMargin}) para ${strainName}`;
+      const message = `${tent.name}: pH ${ph.toFixed(1)} acima do ideal ${phMax.toFixed(1)} (±${margins.phMargin}) para ${strainName}`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
