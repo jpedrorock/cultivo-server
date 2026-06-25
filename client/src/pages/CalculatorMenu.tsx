@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight, Wind, Lock, Sparkles, Play, Sprout } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { usePlan } from "@/_core/hooks/usePlan";
+import { useHasOrganicTent } from "@/_core/hooks/useCultivationMethod";
 import { usePaywall } from "@/components/PaywallGate";
 import { useCalculatorUnlock } from "@/_core/hooks/useCalculatorUnlock";
 import { RewardedUnlockModal } from "@/components/RewardedUnlockModal";
@@ -143,6 +144,7 @@ export default function CalculatorMenu() {
   const { limits, isPro } = usePlan();
   const paywall = usePaywall();
   const { data: tents } = trpc.tents.list.useQuery();
+  const hasOrganic = useHasOrganicTent();
   const calculators = [
     {
       id: "watering-runoff",
@@ -274,6 +276,32 @@ export default function CalculatorMenu() {
     ? rec.ids.flatMap((id) => { const c = calculators.find((x) => x.id === id); return c ? [c] : []; })
     : [];
 
+  // Calcs orgânicas agrupadas à parte das minerais. Quando o user tem estufa
+  // orgânica, a seção sobe pro topo (relevante); senão vai pro fim (ruído).
+  const ORGANIC_IDS = ["living-soil", "organic-maintenance"];
+  const mineralCalcs = calculators.filter((c) => !ORGANIC_IDS.includes(c.id));
+  const organicCalcs = calculators.filter((c) => ORGANIC_IDS.includes(c.id));
+
+  const organicSection = (
+    <div className={hasOrganic ? "mb-6" : "mt-8"}>
+      <p className="text-xs font-semibold uppercase tracking-wider text-green-600 dark:text-green-400 flex items-center gap-1.5 mb-3">
+        <Sprout className="w-3.5 h-3.5" /> Cultivo orgânico
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {organicCalcs.map((calc, index) => (
+          <CalculatorCard
+            key={`org-${calc.id}`}
+            calc={calc}
+            index={index}
+            isProUser={isPro}
+            isAllowed={limits.allowedCalculators.includes(calc.id)}
+            openPaywall={paywall.open}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <PageLayout
       header={
@@ -314,8 +342,10 @@ export default function CalculatorMenu() {
             </p>
           </div>
         )}
+        {/* Estufa orgânica → seção orgânica em destaque no topo */}
+        {hasOrganic && organicSection}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {calculators.map((calc, index) => (
+          {mineralCalcs.map((calc, index) => (
             <CalculatorCard
               key={calc.id}
               calc={calc}
@@ -326,6 +356,8 @@ export default function CalculatorMenu() {
             />
           ))}
         </div>
+        {/* Sem estufa orgânica → seção orgânica de-priorizada no fim */}
+        {!hasOrganic && organicSection}
         {paywall.PaywallElement}
 
         {/* Info Card */}
