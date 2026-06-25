@@ -1311,6 +1311,24 @@ input[type="range"]::-moz-range-track {
   }
 }
 
+/* Touch devices em QUALQUER largura (tablets/laptops touch > 768px também) —
+   garante alvo de toque de 44px nos botões só-ícone e checkboxes. min-width/
+   min-height vencem larguras explícitas tipo w-7/h-7. Não afeta desktop com
+   mouse (pointer: fine), então layouts compactos no desktop ficam intactos. */
+@media (pointer: coarse) {
+  input[type="checkbox"],
+  button[role="checkbox"] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  button:has(svg:only-child),
+  a:has(svg:only-child) {
+    min-width: 44px;
+    min-height: 44px;
+    @apply flex items-center justify-center;
+  }
+}
+
 /* Forest theme: ensure no grayscale filter */
 .forest {
   color-scheme: dark;
