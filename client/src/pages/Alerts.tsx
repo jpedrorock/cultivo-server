@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, FlaskConical, CheckCircle2 } from "lucide-react";
+import { Bell, ThermometerSun, Droplets, Sun, Loader2, Settings, FlaskConical, CheckCircle2, Leaf } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -268,7 +268,12 @@ export default function Alerts() {
                                     <FlaskConical className={cn("w-5 h-5", isNew ? "text-purple-600" : "text-muted-foreground")} />
                                   </div>
                                 )}
-                                {!["TEMP","RH","PPFD","PH"].includes(alert.metric) && (
+                                {alert.metric === "HEALTH" && (
+                                  <div className={cn("p-2 rounded-lg shrink-0", isNew ? "bg-green-500/15" : "bg-muted")}>
+                                    <Leaf className={cn("w-5 h-5", isNew ? "text-green-600" : "text-muted-foreground")} />
+                                  </div>
+                                )}
+                                {!["TEMP","RH","PPFD","PH","HEALTH"].includes(alert.metric) && (
                                   <div className="p-2 bg-muted rounded-lg shrink-0">
                                     <Bell className="w-5 h-5 text-muted-foreground" />
                                   </div>
@@ -293,9 +298,11 @@ export default function Alerts() {
                                           : parseFloat(alert.value).toFixed(1)}
                                       </Badge>
                                     )}
-                                    <Badge variant="secondary" className="text-xs">
-                                      {alert.turn === "AM" ? "Manhã" : "Tarde"}
-                                    </Badge>
+                                    {alert.turn && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {alert.turn === "AM" ? "Manhã" : "Tarde"}
+                                      </Badge>
+                                    )}
                                     <Badge
                                       variant={isNew ? "destructive" : "outline"}
                                       className="text-xs"
