@@ -12,6 +12,7 @@ import { TaskCardSkeleton } from "@/components/ListSkeletons";
 import { PageHeader } from "@/components/PageHeader";
 import { PageTransition, StaggerList, ListItemAnimation } from "@/components/PageTransition";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Tarefas() {
   const { data: tasks, isLoading } = trpc.tasks.getCurrentWeekTasks.useQuery();
@@ -21,13 +22,19 @@ export default function Tarefas() {
   const [deleteTaskConfirm, setDeleteTaskConfirm] = useState<{ open: boolean; taskId: number | null }>({
     open: false, taskId: null
   });
+  const [justCompleted, setJustCompleted] = useState<Set<number>>(new Set());
 
   const markAsDone = trpc.tasks.markAsDone.useMutation({
     onSuccess: () => {
       utils.tasks.getCurrentWeekTasks.invalidate();
       toast.success("Tarefa concluída!");
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      setJustCompleted(prev => {
+        const next = new Set(prev);
+        next.delete(variables.taskId);
+        return next;
+      });
       toast.error(`Erro ao marcar tarefa: ${error.message}`);
     },
   });
@@ -44,6 +51,7 @@ export default function Tarefas() {
 
   const handleToggleTask = (taskId: number, isDone: boolean) => {
     if (!isDone && taskId > 0) {
+      setJustCompleted(prev => new Set([...prev, taskId]));
       markAsDone.mutate({ taskId });
     }
   };
@@ -220,72 +228,86 @@ export default function Tarefas() {
                       </CardHeader>
 
                       <CardContent className="pt-0">
-                        <div className="space-y-2">
-                          {tentTasks.map((task) => (
-                            <div
-                              key={task.id || task.title}
-                              className={`flex items-start gap-3 px-3 py-3 rounded-lg border transition-all min-h-[56px] ${
-                                task.isDone
-                                  ? "bg-primary/10 border-primary/20"
-                                  : "bg-background border-border hover:border-green-300"
-                              }`}
-                            >
-                              {/* Checkbox com área de toque ampliada */}
-                              <button
-                                onClick={() => handleToggleTask(task.id, task.isDone)}
-                                disabled={task.isDone || task.id === 0}
-                                className="mt-0.5 shrink-0 p-1 -m-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                aria-label={task.isDone ? "Tarefa concluída" : "Marcar como concluída"}
+                        <div className="flex flex-col">
+                          <AnimatePresence
+                            initial={false}
+                            onExitComplete={() => setJustCompleted(new Set())}
+                          >
+                            {tentTasks
+                              .filter((task) => !justCompleted.has(task.id))
+                              .map((task) => (
+                              <motion.div
+                                key={task.id || task.title}
+                                layout
+                                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                                transition={{ duration: 0.25, ease: "easeOut" }}
+                                style={{ overflow: "hidden", marginBottom: "0.5rem" }}
                               >
-                                {task.isDone ? (
-                                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                                ) : (
-                                  <Circle className="w-5 h-5 text-muted-foreground" />
-                                )}
-                              </button>
-
-                              {/* Conteúdo */}
-                              <div className="flex-1 min-w-0">
-                                <p
-                                  className={`text-sm font-medium leading-snug ${
+                                <div
+                                  className={`flex items-start gap-3 px-3 py-3 rounded-lg border transition-all min-h-[56px] ${
                                     task.isDone
-                                      ? "text-muted-foreground line-through"
-                                      : "text-foreground"
+                                      ? "bg-primary/10 border-primary/20"
+                                      : "bg-background border-border hover:border-green-300"
                                   }`}
                                 >
-                                  {task.title}
-                                </p>
-                                {task.description && (
-                                  <p
-                                    className={`text-xs mt-0.5 leading-snug ${
-                                      task.isDone ? "text-muted-foreground/60" : "text-muted-foreground"
-                                    }`}
+                                  {/* Checkbox com área de toque ampliada */}
+                                  <button
+                                    onClick={() => handleToggleTask(task.id, task.isDone)}
+                                    disabled={task.isDone || task.id === 0}
+                                    className="mt-0.5 shrink-0 p-1 -m-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={task.isDone ? "Tarefa concluída" : "Marcar como concluída"}
                                   >
-                                    {task.description}
-                                  </p>
-                                )}
-                                {task.completedAt && (
-                                  <p className="text-xs text-muted-foreground/60 mt-1">
-                                    Concluída em{" "}
-                                    {new Date(task.completedAt).toLocaleDateString("pt-BR")}
-                                  </p>
-                                )}
-                              </div>
+                                    {task.isDone ? (
+                                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                    ) : (
+                                      <Circle className="w-5 h-5 text-muted-foreground" />
+                                    )}
+                                  </button>
 
-                              {/* Botão excluir */}
-                              {task.id > 0 && (
-                                <button
-                                  onClick={() => {
-                                    setDeleteTaskConfirm({ open: true, taskId: task.id });
-                                  }}
-                                  className="shrink-0 p-2 -mr-1 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  aria-label="Excluir tarefa"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          ))}
+                                  {/* Conteúdo */}
+                                  <div className="flex-1 min-w-0">
+                                    <p
+                                      className={`text-sm font-medium leading-snug ${
+                                        task.isDone
+                                          ? "text-muted-foreground line-through"
+                                          : "text-foreground"
+                                      }`}
+                                    >
+                                      {task.title}
+                                    </p>
+                                    {task.description && (
+                                      <p
+                                        className={`text-xs mt-0.5 leading-snug ${
+                                          task.isDone ? "text-muted-foreground/60" : "text-muted-foreground"
+                                        }`}
+                                      >
+                                        {task.description}
+                                      </p>
+                                    )}
+                                    {task.completedAt && (
+                                      <p className="text-xs text-muted-foreground/60 mt-1">
+                                        Concluída em{" "}
+                                        {new Date(task.completedAt).toLocaleDateString("pt-BR")}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* Botão excluir */}
+                                  {task.id > 0 && (
+                                    <button
+                                      onClick={() => {
+                                        setDeleteTaskConfirm({ open: true, taskId: task.id });
+                                      }}
+                                      className="shrink-0 p-2 -mr-1 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                      aria-label="Excluir tarefa"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
                         </div>
                       </CardContent>
                     </Card>
