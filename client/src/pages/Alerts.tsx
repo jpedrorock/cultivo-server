@@ -17,9 +17,25 @@ import { cn } from "@/lib/utils";
 
 const ALERTS_PER_PAGE = 10;
 
+// Abas de filtro por tipo de alerta (o `metric` já vem do backend)
+const METRIC_TABS = [
+  { key: "ALL", label: "Todos" },
+  { key: "TEMP", label: "Temp" },
+  { key: "RH", label: "Umidade" },
+  { key: "PPFD", label: "Luz" },
+  { key: "PH", label: "pH" },
+  { key: "HEALTH", label: "Saúde" },
+] as const;
+
+// Severidade derivada do alertType: limite de segurança = crítico; resto = atenção
+function alertSeverity(a: { alertType?: string }): "CRITICAL" | "WARNING" {
+  return a.alertType === "SAFETY_LIMIT" ? "CRITICAL" : "WARNING";
+}
+
 export default function Alerts() {
   const [, navigate] = useLocation();
   const [selectedTentId, setSelectedTentId] = useState<number | undefined>(undefined);
+  const [metricFilter, setMetricFilter] = useState<string>("ALL");
   const [visibleCount, setVisibleCount] = useState(ALERTS_PER_PAGE);
 
   const handleSelectTent = (id: number | undefined) => {
@@ -107,6 +123,13 @@ export default function Alerts() {
 
   const currentTent = tents?.find(t => t.id === selectedTentId);
   const newCount = alertList?.filter((a: any) => a.status === "NEW").length ?? 0;
+
+  // Filtro por tipo (metric) — o dado já tem o campo; só expomos como aba.
+  const filteredAlerts = (alertList ?? []).filter(
+    (a: any) => metricFilter === "ALL" || a.metric === metricFilter
+  );
+  const metricCount = (key: string) =>
+    key === "ALL" ? (alertList?.length ?? 0) : (alertList ?? []).filter((a: any) => a.metric === key).length;
 
   return (
     <PageTransition>
@@ -227,9 +250,34 @@ export default function Alerts() {
                 {loadingAlerts ? (
                   <AlertsListSkeleton count={4} />
                 ) : alertList && alertList.length > 0 ? (
+                  <>
+                    {/* Filtro por tipo de alerta */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {METRIC_TABS.map((t) => {
+                        const c = metricCount(t.key);
+                        if (t.key !== "ALL" && c === 0) return null;
+                        return (
+                          <button
+                            key={t.key}
+                            onClick={() => { setMetricFilter(t.key); setVisibleCount(ALERTS_PER_PAGE); }}
+                            className={cn(
+                              "text-xs px-3 py-1.5 rounded-full border transition-colors",
+                              metricFilter === t.key
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border text-muted-foreground hover:bg-muted"
+                            )}
+                          >
+                            {t.label} <span className="opacity-60">{c}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {filteredAlerts.length === 0 ? (
+                      <p className="text-center text-sm text-muted-foreground py-6">Nenhum alerta desse tipo.</p>
+                    ) : (
                   <div className="space-y-3">
                     <StaggerList className="space-y-3">
-                    {alertList.slice(0, visibleCount).map((alert: any) => {
+                    {filteredAlerts.slice(0, visibleCount).map((alert: any) => {
                       const isNew = alert.status === "NEW";
                       const isPending = markAsSeen.isPending && markAsSeen.variables?.alertId === alert.id;
 
@@ -284,6 +332,15 @@ export default function Alerts() {
                                     {alert.message}
                                   </p>
                                   <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    {/* Severidade */}
+                                    <span className={cn(
+                                      "text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full",
+                                      alertSeverity(alert) === "CRITICAL"
+                                        ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                    )}>
+                                      {alertSeverity(alert) === "CRITICAL" ? "Crítico" : "Atenção"}
+                                    </span>
                                     {!selectedTentId && (
                                       <Badge variant="outline" className="text-xs">
                                         {tents?.find(t => t.id === alert.tentId)?.name ?? `Estufa #${alert.tentId}`}
@@ -338,21 +395,23 @@ export default function Alerts() {
                       );
                     })}
                   </StaggerList>
-                  {visibleCount < alertList.length && (
+                  {visibleCount < filteredAlerts.length && (
                     <div className="pt-2 text-center">
                       <p className="text-xs text-muted-foreground mb-2">
-                        Mostrando {visibleCount} de {alertList.length} alertas
+                        Mostrando {visibleCount} de {filteredAlerts.length} alertas
                       </p>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setVisibleCount(v => v + ALERTS_PER_PAGE)}
                       >
-                        Ver mais {Math.min(ALERTS_PER_PAGE, alertList.length - visibleCount)}
+                        Ver mais {Math.min(ALERTS_PER_PAGE, filteredAlerts.length - visibleCount)}
                       </Button>
                     </div>
                   )}
                   </div>
+                    )}
+                  </>
                 ) : (
                   <EmptyState
                     icon={Bell}
