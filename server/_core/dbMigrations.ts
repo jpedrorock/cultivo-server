@@ -71,6 +71,17 @@ async function addColumnIfNotExists(
   return true;
 }
 
+/** True se já existe uma FK de table.column → referenced(id). */
+async function fkExists(conn: Conn, table: string, column: string, referenced: string): Promise<boolean> {
+  const [rows] = (await conn.execute(
+    `SELECT 1 FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?
+       AND REFERENCED_TABLE_NAME = ? LIMIT 1`,
+    [table, column, referenced]
+  )) as [Array<unknown>, unknown];
+  return rows.length > 0;
+}
+
 // ── Migrations ───────────────────────────────────────────────────────────────
 
 const MIGRATIONS: Migration[] = [
@@ -840,6 +851,41 @@ const MIGRATIONS: Migration[] = [
       if (await tableExists(c, 'alerts')) {
         await c.query(`ALTER TABLE \`alerts\` MODIFY COLUMN \`alertType\` ENUM('OUT_OF_RANGE','SAFETY_LIMIT','TREND','PLANT_HEALTH') NOT NULL`);
         await c.query(`ALTER TABLE \`alerts\` MODIFY COLUMN \`metric\` ENUM('TEMP','RH','PPFD','PH','HEALTH') NOT NULL`);
+      }
+    },
+  },
+  {
+    // T12 — integridade referencial multi-tenant. ON DELETE SET NULL (decisão do
+    // João): deletar grupo NÃO apaga os dados via cascata (a deleção de conta já
+    // remove tudo explicitamente em db-account-delete.ts). Limpa órfãos antes de
+    // criar a FK pra o ALTER não falhar. ownerId fica de fora (é NOT NULL).
+    id: 'add-groupId-foreign-keys',
+    description: 'FK groupId → groups.id (ON DELETE SET NULL) nas tabelas multi-tenant',
+    run: async (c) => {
+      const tables = [
+        'users', 'tents', 'strains', 'plants', 'taskTemplates', 'recipeTemplates',
+        'wateringPresets', 'fertilizationPresets', 'weeklyTargets',
+        'notificationHistory', 'pushSubscriptions', 'pumpPresets', 'phaseAlertMargins',
+      ];
+      for (const t of tables) {
+        if (!(await tableExists(c, t))) continue;
+        if (!(await columnExists(c, t, 'groupId'))) continue;
+        if (await fkExists(c, t, 'groupId', 'groups')) continue;
+        // 1. Limpa órfãos: groupId apontando pra grupo inexistente vira NULL.
+        await c.query(
+          `UPDATE \`${t}\` SET \`groupId\` = NULL
+           WHERE \`groupId\` IS NOT NULL AND \`groupId\` NOT IN (SELECT id FROM \`groups\`)`
+        );
+        // 2. Cria a FK.
+        try {
+          await c.query(
+            `ALTER TABLE \`${t}\` ADD CONSTRAINT \`${t}_groupId_groups_fk\`
+             FOREIGN KEY (\`groupId\`) REFERENCES \`groups\`(\`id\`) ON DELETE SET NULL`
+          );
+          console.log(`[Migrations] FK groupId adicionada em ${t}`);
+        } catch (e) {
+          console.warn(`[Migrations] FK groupId em ${t} não criada: ${(e as Error)?.message}`);
+        }
       }
     },
   },
