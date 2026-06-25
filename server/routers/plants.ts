@@ -36,7 +36,7 @@ import {
   strains,
   dailyLogs,
 } from "../../drizzle/schema";
-import { validatePlantOwnership, validateTentOwnership } from "./_helpers";
+import { validatePlantOwnership, validateTentOwnership, requirePlanFeature } from "./_helpers";
 
 export const plantsRouter = router({
     // Criar nova planta
@@ -897,6 +897,8 @@ export const plantsRouter = router({
       .mutation(async ({ input, ctx }) => {
         const database = await getDb();
         if (!database) throw new Error("Database not available");
+        // Fotos das plantas são do plano Starter+ — bloqueia Free (T28)
+        requirePlanFeature(ctx.user, "photos");
         await validatePlantOwnership(input.plantId, ctx.user.groupId);
 
         // Converter base64 para Buffer

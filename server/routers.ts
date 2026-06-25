@@ -62,7 +62,7 @@ import { deviceRouter } from "./routers/device";
 
 // Helpers compartilhados (validators de ownership) — antes inline aqui,
 // agora em routers/_helpers.ts pra que sub-routers extraídos consigam importar.
-import { validateTentOwnership } from "./routers/_helpers";
+import { validateTentOwnership, requirePlanFeature } from "./routers/_helpers";
 
 /**
  * D3 — Seed task instances for a tent immediately after cycle creation.
@@ -114,6 +114,8 @@ const tuyaRouter = router({
       homeId: z.string().max(50).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Integração IoT (Tuya) é recurso do plano Cloud+ — bloqueia Free/Starter (T28)
+      requirePlanFeature(ctx.user, "iot");
       const pool = getMysqlPool();
       if (input.accessSecret) {
         // Novo segredo fornecido: criptografar e salvar
@@ -453,6 +455,7 @@ const tuyaRouter = router({
       value: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {
+      requirePlanFeature(ctx.user, "iot"); // controle IoT é Cloud+ (T28)
       const cfg = await getTuyaConfig(ctx.user.id, { requireEnabled: true });
       const { controlTuyaDevice } = await import("./lib/tuya");
       const result = await controlTuyaDevice(input.deviceId, input.switchCode, input.value, cfg.accessId, cfg.accessSecret, cfg.region);
@@ -548,6 +551,7 @@ const tuyaRouter = router({
   triggerScene: protectedProcedure
     .input(z.object({ homeId: z.number().optional(), sceneId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      requirePlanFeature(ctx.user, "iot"); // disparar cena IoT é Cloud+ (T28)
       const cfg = await getTuyaConfig(ctx.user.id);
       const { triggerTuyaScene } = await import("./lib/tuya");
       const result = await triggerTuyaScene(input.homeId ?? 0, input.sceneId, cfg.accessId, cfg.accessSecret, cfg.region);
