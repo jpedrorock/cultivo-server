@@ -225,6 +225,12 @@ const tuyaRouter = router({
       enabled: z.boolean(),
     })))
     .mutation(async ({ ctx, input }) => {
+      // Valida ownership de cada estufa ANTES de gravar — impede mapear um
+      // sensor para estufa de outro grupo (vazamento cross-tenant).
+      const tentIds = [...new Set(input.map(m => m.tentId))];
+      for (const tentId of tentIds) {
+        await validateTentOwnership(tentId, ctx.user.groupId);
+      }
       const pool = getMysqlPool();
       await pool.execute(`DELETE FROM tuyaSensorMappings WHERE userId = ?`, [ctx.user.id]);
       for (const m of input) {
@@ -402,6 +408,11 @@ const tuyaRouter = router({
     .mutation(async ({ ctx, input }) => {
       const pool = getMysqlPool();
       const tentIds = [...new Set(input.map(m => m.tentId))];
+      // Valida ownership de cada estufa ANTES de gravar — impede mapear um
+      // device controlável para estufa de outro grupo (vazamento cross-tenant).
+      for (const tentId of tentIds) {
+        await validateTentOwnership(tentId, ctx.user.groupId);
+      }
       for (const tentId of tentIds) {
         await pool.execute(
           `DELETE FROM tuyaDeviceMappings WHERE userId = ? AND tentId = ?`,
