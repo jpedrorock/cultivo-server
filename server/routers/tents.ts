@@ -99,9 +99,11 @@ export const tentsRouter = router({
 
           const currentCount = Number(countRow?.count ?? 0);
           if (currentCount >= maxTents) {
+            const planLabel = userPlan.charAt(0).toUpperCase() + userPlan.slice(1);
+            const nextPlan = userPlan === "free" ? "Starter" : "Cloud";
             throw new TRPCError({
               code: "FORBIDDEN",
-              message: `Plano Free permite no máximo ${maxTents} estufa. Faça upgrade para Pro para criar mais estufas.`,
+              message: `Seu plano (${planLabel}) permite no máximo ${maxTents} estufa${maxTents > 1 ? "s" : ""}. Faça upgrade para ${nextPlan} para criar mais.`,
             });
           }
         }

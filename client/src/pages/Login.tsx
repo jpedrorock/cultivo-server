@@ -243,16 +243,7 @@ export default function Login() {
 
             {/* Senha */}
             <div>
-              <div className="flex items-baseline justify-between mb-1.5">
-                <label htmlFor="login-password" className="block text-sm font-medium text-foreground">Senha</label>
-                <button
-                  type="button"
-                  onClick={() => { if (email) setForgotEmail(email); setForgotOpen(true); }}
-                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
-                >
-                  Esqueci minha senha
-                </button>
-              </div>
+              <label htmlFor="login-password" className="block text-sm font-medium text-foreground mb-1.5">Senha</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
                 <input
@@ -265,6 +256,16 @@ export default function Login() {
                   required
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-input bg-background/60 dark:bg-background/40 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all"
                 />
+              </div>
+              {/* Recuperação abaixo do campo (mais visível que ao lado do label — NN/g) */}
+              <div className="mt-2 text-right">
+                <button
+                  type="button"
+                  onClick={() => { if (email) setForgotEmail(email); setForgotOpen(true); }}
+                  className="text-xs font-medium text-primary hover:underline transition-colors"
+                >
+                  Esqueci minha senha
+                </button>
               </div>
             </div>
 
