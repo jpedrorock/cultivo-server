@@ -126,6 +126,8 @@ export default function Home() {
     setCreateTentModalOpen(true);
   };
   const { data: activeCycles } = trpc.cycles.listActive.useQuery();
+  const { data: weekTasks } = trpc.tasks.getCurrentWeekTasks.useQuery();
+  const pendingTasks = (weekTasks ?? []).filter((t: any) => !t.isDone).length;
   const { data: notifSettings, refetch: refetchNotifSettings } = trpc.alerts.getNotificationSettings.useQuery();
   const systemPaused = notifSettings?.systemPaused ?? false;
 
@@ -539,6 +541,7 @@ export default function Home() {
             tents={tents}
             totalNewAlerts={totalNewAlerts}
             hasActiveCycle={(tentId) => Boolean(getTentCycle(tentId))}
+            pendingTasks={pendingTasks}
           />
         )}
 
