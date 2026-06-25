@@ -82,6 +82,35 @@ async function fkExists(conn: Conn, table: string, column: string, referenced: s
   return rows.length > 0;
 }
 
+/**
+ * Grandfather do pricing 4-tier: remapeia os planos antigos pros novos.
+ *   team (antigo) → pro   (novo topo, com equipe)
+ *   pro  (antigo) → cloud (tier destaque, herda tudo do pro antigo)
+ *   free → free (inalterado)
+ *
+ * Usa 'starter' como sentinela temporária pra team, evitando colisão com o
+ * remap pro→cloud (ordem importa). Idempotente: após rodar, não há mais
+ * 'team'/'pro'(antigo) → rodar de novo é no-op.
+ *
+ * Parametrizado por `table` pra ser testável contra uma tabela temporária
+ * (ver server/planMigration.test.ts) sem tocar a tabela `users` real.
+ * `table` é constante interna (não input de usuário) — interpolação é segura.
+ */
+export async function applyPlanGrandfather(conn: Conn, table = 'users'): Promise<void> {
+  await conn.query(`UPDATE \`${table}\` SET \`plan\` = 'starter' WHERE \`plan\` = 'team'`); // sentinela temporária
+  await conn.query(`UPDATE \`${table}\` SET \`plan\` = 'cloud'   WHERE \`plan\` = 'pro'`);  // pro antigo → cloud
+  await conn.query(`UPDATE \`${table}\` SET \`plan\` = 'pro'     WHERE \`plan\` = 'starter'`); // sentinela → pro (era team)
+}
+
+/**
+ * Idempotência da migration 4-tier: o remap acima NÃO é seguro de rodar 2x
+ * (rodaria team→pro→cloud na 2ª passada). A proteção é checar o enum: se já
+ * tem 'cloud' e não tem mais 'team', a migration já rodou → pula.
+ */
+export function isPlanMigrationApplied(colType: string): boolean {
+  return colType.includes("'cloud'") && !colType.includes("'team'");
+}
+
 // ── Migrations ───────────────────────────────────────────────────────────────
 
 const MIGRATIONS: Migration[] = [
@@ -790,19 +819,16 @@ const MIGRATIONS: Migration[] = [
         `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'plan'`
       ) as [Array<{ COLUMN_TYPE: string }>, unknown];
       const colType = colRows?.[0]?.COLUMN_TYPE ?? '';
-      // Se já tem 'cloud' e NÃO tem 'team', a migração já rodou — sai.
-      if (colType.includes("'cloud'") && !colType.includes("'team'")) return;
+      // Se a migração já rodou (enum 4-tier sem 'team'), sai — o remap não é
+      // seguro de rodar 2x. Ver isPlanMigrationApplied.
+      if (isPlanMigrationApplied(colType)) return;
 
       // 1. Enum transitório com TODOS os valores (antigos + novos), pra permitir o remap.
       await c.query(
         `ALTER TABLE \`users\` MODIFY COLUMN \`plan\` ENUM('free','pro','team','starter','cloud') NOT NULL DEFAULT 'free'`
       );
-      // 2. Grandfather dos dados existentes (ordem: team→pro depois pro→cloud não pode
-      //    ser na ordem inversa senão 'team' viraria 'cloud'. Fazemos team→pro primeiro
-      //    com um valor sentinela pra evitar colisão).
-      await c.query(`UPDATE \`users\` SET \`plan\` = 'starter' WHERE \`plan\` = 'team'`); // sentinela temporária
-      await c.query(`UPDATE \`users\` SET \`plan\` = 'cloud'   WHERE \`plan\` = 'pro'`);  // pro antigo → cloud
-      await c.query(`UPDATE \`users\` SET \`plan\` = 'pro'     WHERE \`plan\` = 'starter'`); // sentinela → pro (era team)
+      // 2. Grandfather dos dados existentes (team→pro, pro→cloud) — ver applyPlanGrandfather.
+      await applyPlanGrandfather(c);
       // 3. Enum final, só com os 4 valores válidos.
       await c.query(
         `ALTER TABLE \`users\` MODIFY COLUMN \`plan\` ENUM('free','starter','cloud','pro') NOT NULL DEFAULT 'free'`
