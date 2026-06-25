@@ -95,9 +95,23 @@ export function useOfflineSync() {
       const { logDate, ...rest } = log;
 
       if (isOnline()) {
-        // Online: salvar direto no servidor
-        await createLogMutation.mutateAsync({ ...rest, logDate });
-        return 'server';
+        // Online: tenta o servidor direto.
+        try {
+          await createLogMutation.mutateAsync({ ...rest, logDate });
+          return 'server';
+        } catch (err: any) {
+          // Se o servidor RESPONDEU um erro (validação/negócio), não enfileira —
+          // re-tentar não resolveria e ficaria em loop. Só enfileira quando NÃO
+          // houve resposta (falha de rede: navigator.onLine=true mas wifi caiu).
+          const httpStatus = err?.data?.httpStatus ?? err?.shape?.data?.httpStatus;
+          if (httpStatus) throw err;
+          await savePendingLog({ ...rest, logDate: logDate.toISOString() });
+          await refreshPendingCount();
+          toast.warning('Falha ao enviar — registro salvo localmente. Será reenviado quando a conexão voltar.', {
+            duration: 5000,
+          });
+          return 'offline';
+        }
       } else {
         // Offline: salvar no IndexedDB
         await savePendingLog({ ...rest, logDate: logDate.toISOString() });
