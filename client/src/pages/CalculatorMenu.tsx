@@ -6,6 +6,16 @@ import { usePlan } from "@/_core/hooks/usePlan";
 import { usePaywall } from "@/components/PaywallGate";
 import { useCalculatorUnlock } from "@/_core/hooks/useCalculatorUnlock";
 import { RewardedUnlockModal } from "@/components/RewardedUnlockModal";
+import { trpc } from "@/lib/trpc";
+
+// Fase dominante entre as estufas → calcs recomendadas (proposta #5).
+const PHASE_RANK: Record<string, number> = { FLORA: 3, VEGA: 2, DRYING: 1, MAINTENANCE: 0 };
+const RECOMMEND_BY_PHASE: Record<string, { ids: string[]; label: string }> = {
+  VEGA:        { ids: ["nutrients", "vpd"], label: "Vegetativo" },
+  FLORA:       { ids: ["nutrients", "vpd"], label: "Floração" },
+  DRYING:      { ids: ["vpd", "ph-adjust"], label: "Secagem" },
+  MAINTENANCE: { ids: ["nutrients", "vpd"], label: "Manutenção" },
+};
 
 /** Helper: card individual de calculadora que gerencia seu próprio unlock */
 function CalculatorCard({
@@ -132,6 +142,7 @@ function CalculatorCard({
 export default function CalculatorMenu() {
   const { limits, isPro } = usePlan();
   const paywall = usePaywall();
+  const { data: tents } = trpc.tents.list.useQuery();
   const calculators = [
     {
       id: "watering-runoff",
@@ -252,6 +263,17 @@ export default function CalculatorMenu() {
     },
   ];
 
+  // Fase dominante entre as estufas (flora > vega > secagem > manutenção)
+  const dominantPhase = (tents ?? []).reduce<string | null>((acc, t: any) => {
+    if (!t.category) return acc;
+    if (!acc) return t.category;
+    return (PHASE_RANK[t.category] ?? 0) > (PHASE_RANK[acc] ?? 0) ? t.category : acc;
+  }, null);
+  const rec = dominantPhase ? RECOMMEND_BY_PHASE[dominantPhase] : null;
+  const recommended = rec
+    ? rec.ids.flatMap((id) => { const c = calculators.find((x) => x.id === id); return c ? [c] : []; })
+    : [];
+
   return (
     <PageLayout
       header={
@@ -269,6 +291,29 @@ export default function CalculatorMenu() {
       }
     >
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
+        {/* Recomendadas pela fase atual do cultivo (proposta #5) */}
+        {recommended.length > 0 && rec && (
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5 mb-3">
+              <Sparkles className="w-3.5 h-3.5" /> Recomendadas para {rec.label}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              {recommended.map((calc, index) => (
+                <CalculatorCard
+                  key={`rec-${calc.id}`}
+                  calc={calc}
+                  index={index}
+                  isProUser={isPro}
+                  isAllowed={limits.allowedCalculators.includes(calc.id)}
+                  openPaywall={paywall.open}
+                />
+              ))}
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-6 mb-3">
+              Todas as ferramentas
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {calculators.map((calc, index) => (
             <CalculatorCard
