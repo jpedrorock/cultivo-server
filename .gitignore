@@ -116,3 +116,8 @@ releases/
 # Manus / scratch (artefatos de agentes IA)
 .manus/
 todo.md
+
+# Playwright e2e
+/test-results/
+/playwright-report/
+/playwright/.cache/
