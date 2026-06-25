@@ -26,20 +26,27 @@ self.addEventListener('install', (event) => {
       // 1. Cachear assets estáticos conhecidos
       await cache.addAll(STATIC_ASSETS);
 
-      // 2. Descobrir e cachear chunks JS/CSS do Vite via index.html
+      // 2. Descobrir e cachear chunks JS/CSS do Vite via index.html.
+      // Regex (SW não tem DOM → sem DOMParser): captura QUALQUER src/href p/
+      // .js ou .css, incluindo os <link rel="modulepreload" href="....js"> que
+      // o Vite emite (o regex antigo só pegava src=.js e href=.css, perdendo
+      // os preload de JS). Loga a contagem pra falha não passar silenciosa.
       try {
         const html = await fetch('/index.html').then(r => r.text());
-        const matches = [...html.matchAll(/src="([^"]+\.js)"|href="([^"]+\.css)"/g)];
-        const vitChunks = matches
-          .map(m => m[1] || m[2])
-          .filter(Boolean)
-          .filter(url => url.startsWith('/') || url.startsWith('./'));
+        const matches = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)];
+        const vitChunks = [...new Set(
+          matches
+            .map(m => m[1])
+            .filter(url => url && (url.startsWith('/') || url.startsWith('./')))
+        )];
+        console.log(`[SW] Vite chunks encontrados: ${vitChunks.length}`);
         if (vitChunks.length > 0) {
-          console.log('[SW] Caching Vite chunks:', vitChunks.length);
           await cache.addAll(vitChunks);
+        } else {
+          console.warn('[SW] Nenhum chunk casou o regex — index.html pode ter mudado de formato.');
         }
       } catch (e) {
-        console.warn('[SW] Could not pre-cache Vite chunks:', e);
+        console.warn('[SW] Falha ao pré-cachear chunks do Vite:', e);
       }
     })
   );
