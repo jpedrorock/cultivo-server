@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Bell, CheckCircle, CheckCircle2, Zap } from "lucide-react";
+import { Bell, CheckCircle, CheckCircle2, Zap, CheckSquare } from "lucide-react";
 
 interface Tent {
   id: number;
@@ -13,6 +13,8 @@ interface TodayMissionWidgetProps {
   totalNewAlerts: number;
   /** Função pra dizer se uma estufa tem ciclo ativo (do estado do pai). */
   hasActiveCycle: (tentId: number) => boolean;
+  /** Tarefas da semana ainda não concluídas — entra no "tudo certo hoje". */
+  pendingTasks?: number;
 }
 
 /**
@@ -24,7 +26,7 @@ interface TodayMissionWidgetProps {
  *
  * Não renderiza nada se não houver estufas com ciclo ativo (no caller).
  */
-export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle }: TodayMissionWidgetProps) {
+export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle, pendingTasks = 0 }: TodayMissionWidgetProps) {
   const activeTents = tents.filter((t) => hasActiveCycle(t.id));
   const registeredToday = activeTents.filter((t) => {
     if (!t.lastReadingAt) return false;
@@ -32,7 +34,14 @@ export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle }: To
     return diff < 24 * 60 * 60 * 1000;
   });
   const pendingRegistrations = activeTents.length - registeredToday.length;
-  const allDone = pendingRegistrations === 0 && totalNewAlerts === 0;
+  const allDone = pendingRegistrations === 0 && totalNewAlerts === 0 && pendingTasks === 0;
+
+  // CTA prioriza a ação mais "diária": registro > tarefa > alerta.
+  const cta = pendingRegistrations > 0
+    ? { href: "/quick-log", label: "Registrar" }
+    : pendingTasks > 0
+      ? { href: "/tarefas", label: "Ver tarefas" }
+      : { href: "/alerts", label: "Ver alertas" };
 
   return (
     <div
@@ -85,17 +94,26 @@ export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle }: To
               ? `${totalNewAlerts} alerta${totalNewAlerts > 1 ? "s" : ""} novo${totalNewAlerts > 1 ? "s" : ""}`
               : "Sem alertas"}
           </span>
+          <span
+            className={`text-xs flex items-center gap-1 ${
+              pendingTasks > 0
+                ? "text-amber-500 font-medium"
+                : "text-muted-foreground line-through"
+            }`}
+          >
+            <CheckSquare className="w-3 h-3" />
+            {pendingTasks > 0
+              ? `${pendingTasks} tarefa${pendingTasks > 1 ? "s" : ""} pendente${pendingTasks > 1 ? "s" : ""}`
+              : "Tarefas OK"}
+          </span>
         </div>
       </div>
 
       {/* CTA */}
       {!allDone && (
-        <Link
-          href={pendingRegistrations > 0 ? "/quick-log" : "/alerts"}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <Link href={cta.href} onClick={(e) => e.stopPropagation()}>
           <button className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-            {pendingRegistrations > 0 ? "Registrar" : "Ver alertas"}
+            {cta.label}
           </button>
         </Link>
       )}
