@@ -297,7 +297,7 @@ export default function CalculatorMenu() {
             <p className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5 mb-3">
               <Sparkles className="w-3.5 h-3.5" /> Recomendadas para {rec.label}
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {recommended.map((calc, index) => (
                 <CalculatorCard
                   key={`rec-${calc.id}`}
@@ -314,7 +314,7 @@ export default function CalculatorMenu() {
             </p>
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {calculators.map((calc, index) => (
             <CalculatorCard
               key={calc.id}
