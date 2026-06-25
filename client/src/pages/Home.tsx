@@ -546,7 +546,7 @@ export default function Home() {
         )}
 
         {/* Ad banner — só pra usuário Free em mobile, no-op pro Pro/web */}
-        <div className="mt-3">
+        <div className="mt-4">
           <AdBanner slot="home-top" />
         </div>
 
