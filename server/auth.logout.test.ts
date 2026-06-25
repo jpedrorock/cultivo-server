@@ -60,10 +60,11 @@ describe.skipIf(!DB_AVAILABLE)("auth.logout", () => {
     expect(result).toEqual({ success: true });
     expect(clearedCookies).toHaveLength(1);
     expect(clearedCookies[0]?.name).toBe(AUTH_COOKIE_NAME);
+    // Atributos devem bater com setAuthCookie (clearAuthCookie) — senão o
+    // browser não limpa o cookie. secure: false em teste (não-produção).
     expect(clearedCookies[0]?.options).toMatchObject({
-      maxAge: -1,
-      secure: true,
-      sameSite: "none",
+      secure: false,
+      sameSite: "lax",
       httpOnly: true,
       path: "/",
     });

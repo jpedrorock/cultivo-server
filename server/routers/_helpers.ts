@@ -9,8 +9,49 @@
  */
 
 import { eq, and } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
 import { tents, cycles, plants, taskTemplates, taskInstances } from "../../drizzle/schema";
+
+// ── Limites de plano (T28) ────────────────────────────────────────────────────
+// Espelha as capacidades por tier de client/src/_core/hooks/usePlan.ts.
+// Objetivo principal: bloquear o plano Free dos recursos pagos no backend
+// (o paywall do front é só UX e pode ser contornado batendo direto na API).
+type PlanTier = "free" | "starter" | "cloud" | "pro";
+export type PlanFeature = "photos" | "aiChat" | "iot" | "presets" | "customAlerts";
+
+const PLAN_FEATURES: Record<PlanTier, Record<PlanFeature, boolean>> = {
+  free:    { photos: false, aiChat: false, iot: false, presets: false, customAlerts: false },
+  starter: { photos: true,  aiChat: false, iot: false, presets: true,  customAlerts: true  },
+  cloud:   { photos: true,  aiChat: true,  iot: true,  presets: true,  customAlerts: true  },
+  pro:     { photos: true,  aiChat: true,  iot: true,  presets: true,  customAlerts: true  },
+};
+
+const FEATURE_INFO: Record<PlanFeature, { label: string; minPlan: string }> = {
+  photos:       { label: "Fotos das plantas",           minPlan: "Starter" },
+  presets:      { label: "Presets salvos",              minPlan: "Starter" },
+  customAlerts: { label: "Alertas personalizados",      minPlan: "Starter" },
+  aiChat:       { label: "Doctor Jah (IA)",             minPlan: "Cloud"   },
+  iot:          { label: "Integração IoT (Tuya/ESP32)", minPlan: "Cloud"   },
+};
+
+/**
+ * Bloqueia o acesso a um recurso pago se o plano do usuário não o inclui.
+ * Plano nulo/desconhecido → permissivo (não bloqueia usuários grandfathered
+ * sem plano definido — mesmo espírito do fallback `?? "pro"` de tents.ts).
+ * Free, porém, é explícito e fica bloqueado dos recursos pagos.
+ */
+export function requirePlanFeature(user: { plan?: string | null } | undefined, feature: PlanFeature): void {
+  const plan = user?.plan as PlanTier | null | undefined;
+  if (!plan || !(plan in PLAN_FEATURES)) return; // desconhecido → não bloqueia
+  if (!PLAN_FEATURES[plan][feature]) {
+    const info = FEATURE_INFO[feature];
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `${info.label} requer o plano ${info.minPlan} ou superior. Faça upgrade para usar.`,
+    });
+  }
+}
 
 /**
  * Valida que uma estufa pertence ao grupo do usuário.
