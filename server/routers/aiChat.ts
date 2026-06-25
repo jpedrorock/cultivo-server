@@ -113,18 +113,27 @@ async function aiFetch(url: string, init?: RequestInit): Promise<Response> {
   }
 }
 
-/** Busca modelos disponíveis do Gemini via ListModels API */
+// Cache de modelos Gemini por apiKey (TTL 1h) — evita um ListModels a cada
+// testConnection / chamada (T22 da auditoria). Reseta com restart do servidor.
+const GEMINI_MODELS_CACHE_TTL_MS = 60 * 60 * 1000;
+const geminiModelsCache = new Map<string, { models: string[]; expiry: number }>();
+
+/** Busca modelos disponíveis do Gemini via ListModels API (com cache de 1h) */
 async function fetchGeminiModels(apiKey: string): Promise<string[]> {
+  const cached = geminiModelsCache.get(apiKey);
+  if (cached && cached.expiry > Date.now()) return cached.models;
   try {
     const res = await aiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=100`
     );
     if (!res.ok) return [];
     const data: any = await res.json();
-    return (data.models ?? [])
+    const models = (data.models ?? [])
       .filter((m: any) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
       .map((m: any) => (m.name as string).replace("models/", ""))
       .filter((name: string) => name.startsWith("gemini"));
+    geminiModelsCache.set(apiKey, { models, expiry: Date.now() + GEMINI_MODELS_CACHE_TTL_MS });
+    return models;
   } catch {
     return [];
   }
@@ -282,9 +291,41 @@ async function callAiProvider(opts: {
   throw new Error(`Provedor desconhecido: ${provider}`);
 }
 
+// ── Circuit breaker por provider (T23) ───────────────────────────────────────
+// Após CB_THRESHOLD falhas reais consecutivas (rede/5xx/429/timeout) o circuito
+// abre por CB_COOLDOWN_MS e as chamadas falham rápido com mensagem amigável, em
+// vez de cada request esperar timeout. Sucesso reseta. Em memória (single-instance).
+const CB_THRESHOLD = 5;
+const CB_COOLDOWN_MS = 60 * 1000;
+const cbState = new Map<string, { failures: number; openUntil: number }>();
+
+function cbCheck(provider: string): void {
+  const s = cbState.get(provider);
+  if (s && s.openUntil > Date.now()) {
+    const secs = Math.ceil((s.openUntil - Date.now()) / 1000);
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `O provider ${provider} está instável (muitas falhas seguidas). Tente de novo em ~${secs}s ou troque de provider em Configurações.`,
+    });
+  }
+}
+function cbSuccess(provider: string): void {
+  cbState.delete(provider);
+}
+function cbFailure(provider: string): void {
+  const s = cbState.get(provider) ?? { failures: 0, openUntil: 0 };
+  s.failures += 1;
+  if (s.failures >= CB_THRESHOLD) {
+    s.openUntil = Date.now() + CB_COOLDOWN_MS;
+    s.failures = 0; // reinicia a contagem; circuito reabre só após o cooldown
+  }
+  cbState.set(provider, s);
+}
+
 /** Chama o provider com auto-fallback se o modelo for deprecado/não encontrado */
 async function callAiProviderWithFallback(opts: Parameters<typeof callAiProvider>[0]): Promise<{ reply: string; modelUsed: string }> {
   const { provider, model, apiKey } = opts;
+  cbCheck(provider); // falha rápido se o circuito do provider estiver aberto
 
   // Para Gemini: busca modelos reais da API antes de tentar
   let candidates: string[];
@@ -311,10 +352,12 @@ async function callAiProviderWithFallback(opts: Parameters<typeof callAiProvider
       if (candidate !== model) {
         console.log(`[aiChat] Modelo ${model} indisponível, usando fallback: ${candidate}`);
       }
+      cbSuccess(provider); // chamada deu certo — fecha o circuito
       return { reply, modelUsed: candidate };
     } catch (err: any) {
       lastError = err?.message ?? String(err);
       if (!isModelNotFoundError(lastError)) {
+        cbFailure(provider); // falha real (rede/5xx/429/timeout) — conta no breaker
         throw err; // Não é erro de modelo — lança imediatamente
       }
       console.warn(`[aiChat] Modelo ${candidate} não disponível, tentando próximo...`);
