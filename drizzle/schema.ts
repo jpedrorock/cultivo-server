@@ -1095,3 +1095,115 @@ export const siteSettings = mysqlTable("siteSettings", {
 
 export type SiteSettings = typeof siteSettings.$inferSelect;
 export type InsertSiteSettings = typeof siteSettings.$inferInsert;
+
+// ── Tuya / IoT ────────────────────────────────────────────────────────────────
+// Modeladas pra dar type-safety (antes acessadas só via SQL raw em routers.ts).
+// As definições espelham EXATAMENTE as tabelas existentes — SEM foreign keys
+// (o banco não tem) pra um db:push futuro não propor ALTER/ADD CONSTRAINT.
+
+/** Credenciais e config da integração Tuya por usuário */
+export const tuyaConfig = mysqlTable("tuyaConfig", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  accessId: varchar("accessId", { length: 100 }).notNull(),
+  accessSecret: varchar("accessSecret", { length: 100 }).notNull(), // criptografado (aiCrypto)
+  region: varchar("region", { length: 10 }).default("eu").notNull(),
+  pollIntervalMin: int("pollIntervalMin").default(60).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  homeId: varchar("homeId", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  userUnique: unique("tuyaConfig_userId").on(t.userId),
+}));
+
+/** Mapeamento sensor Tuya → estufa (leitura de temp/RH) */
+export const tuyaSensorMappings = mysqlTable("tuyaSensorMappings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tentId: int("tentId").notNull(),
+  deviceId: varchar("deviceId", { length: 100 }).notNull(),
+  deviceName: varchar("deviceName", { length: 200 }),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  userTentUnique: unique("tuyaSensorMappings_userId_tentId").on(t.userId, t.tentId),
+}));
+
+/** Mapeamento device controlável Tuya → estufa (switch) */
+export const tuyaDeviceMappings = mysqlTable("tuyaDeviceMappings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tentId: int("tentId").notNull(),
+  deviceId: varchar("deviceId", { length: 100 }).notNull(),
+  deviceName: varchar("deviceName", { length: 200 }),
+  switchCode: varchar("switchCode", { length: 50 }).default("switch_1").notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  userTentDevUnique: unique("tuyaDeviceMappings_user_tent_dev").on(t.userId, t.tentId, t.deviceId),
+}));
+
+/** Cenas SmartLife adicionadas manualmente (a API de listagem foi deprecada) */
+export const tuyaManualScenes = mysqlTable("tuyaManualScenes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  homeId: varchar("homeId", { length: 50 }).notNull(),
+  sceneId: varchar("sceneId", { length: 100 }).notNull(),
+  name: varchar("name", { length: 200 }).default("Cena").notNull(),
+  type: varchar("type", { length: 20 }).default("tap").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  userSceneUnique: unique("tuyaManualScenes_user_scene").on(t.userId, t.sceneId),
+}));
+
+/** Última leitura por sensor (cache pra exibição rápida) */
+export const sensorLatestReadings = mysqlTable("sensorLatestReadings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  deviceId: varchar("deviceId", { length: 100 }).notNull(),
+  tempC: decimal("tempC", { precision: 4, scale: 1 }),
+  rhPct: decimal("rhPct", { precision: 4, scale: 1 }),
+  readAt: timestamp("readAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  deviceUnique: unique("sensorLatestReadings_deviceId").on(t.deviceId),
+}));
+
+/** Cenas associadas a uma estufa (mostradas no display ESP) */
+export const tentScenes = mysqlTable("tentScenes", {
+  id: int("id").autoincrement().primaryKey(),
+  tentId: int("tentId").notNull(),
+  sceneId: varchar("sceneId", { length: 64 }).notNull(),
+  name: varchar("name", { length: 100 }).default("Cena").notNull(),
+  type: varchar("type", { length: 20 }).default("scene").notNull(),
+  iconHint: varchar("iconHint", { length: 20 }),
+  executionSec: int("executionSec").default(5).notNull(),
+  position: int("position").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  tentPosIdx: index("idx_tentScenes_tent_pos").on(t.tentId, t.position),
+}));
+
+/** Devices controláveis associados a uma estufa (mostrados no display ESP) */
+export const tentDevices = mysqlTable("tentDevices", {
+  id: int("id").autoincrement().primaryKey(),
+  tentId: int("tentId").notNull(),
+  deviceId: varchar("deviceId", { length: 64 }).notNull(),
+  name: varchar("name", { length: 100 }).default("Dispositivo").notNull(),
+  position: int("position").default(0).notNull(),
+  iconHint: varchar("iconHint", { length: 20 }),
+  switchCode: varchar("switchCode", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  tentPosIdx: index("idx_tentDevices_tent_pos").on(t.tentId, t.position),
+}));
+
+export type TuyaConfig = typeof tuyaConfig.$inferSelect;
+export type TuyaSensorMapping = typeof tuyaSensorMappings.$inferSelect;
+export type TuyaDeviceMapping = typeof tuyaDeviceMappings.$inferSelect;
+export type TuyaManualScene = typeof tuyaManualScenes.$inferSelect;
+export type SensorLatestReading = typeof sensorLatestReadings.$inferSelect;
+export type TentScene = typeof tentScenes.$inferSelect;
+export type TentDevice = typeof tentDevices.$inferSelect;
