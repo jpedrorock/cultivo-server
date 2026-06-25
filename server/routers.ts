@@ -1,5 +1,6 @@
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { clearAuthCookie } from "./_core/auth";
 import { TRPCError } from "@trpc/server";
 import { getMysqlPool } from "./mysql-pool";
 import { saveSubscription, sendPushToUser, getVapidPublicKey, isPushConfigured } from "./pushService";
@@ -2087,13 +2088,9 @@ export const appRouter = router({
      * Espelho tRPC do POST /api/auth/logout (que é REST).
      */
     logout: protectedProcedure.mutation(({ ctx }) => {
-      ctx.res.clearCookie("auth_token", {
-        maxAge: -1,
-        secure: true,
-        sameSite: "none",
-        httpOnly: true,
-        path: "/",
-      });
+      // Usa o mesmo helper do setAuthCookie (secure: ENV.isProduction,
+      // sameSite: 'lax') — atributos têm que bater pro browser limpar o cookie.
+      clearAuthCookie(ctx.res);
       return { success: true };
     }),
   }),
