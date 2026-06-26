@@ -560,13 +560,7 @@ export function TentCard({
                     ? (tent.lastCloningAt
                         ? (() => { const d = Math.floor((Date.now() - tent.lastCloningAt) / 86400000); return d === 0 ? 'Hoje' : d === 1 ? 'Ontem' : `Há ${d}d`; })()
                         : 'Sem clonagem')
-                    : `Semana ${(() => {
-                        const now = new Date(); const start = new Date(cycle.startDate);
-                        if (isNaN(start.getTime())) return '?';
-                        const fs = cycle.floraStartDate ? new Date(cycle.floraStartDate) : null;
-                        if (fs && !isNaN(fs.getTime()) && now >= fs) return Math.max(1, Math.floor((now.getTime() - fs.getTime()) / 604800000) + 1);
-                        return Math.max(1, Math.floor((now.getTime() - start.getTime()) / 604800000) + 1);
-                      })()}`
+                    : `Semana ${cycleWeekNum ?? '?'}`
                   }
                 </span>
               </div>
