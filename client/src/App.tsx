@@ -19,6 +19,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 // Isso puxava todo o wizard (~57 kB) pro bundle principal, tornando o lazy() abaixo ineficaz.
 import { isWizardDone } from "./lib/wizardStorage";
 import { useOnboardingTour } from "./hooks/useOnboardingTour";
+import { useSimpleMode } from "./hooks/useSimpleMode";
 import { useAppStateRefetch } from "./hooks/useAppStateRefetch";
 import { hideSplash } from "./lib/splash";
 import { initAndroidBackButton, pushBackHandler } from "./lib/androidBackButton";
@@ -98,12 +99,18 @@ function Redirect({ to }: { to: string }) {
   return null;
 }
 
+/** No Modo Simples (app de iniciante), o Jardim é a home; no avançado, o painel de estufas. */
+function HomeRoute() {
+  const [simpleMode] = useSimpleMode();
+  return simpleMode ? <Jardim /> : <Home />;
+}
+
 function Router() {
   const [location] = useLocation();
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch key={location}>
-        <Route path={"/"} component={Home} />
+        <Route path={"/"} component={HomeRoute} />
 
         <Route path={"/strains"} component={ManageStrains} />
         {/* /manage-strains: legacy URL — redireciona pro canônico /strains */}

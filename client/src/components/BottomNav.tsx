@@ -1,4 +1,5 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, PenLine, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi, Timer, FlaskConical, Sun, TestTube, Droplets } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, PenLine, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi, Timer, FlaskConical, Sun, TestTube, Droplets, Flower2 } from "lucide-react";
+import { useSimpleMode } from "@/hooks/useSimpleMode";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -146,6 +147,7 @@ function ChatPlantPicker({
 
 export function BottomNav() {
   const [location, navigate] = useLocation();
+  const [simpleMode] = useSimpleMode();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   const [trainingPickerOpen, setTrainingPickerOpen] = useState(false);
@@ -225,8 +227,11 @@ export function BottomNav() {
   }, []);
 
   // Slots diretos: Estufas · Plantas · [FAB] · Alertas · Mais
+  // No Modo Simples (app de iniciante), o slot 1 vira o Jardim (a home dele).
   const navItems: NavItem[] = [
-    { href: "/", icon: TentIcon, label: "Estufas" },
+    simpleMode
+      ? { href: "/", icon: Flower2, label: "Jardim" }
+      : { href: "/", icon: TentIcon, label: "Estufas" },
     { href: "/plants", icon: Leaf, label: "Plantas" },
   ];
 
