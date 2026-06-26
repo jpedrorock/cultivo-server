@@ -725,14 +725,6 @@ export async function checkAlertsForTent(tentId: number): Promise<{
   if (marginsResult.length === 0) return { alertsGenerated: 0, messages: [] };
   const margins = marginsResult[0];
 
-  // Buscar strain name para mensagem contextual
-  const cycle = await getCycleByTentId(tentId);
-  let strainName = "strain desconhecida";
-  if (cycle?.strainId) {
-    const strain = await getStrainById(cycle.strainId);
-    if (strain) strainName = strain.name;
-  }
-
   const alertsToInsert: any[] = [];
   const messages: string[] = [];
 
@@ -743,7 +735,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
     const idealMax = idealValues.tempMax + parseFloat(String(margins.tempMargin));
     
     if (temp < idealMin) {
-      const message = `${tent.name}: Temp ${temp.toFixed(1)}°C abaixo do ideal ${idealValues.tempMin.toFixed(1)}°C (±${margins.tempMargin}°C) para ${strainName}`;
+      const message = `${tent.name}: está frio (${temp.toFixed(1)}°C, ideal ${idealValues.tempMin.toFixed(1)}°C). O crescimento fica lento — considere um aquecedor.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -756,7 +748,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
         status: "NEW",
       });
     } else if (temp > idealMax) {
-      const message = `${tent.name}: Temp ${temp.toFixed(1)}°C acima do ideal ${idealValues.tempMax.toFixed(1)}°C (±${margins.tempMargin}°C) para ${strainName}`;
+      const message = `${tent.name}: está quente (${temp.toFixed(1)}°C, ideal ${idealValues.tempMax.toFixed(1)}°C). Pode estressar as plantas — aumente a ventilação.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -778,7 +770,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
     const idealMax = idealValues.rhMax + parseFloat(String(margins.rhMargin));
     
     if (rh < idealMin) {
-      const message = `${tent.name}: RH ${rh.toFixed(1)}% abaixo do ideal ${idealValues.rhMin.toFixed(1)}% (±${margins.rhMargin}%) para ${strainName}`;
+      const message = `${tent.name}: ar seco (${rh.toFixed(0)}%, ideal ${idealValues.rhMin.toFixed(0)}%). Plantas com sede — use um umidificador.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -791,7 +783,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
         status: "NEW",
       });
     } else if (rh > idealMax) {
-      const message = `${tent.name}: RH ${rh.toFixed(1)}% acima do ideal ${idealValues.rhMax.toFixed(1)}% (±${margins.rhMargin}%) para ${strainName}`;
+      const message = `${tent.name}: muita umidade (${rh.toFixed(0)}%, ideal ${idealValues.rhMax.toFixed(0)}%). Risco de mofo — melhore a ventilação.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -813,7 +805,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
     const idealMax = idealValues.ppfdMax + margins.ppfdMargin;
     
     if (ppfd < idealMin) {
-      const message = `${tent.name}: PPFD ${ppfd} abaixo do ideal ${idealValues.ppfdMin} (±${margins.ppfdMargin}) para ${strainName}`;
+      const message = `${tent.name}: pouca luz (PPFD ${ppfd}, ideal ${idealValues.ppfdMin}). As plantas crescem devagar — aproxime a luminária.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -826,7 +818,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
         status: "NEW",
       });
     } else if (ppfd > idealMax) {
-      const message = `${tent.name}: PPFD ${ppfd} acima do ideal ${idealValues.ppfdMax} (±${margins.ppfdMargin}) para ${strainName}`;
+      const message = `${tent.name}: luz muito forte (PPFD ${ppfd}, ideal ${idealValues.ppfdMax}). As folhas podem queimar — afaste a luminária.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -854,7 +846,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
     const idealMax = phMax + parseFloat(String(margins.phMargin));
     
     if (ph < idealMin) {
-      const message = `${tent.name}: pH ${ph.toFixed(1)} abaixo do ideal ${phMin.toFixed(1)} (±${margins.phMargin}) para ${strainName}`;
+      const message = `${tent.name}: pH ${ph.toFixed(1)} abaixo do ideal (${phMin.toFixed(1)}). Ajuste a solução nutritiva.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
@@ -867,7 +859,7 @@ export async function checkAlertsForTent(tentId: number): Promise<{
         status: "NEW",
       });
     } else if (ph > idealMax) {
-      const message = `${tent.name}: pH ${ph.toFixed(1)} acima do ideal ${phMax.toFixed(1)} (±${margins.phMargin}) para ${strainName}`;
+      const message = `${tent.name}: pH ${ph.toFixed(1)} acima do ideal (${phMax.toFixed(1)}). Ajuste a solução nutritiva.`;
       messages.push(message);
       alertsToInsert.push({
         tentId,
