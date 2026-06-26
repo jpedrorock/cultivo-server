@@ -8,12 +8,16 @@ const TIER_NAME: Record<TrophyTier, string> = {
   bronze: "Broto",
   silver: "Folhagem",
   gold: "Florada",
+  diamond: "Diamante",
+  legendary: "Lendário",
   platinum: "Lenda",
 };
 const TIER_COLOR: Record<TrophyTier, string> = {
   bronze: "#c0843f",
   silver: "#c2ccd4",
   gold: "#f0cf6a",
+  diamond: "#9fe8ff",
+  legendary: "#ffcf5a",
   platinum: "#7df0e0",
 };
 
