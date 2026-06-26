@@ -19,6 +19,8 @@ export interface GamificationStats {
   plantCount: number;
   /** Ofensiva atual (dias seguidos com registro). */
   currentStreak: number;
+  /** Maior ofensiva já alcançada. */
+  longestStreak: number;
 }
 
 // ─── Grow Score ──────────────────────────────────────────────────────────────
@@ -75,40 +77,85 @@ export function computeLevel(score: number): LevelInfo {
   };
 }
 
-// ─── Badges ──────────────────────────────────────────────────────────────────
-export interface BadgeInfo {
-  id: string;
+// ─── Conquistas com tiers (Troféus do Cultivo) ───────────────────────────────
+// Ver TROPHY-SYSTEM-DESIGN.md. Fase 0: só métricas que já existem (as conquistas
+// que precisam de contadores novos — Zona de Conforto, Engenheiro, Madrugador,
+// Curador, Renascido — entram na Fase 4).
+export type Tier = "bronze" | "silver" | "gold";
+const TIERS: Tier[] = ["bronze", "silver", "gold"];
+const TIER_VALUE: Record<Tier, number> = { bronze: 1, silver: 2, gold: 3 };
+
+export interface Achievement {
+  key: string;
   name: string;
-  description: string;
+  /** Pista mostrada no estado bloqueado. */
+  hint: string;
+  /** Marco = 1 tier fixo; escalável = 3 tiers (bronze/prata/ouro). */
+  isMilestone: boolean;
+  /** Valor atual da métrica. */
+  current: number;
+  /** Thresholds [bronze, prata, ouro] (escalável) ou [need] (marco). */
+  thresholds: number[];
+  /** Maior tier desbloqueado (null = bloqueado). */
+  tier: Tier | null;
   unlocked: boolean;
-  /** Progresso pra badges de meta (ex: 4/7 dias). Ausente em badges binários. */
-  progress?: { have: number; need: number };
+  /** Próximo threshold a bater (null = no topo). */
+  nextThreshold: number | null;
 }
 
-function badge(
-  id: string,
-  name: string,
-  description: string,
-  unlocked: boolean,
-  have?: number,
-  need?: number,
-): BadgeInfo {
-  const b: BadgeInfo = { id, name, description, unlocked };
-  if (need != null && have != null) b.progress = { have: Math.min(have, need), need };
-  return b;
+const SCALABLE: { key: string; name: string; hint: string; stat: keyof GamificationStats; thresholds: [number, number, number] }[] = [
+  { key: "mao-na-terra", name: "Mão na Terra", hint: "Dias seguidos registrando", stat: "currentStreak", thresholds: [7, 30, 100] },
+  { key: "diario-de-bordo", name: "Diário de Bordo", hint: "Registros feitos", stat: "logCount", thresholds: [10, 100, 500] },
+  { key: "olho-de-lince", name: "Olho de Lince", hint: "Registros de tricoma", stat: "trichomeCount", thresholds: [5, 25, 100] },
+  { key: "lente-verde", name: "Lente Verde", hint: "Fotos de planta", stat: "photoCount", thresholds: [10, 50, 200] },
+  { key: "ciclo-completo", name: "Ciclo Completo", hint: "Ciclos finalizados", stat: "finishedCycles", thresholds: [1, 5, 15] },
+  { key: "raiz-profunda", name: "Raiz Profunda", hint: "Recorde de ofensiva (dias)", stat: "longestStreak", thresholds: [14, 60, 180] },
+];
+
+const MILESTONES: { key: string; name: string; hint: string; stat: keyof GamificationStats; need: number; tier: Tier }[] = [
+  { key: "primeiro-broto", name: "Primeiro Broto", hint: "Faça seu primeiro registro", stat: "logCount", need: 1, tier: "bronze" },
+  { key: "germinacao", name: "Germinação", hint: "Cadastre sua primeira planta", stat: "plantCount", need: 1, tier: "bronze" },
+  { key: "primeira-colheita", name: "Primeira Colheita", hint: "Finalize um ciclo até a colheita", stat: "finishedCycles", need: 1, tier: "gold" },
+];
+
+function tierForValue(value: number, thresholds: number[]): { tier: Tier | null; next: number | null } {
+  let tier: Tier | null = null;
+  for (let i = 0; i < thresholds.length; i++) if (value >= thresholds[i]) tier = TIERS[i];
+  const nextIdx = thresholds.findIndex((t) => value < t);
+  return { tier, next: nextIdx === -1 ? null : thresholds[nextIdx] };
 }
 
-export function computeBadges(s: GamificationStats): BadgeInfo[] {
-  return [
-    badge("first-log", "Primeiro Registro", "Fez seu primeiro registro", s.logCount >= 1),
-    badge("first-plant", "Mão na Terra", "Cadastrou sua primeira planta", s.plantCount >= 1),
-    badge("streak-7", "Constante", "7 dias seguidos registrando", s.currentStreak >= 7, s.currentStreak, 7),
-    badge("streak-30", "Dedicado", "30 dias seguidos registrando", s.currentStreak >= 30, s.currentStreak, 30),
-    badge("streak-100", "Inabalável", "100 dias seguidos registrando", s.currentStreak >= 100, s.currentStreak, 100),
-    badge("photographer", "Fotógrafo", "10 fotos de planta", s.photoCount >= 10, s.photoCount, 10),
-    badge("observer", "Observador", "5 registros de tricoma", s.trichomeCount >= 5, s.trichomeCount, 5),
-    badge("first-harvest", "Primeira Colheita", "Finalizou um ciclo do início ao fim", s.finishedCycles >= 1),
-  ];
+export function computeAchievements(s: GamificationStats): Achievement[] {
+  const scal: Achievement[] = SCALABLE.map((d) => {
+    const current = s[d.stat];
+    const { tier, next } = tierForValue(current, d.thresholds);
+    return { key: d.key, name: d.name, hint: d.hint, isMilestone: false, current, thresholds: d.thresholds, tier, unlocked: tier != null, nextThreshold: next };
+  });
+  const mile: Achievement[] = MILESTONES.map((d) => {
+    const current = s[d.stat];
+    const unlocked = current >= d.need;
+    return { key: d.key, name: d.name, hint: d.hint, isMilestone: true, current, thresholds: [d.need], tier: unlocked ? d.tier : null, unlocked, nextThreshold: unlocked ? null : d.need };
+  });
+  return [...scal, ...mile];
+}
+
+/**
+ * Platina "Lenda do Cultivo": todos os escaláveis no OURO + todos os marcos,
+ * com a suavização do Ciclo Completo (PRATA já conta — ver design). have/total
+ * contam tiers desbloqueados (escalável=3, marco=1) pro contador "X de Y".
+ */
+export function computePlatinum(achs: Achievement[]): { unlocked: boolean; have: number; total: number } {
+  let have = 0;
+  let total = 0;
+  let allDone = true;
+  for (const a of achs) {
+    total += a.isMilestone ? 1 : 3;
+    const got = a.isMilestone ? (a.unlocked ? 1 : 0) : a.tier ? TIER_VALUE[a.tier] : 0;
+    have += got;
+    const need = a.isMilestone ? 1 : a.key === "ciclo-completo" ? 2 : 3;
+    if (got < need) allDone = false;
+  }
+  return { unlocked: allDone, have, total };
 }
 
 /**
@@ -155,12 +202,11 @@ export function computeStreak(
 /** Resumo completo de progresso (sem a ofensiva, que vem do router). */
 export function computeProgress(s: GamificationStats) {
   const growScore = computeGrowScore(s);
-  const badges = computeBadges(s);
+  const achievements = computeAchievements(s);
   return {
     growScore,
     level: computeLevel(growScore),
-    badges,
-    badgesUnlocked: badges.filter((b) => b.unlocked).length,
-    badgesTotal: badges.length,
+    achievements,
+    platinum: computePlatinum(achievements),
   };
 }
