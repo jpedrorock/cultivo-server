@@ -20,6 +20,8 @@ type PlanCardData = {
   monthly: string | null;
   yearly: string | null;
   perCapita?: string;
+  /** Equivalente mensal quando paga no anual (headline pra parecer mais barato). */
+  perMonth?: string;
   features: string[];
   cta: string;
   badge?: string;
@@ -52,6 +54,7 @@ const PLANS: PlanCardData[] = [
     monthly: "R$19",
     yearly: "R$180",
     perCapita: "R$15/mês no anual",
+    perMonth: "R$15",
     features: [
       "Até 3 estufas",
       "Todas as 7 calculadoras",
@@ -73,6 +76,7 @@ const PLANS: PlanCardData[] = [
     monthly: "R$29",
     yearly: "R$288",
     perCapita: "R$24/mês no anual",
+    perMonth: "R$24",
     features: [
       "Estufas ilimitadas",
       "Histórico completo",
@@ -91,6 +95,7 @@ const PLANS: PlanCardData[] = [
     monthly: "R$89",
     yearly: "R$888",
     perCapita: "R$74/mês no anual",
+    perMonth: "R$74",
     features: [
       "Tudo do Cloud",
       "Até 3 membros no grupo",
@@ -242,14 +247,17 @@ export default function Subscription() {
 
                       {plan.yearly && (
                         <div className="mb-3">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-bold text-foreground">{plan.yearly}</span>
-                            <span className="text-sm text-muted-foreground">/ano</span>
+                          {/* Headline = equivalente mensal no anual (parece mais barato) */}
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-3xl font-bold text-foreground">{plan.perMonth ?? plan.monthly}</span>
+                            <span className="text-sm text-muted-foreground">/mês</span>
+                            {plan.monthly && plan.perMonth && plan.monthly !== plan.perMonth && (
+                              <span className="text-xs text-muted-foreground/70 line-through ml-1">{plan.monthly}</span>
+                            )}
                           </div>
-                          {plan.perCapita && (
-                            <p className="text-xs text-muted-foreground">{plan.perCapita}</p>
-                          )}
-                          <p className="text-[11px] text-muted-foreground">ou {plan.monthly}/mês</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            cobrado {plan.yearly}/ano · cancele quando quiser
+                          </p>
                         </div>
                       )}
                       {!plan.yearly && plan.monthly && (
