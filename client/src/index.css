@@ -2263,10 +2263,18 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 .plant-celebrate    { animation: plant-celebrate 1.2s ease-in-out; }
 .jardim-falling     { animation: jardim-fall 2.2s ease-in forwards; }
 
+/* Level-up de estágio — flash dourado expansivo atrás da planta */
+@keyframes jardim-glow-burst {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  30%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
+}
+.jardim-glow { animation: jardim-glow-burst 1.5s ease-out forwards; }
+
 .jardim-particle { animation: jardim-float-up 1s ease-out forwards; }
 .jardim-bubble   { animation: jardim-pop 0.35s ease-out forwards; }
 
 @media (prefers-reduced-motion: reduce) {
   .plant-idle-happy, .plant-idle-thirsty, .plant-idle-sad, .plant-reacting, .plant-celebrate { animation: none; }
-  .jardim-particle, .jardim-bubble, .jardim-falling { animation-duration: 0.01s; }
+  .jardim-particle, .jardim-bubble, .jardim-falling, .jardim-glow { animation-duration: 0.01s; }
 }

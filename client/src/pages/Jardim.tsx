@@ -8,9 +8,12 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { haptics } from "@/lib/haptics";
 import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
+import { readLastStage, writeLastStage } from "@/lib/gardenStage";
 
 // Folhas que caem na celebração (posições/emojis fixos por índice).
 const CELEBRATE_LEAVES = ["🌿", "💚", "✨", "🍃", "🌱", "💚", "✨", "🌿", "🍃", "🌱", "✨", "💚"];
+// Estrelas que sobem no level-up de estágio.
+const LEVELUP_STARS = ["⭐", "✨", "🌟", "✨", "⭐", "🌟", "✨", "⭐"];
 
 // Falas da planta ao ser tocada (por humor).
 const PET_PHRASES: Record<PlantMood, string[]> = {
@@ -63,6 +66,25 @@ export default function Jardim() {
 
   // Limpa timers do toque ao desmontar.
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
+
+  // Level-up: detecta subida de estágio (semente→muda→…) e celebra.
+  const [levelUp, setLevelUp] = useState<string | null>(null);
+  useEffect(() => {
+    if (!data || !("hasGarden" in data) || !data.hasGarden) return;
+    const prev = readLastStage(data.tentId);
+    if (prev != null && data.stage > prev) {
+      // Subiu! Não persiste agora — só ao fim (sobrevive ao double-mount do StrictMode).
+      setLevelUp(data.stageName);
+      haptics.success().catch(() => {});
+      const t = setTimeout(() => {
+        setLevelUp(null);
+        writeLastStage(data.tentId, data.stage);
+      }, 3200);
+      return () => clearTimeout(t);
+    }
+    // Primeira vez ou sem subida: só sincroniza o marcador.
+    writeLastStage(data.tentId, data.stage);
+  }, [data]);
 
   const mood = (data && "hasGarden" in data && data.hasGarden ? data.mood : "happy") as PlantMood;
 
@@ -128,6 +150,29 @@ export default function Jardim() {
                   </span>
                 </>
               )}
+              {/* Level-up de estágio */}
+              {levelUp && (
+                <>
+                  <span
+                    className="jardim-glow pointer-events-none absolute left-1/2 top-[42%] z-0 h-44 w-44 rounded-full"
+                    style={{ background: "radial-gradient(circle, rgba(255,207,106,0.55), transparent 70%)" }}
+                  />
+                  <span className="pointer-events-none absolute inset-0 z-20">
+                    {LEVELUP_STARS.map((s, i) => (
+                      <span
+                        key={i}
+                        className="jardim-particle absolute text-lg"
+                        style={{ left: `${18 + i * 9}%`, bottom: "40%", animationDelay: `${i * 70}ms` }}
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="jardim-bubble absolute left-1/2 top-2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 text-amber-950 text-sm font-extrabold px-4 py-1.5 shadow-lg">
+                    🎉 Novo estágio: {levelUp}!
+                  </span>
+                </>
+              )}
               <button
                 type="button"
                 onClick={petPlant}
@@ -162,7 +207,7 @@ export default function Jardim() {
                     ))}
                   </span>
                 )}
-                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} celebrating={celebrating} />
+                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} celebrating={celebrating || !!levelUp} />
               </button>
               <p className="text-lg font-bold text-foreground mt-1">{data.tentName}</p>
               <p className="text-xs text-muted-foreground">
