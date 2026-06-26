@@ -21,7 +21,7 @@ const PRO_BENEFITS = [
   "Estufas e ciclos ilimitados",
   "Todas as 7 calculadoras (NPK, EC, pH, Rega Automática...)",
   "Fotos das plantas ilimitadas",
-  "Chat com IA especialista (Doctor Jáh)",
+  "Chat com IA especialista (Cultivisor)",
   "Integração Tuya / SmartLife / ESP32",
   "Histórico completo + export CSV",
   "Sem anúncios",

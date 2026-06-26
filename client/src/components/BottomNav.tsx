@@ -406,7 +406,7 @@ export function BottomNav() {
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                 </button>
 
-                {/* Doctor Jáh — abre picker de planta */}
+                {/* Cultivisor — abre picker de planta */}
                 <button
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); setChatPickerOpen(true); }}
                   className="flex items-center gap-4 px-5 py-4 hover:bg-blue-500/8 active:bg-blue-500/15 transition-colors w-full text-left"
@@ -415,7 +415,7 @@ export function BottomNav() {
                     <Bot className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-foreground leading-tight">Doctor Jáh</p>
+                    <p className="text-base font-semibold text-foreground leading-tight">Cultivisor</p>
                     <p className="text-xs text-muted-foreground/60 mt-0.5">Diagnóstico · LST · Tricomas</p>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />

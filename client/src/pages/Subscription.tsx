@@ -80,7 +80,7 @@ const PLANS: PlanCardData[] = [
     features: [
       "Estufas ilimitadas",
       "Histórico completo",
-      "AI Chat — Doctor Jáh",
+      "AI Chat — Cultivisor",
       "Integração Tuya / SmartLife / ESP32",
       "Tudo do Starter incluído",
     ],

@@ -590,7 +590,7 @@ export const aiChatRouter = router({
       imageMime:   z.enum(["image/jpeg", "image/png", "image/webp"]).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Doctor Jah (IA) é recurso do plano Cloud+ — bloqueia Free/Starter (T28)
+      // Cultivisor (IA) é recurso do plano Cloud+ — bloqueia Free/Starter (T28)
       requirePlanFeature(ctx.user, "aiChat");
       // Rate limit: 20 mensagens/hora por usuário
       checkAiRateLimit(ctx.user.id);
