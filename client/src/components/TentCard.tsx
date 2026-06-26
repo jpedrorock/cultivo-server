@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { phaseColor } from "@/lib/phaseColors";
 import { useSimpleMode } from "@/hooks/useSimpleMode";
-import { classifyEnvMetric, envStatusLabel } from "@/lib/envStatus";
+import { classifyEnvMetric } from "@/lib/envStatus";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { toast } from "sonner";
@@ -219,6 +219,9 @@ export function TentCard({
         ? { ring: "border-border", color: "text-muted-foreground/50" }
         : { ring: "border-amber-500/70", color: "text-amber-600 dark:text-amber-400" };
 
+  const simpleAllOk = simpleMetrics.every((m) => m.status === "ok");
+  const simpleHasAttention = simpleMetrics.some((m) => m.status === "low" || m.status === "high");
+
   // Função para determinar cor baseada no valor e target
   const _getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
     if (!value || !min || !max) return "text-foreground";
@@ -351,7 +354,7 @@ export function TentCard({
             {/* Linha 1: nome + freshness badge */}
             <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-xl font-bold tracking-tight">{tent.name}</CardTitle>
-              {(() => {
+              {!simpleMode && (() => {
                 if (!tent.lastReadingAt) return (
                   <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-border/60 text-muted-foreground">
                     <Clock className="w-3 h-3" /> Sem registros
@@ -558,21 +561,31 @@ export function TentCard({
 
           {/* KPI Metrics — 3 colunas. Modo Simples: status em linguagem natural */}
           {simpleMode ? (
-            <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border/60">
-              {simpleMetrics.map((m) => {
-                const s = simpleStatusStyle(m.status);
-                return (
-                  <div key={m.key} className="flex flex-col items-center text-center gap-1 py-2 px-1">
-                    <span className={`w-11 h-11 rounded-full flex items-center justify-center border-[3px] ${s.ring}`}>
+            <div className="pt-4 border-t border-border/60">
+              {/* Veredito geral em 1 frase */}
+              <div className="flex items-center justify-center gap-1.5 mb-3">
+                {simpleAllOk ? (
+                  <Sprout className="w-4 h-4 text-green-600 dark:text-green-400" />
+                ) : simpleHasAttention ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                ) : (
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                )}
+                <span className={`text-sm font-semibold ${simpleAllOk ? "text-green-600 dark:text-green-400" : simpleHasAttention ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                  {simpleAllOk ? "Estufa saudável" : simpleHasAttention ? "Precisa de atenção" : "Sem leitura recente"}
+                </span>
+              </div>
+              {/* 3 anéis — só ícone, cor = status (sem labels) */}
+              <div className="flex items-center justify-center gap-6">
+                {simpleMetrics.map((m) => {
+                  const s = simpleStatusStyle(m.status);
+                  return (
+                    <span key={m.key} title={m.title} className={`w-11 h-11 rounded-full flex items-center justify-center border-[3px] ${s.ring}`}>
                       <m.Icon className={`w-5 h-5 ${s.color}`} />
                     </span>
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{m.title}</p>
-                    <p className={`text-xs font-semibold leading-tight ${s.color}`}>
-                      {m.status === "unknown" ? "--" : envStatusLabel(m.key, m.status)}
-                    </p>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           ) : (
           <div className="grid grid-cols-3 gap-2 pt-4 border-t border-border/60">
