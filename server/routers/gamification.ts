@@ -18,7 +18,7 @@ export const gamificationRouter = router({
 
     const groupId = ctx.user.groupId;
     const zeroStats: GamificationStats = {
-      logCount: 0, photoCount: 0, trichomeCount: 0, finishedCycles: 0, plantCount: 0, currentStreak: 0,
+      logCount: 0, photoCount: 0, trichomeCount: 0, finishedCycles: 0, plantCount: 0, currentStreak: 0, longestStreak: 0,
     };
 
     if (groupId == null) {
@@ -63,6 +63,7 @@ export const gamificationRouter = router({
       finishedCycles,
       plantCount: plantIds.length,
       currentStreak: streak.current,
+      longestStreak: streak.longest,
     };
 
     return { streak, ...computeProgress(stats) };
