@@ -60,7 +60,7 @@ const NAV_GROUPS: {
     label: "Ferramentas",
     items: [
       { href: "/calculators", icon: Calculator, label: "Calculadoras" },
-      { href: "/chat",        icon: Bot,        label: "Doctor Jáh", hideInSimple: true },
+      { href: "/chat",        icon: Bot,        label: "Cultivisor", hideInSimple: true },
       { href: "/smartlife",   icon: Wifi,       label: "SmartLife",  hideInSimple: true },
     ],
   },

@@ -31,7 +31,7 @@ const FEATURE_INFO: Record<PlanFeature, { label: string; minPlan: string }> = {
   photos:       { label: "Fotos das plantas",           minPlan: "Starter" },
   presets:      { label: "Presets salvos",              minPlan: "Starter" },
   customAlerts: { label: "Alertas personalizados",      minPlan: "Starter" },
-  aiChat:       { label: "Doctor Jah (IA)",             minPlan: "Cloud"   },
+  aiChat:       { label: "Cultivisor (IA)",             minPlan: "Cloud"   },
   iot:          { label: "Integração IoT (Tuya/ESP32)", minPlan: "Cloud"   },
 };
 

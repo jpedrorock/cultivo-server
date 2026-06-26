@@ -556,7 +556,7 @@ function AiSettingsCard() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
           <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-          Doctor Jáh
+          Cultivisor
         </CardTitle>
         <CardDescription className="text-xs sm:text-sm">
           Configure sua chave de API para usar o chat de diagnóstico de plantas
