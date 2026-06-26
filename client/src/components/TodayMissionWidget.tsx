@@ -15,6 +15,8 @@ interface TodayMissionWidgetProps {
   hasActiveCycle: (tentId: number) => boolean;
   /** Tarefas da semana ainda não concluídas — entra no "tudo certo hoje". */
   pendingTasks?: number;
+  /** Modo Simples: esconde números crus, mostra "N coisas pra cuidar". */
+  simpleMode?: boolean;
 }
 
 /**
@@ -26,7 +28,7 @@ interface TodayMissionWidgetProps {
  *
  * Não renderiza nada se não houver estufas com ciclo ativo (no caller).
  */
-export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle, pendingTasks = 0 }: TodayMissionWidgetProps) {
+export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle, pendingTasks = 0, simpleMode = false }: TodayMissionWidgetProps) {
   const activeTents = tents.filter((t) => hasActiveCycle(t.id));
   const registeredToday = activeTents.filter((t) => {
     if (!t.lastReadingAt) return false;
@@ -35,6 +37,11 @@ export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle, pend
   });
   const pendingRegistrations = activeTents.length - registeredToday.length;
   const allDone = pendingRegistrations === 0 && totalNewAlerts === 0 && pendingTasks === 0;
+
+  // Modo Simples: nº de CATEGORIAS que precisam de atenção (não os números crus,
+  // pra não assustar com "150 tarefas"). Máx 3.
+  const attentionCount =
+    (pendingRegistrations > 0 ? 1 : 0) + (totalNewAlerts > 0 ? 1 : 0) + (pendingTasks > 0 ? 1 : 0);
 
   // CTA prioriza a ação mais "diária": registro > tarefa > alerta.
   const cta = pendingRegistrations > 0
@@ -67,8 +74,15 @@ export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle, pend
       {/* Metrics */}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-foreground">
-          {allDone ? "Tudo certo hoje! 🌿" : "Missão de hoje"}
+          {allDone ? "Tudo certo hoje! 🌿" : simpleMode ? "Precisa de atenção" : "Missão de hoje"}
         </p>
+        {simpleMode ? (
+          !allDone && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {attentionCount} coisa{attentionCount > 1 ? "s" : ""} pra cuidar hoje
+            </p>
+          )
+        ) : (
         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
           <span
             className={`text-xs flex items-center gap-1 ${
@@ -107,6 +121,7 @@ export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle, pend
               : "Tarefas OK"}
           </span>
         </div>
+        )}
       </div>
 
       {/* CTA */}
