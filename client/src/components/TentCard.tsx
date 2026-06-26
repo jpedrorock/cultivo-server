@@ -377,12 +377,15 @@ export function TentCard({
                 </span>
               )}
             </div>
-            {/* Linha 2: dimensões */}
-            <p className="text-xs text-muted-foreground mt-0.5">{tent.width}×{tent.depth}×{tent.height}cm</p>
+            {/* Linha 2: dimensões — técnico, oculto no Modo Simples */}
+            {!simpleMode && (
+              <p className="text-xs text-muted-foreground mt-0.5">{tent.width}×{tent.depth}×{tent.height}cm</p>
+            )}
           </div>
 
-          {/* Monitor — acesso rápido ao display da estufa.
+          {/* Monitor — acesso rápido ao display da estufa (oculto no Modo Simples).
               Touch target 44x44 pra HIG iOS — antes era 32x32 (frustrante mobile). */}
+          {!simpleMode && (
           <Link href={`/tent/${tent.id}/display`} onClick={e => e.stopPropagation()}>
             <button
               className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
@@ -392,6 +395,7 @@ export function TentCard({
               <Monitor className="w-4 h-4" />
             </button>
           </Link>
+          )}
 
           {/* ··· dropdown menu — leads to destructive actions (Excluir).
               Touch target 44x44 pra evitar tap acidental ou frustração. */}
@@ -492,7 +496,7 @@ export function TentCard({
                   {tent.plantCount} {tent.plantCount === 1 ? 'planta' : 'plantas'}
                 </span>
               )}
-              {tent.seedlingCount > 0 && (
+              {!simpleMode && tent.seedlingCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-border/60 bg-muted/40 text-foreground hover:bg-muted/70 transition-colors">
                   <Scissors className="w-3.5 h-3.5 text-cyan-500" />
                   {tent.seedlingCount} {tent.seedlingCount === 1 ? 'muda' : 'mudas'}
@@ -532,7 +536,8 @@ export function TentCard({
                   }
                 </span>
               </div>
-              {/* Linha 2: label | data */}
+              {/* Linha 2: label | data — detalhe, oculto no Modo Simples */}
+              {!simpleMode && (
               <div className="flex justify-between items-center mt-1.5">
                 <span className="text-xs text-white/70 dark:text-muted-foreground">
                   {tent.category === 'MAINTENANCE' ? 'Última Clonagem' : 'Iniciado em'}
@@ -543,6 +548,7 @@ export function TentCard({
                     : new Date(cycle.startDate).toLocaleDateString('pt-BR')}
                 </span>
               </div>
+              )}
             </div>
           ) : (
             <div className="rounded-xl border border-border/40 bg-muted/20 p-3.5 text-center">
