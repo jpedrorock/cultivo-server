@@ -2241,16 +2241,32 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes plant-celebrate {
+  0%   { transform: translateY(0) scale(1) rotate(0); }
+  20%  { transform: translateY(-14px) scale(1.06) rotate(-4deg); }
+  40%  { transform: translateY(0) scale(1) rotate(3deg); }
+  58%  { transform: translateY(-8px) scale(1.04) rotate(-2deg); }
+  76%  { transform: translateY(0) scale(1) rotate(1deg); }
+  100% { transform: translateY(0) scale(1) rotate(0); }
+}
+@keyframes jardim-fall {
+  0%   { opacity: 0; transform: translateY(-10px) rotate(0); }
+  12%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(220px) rotate(220deg); }
+}
+
 .plant-stage { transform-origin: 50% 92%; will-change: transform; }
 .plant-idle-happy   { animation: plant-sway 4.2s ease-in-out infinite, plant-breathe 3.6s ease-in-out infinite; }
 .plant-idle-thirsty { animation: plant-sway 7s ease-in-out infinite; }
 .plant-idle-sad     { animation: plant-sway 9.5s ease-in-out infinite; opacity: 0.9; }
 .plant-reacting     { animation: plant-wiggle 0.6s ease-in-out; }
+.plant-celebrate    { animation: plant-celebrate 1.2s ease-in-out; }
+.jardim-falling     { animation: jardim-fall 2.2s ease-in forwards; }
 
 .jardim-particle { animation: jardim-float-up 1s ease-out forwards; }
 .jardim-bubble   { animation: jardim-pop 0.35s ease-out forwards; }
 
 @media (prefers-reduced-motion: reduce) {
-  .plant-idle-happy, .plant-idle-thirsty, .plant-idle-sad, .plant-reacting { animation: none; }
-  .jardim-particle, .jardim-bubble { animation-duration: 0.01s; }
+  .plant-idle-happy, .plant-idle-thirsty, .plant-idle-sad, .plant-reacting, .plant-celebrate { animation: none; }
+  .jardim-particle, .jardim-bubble, .jardim-falling { animation-duration: 0.01s; }
 }

@@ -18,6 +18,7 @@ import { PhotoUploadProgress, type UploadStage } from "@/components/PhotoUploadP
 import { PageTransition } from "@/components/PageTransition";
 import { savePendingLog, isOnline } from "@/lib/offlineStorage";
 import { haptics } from "@/lib/haptics";
+import { markGardenCare } from "@/lib/gardenCare";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
 import { getCircleStyle, getPHColor, getValidationColor } from "@/lib/quickLogColors";
@@ -277,6 +278,7 @@ export default function QuickLog() {
       // Invalida cache para que Home e TentDetails mostrem o novo log imediatamente
       utils.dailyLogs.list.invalidate();
       utils.dailyLogs.getLatestByTent.invalidate();
+      markGardenCare(); // Modo Jardim: planta comemora ao voltar
       // Log saved — advance to plant health question (step 9)
       haptics.light();
       setCurrentStep(9);
@@ -300,6 +302,7 @@ export default function QuickLog() {
         setRecordTrichomes(null);
       } else {
         haptics.success();
+        markGardenCare(); // Modo Jardim: planta comemora ao voltar
         toast.success("Registros salvos com sucesso!");
         resetForm();
         setTimeout(() => setLocation("/"), 1500);
@@ -319,6 +322,7 @@ export default function QuickLog() {
         setCurrentTrichomeIndex(currentTrichomeIndex + 1);
       } else {
         haptics.success();
+        markGardenCare(); // Modo Jardim: planta comemora ao voltar
         toast.success("Todos os registros salvos!");
         resetForm();
         setTimeout(() => setLocation("/"), 1500);
@@ -334,6 +338,7 @@ export default function QuickLog() {
   const uploadPhotoMutation = trpc.plantPhotos.upload.useMutation({
     onSuccess: () => {
       haptics.success();
+      markGardenCare(); // Modo Jardim: planta comemora ao voltar
       toast.success("Foto salva!");
     },
     onError: (error) => {

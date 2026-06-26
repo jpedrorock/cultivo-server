@@ -29,16 +29,24 @@ export function LivingPlant({
   mood,
   size = 150,
   reacting = false,
+  celebrating = false,
   animate = true,
 }: {
   stage: PlantStage;
   mood: PlantMood;
   size?: number;
   reacting?: boolean;
+  celebrating?: boolean;
   animate?: boolean;
 }) {
-  // Classe da animação: wiggle quando toca, senão o idle do humor.
-  const animClass = !animate ? "" : reacting ? "plant-reacting" : IDLE_CLASS[mood];
+  // Classe da animação: celebração > wiggle do toque > idle do humor.
+  const animClass = !animate
+    ? ""
+    : celebrating
+      ? "plant-celebrate"
+      : reacting
+        ? "plant-reacting"
+        : IDLE_CLASS[mood];
 
   if (HAS_ART) {
     return (

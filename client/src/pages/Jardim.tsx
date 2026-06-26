@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
@@ -7,6 +7,10 @@ import { EmptyState } from "@/components/EmptyState";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { haptics } from "@/lib/haptics";
+import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
+
+// Folhas que caem na celebração (posições/emojis fixos por índice).
+const CELEBRATE_LEAVES = ["🌿", "💚", "✨", "🍃", "🌱", "💚", "✨", "🌿", "🍃", "🌱", "✨", "💚"];
 
 // Falas da planta ao ser tocada (por humor).
 const PET_PHRASES: Record<PlantMood, string[]> = {
@@ -34,13 +38,31 @@ const MOOD_TONE: Record<PlantMood, string> = {
 const STAGES = ["Semente", "Muda", "Vegetativo", "Floração", "Maturação", "Colheita"];
 
 export default function Jardim() {
-  const { data, isLoading } = trpc.garden.getState.useQuery();
+  const { data, isLoading, refetch } = trpc.garden.getState.useQuery();
 
   // Reação ao toque na planta: wiggle + partículas + balão de fala.
   const [reacting, setReacting] = useState(false);
   const [burst, setBurst] = useState(0);
   const [phrase, setPhrase] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Celebração ao voltar de um registro (cuidar = recompensa).
+  const [celebrating, setCelebrating] = useState(false);
+  useEffect(() => {
+    if (!hasPendingGardenCare()) return;
+    refetch(); // mood deve refletir o registro fresco
+    haptics.success().catch(() => {});
+    setCelebrating(true);
+    // Só limpa a flag ao FIM da celebração — sobrevive ao double-mount do StrictMode.
+    const t = setTimeout(() => {
+      setCelebrating(false);
+      clearGardenCare();
+    }, 2400);
+    return () => clearTimeout(t);
+  }, [refetch]);
+
+  // Limpa timers do toque ao desmontar.
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   const mood = (data && "hasGarden" in data && data.hasGarden ? data.mood : "happy") as PlantMood;
 
@@ -86,7 +108,26 @@ export default function Jardim() {
         ) : (
           <div className="space-y-4">
             {/* Planta viva */}
-            <div className="rounded-2xl border border-border/50 bg-card p-5 text-center">
+            <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 text-center">
+              {/* Celebração ao voltar de um registro */}
+              {celebrating && (
+                <>
+                  <span className="pointer-events-none absolute inset-0 z-20">
+                    {CELEBRATE_LEAVES.map((leaf, i) => (
+                      <span
+                        key={i}
+                        className="jardim-falling absolute text-lg"
+                        style={{ left: `${5 + i * 8}%`, top: "-6%", animationDelay: `${i * 110}ms` }}
+                      >
+                        {leaf}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="jardim-bubble absolute left-1/2 top-2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5 shadow-lg">
+                    Verdinha agradeceu o cuidado! 💚
+                  </span>
+                </>
+              )}
               <button
                 type="button"
                 onClick={petPlant}
@@ -121,7 +162,7 @@ export default function Jardim() {
                     ))}
                   </span>
                 )}
-                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} />
+                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} celebrating={celebrating} />
               </button>
               <p className="text-lg font-bold text-foreground mt-1">{data.tentName}</p>
               <p className="text-xs text-muted-foreground">
