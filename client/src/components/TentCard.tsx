@@ -222,6 +222,17 @@ export function TentCard({
   const simpleAllOk = simpleMetrics.every((m) => m.status === "ok");
   const simpleHasAttention = simpleMetrics.some((m) => m.status === "low" || m.status === "high");
 
+  // Semana do ciclo (pra linha compacta do Modo Simples).
+  const cycleWeekNum = cycle && !isNaN(new Date(cycle.startDate).getTime())
+    ? (() => {
+        const now = Date.now();
+        const start = new Date(cycle.startDate).getTime();
+        const fs = cycle.floraStartDate ? new Date(cycle.floraStartDate).getTime() : null;
+        const base = fs != null && !isNaN(fs) && now >= fs ? fs : start;
+        return Math.max(1, Math.floor((now - base) / 604800000) + 1);
+      })()
+    : null;
+
   // Função para determinar cor baseada no valor e target
   const _getValueColor = (value: number | null | undefined, min: string | number | null | undefined, max: string | number | null | undefined) => {
     if (!value || !min || !max) return "text-foreground";
@@ -489,8 +500,8 @@ export function TentCard({
           </DropdownMenu>
         </div>
 
-        {/* Plant count chips — abaixo do header */}
-        {(tent.plantCount > 0 || tent.seedlingCount > 0) && (
+        {/* Plant count chips — abaixo do header (oculto no Modo Simples → vai pra linha compacta) */}
+        {!simpleMode && (tent.plantCount > 0 || tent.seedlingCount > 0) && (
           <Link href={`/plants?tent=${tent.id}`}>
             <div className="flex items-center gap-2 mt-3">
               {tent.plantCount > 0 && (
@@ -512,8 +523,20 @@ export function TentCard({
 
       <CardContent className="relative z-10 px-5 pb-5 pt-0">
         <div className="space-y-3">
-          {/* Cycle Info — compacto, sem barra de progresso */}
-          {cycle ? (
+          {/* Modo Simples: plantas + ciclo numa linha compacta, lado a lado */}
+          {simpleMode && (
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-0.5">
+              {tent.plantCount > 0 && (
+                <>
+                  <span className="inline-flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-primary" />{tent.plantCount} {tent.plantCount === 1 ? 'planta' : 'plantas'}</span>
+                  <span className="opacity-40">·</span>
+                </>
+              )}
+              <span>{cycle ? (tent.category === 'MAINTENANCE' ? 'Manutenção' : `Semana ${cycleWeekNum}`) : 'Sem ciclo ativo'}</span>
+            </div>
+          )}
+          {/* Cycle Info — compacto (oculto no Modo Simples → vira a linha acima) */}
+          {!simpleMode && (cycle ? (
             <div
               onClick={() => navigate(`/tent/${tent.id}`)}
               className={`rounded-xl p-3.5 border cursor-pointer active:scale-[0.99] transition-all duration-150 ${phaseCardClass}`}
@@ -557,7 +580,7 @@ export function TentCard({
             <div className="rounded-xl border border-border/40 bg-muted/20 p-3.5 text-center">
               <p className="text-sm text-muted-foreground">Nenhum ciclo ativo</p>
             </div>
-          )}
+          ))}
 
           {/* KPI Metrics — 3 colunas. Modo Simples: status em linguagem natural */}
           {simpleMode ? (
