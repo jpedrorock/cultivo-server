@@ -17,6 +17,25 @@ const TIER_COLOR: Record<TrophyTier, string> = {
   platinum: "#7df0e0",
 };
 
+// Marcos cedo (proposta B) — celebra ao bater o nº de dias; a pesquisa diz que
+// reconhecer 3/5/7 dias é o que separa quem forma hábito de quem desiste.
+const STREAK_MILESTONE: Record<number, string> = {
+  3: "🔥 3 dias! Você está pegando o ritmo",
+  5: "🔥 5 dias seguidos — tá ficando sério",
+  7: "🎉 Uma semana! Isso já virou hábito",
+  14: "💪 Duas semanas de dedicação",
+  30: "🏆 30 dias! Dedicação de verdade",
+  60: "🌟 60 dias — impressionante",
+  100: "👑 100 dias! Lendário",
+  180: "🔥 180 dias de ofensiva",
+  365: "🏆 Um ANO seguido — lenda do cultivo",
+};
+function streakLine(current: number, todayDone: boolean): string {
+  if (current === 0) return "Registre hoje pra começar sua ofensiva";
+  if (STREAK_MILESTONE[current]) return STREAK_MILESTONE[current];
+  return todayDone ? "Ofensiva em dia — mandou bem! 🌿" : "Registre hoje pra não quebrar a ofensiva";
+}
+
 export default function Progresso() {
   const { data, isLoading } = trpc.gamification.getProgress.useQuery();
 
@@ -48,11 +67,7 @@ export default function Progresso() {
               <Flame className={cn("w-9 h-9 mx-auto", data.streak.current > 0 ? "text-amber-500" : "text-muted-foreground/40")} />
               <p className="text-3xl font-bold text-foreground mt-1 leading-none">{data.streak.current} dia{data.streak.current === 1 ? "" : "s"}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {data.streak.current === 0
-                  ? "Registre hoje pra começar sua ofensiva"
-                  : data.streak.todayDone
-                    ? "Ofensiva em dia — mandou bem! 🌿"
-                    : "Registre hoje pra não quebrar a ofensiva"}
+                {streakLine(data.streak.current, data.streak.todayDone)}
               </p>
               {data.streak.current > 0 && (
                 <div className="mt-3">
