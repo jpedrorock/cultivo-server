@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Bell, CheckCircle, CheckCircle2, Zap, CheckSquare } from "lucide-react";
+import { CheckCircle, CheckCircle2, Zap, CheckSquare } from "lucide-react";
 
 interface Tent {
   id: number;
@@ -96,18 +96,8 @@ export function TodayMissionWidget({ tents, totalNewAlerts, hasActiveCycle, pend
               ? `${pendingRegistrations} registro${pendingRegistrations > 1 ? "s" : ""} pendente${pendingRegistrations > 1 ? "s" : ""}`
               : "Registros OK"}
           </span>
-          <span
-            className={`text-xs flex items-center gap-1 ${
-              totalNewAlerts > 0
-                ? "text-red-500 font-medium"
-                : "text-muted-foreground line-through"
-            }`}
-          >
-            <Bell className="w-3 h-3" />
-            {totalNewAlerts > 0
-              ? `${totalNewAlerts} alerta${totalNewAlerts > 1 ? "s" : ""} novo${totalNewAlerts > 1 ? "s" : ""}`
-              : "Sem alertas"}
-          </span>
+          {/* Chip de alertas removido — o banner vermelho acima ja' mostra a
+              contagem (evita duplicar o numero na mesma tela). */}
           <span
             className={`text-xs flex items-center gap-1 ${
               pendingTasks > 0
