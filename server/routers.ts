@@ -64,6 +64,7 @@ import { deviceRouter } from "./routers/device";
 // agora em routers/_helpers.ts pra que sub-routers extraídos consigam importar.
 import { validateTentOwnership, requirePlanFeature } from "./routers/_helpers";
 import { tuyaRouter, tentScenesRouter, tentDevicesRouter, tentDisplayRouter } from "./routers/tuya";
+import { gamificationRouter } from "./routers/gamification";
 
 /**
  * D3 — Seed task instances for a tent immediately after cycle creation.
@@ -77,6 +78,7 @@ import { tuyaRouter, tentScenesRouter, tentDevicesRouter, tentDisplayRouter } fr
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  gamification: gamificationRouter,
   tuya: tuyaRouter,
   tentScenes: tentScenesRouter,
   tentDevices: tentDevicesRouter,
