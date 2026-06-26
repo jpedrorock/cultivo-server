@@ -48,6 +48,7 @@ const CalculatorMenu       = lazy(() => import("./pages/CalculatorMenu"));
 const Alerts               = lazy(() => import("./pages/Alerts"));
 const Analytics            = lazy(() => import("./pages/Analytics"));
 const Progresso            = lazy(() => import("./pages/Progresso"));
+const Jardim               = lazy(() => import("./pages/Jardim"));
 const HistoryTable         = lazy(() => import("./pages/HistoryTable"));
 const Settings             = lazy(() => import("./pages/Settings"));
 const AccountSettings      = lazy(() => import("./pages/AccountSettings"));
@@ -112,6 +113,7 @@ function Router() {
         <Route path={"/tarefas"} component={Tarefas} />
         <Route path={"/analytics"} component={Analytics} />
         <Route path={"/progresso"} component={Progresso} />
+        <Route path={"/jardim"} component={Jardim} />
         <Route path={"/calculators"} component={CalculatorMenu} />
         <Route path={"/calculators/:id"} component={Calculators} />
         <Route path={"/nutrients"} component={Nutrients} />
