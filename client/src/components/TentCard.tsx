@@ -575,14 +575,12 @@ export function TentCard({
                   {simpleAllOk ? "Estufa saudável" : simpleHasAttention ? "Precisa de atenção" : "Sem leitura recente"}
                 </span>
               </div>
-              {/* 3 anéis — só ícone, cor = status (sem labels) */}
-              <div className="flex items-center justify-center gap-6">
+              {/* 3 ícones — só o ícone, cor = status (sem anel, sem labels) */}
+              <div className="flex items-center justify-center gap-8">
                 {simpleMetrics.map((m) => {
                   const s = simpleStatusStyle(m.status);
                   return (
-                    <span key={m.key} title={m.title} className={`w-11 h-11 rounded-full flex items-center justify-center border-[3px] ${s.ring}`}>
-                      <m.Icon className={`w-5 h-5 ${s.color}`} />
-                    </span>
+                    <m.Icon key={m.key} className={`w-7 h-7 ${s.color}`} aria-label={m.title} />
                   );
                 })}
               </div>
