@@ -529,12 +529,18 @@ export function TentCard({
           {simpleMode && (
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground pt-0.5">
               {tent.plantCount > 0 && (
-                <>
-                  <span className="inline-flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-primary" />{tent.plantCount} {tent.plantCount === 1 ? 'planta' : 'plantas'}</span>
-                  <span className="opacity-40">·</span>
-                </>
+                <span className="inline-flex items-center gap-1"><Sprout className="w-3.5 h-3.5 text-primary" />{tent.plantCount} {tent.plantCount === 1 ? 'planta' : 'plantas'}</span>
               )}
-              <span>{cycle ? (tent.category === 'MAINTENANCE' ? 'Manutenção' : `Semana ${cycleWeekNum}`) : 'Sem ciclo ativo'}</span>
+              {cycle ? (
+                <span
+                  className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                  style={{ backgroundColor: `${phaseAccentColor}26`, color: phaseAccentColor }}
+                >
+                  {tent.category === 'MAINTENANCE' ? 'Manutenção' : `Semana ${cycleWeekNum}`}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-muted/50 text-muted-foreground">Sem ciclo ativo</span>
+              )}
             </div>
           )}
           {/* Cycle Info — compacto (oculto no Modo Simples → vira a linha acima) */}
