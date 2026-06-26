@@ -37,6 +37,27 @@ import {
   type PhaseAlertMargins,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { computeStreak } from './lib/gamification';
+
+/**
+ * Ofensiva de CONTA (todas as estufas do grupo) — dias distintos com registro.
+ * Usado pela gamificação (router) e pelo push de lembrete streak-aware.
+ */
+export async function getGroupStreak(groupId: number | null): Promise<{ current: number; longest: number; todayDone: boolean }> {
+  const zero = { current: 0, longest: 0, todayDone: false };
+  if (groupId == null) return zero;
+  const database = await getDb();
+  if (!database) return zero;
+  const groupTents = await database.select({ id: tents.id }).from(tents).where(eq(tents.groupId, groupId));
+  const tentIds = groupTents.map((t) => t.id);
+  if (tentIds.length === 0) return zero;
+  const rows = (await database
+    .select({ day: sql<string>`DATE(${dailyLogs.logDate})` })
+    .from(dailyLogs)
+    .where(inArray(dailyLogs.tentId, tentIds))
+    .groupBy(sql`DATE(${dailyLogs.logDate})`)) as Array<{ day: string }>;
+  return computeStreak(rows.map((r) => String(r.day)));
+}
 
 /**
  * Cliente Drizzle tipado + lazy init.

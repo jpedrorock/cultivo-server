@@ -26,6 +26,7 @@ import {
   PauseCircle,
   Menu,
   Sparkles,
+  Flame,
 } from "lucide-react";
 import {
   Dialog,
@@ -129,6 +130,8 @@ export default function Home() {
   const { data: activeCycles } = trpc.cycles.listActive.useQuery();
   const { data: weekTasks } = trpc.tasks.getCurrentWeekTasks.useQuery();
   const pendingTasks = (weekTasks ?? []).filter((t: any) => !t.isDone).length;
+  const { data: gameProgress } = trpc.gamification.getProgress.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+  const accountStreak = gameProgress?.streak.current ?? 0;
   const { data: notifSettings, refetch: refetchNotifSettings } = trpc.alerts.getNotificationSettings.useQuery();
   const systemPaused = notifSettings?.systemPaused ?? false;
 
@@ -552,6 +555,16 @@ export default function Home() {
             pendingTasks={pendingTasks}
             simpleMode={simpleMode}
           />
+        )}
+
+        {/* Ofensiva de conta — gancho de retenção, linka pra /progresso */}
+        {!isLoading && tents && tents.length > 0 && accountStreak >= 1 && (
+          <Link href="/progresso">
+            <div className="mb-4 -mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-1 text-sm font-semibold hover:bg-amber-500/15 transition-colors cursor-pointer">
+              <Flame className="w-4 h-4" />
+              {accountStreak} dia{accountStreak === 1 ? "" : "s"} de ofensiva
+            </div>
+          </Link>
         )}
 
         {/* Ad banner — só pra usuário Free em mobile, no-op pro Pro/web */}

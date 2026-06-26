@@ -8,6 +8,7 @@ import {
   computeLevel,
   computeBadges,
   computeProgress,
+  computeStreak,
   SCORE_WEIGHTS,
 } from "./lib/gamification";
 
@@ -81,6 +82,40 @@ describe("computeBadges", () => {
   it("progresso é clampado ao alvo quando desbloqueado", () => {
     const badges = computeBadges({ ...empty, photoCount: 25 });
     expect(badges.find((b) => b.id === "photographer")?.progress).toEqual({ have: 10, need: 10 });
+  });
+});
+
+describe("computeStreak", () => {
+  const now = new Date("2026-06-26T15:00:00Z");
+
+  it("vazio sem dias", () => {
+    expect(computeStreak([], now)).toEqual({ current: 0, longest: 0, todayDone: false });
+  });
+
+  it("conta dias consecutivos terminando hoje", () => {
+    const days = ["2026-06-24", "2026-06-25", "2026-06-26"];
+    const r = computeStreak(days, now);
+    expect(r.current).toBe(3);
+    expect(r.todayDone).toBe(true);
+  });
+
+  it("tolera 'ainda não registrou hoje' (conta até ontem)", () => {
+    const days = ["2026-06-24", "2026-06-25"]; // hoje (26) ausente
+    const r = computeStreak(days, now);
+    expect(r.current).toBe(2);
+    expect(r.todayDone).toBe(false);
+  });
+
+  it("quebra a ofensiva com buraco", () => {
+    const days = ["2026-06-20", "2026-06-25", "2026-06-26"]; // buraco antes do 25
+    const r = computeStreak(days, now);
+    expect(r.current).toBe(2);
+    expect(r.longest).toBe(2);
+  });
+
+  it("longest pega a maior sequência histórica", () => {
+    const days = ["2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-26"];
+    expect(computeStreak(days, now).longest).toBe(4);
   });
 });
 

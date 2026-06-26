@@ -304,6 +304,7 @@ export async function checkAndSendDailyReminders(): Promise<void> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
 
   const allSubs = await getAllSubscriptions();
+  const { getGroupStreak } = await import("./db");
   let sent = 0;
 
   for (const sub of allSubs) {
@@ -328,13 +329,27 @@ export async function checkAndSendDailyReminders(): Promise<void> {
 
     if (!times.includes(currentTime)) continue;
 
+    // Ofensiva (gancho de retenção): se já registrou hoje, não enche o saco;
+    // se tem ofensiva ativa (2+ dias), usa a mensagem que protege a streak.
+    const streak = await getGroupStreak(sub.groupId);
+    if (streak.todayDone) continue;
+
+    const payload = streak.current >= 2
+      ? {
+          title: `🔥 Ofensiva de ${streak.current} dias!`,
+          body: "Não quebre sua sequência — registre a leitura de hoje.",
+          url: "/quick-log",
+          tag: "daily-reminder",
+        }
+      : {
+          title: "📝 Hora de Registrar!",
+          body: "Não esqueça de registrar os dados das suas estufas.",
+          url: "/quick-log",
+          tag: "daily-reminder",
+        };
+
     // Apenas para o dispositivo deste usuário — não vaza
-    const pushed = await sendToSubscriptions([sub], {
-      title: "📝 Hora de Registrar!",
-      body: "Não esqueça de registrar os dados das suas estufas.",
-      url: "/quick-log",
-      tag: "daily-reminder",
-    });
+    const pushed = await sendToSubscriptions([sub], payload);
     sent += pushed;
   }
 

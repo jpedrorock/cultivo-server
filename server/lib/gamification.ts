@@ -111,6 +111,47 @@ export function computeBadges(s: GamificationStats): BadgeInfo[] {
   ];
 }
 
+/**
+ * Ofensiva (current/longest) + se já registrou hoje, a partir de dias distintos
+ * (YYYY-MM-DD). Puro — `now` injetável pra teste determinístico.
+ */
+export function computeStreak(
+  dayKeys: string[],
+  now: Date = new Date(),
+): { current: number; longest: number; todayDone: boolean } {
+  const days = new Set(dayKeys.map((d) => d.slice(0, 10)).filter(Boolean));
+  if (days.size === 0) return { current: 0, longest: 0, todayDone: false };
+
+  const toKey = (d: Date) => d.toISOString().slice(0, 10);
+  const today = new Date(now);
+  today.setUTCHours(12, 0, 0, 0); // meio-dia UTC evita borda de fuso
+  const todayDone = days.has(toKey(today));
+
+  // Ofensiva atual: anda pra trás a partir de hoje (ou ontem, se hoje vazio).
+  const cursor = new Date(today);
+  if (!days.has(toKey(cursor))) cursor.setUTCDate(cursor.getUTCDate() - 1);
+  let current = 0;
+  while (days.has(toKey(cursor))) {
+    current++;
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+
+  // Maior ofensiva: maior sequência consecutiva no histórico.
+  const sorted = [...days].sort();
+  let longest = 0;
+  let run = 0;
+  let prev: number | null = null;
+  for (const d of sorted) {
+    const t = new Date(`${d}T12:00:00Z`).getTime();
+    if (prev != null && Math.round((t - prev) / 86400000) === 1) run++;
+    else run = 1;
+    if (run > longest) longest = run;
+    prev = t;
+  }
+
+  return { current, longest, todayDone };
+}
+
 /** Resumo completo de progresso (sem a ofensiva, que vem do router). */
 export function computeProgress(s: GamificationStats) {
   const growScore = computeGrowScore(s);
