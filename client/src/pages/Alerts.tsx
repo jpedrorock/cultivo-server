@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,7 @@ export default function Alerts() {
   const [selectedTentId, setSelectedTentId] = useState<number | undefined>(undefined);
   const [metricFilter, setMetricFilter] = useState<string>("ALL");
   const [visibleCount, setVisibleCount] = useState(ALERTS_PER_PAGE);
+  const [hideSeen, setHideSeen] = useState(false);
 
   const handleSelectTent = (id: number | undefined) => {
     setSelectedTentId(id);
@@ -70,6 +71,12 @@ export default function Alerts() {
   const handleMarkAsSeen = (alertId: number, currentStatus: string) => {
     if (currentStatus !== "NEW") return; // Já está visto, não faz nada
     markAsSeen.mutate({ alertId });
+  };
+
+  // Marca o grupo inteiro (todos os repetidos novos) como visto.
+  const handleMarkGroup = async (newIds: number[]) => {
+    if (newIds.length === 0) return;
+    await Promise.all(newIds.map((id) => markAsSeen.mutateAsync({ alertId: id })));
   };
 
   // Buscar estufas
@@ -130,6 +137,27 @@ export default function Alerts() {
   );
   const metricCount = (key: string) =>
     key === "ALL" ? (alertList?.length ?? 0) : (alertList ?? []).filter((a: any) => a.metric === key).length;
+
+  // Consolida repetidos: agrupa por estufa + métrica + tipo. A lista vem mais
+  // recente primeiro, então o 1º de cada grupo é o "latest". Cada grupo vira 1
+  // card com contador "N×" — evita a parede de alertas iguais.
+  const groupedAlerts = useMemo(() => {
+    const map = new Map<string, { key: string; latest: any; count: number; newCount: number; newIds: number[] }>();
+    for (const a of filteredAlerts as any[]) {
+      const key = `${a.tentId}-${a.metric}-${a.alertType}`;
+      const g = map.get(key);
+      if (!g) {
+        map.set(key, { key, latest: a, count: 1, newCount: a.status === "NEW" ? 1 : 0, newIds: a.status === "NEW" ? [a.id] : [] });
+      } else {
+        g.count++;
+        if (a.status === "NEW") { g.newCount++; g.newIds.push(a.id); }
+      }
+    }
+    return [...map.values()];
+  }, [filteredAlerts]);
+
+  // "Ocultar vistos": some os grupos já totalmente vistos (limpa a visão).
+  const visibleGroups = hideSeen ? groupedAlerts.filter((g) => g.newCount > 0) : groupedAlerts;
 
   return (
     <PageTransition>
@@ -271,20 +299,33 @@ export default function Alerts() {
                           </button>
                         );
                       })}
+                      {/* Ocultar vistos — limpa a visão deixando só os novos */}
+                      <button
+                        onClick={() => { setHideSeen((v) => !v); setVisibleCount(ALERTS_PER_PAGE); }}
+                        className={cn(
+                          "text-xs px-3 py-1.5 rounded-full border transition-colors ml-auto",
+                          hideSeen
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "border-border text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {hideSeen ? "Mostrando só novos" : "Ocultar vistos"}
+                      </button>
                     </div>
-                    {filteredAlerts.length === 0 ? (
+                    {visibleGroups.length === 0 ? (
                       <p className="text-center text-sm text-muted-foreground py-6">Nenhum alerta desse tipo.</p>
                     ) : (
                   <div className="space-y-3">
                     <StaggerList className="space-y-3">
-                    {filteredAlerts.slice(0, visibleCount).map((alert: any) => {
-                      const isNew = alert.status === "NEW";
-                      const isPending = markAsSeen.isPending && markAsSeen.variables?.alertId === alert.id;
+                    {visibleGroups.slice(0, visibleCount).map((group: any) => {
+                      const alert = group.latest;
+                      const isNew = group.newCount > 0;
+                      const isPending = markAsSeen.isPending && group.newIds.includes(markAsSeen.variables?.alertId);
 
                       return (
-                        <ListItemAnimation key={alert.id}>
+                        <ListItemAnimation key={group.key}>
                           <div
-                            onClick={() => handleMarkAsSeen(alert.id, alert.status)}
+                            onClick={() => handleMarkGroup(group.newIds)}
                             className={cn(
                               "p-4 rounded-lg border transition-all duration-200 active:scale-[0.99]",
                               isNew
@@ -336,6 +377,12 @@ export default function Alerts() {
                                     <Badge variant={alertSeverity(alert) === "CRITICAL" ? "danger" : "warning"}>
                                       {alertSeverity(alert) === "CRITICAL" ? "Crítico" : "Atenção"}
                                     </Badge>
+                                    {/* Contador de repetidos consolidados */}
+                                    {group.count > 1 && (
+                                      <Badge variant="neutral" className="text-xs">
+                                        {group.count}× {group.newCount > 0 && group.newCount < group.count ? `(${group.newCount} novos)` : ""}
+                                      </Badge>
+                                    )}
                                     {!selectedTentId && (
                                       <Badge variant="outline" className="text-xs">
                                         {tents?.find(t => t.id === alert.tentId)?.name ?? `Estufa #${alert.tentId}`}
@@ -390,17 +437,17 @@ export default function Alerts() {
                       );
                     })}
                   </StaggerList>
-                  {visibleCount < filteredAlerts.length && (
+                  {visibleCount < visibleGroups.length && (
                     <div className="pt-2 text-center">
                       <p className="text-xs text-muted-foreground mb-2">
-                        Mostrando {visibleCount} de {filteredAlerts.length} alertas
+                        Mostrando {visibleCount} de {visibleGroups.length} grupos de alerta
                       </p>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setVisibleCount(v => v + ALERTS_PER_PAGE)}
                       >
-                        Ver mais {Math.min(ALERTS_PER_PAGE, filteredAlerts.length - visibleCount)}
+                        Ver mais {Math.min(ALERTS_PER_PAGE, visibleGroups.length - visibleCount)}
                       </Button>
                     </div>
                   )}
