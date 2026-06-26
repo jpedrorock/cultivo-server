@@ -1,4 +1,4 @@
-import { Flame, Loader2, Trophy, Shield } from "lucide-react";
+import { Flame, Loader2, Trophy, Shield, Camera, Eye, Scissors, Sprout, PenLine } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { TrophyIcon, type TrophyTier } from "@/components/TrophyIcon";
 import { trpc } from "@/lib/trpc";
@@ -96,6 +96,27 @@ export default function Progresso() {
               ) : (
                 <p className="text-xs text-primary font-medium">Nível máximo alcançado 🏆</p>
               )}
+            </div>
+
+            {/* Suas estatísticas (recordes pessoais) */}
+            <div className="rounded-2xl border border-border/50 bg-card p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Suas estatísticas</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { Icon: Flame, label: "Maior ofensiva", value: `${data.stats.longestStreak}`, suffix: "d", hl: true },
+                  { Icon: PenLine, label: "Registros", value: `${data.stats.logCount}`, suffix: "", hl: false },
+                  { Icon: Camera, label: "Fotos", value: `${data.stats.photoCount}`, suffix: "", hl: false },
+                  { Icon: Eye, label: "Tricomas", value: `${data.stats.trichomeCount}`, suffix: "", hl: false },
+                  { Icon: Scissors, label: "Ciclos", value: `${data.stats.finishedCycles}`, suffix: "", hl: false },
+                  { Icon: Sprout, label: "Plantas", value: `${data.stats.plantCount}`, suffix: "", hl: false },
+                ].map((s) => (
+                  <div key={s.label} className="flex flex-col items-center text-center gap-0.5 rounded-xl border border-border/40 bg-muted/10 py-3 px-1">
+                    <s.Icon className={cn("w-4 h-4 mb-0.5", s.hl ? "text-amber-500" : "text-muted-foreground")} />
+                    <span className="text-lg font-bold text-foreground tabular-nums leading-none">{s.value}<span className="text-xs font-medium text-muted-foreground">{s.suffix}</span></span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">{s.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Platina — pedestal */}
