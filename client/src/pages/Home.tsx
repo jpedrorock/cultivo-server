@@ -56,6 +56,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { TentCardSkeleton } from "@/components/TentCardSkeleton";
 import { EmptyOnboarding } from "@/components/EmptyOnboarding";
 import { TodayMissionWidget } from "@/components/TodayMissionWidget";
+import { useSimpleMode } from "@/hooks/useSimpleMode";
 import { HomeLoadingState } from "@/components/HomeLoadingState";
 import { TentCard } from "@/components/TentCard";
 import { AdBanner } from "@/components/AdBanner";
@@ -137,6 +138,7 @@ export default function Home() {
     { staleTime: 2 * 60 * 1000 }
   );
   const totalNewAlerts = globalAlertCount != null ? Number(globalAlertCount) : 0;
+  const [simpleMode] = useSimpleMode();
   const toggleSystemPaused = trpc.alerts.toggleSystemPaused.useMutation({
     onSuccess: (data) => {
       refetchNotifSettings();
@@ -519,12 +521,18 @@ export default function Home() {
       {totalNewAlerts > 0 && !systemPaused && (
         <div className="container pt-4">
           <Link href="/alerts">
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/15 transition-colors cursor-pointer">
-              <Bell className="w-4 h-4 flex-shrink-0 animate-pulse" />
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors cursor-pointer ${
+              simpleMode
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/15"
+                : "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/15"
+            }`}>
+              <Bell className={`w-4 h-4 flex-shrink-0 ${simpleMode ? "" : "animate-pulse"}`} />
               <span className="text-sm font-medium flex-1">
-                {totalNewAlerts === 1
-                  ? "1 alerta novo — toque para ver"
-                  : `${totalNewAlerts} alertas novos — toque para ver`}
+                {simpleMode
+                  ? "Algumas coisas precisam de atenção — toque para ver"
+                  : totalNewAlerts === 1
+                    ? "1 alerta novo — toque para ver"
+                    : `${totalNewAlerts} alertas novos — toque para ver`}
               </span>
               <ArrowRight className="w-4 h-4 flex-shrink-0 opacity-60" />
             </div>
@@ -542,6 +550,7 @@ export default function Home() {
             totalNewAlerts={totalNewAlerts}
             hasActiveCycle={(tentId) => Boolean(getTentCycle(tentId))}
             pendingTasks={pendingTasks}
+            simpleMode={simpleMode}
           />
         )}
 
