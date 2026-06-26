@@ -1,4 +1,4 @@
-import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, PenLine, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi, Timer, FlaskConical, Sun, TestTube, Droplets, Flower2 } from "lucide-react";
+import { Calculator, Bell, MoreHorizontal, Sprout, Settings, Leaf, CheckSquare, PenLine, BookOpen, Wind, ThermometerSun, Heart, Sparkles, Scissors, ChevronRight, Bot, Wifi, Timer, FlaskConical, Sun, TestTube, Droplets, Flower2, Trophy } from "lucide-react";
 import { useSimpleMode } from "@/hooks/useSimpleMode";
 import { TentIcon } from "@/components/TentIcon";
 import { Link, useLocation } from "wouter";
@@ -250,7 +250,7 @@ export function BottomNav() {
     { id: "vpd",                 title: "VPD",              desc: "Zona ideal de temperatura e umidade",icon: Wind,        color: "bg-indigo-600" },
   ] as const;
 
-  const moreMenuItems: NavItem[] = [
+  const allMoreMenuItems: NavItem[] = [
     { href: "/alerts", icon: Bell, label: "Alertas", badge: alertCount || 0 },
     { href: "/harvest-queue", icon: Wind, label: "Aguardando Secagem", badge: harvestQueueCount },
     { href: "/tarefas", icon: CheckSquare, label: "Tarefas" },
@@ -259,6 +259,10 @@ export function BottomNav() {
     { href: "/help", icon: BookOpen, label: "Guia do Usuário" },
     { href: "/settings", icon: Settings, label: "Configurações" },
   ];
+  // No Modo Simples (app de iniciante), só o essencial: Alertas · Tarefas · Config.
+  const moreMenuItems: NavItem[] = simpleMode
+    ? allMoreMenuItems.filter((i) => ["/alerts", "/tarefas", "/settings"].includes(i.href))
+    : allMoreMenuItems;
 
   const isMoreMenuActive = moreMenuItems.some(item => location === item.href);
 
@@ -371,7 +375,10 @@ export function BottomNav() {
                 <Link
                   href="/quick-log?mode=plant"
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
-                  className="flex items-center gap-4 px-5 py-4 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors border-b border-border/30 w-full"
+                  className={cn(
+                    "flex items-center gap-4 px-5 py-4 hover:bg-rose-500/8 active:bg-rose-500/15 transition-colors w-full",
+                    !simpleMode && "border-b border-border/30",
+                  )}
                 >
                   <div className="w-10 h-10 rounded-xl bg-rose-600 flex items-center justify-center shrink-0 shadow-sm">
                     <Heart className="w-5 h-5 text-white" />
@@ -382,6 +389,8 @@ export function BottomNav() {
                   </div>
                 </Link>
 
+                {/* Modos avançados — escondidos no app de iniciante */}
+                {!simpleMode && (<>
                 <Link
                   href="/quick-log?mode=trichome"
                   onClick={() => { triggerHapticFeedback(); setFabMenuOpen(false); }}
@@ -425,6 +434,7 @@ export function BottomNav() {
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
                 </button>
+                </>)}
               </div>
             )}
 
@@ -553,7 +563,20 @@ export function BottomNav() {
           {/* Placeholder do FAB no flex flow — ocupa o slot central sem conteúdo */}
           <div className="w-12 h-12 shrink-0" aria-hidden />
 
-          {/* Calculadoras — slot 4: popup flutuante igual ao FAB */}
+          {/* Slot 4 — no app de iniciante vira Progresso (troféus); no avançado, calculadoras */}
+          {simpleMode ? (
+            <Link
+              href="/progresso"
+              onClick={triggerHapticFeedback}
+              aria-label="Progresso"
+              className={cn(
+                "flex items-center justify-center w-12 h-12 rounded-xl transition-colors relative focus-visible:outline-none",
+                location === "/progresso" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary",
+              )}
+            >
+              <Trophy className={cn("w-6 h-6", location === "/progresso" && "stroke-[2.5]")} />
+            </Link>
+          ) : (
           <div ref={calcRef} className="relative">
             {calcMenuOpen && (
               <div
@@ -609,6 +632,7 @@ export function BottomNav() {
               <Calculator className={cn("w-6 h-6", (isCalcActive || calcMenuOpen) && "stroke-[2.5]")} />
             </button>
           </div>
+          )}
 
           {/* More Menu */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
