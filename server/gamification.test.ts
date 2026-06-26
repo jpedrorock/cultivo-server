@@ -85,6 +85,14 @@ describe("computeAchievements", () => {
     expect(a?.tier).toBe("bronze");
     expect(a?.nextThreshold).toBe(30);
   });
+
+  it("tiers RAROS: diamante e lendário acima do ouro", () => {
+    expect(find({ ...empty, logCount: 999 }, "diario-de-bordo")?.tier).toBe("gold");
+    expect(find({ ...empty, logCount: 1000 }, "diario-de-bordo")?.tier).toBe("diamond");
+    expect(find({ ...empty, logCount: 2500 }, "diario-de-bordo")?.tier).toBe("legendary");
+    // ofensiva lendária = 1 ano
+    expect(find({ ...empty, currentStreak: 365 }, "mao-na-terra")?.tier).toBe("legendary");
+  });
 });
 
 describe("computePlatinum", () => {

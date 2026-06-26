@@ -81,9 +81,12 @@ export function computeLevel(score: number): LevelInfo {
 // Ver TROPHY-SYSTEM-DESIGN.md. Fase 0: só métricas que já existem (as conquistas
 // que precisam de contadores novos — Zona de Conforto, Engenheiro, Madrugador,
 // Curador, Renascido — entram na Fase 4).
-export type Tier = "bronze" | "silver" | "gold";
-const TIERS: Tier[] = ["bronze", "silver", "gold"];
-const TIER_VALUE: Record<Tier, number> = { bronze: 1, silver: 2, gold: 3 };
+export type Tier = "bronze" | "silver" | "gold" | "diamond" | "legendary";
+const TIERS: Tier[] = ["bronze", "silver", "gold", "diamond", "legendary"];
+const TIER_VALUE: Record<Tier, number> = { bronze: 1, silver: 2, gold: 3, diamond: 4, legendary: 5 };
+// A platina ("Lenda do Cultivo") exige só até OURO (índice 3). Diamante e
+// Lendário são tiers RAROS pós-platina (grind extremo) — não travam a platina.
+const PLATINUM_CAP = 3;
 
 export interface Achievement {
   key: string;
@@ -103,13 +106,15 @@ export interface Achievement {
   nextThreshold: number | null;
 }
 
-const SCALABLE: { key: string; name: string; hint: string; stat: keyof GamificationStats; thresholds: [number, number, number] }[] = [
-  { key: "mao-na-terra", name: "Mão na Terra", hint: "Dias seguidos registrando", stat: "currentStreak", thresholds: [7, 30, 100] },
-  { key: "diario-de-bordo", name: "Diário de Bordo", hint: "Registros feitos", stat: "logCount", thresholds: [10, 100, 500] },
-  { key: "olho-de-lince", name: "Olho de Lince", hint: "Registros de tricoma", stat: "trichomeCount", thresholds: [5, 25, 100] },
-  { key: "lente-verde", name: "Lente Verde", hint: "Fotos de planta", stat: "photoCount", thresholds: [10, 50, 200] },
-  { key: "ciclo-completo", name: "Ciclo Completo", hint: "Ciclos finalizados", stat: "finishedCycles", thresholds: [1, 5, 15] },
-  { key: "raiz-profunda", name: "Raiz Profunda", hint: "Recorde de ofensiva (dias)", stat: "longestStreak", thresholds: [14, 60, 180] },
+// thresholds: [bronze, prata, ouro, (diamante), (lendário)]. As conquistas de
+// grind ganham 2 tiers raros acima do ouro.
+const SCALABLE: { key: string; name: string; hint: string; stat: keyof GamificationStats; thresholds: number[] }[] = [
+  { key: "mao-na-terra", name: "Mão na Terra", hint: "Dias seguidos registrando", stat: "currentStreak", thresholds: [7, 30, 100, 200, 365] },
+  { key: "diario-de-bordo", name: "Diário de Bordo", hint: "Registros feitos", stat: "logCount", thresholds: [10, 100, 500, 1000, 2500] },
+  { key: "olho-de-lince", name: "Olho de Lince", hint: "Registros de tricoma", stat: "trichomeCount", thresholds: [5, 25, 100, 250, 500] },
+  { key: "lente-verde", name: "Lente Verde", hint: "Fotos de planta", stat: "photoCount", thresholds: [10, 50, 200, 500, 1000] },
+  { key: "ciclo-completo", name: "Ciclo Completo", hint: "Ciclos finalizados", stat: "finishedCycles", thresholds: [1, 5, 15, 30, 50] },
+  { key: "raiz-profunda", name: "Raiz Profunda", hint: "Recorde de ofensiva (dias)", stat: "longestStreak", thresholds: [14, 60, 180, 365, 730] },
 ];
 
 const MILESTONES: { key: string; name: string; hint: string; stat: keyof GamificationStats; need: number; tier: Tier }[] = [
@@ -149,10 +154,11 @@ export function computePlatinum(achs: Achievement[]): { unlocked: boolean; have:
   let total = 0;
   let allDone = true;
   for (const a of achs) {
-    total += a.isMilestone ? 1 : 3;
-    const got = a.isMilestone ? (a.unlocked ? 1 : 0) : a.tier ? TIER_VALUE[a.tier] : 0;
+    total += a.isMilestone ? 1 : PLATINUM_CAP;
+    const rawGot = a.isMilestone ? (a.unlocked ? 1 : 0) : a.tier ? TIER_VALUE[a.tier] : 0;
+    const got = a.isMilestone ? rawGot : Math.min(rawGot, PLATINUM_CAP); // diamante/lendário contam como ouro aqui
     have += got;
-    const need = a.isMilestone ? 1 : a.key === "ciclo-completo" ? 2 : 3;
+    const need = a.isMilestone ? 1 : a.key === "ciclo-completo" ? 2 : PLATINUM_CAP;
     if (got < need) allDone = false;
   }
   return { unlocked: allDone, have, total };
