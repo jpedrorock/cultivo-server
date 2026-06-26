@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
@@ -5,6 +6,20 @@ import { LivingPlant, type PlantStage, type PlantMood } from "@/components/Livin
 import { EmptyState } from "@/components/EmptyState";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { haptics } from "@/lib/haptics";
+
+// Falas da planta ao ser tocada (por humor).
+const PET_PHRASES: Record<PlantMood, string[]> = {
+  happy: ["Tô feliz! 🌿", "Obrigada por cuidar 💚", "Crescendo forte!"],
+  thirsty: ["Tô com sede… 💧", "Bora registrar?", "Me dá um carinho 🌱"],
+  sad: ["Senti sua falta 🥺", "Volta sempre 🌱", "Vamos retomar?"],
+};
+// Partículas que sobem ao tocar (por humor).
+const PET_PARTICLES: Record<PlantMood, string[]> = {
+  happy: ["💚", "✨", "🌿", "💚", "✨", "🌱"],
+  thirsty: ["💧", "🌱", "💧", "🌿", "💧", "✨"],
+  sad: ["🌱", "💚", "🌿", "🌱", "✨", "💚"],
+};
 
 const MOOD_ICON: Record<PlantMood, typeof Smile> = {
   happy: Smile,
@@ -20,6 +35,26 @@ const STAGES = ["Semente", "Muda", "Vegetativo", "Floração", "Maturação", "C
 
 export default function Jardim() {
   const { data, isLoading } = trpc.garden.getState.useQuery();
+
+  // Reação ao toque na planta: wiggle + partículas + balão de fala.
+  const [reacting, setReacting] = useState(false);
+  const [burst, setBurst] = useState(0);
+  const [phrase, setPhrase] = useState<string | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const mood = (data && "hasGarden" in data && data.hasGarden ? data.mood : "happy") as PlantMood;
+
+  const petPlant = () => {
+    haptics.light().catch(() => {});
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    setReacting(true);
+    setBurst((b) => b + 1);
+    const phrases = PET_PHRASES[mood];
+    setPhrase(phrases[burst % phrases.length]);
+    timers.current.push(setTimeout(() => setReacting(false), 650));
+    timers.current.push(setTimeout(() => setPhrase(null), 1500));
+  };
 
   return (
     <PageLayout
@@ -52,12 +87,42 @@ export default function Jardim() {
           <div className="space-y-4">
             {/* Planta viva */}
             <div className="rounded-2xl border border-border/50 bg-card p-5 text-center">
-              <div
-                className="mx-auto inline-block rounded-2xl"
+              <button
+                type="button"
+                onClick={petPlant}
+                aria-label="Fazer carinho na planta"
+                className="relative mx-auto block rounded-2xl focus-visible:outline-none active:scale-[0.98] transition-transform"
                 style={{ background: "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(91,191,58,0.14), transparent 70%)" }}
               >
-                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} />
-              </div>
+                {/* Balão de fala */}
+                {phrase && (
+                  <span
+                    key={`bubble-${burst}`}
+                    className="jardim-bubble absolute left-1/2 -top-1 -translate-x-1/2 z-10 whitespace-nowrap rounded-full bg-foreground text-background text-xs font-semibold px-3 py-1 shadow-lg"
+                  >
+                    {phrase}
+                  </span>
+                )}
+                {/* Partículas que sobem */}
+                {burst > 0 && (
+                  <span key={`burst-${burst}`} className="pointer-events-none absolute inset-0 z-10">
+                    {PET_PARTICLES[mood].map((p, i) => (
+                      <span
+                        key={i}
+                        className="jardim-particle absolute text-base"
+                        style={{
+                          left: `${30 + i * 9}%`,
+                          bottom: "38%",
+                          animationDelay: `${i * 55}ms`,
+                        }}
+                      >
+                        {p}
+                      </span>
+                    ))}
+                  </span>
+                )}
+                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} />
+              </button>
               <p className="text-lg font-bold text-foreground mt-1">{data.tentName}</p>
               <p className="text-xs text-muted-foreground">
                 {data.weekNum > 0 ? `Semana ${data.weekNum} · ` : ""}{data.stageName}

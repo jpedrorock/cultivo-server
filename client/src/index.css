@@ -2211,3 +2211,46 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 @media (prefers-reduced-motion: reduce) {
   .live-pill-dot { animation: none; }
 }
+
+/* ── Modo Jardim — planta viva (idle + reação ao toque + partículas) ──
+   A planta "respira" e balança suave, com ritmo conforme o humor. Pivô na
+   base do vaso (transform-origin: bottom). Tocar nela dispara o wiggle. */
+@keyframes plant-sway {
+  0%, 100% { transform: rotate(-1.6deg); }
+  50%      { transform: rotate(1.6deg); }
+}
+@keyframes plant-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.035); }
+}
+@keyframes plant-wiggle {
+  0%, 100% { transform: rotate(0); }
+  18%      { transform: rotate(-7deg); }
+  38%      { transform: rotate(6deg); }
+  58%      { transform: rotate(-4deg); }
+  78%      { transform: rotate(2.5deg); }
+}
+@keyframes jardim-float-up {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.5); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-64px) scale(1.05); }
+}
+@keyframes jardim-pop {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.7); }
+  55%  { opacity: 1; transform: translateY(0) scale(1.08); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.plant-stage { transform-origin: 50% 92%; will-change: transform; }
+.plant-idle-happy   { animation: plant-sway 4.2s ease-in-out infinite, plant-breathe 3.6s ease-in-out infinite; }
+.plant-idle-thirsty { animation: plant-sway 7s ease-in-out infinite; }
+.plant-idle-sad     { animation: plant-sway 9.5s ease-in-out infinite; opacity: 0.9; }
+.plant-reacting     { animation: plant-wiggle 0.6s ease-in-out; }
+
+.jardim-particle { animation: jardim-float-up 1s ease-out forwards; }
+.jardim-bubble   { animation: jardim-pop 0.35s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .plant-idle-happy, .plant-idle-thirsty, .plant-idle-sad, .plant-reacting { animation: none; }
+  .jardim-particle, .jardim-bubble { animation-duration: 0.01s; }
+}

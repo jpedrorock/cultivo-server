@@ -18,10 +18,32 @@ const MOOD_COLOR: Record<PlantMood, string> = {
 const MOOD_DROOP: Record<PlantMood, number> = { happy: 0, thirsty: 18, sad: 34 };
 const POT_BG: Record<PlantMood, string> = { happy: "#2a3d2e", thirsty: "#2a3d2e", sad: "#26302a" };
 
-export function LivingPlant({ stage, mood, size = 150 }: { stage: PlantStage; mood: PlantMood; size?: number }) {
+const IDLE_CLASS: Record<PlantMood, string> = {
+  happy: "plant-idle-happy",
+  thirsty: "plant-idle-thirsty",
+  sad: "plant-idle-sad",
+};
+
+export function LivingPlant({
+  stage,
+  mood,
+  size = 150,
+  reacting = false,
+  animate = true,
+}: {
+  stage: PlantStage;
+  mood: PlantMood;
+  size?: number;
+  reacting?: boolean;
+  animate?: boolean;
+}) {
+  // Classe da animação: wiggle quando toca, senão o idle do humor.
+  const animClass = !animate ? "" : reacting ? "plant-reacting" : IDLE_CLASS[mood];
+
   if (HAS_ART) {
     return (
       <img
+        className={`plant-stage ${animClass}`}
         src={`/illustrations/jardim/stage-${stage}-${mood}.png`}
         width={size}
         height={size * 1.2}
@@ -49,7 +71,7 @@ export function LivingPlant({ stage, mood, size = 150 }: { stage: PlantStage; mo
   const showTrichomes = stage >= 5;
 
   return (
-    <svg viewBox="0 0 120 150" width={size} height={size * 1.25} xmlns="http://www.w3.org/2000/svg" role="img" aria-label={`planta estágio ${stage} ${mood}`}>
+    <svg viewBox="0 0 120 150" width={size} height={size * 1.25} xmlns="http://www.w3.org/2000/svg" role="img" aria-label={`planta estágio ${stage} ${mood}`} className={`plant-stage ${animClass}`}>
       <g stroke={color} strokeWidth="3" strokeLinecap="round" fill={color}>
         <line x1="60" y1="110" x2="60" y2={stemTopY} />
         {leaves.map((l, i) => (
