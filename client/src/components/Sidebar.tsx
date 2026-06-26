@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavBadges } from "@/hooks/useNavBadges";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useSimpleMode } from "@/hooks/useSimpleMode";
 import {
   Tooltip,
   TooltipContent,
@@ -42,7 +43,7 @@ function UserAvatar({ name, email }: { name: string | null; email: string }) {
 // "o que faço todo dia" (Monitoramento) vs "ferramentas" vs "cultivo".
 const NAV_GROUPS: {
   label: string;
-  items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; isAlerts?: boolean }[];
+  items: { href: string; icon: React.ComponentType<{ className?: string }>; label: string; isAlerts?: boolean; hideInSimple?: boolean }[];
 }[] = [
   {
     label: "Monitoramento",
@@ -58,14 +59,14 @@ const NAV_GROUPS: {
     label: "Ferramentas",
     items: [
       { href: "/calculators", icon: Calculator, label: "Calculadoras" },
-      { href: "/chat",        icon: Bot,        label: "Doctor Jáh"   },
-      { href: "/smartlife",   icon: Wifi,       label: "SmartLife"    },
+      { href: "/chat",        icon: Bot,        label: "Doctor Jáh", hideInSimple: true },
+      { href: "/smartlife",   icon: Wifi,       label: "SmartLife",  hideInSimple: true },
     ],
   },
   {
     label: "Cultivo",
     items: [
-      { href: "/manage-strains", icon: Leaf, label: "Strains"            },
+      { href: "/manage-strains", icon: Leaf, label: "Strains", hideInSimple: true },
       { href: "/harvest-queue",  icon: Wind, label: "Aguardando Secagem" },
     ],
   },
@@ -79,6 +80,12 @@ export function Sidebar() {
   const { alertCount, harvestQueueCount } = useNavBadges();
   const { user } = useAuth();
   const { collapsed, open, toggle, closeSidebar } = useSidebar();
+  const [simpleMode] = useSimpleMode();
+
+  // Modo Simples: esconde itens marcados como avançados e grupos que ficam vazios.
+  const visibleGroups = NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((i) => !simpleMode || !i.hideInSimple) }))
+    .filter((g) => g.items.length > 0);
 
   // Badge shake
   const prevCountRef = useRef<number | null>(null);
@@ -268,7 +275,7 @@ export function Sidebar() {
 
         {/* ── Nav ── */}
         <nav className={cn("flex-1 py-3 space-y-0.5 overflow-y-auto", isIconOnly ? "px-2" : "px-3")}>
-          {NAV_GROUPS.map((group, gi) => (
+          {visibleGroups.map((group, gi) => (
             <div key={group.label} className="space-y-0.5">
               {isIconOnly
                 ? gi > 0 && <div className="my-2 mx-1 border-t border-sidebar-border/60" />

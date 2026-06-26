@@ -8,6 +8,10 @@ import { usePaywall } from "@/components/PaywallGate";
 import { useCalculatorUnlock } from "@/_core/hooks/useCalculatorUnlock";
 import { RewardedUnlockModal } from "@/components/RewardedUnlockModal";
 import { trpc } from "@/lib/trpc";
+import { useSimpleMode } from "@/hooks/useSimpleMode";
+
+// Modo Simples: só as 3 calculadoras essenciais pra iniciante.
+const SIMPLE_CALC_IDS = ["watering-runoff", "vpd", "ph-adjust"];
 
 // Fase dominante entre as estufas → calcs recomendadas (proposta #5).
 const PHASE_RANK: Record<string, number> = { FLORA: 3, VEGA: 2, DRYING: 1, MAINTENANCE: 0 };
@@ -145,6 +149,7 @@ export default function CalculatorMenu() {
   const paywall = usePaywall();
   const { data: tents } = trpc.tents.list.useQuery();
   const hasOrganic = useHasOrganicTent();
+  const [simpleMode] = useSimpleMode();
   const calculators = [
     {
       id: "watering-runoff",
@@ -319,6 +324,25 @@ export default function CalculatorMenu() {
       }
     >
       <main className="container mx-auto px-3 py-4 md:px-4 md:py-8">
+        {simpleMode ? (
+          <>
+            {/* Modo Simples: só as 3 calculadoras essenciais */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {calculators.filter((c) => SIMPLE_CALC_IDS.includes(c.id)).map((calc, index) => (
+                <CalculatorCard
+                  key={calc.id}
+                  calc={calc}
+                  index={index}
+                  isProUser={isPro}
+                  isAllowed={limits.allowedCalculators.includes(calc.id)}
+                  openPaywall={paywall.open}
+                />
+              ))}
+            </div>
+            {paywall.PaywallElement}
+          </>
+        ) : (
+          <>
         {/* Recomendadas pela fase atual do cultivo (proposta #5) */}
         {recommended.length > 0 && rec && (
           <div className="mb-6">
@@ -372,6 +396,8 @@ export default function CalculatorMenu() {
           <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Microscope className="w-3 h-3 text-rose-400"/>pH:</strong> Calcule quanto ácido ou base adicionar para ajustar o pH da solução</p>
           <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Wind className="w-3 h-3 text-indigo-400"/>VPD:</strong> Pressão de vapor deficit — parâmetro essencial para growers avançados</p>
         </div>
+          </>
+        )}
       </main>
     </PageLayout>
   );

@@ -5,6 +5,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { PageTransition, StaggerList, ListItemAnimation } from '@/components/PageTransition';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { resetTour } from '@/hooks/useOnboardingTour';
+import { useSimpleMode } from '@/hooks/useSimpleMode';
+import { Switch } from '@/components/ui/switch';
 import { isNative } from '@/lib/platform';
 import { toast } from 'sonner';
 
@@ -26,6 +28,7 @@ export default function Settings() {
   const { user } = useAuth();
   const { tier, isPro, isTeam } = usePlan();
   const [, setLocation] = useLocation();
+  const [simpleMode, setSimpleMode] = useSimpleMode();
 
   const handleReplayTour = async () => {
     await resetTour();
@@ -138,6 +141,17 @@ export default function Settings() {
             {/* Seção: Personalização */}
             <ListItemAnimation>
               <SettingsSection title="Personalização">
+                {/* Toggle Modo Simples (proposta Modo Simples #1) */}
+                <div className="flex flex-row items-center justify-start gap-3 px-4 py-3.5 w-full">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">Modo Simples</p>
+                    <p className="text-xs text-muted-foreground">Esconde termos técnicos (VPD, PPFD, EC) e mostra só o essencial</p>
+                  </div>
+                  <Switch checked={simpleMode} onCheckedChange={setSimpleMode} aria-label="Alternar Modo Simples" />
+                </div>
                 <SettingsRow href="/settings/appearance" icon={<Palette className="w-4 h-4" />} label="Tema" description="Claro, escuro, floresta e outros" />
                 <SettingsRow href="/settings/alerts" icon={<Sliders className="w-4 h-4" />} label="Alertas de ambiente" description="Margens de tolerância por fase" />
                 <SettingsRow href="/settings/notifications" icon={<Bell className="w-4 h-4" />} label="Notificações" description="Push e lembretes diários" />
