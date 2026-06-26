@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, Droplets, Sun, Beaker, TestTube, Timer, FlaskConical, Microscope, ArrowRight, Wind, Lock, Sparkles, Play, Sprout } from "lucide-react";
+import { Calculator, Droplets, Sun, TestTube, Timer, FlaskConical, ArrowRight, Wind, Lock, Sparkles, Play, Sprout } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { usePlan } from "@/_core/hooks/usePlan";
 import { useHasOrganicTent } from "@/_core/hooks/useCultivationMethod";
@@ -383,19 +383,6 @@ export default function CalculatorMenu() {
         {/* Sem estufa orgânica → seção orgânica de-priorizada no fim */}
         {!hasOrganic && organicSection}
         {paywall.PaywallElement}
-
-        {/* Info Card */}
-        <div className="mt-4 rounded-2xl border border-border/50 bg-muted/10 p-4 space-y-2.5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <Beaker className="w-3.5 h-3.5" /> Sobre as Calculadoras
-          </p>
-          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Droplets className="w-3 h-3 text-cyan-400"/>Rega e Runoff:</strong> Volume ideal de rega com recomendações de ajuste por runoff</p>
-          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><FlaskConical className="w-3 h-3 text-emerald-400"/>Fertilização:</strong> Receitas de sais minerais (Ca, K, MKP, Mg) por fase e semana</p>
-          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Sun className="w-3 h-3 text-yellow-400"/>Lux → PPFD:</strong> Converta leituras de luxímetro para PPFD por tipo de luminária</p>
-          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Calculator className="w-3 h-3 text-violet-400"/>PPM ↔ EC:</strong> Conversão bidirecional entre partes por milhão e condutividade</p>
-          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Microscope className="w-3 h-3 text-rose-400"/>pH:</strong> Calcule quanto ácido ou base adicionar para ajustar o pH da solução</p>
-          <p className="text-xs text-muted-foreground"><strong className="text-foreground inline-flex items-center gap-1"><Wind className="w-3 h-3 text-indigo-400"/>VPD:</strong> Pressão de vapor deficit — parâmetro essencial para growers avançados</p>
-        </div>
           </>
         )}
       </main>
