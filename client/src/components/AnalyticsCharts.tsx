@@ -1,8 +1,17 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useState } from "react";
 import { TrendingUp, Droplets, Sun, FlaskConical } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const RANGE_OPTIONS: { label: string; days: number | null }[] = [
+  { label: "7 dias", days: 7 },
+  { label: "30 dias", days: 30 },
+  { label: "90 dias", days: 90 },
+  { label: "Tudo", days: null },
+];
 
 interface LogData {
   id: number;
@@ -21,6 +30,8 @@ interface AnalyticsChartsProps {
 }
 
 export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
+  const [rangeDays, setRangeDays] = useState<number | null>(30);
+
   // Preparar dados para os gráficos
   const chartData = logs
     .filter(log => log.tempC !== null || log.rhPct !== null || log.ppfd !== null)
@@ -28,6 +39,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
     .map(log => {
       const logDate = new Date(log.logDate);
       return {
+        ts: logDate.getTime(),
         date: format(logDate, 'dd/MM', { locale: ptBR }),
         fullDate: format(logDate, 'dd/MM/yyyy', { locale: ptBR }),
         shift: log.turn === 'AM' ? 'Manhã' : 'Tarde',
@@ -40,6 +52,13 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
       };
     })
     .reverse(); // Mais antigo primeiro para melhor visualização
+
+  // Filtra pelo período selecionado, relativo ao ponto mais recente (robusto a
+  // dados de teste antigos). null = Tudo.
+  const maxTs = chartData.length ? chartData[chartData.length - 1].ts : 0;
+  const visibleData = rangeDays
+    ? chartData.filter((d) => d.ts >= maxTs - rangeDays * 24 * 60 * 60 * 1000)
+    : chartData;
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload }: any) => {
@@ -76,9 +95,28 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <TrendingUp className="w-5 h-5 text-primary" />
-        <h2 className="text-2xl font-bold">Análise de Dados</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary" />
+          <h2 className="text-2xl font-bold">Análise de Dados</h2>
+        </div>
+        {/* Seletor de período (substitui o Brush) */}
+        <div className="inline-flex items-center rounded-full border border-border bg-muted/30 p-0.5">
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.label}
+              onClick={() => setRangeDays(opt.days)}
+              className={cn(
+                "text-xs font-medium px-3 py-1.5 rounded-full transition-colors",
+                rangeDays === opt.days
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -94,7 +132,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
+                <AreaChart data={visibleData}>
                   <defs>
                     <linearGradient id="acGradTemp" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#f97316" stopOpacity={0.35} />
@@ -109,9 +147,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                   <Area type="monotone" dataKey="temp" stroke="#f97316" strokeWidth={2.5}
                     fill="url(#acGradTemp)" dot={{ r: 3.5, fill: "#f97316", strokeWidth: 0 }}
                     activeDot={{ r: 5 }} name="Temp (°C)" connectNulls
-                    animationDuration={800} animationEasing="ease-out" />
-                  <Brush dataKey="date" height={28} stroke="#f97316" fill="transparent" />
-                </AreaChart>
+                    animationDuration={800} animationEasing="ease-out" />                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -129,7 +165,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
+                <AreaChart data={visibleData}>
                   <defs>
                     <linearGradient id="acGradRh" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.35} />
@@ -144,9 +180,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                   <Area type="monotone" dataKey="rh" stroke="#3b82f6" strokeWidth={2.5}
                     fill="url(#acGradRh)" dot={{ r: 3.5, fill: "#3b82f6", strokeWidth: 0 }}
                     activeDot={{ r: 5 }} name="RH (%)" connectNulls
-                    animationDuration={800} animationEasing="ease-out" />
-                  <Brush dataKey="date" height={28} stroke="#3b82f6" fill="transparent" />
-                </AreaChart>
+                    animationDuration={800} animationEasing="ease-out" />                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -164,7 +198,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
+                <AreaChart data={visibleData}>
                   <defs>
                     <linearGradient id="acGradPpfd" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#eab308" stopOpacity={0.35} />
@@ -179,9 +213,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                   <Area type="monotone" dataKey="ppfd" stroke="#eab308" strokeWidth={2.5}
                     fill="url(#acGradPpfd)" dot={{ r: 3.5, fill: "#eab308", strokeWidth: 0 }}
                     activeDot={{ r: 5 }} name="PPFD (μmol/m²/s)" connectNulls
-                    animationDuration={800} animationEasing="ease-out" />
-                  <Brush dataKey="date" height={28} stroke="#eab308" fill="transparent" />
-                </AreaChart>
+                    animationDuration={800} animationEasing="ease-out" />                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -199,7 +231,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
+                <AreaChart data={visibleData}>
                   <defs>
                     <linearGradient id="acGradPh" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.3} />
@@ -227,9 +259,7 @@ export function AnalyticsCharts({ logs }: AnalyticsChartsProps) {
                       fill="url(#acGradEc)" dot={{ r: 3.5, fill: "#a855f7", strokeWidth: 0 }}
                       activeDot={{ r: 5 }} name="EC (mS/cm)" connectNulls
                       animationDuration={800} animationEasing="ease-out" />
-                  )}
-                  <Brush dataKey="date" height={28} stroke="#a855f7" fill="transparent" />
-                </AreaChart>
+                  )}                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
