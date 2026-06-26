@@ -1,4 +1,4 @@
-import { Flame, Loader2, Trophy } from "lucide-react";
+import { Flame, Loader2, Trophy, Shield } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { TrophyIcon, type TrophyTier } from "@/components/TrophyIcon";
 import { trpc } from "@/lib/trpc";
@@ -54,6 +54,19 @@ export default function Progresso() {
                     ? "Ofensiva em dia — mandou bem! 🌿"
                     : "Registre hoje pra não quebrar a ofensiva"}
               </p>
+              {data.streak.current > 0 && (
+                <div className="mt-3">
+                  <span className={cn(
+                    "inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full",
+                    data.streak.shieldUsed
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  )}>
+                    <Shield className="w-3.5 h-3.5" />
+                    {data.streak.shieldUsed ? "Escudo usado — sua ofensiva foi salva!" : "Escudo pronto · 1 dia perdido é perdoado"}
+                  </span>
+                </div>
+              )}
               {data.streak.longest > 0 && (
                 <p className="text-xs text-muted-foreground/70 mt-2">Recorde: {data.streak.longest} dias</p>
               )}

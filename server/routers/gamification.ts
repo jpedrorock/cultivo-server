@@ -22,7 +22,7 @@ export const gamificationRouter = router({
     };
 
     if (groupId == null) {
-      return { streak: { current: 0, longest: 0, todayDone: false }, ...computeProgress(zeroStats) };
+      return { streak: { current: 0, longest: 0, todayDone: false, shieldUsed: false }, ...computeProgress(zeroStats) };
     }
 
     // IDs do grupo (pra escopar os counts).

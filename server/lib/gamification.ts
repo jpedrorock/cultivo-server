@@ -162,12 +162,19 @@ export function computePlatinum(achs: Achievement[]): { unlocked: boolean; have:
  * Ofensiva (current/longest) + se já registrou hoje, a partir de dias distintos
  * (YYYY-MM-DD). Puro — `now` injetável pra teste determinístico.
  */
-export function computeStreak(
-  dayKeys: string[],
-  now: Date = new Date(),
-): { current: number; longest: number; todayDone: boolean } {
+export interface StreakInfo {
+  current: number;
+  longest: number;
+  todayDone: boolean;
+  /** Escudo (gentil): a sequência atual tolera 1 dia perdido. `shieldUsed` =
+   * já gastou essa tolerância nesta sequência. Recarrega quando a ofensiva
+   * quebra de vez. Filosofia Finch/Daylio — dia perdido não é fracasso. */
+  shieldUsed: boolean;
+}
+
+export function computeStreak(dayKeys: string[], now: Date = new Date()): StreakInfo {
   const days = new Set(dayKeys.map((d) => d.slice(0, 10)).filter(Boolean));
-  if (days.size === 0) return { current: 0, longest: 0, todayDone: false };
+  if (days.size === 0) return { current: 0, longest: 0, todayDone: false, shieldUsed: false };
 
   const toKey = (d: Date) => d.toISOString().slice(0, 10);
   const today = new Date(now);
@@ -175,15 +182,31 @@ export function computeStreak(
   const todayDone = days.has(toKey(today));
 
   // Ofensiva atual: anda pra trás a partir de hoje (ou ontem, se hoje vazio).
+  // Tolera UM buraco de 1 dia (o "escudo") se o dia anterior ao buraco tem
+  // registro — assim 1 falta não zera a sequência.
   const cursor = new Date(today);
   if (!days.has(toKey(cursor))) cursor.setUTCDate(cursor.getUTCDate() - 1);
   let current = 0;
-  while (days.has(toKey(cursor))) {
-    current++;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  let shieldUsed = false;
+  while (true) {
+    if (days.has(toKey(cursor))) {
+      current++;
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+      continue;
+    }
+    // Buraco: usa o escudo só se ainda intacto E o dia anterior tem registro.
+    const prevDay = new Date(cursor);
+    prevDay.setUTCDate(prevDay.getUTCDate() - 1);
+    if (!shieldUsed && current > 0 && days.has(toKey(prevDay))) {
+      shieldUsed = true;
+      current++; // o dia "congelado" conta na ofensiva
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+      continue;
+    }
+    break;
   }
 
-  // Maior ofensiva: maior sequência consecutiva no histórico.
+  // Maior ofensiva: maior sequência consecutiva estrita no histórico.
   const sorted = [...days].sort();
   let longest = 0;
   let run = 0;
@@ -195,8 +218,9 @@ export function computeStreak(
     if (run > longest) longest = run;
     prev = t;
   }
+  if (current > longest) longest = current;
 
-  return { current, longest, todayDone };
+  return { current, longest, todayDone, shieldUsed };
 }
 
 /** Resumo completo de progresso (sem a ofensiva, que vem do router). */
