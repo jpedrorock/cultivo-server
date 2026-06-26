@@ -109,7 +109,36 @@ describe("computeStreak", () => {
   const now = new Date("2026-06-26T15:00:00Z");
 
   it("vazio sem dias", () => {
-    expect(computeStreak([], now)).toEqual({ current: 0, longest: 0, todayDone: false });
+    expect(computeStreak([], now)).toEqual({ current: 0, longest: 0, todayDone: false, shieldUsed: false });
+  });
+
+  it("escudo: 1 dia perdido no meio NÃO zera a ofensiva", () => {
+    // hoje(26) ✓, ontem(25) ✓, 24 FALTOU, 23 ✓, 22 ✓ → escudo cobre o 24
+    const days = ["2026-06-22", "2026-06-23", "2026-06-25", "2026-06-26"];
+    const r = computeStreak(days, now);
+    expect(r.current).toBe(5); // 26,25,[24 congelado],23,22
+    expect(r.shieldUsed).toBe(true);
+  });
+
+  it("escudo: sem buraco → escudo intacto (shieldUsed false)", () => {
+    const r = computeStreak(["2026-06-24", "2026-06-25", "2026-06-26"], now);
+    expect(r.current).toBe(3);
+    expect(r.shieldUsed).toBe(false);
+  });
+
+  it("escudo: 2 dias perdidos seguidos quebram a ofensiva", () => {
+    // 26 ✓, 25 ✓, 24 e 23 FALTARAM (buraco de 2) → para no buraco
+    const r = computeStreak(["2026-06-22", "2026-06-25", "2026-06-26"], now);
+    expect(r.current).toBe(2);
+    expect(r.shieldUsed).toBe(false);
+  });
+
+  it("escudo: cobre só 1 buraco por sequência", () => {
+    // 26 ✓,25 ✓,24 falta(escudo),23 ✓,22 falta → para no 22 (escudo já gasto)
+    const days = ["2026-06-21", "2026-06-23", "2026-06-25", "2026-06-26"];
+    const r = computeStreak(days, now);
+    expect(r.current).toBe(4); // 26,25,[24],23
+    expect(r.shieldUsed).toBe(true);
   });
 
   it("conta dias consecutivos terminando hoje", () => {

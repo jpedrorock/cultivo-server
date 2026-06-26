@@ -43,8 +43,8 @@ import { computeStreak } from './lib/gamification';
  * Ofensiva de CONTA (todas as estufas do grupo) — dias distintos com registro.
  * Usado pela gamificação (router) e pelo push de lembrete streak-aware.
  */
-export async function getGroupStreak(groupId: number | null): Promise<{ current: number; longest: number; todayDone: boolean }> {
-  const zero = { current: 0, longest: 0, todayDone: false };
+export async function getGroupStreak(groupId: number | null): Promise<{ current: number; longest: number; todayDone: boolean; shieldUsed: boolean }> {
+  const zero = { current: 0, longest: 0, todayDone: false, shieldUsed: false };
   if (groupId == null) return zero;
   const database = await getDb();
   if (!database) return zero;
