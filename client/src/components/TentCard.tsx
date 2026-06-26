@@ -361,9 +361,11 @@ export function TentCard({
         <div className="pointer-events-none absolute top-0 left-0 right-0 h-[3px] z-20" style={{ background: `linear-gradient(90deg, ${phaseAccentColor}cc 0%, ${phaseAccentColor}22 100%)` }} />
       <CardHeader className="relative z-10 px-5 pt-5 pb-3">
         <div className="flex items-start justify-between gap-2">
+          {/* Spacer p/ balancear o botão ⋮ à direita → nome no centro real (Modo Simples) */}
+          {simpleMode && <div className="w-11 shrink-0" aria-hidden="true" />}
           <div className="flex-1 min-w-0">
-            {/* Linha 1: nome + freshness badge */}
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Linha 1: nome + freshness badge (centralizado no Modo Simples) */}
+            <div className={`flex items-center gap-2 flex-wrap ${simpleMode ? 'justify-center' : ''}`}>
               <CardTitle className="text-xl font-bold tracking-tight">{tent.name}</CardTitle>
               {!simpleMode && (() => {
                 if (!tent.lastReadingAt) return (
