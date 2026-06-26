@@ -322,6 +322,38 @@ export const cyclesRouter = router({
           .where(eq(cycles.id, input.cycleId));
         return { success: true };
       }),
+    // Relatório de colheita — métricas do ciclo pra celebração (gamificação G).
+    harvestReport: protectedProcedure
+      .input(z.object({ cycleId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Banco indisponível");
+        await validateCycleOwnership(input.cycleId, ctx.user.groupId);
+        const [cycle] = await database.select().from(cycles).where(eq(cycles.id, input.cycleId));
+        if (!cycle) throw new Error("Ciclo não encontrado");
+
+        const start = new Date(cycle.startDate);
+        const logs = (await database
+          .select({ logDate: dailyLogs.logDate })
+          .from(dailyLogs)
+          .where(and(eq(dailyLogs.tentId, cycle.tentId), sql`${dailyLogs.logDate} >= ${start}`))) as Array<{ logDate: Date | string }>;
+        const times = logs.map((l) => new Date(l.logDate).getTime());
+        const end = times.length ? new Date(Math.max(...times)) : new Date();
+        const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
+        const distinctDays = new Set(logs.map((l) => new Date(l.logDate).toISOString().slice(0, 10))).size;
+        const pctLogged = Math.min(100, Math.round((distinctDays / days) * 100));
+
+        const [pc] = (await database.select({ n: sql<number>`count(*)` }).from(plants).where(eq(plants.currentTentId, cycle.tentId))) as Array<{ n: number }>;
+        const plantCount = Number(pc?.n ?? 0);
+
+        let strainName: string | null = null;
+        if (cycle.strainId) {
+          const [s] = await database.select({ name: strains.name }).from(strains).where(eq(strains.id, cycle.strainId));
+          strainName = s?.name ?? null;
+        }
+
+        return { days, logsCount: logs.length, distinctDays, pctLogged, plantCount, strainName, startDate: cycle.startDate, status: cycle.status };
+      }),
     transitionToDrying: protectedProcedure
       .input(
         z.object({
