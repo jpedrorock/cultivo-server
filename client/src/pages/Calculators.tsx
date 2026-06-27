@@ -1235,6 +1235,33 @@ function VPDCalculator() {
 
   const haptic = useTactileFeedback();
 
+  // ── Referência por fase do ciclo — VPD ideal sobe ao longo do cultivo ──
+  type RefPhase = "mudas" | "vega" | "flora";
+  const PHASE_TARGET: Record<RefPhase, { min: number; max: number; label: string }> = {
+    mudas: { min: 0.4, max: 0.8, label: "Mudas" },
+    vega: { min: 0.8, max: 1.2, label: "Vegetativa" },
+    flora: { min: 1.2, max: 1.5, label: "Floração" },
+  };
+  const [refPhase, setRefPhase] = useState<RefPhase>("vega");
+  const [refTentId, setRefTentId] = useState<number | null>(null);
+  const { data: activeCycles } = trpc.cycles.getActiveCyclesWithProgress.useQuery(undefined, { staleTime: 60_000 });
+  const cycleToRef = (p: string): RefPhase =>
+    p === "CLONING" ? "mudas" : (p === "FLORA" || p === "PRE_FLORA") ? "flora" : "vega";
+  const refTent = (activeCycles as any[] | undefined)?.find((c) => c.tentId === refTentId) ?? null;
+  const pickRefTent = (id: number | null) => {
+    setRefTentId(id);
+    const c = (activeCycles as any[] | undefined)?.find((t) => t.tentId === id);
+    if (c) setRefPhase(cycleToRef(c.phase));
+  };
+  const phaseLabelPt = (p: string) =>
+    p === "FLORA" ? "Floração" : p === "PRE_FLORA" ? "Pré-flora" : p === "CLONING" ? "Clonagem" : p === "MAINTENANCE" ? "Manutenção" : "Vegetativa";
+  const target = PHASE_TARGET[refPhase];
+  const verdict = vpdNum < target.min
+    ? { txt: "Abaixo do alvo — muito úmido", tone: "text-blue-400 border-blue-500/30 bg-blue-500/10", arrow: "↓" }
+    : vpdNum > target.max
+      ? { txt: "Acima do alvo — ar seco", tone: "text-amber-400 border-amber-500/30 bg-amber-500/10", arrow: "↑" }
+      : { txt: "No alvo", tone: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10", arrow: "✓" };
+
   return (
     <div className="space-y-6 pb-8">
       {/* Editorial header */}
@@ -1291,6 +1318,53 @@ function VPDCalculator() {
             </div>
             <p className="text-xs text-muted-foreground mt-2">{activeZone.sub}</p>
           </div>
+        </div>
+      </div>
+
+      {/* Referência pra fase do ciclo */}
+      <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tá bom pra fase?</p>
+          {(activeCycles as any[] | undefined)?.length ? (
+            <select
+              value={refTentId ?? ""}
+              onChange={(e) => pickRefTent(e.target.value ? parseInt(e.target.value) : null)}
+              className="text-xs bg-muted/30 border border-border/40 rounded-lg px-2 py-1 text-foreground max-w-[160px]"
+            >
+              <option value="">Puxar da estufa…</option>
+              {(activeCycles as any[]).map((c) => (
+                <option key={c.tentId} value={c.tentId}>{c.tentName}</option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+
+        {/* Toggle de fase */}
+        <div className="grid grid-cols-3 gap-2">
+          {(["mudas", "vega", "flora"] as RefPhase[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => { setRefPhase(p); setRefTentId(null); haptic.tap(); }}
+              className={`py-2 rounded-xl text-xs font-medium border transition-colors ${refPhase === p ? "bg-primary/15 border-primary/40 text-primary" : "border-border/40 text-muted-foreground hover:text-foreground"}`}
+            >
+              {PHASE_TARGET[p].label}
+            </button>
+          ))}
+        </div>
+
+        {refTent && (
+          <p className="text-xs text-muted-foreground">
+            {refTent.tentName} · {phaseLabelPt(refTent.phase)} · semana {refTent.currentWeek}
+          </p>
+        )}
+
+        {/* Veredito */}
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${verdict.tone}`}>
+          <div>
+            <p className="text-sm font-bold">{verdict.arrow} {verdict.txt}</p>
+            <p className="text-xs opacity-80">Alvo {target.label}: {target.min.toFixed(1)}–{target.max.toFixed(1)} kPa</p>
+          </div>
+          <span className="mono text-lg font-bold">{vpdFixed}</span>
         </div>
       </div>
 
