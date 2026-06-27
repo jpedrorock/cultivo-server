@@ -191,6 +191,14 @@ static lv_obj_t *cardCycle     = nullptr;
 // Barra de progresso da fase atual no card ciclo (semana/totalSem).
 // Cor da barra = phaseColor(FASE). Atualizada em refreshHomeValues.
 static lv_obj_t *cycleProgress = nullptr;
+// Accent de fase — linha fininha (3px) logo abaixo do header, na cor da fase
+// atual (espelha a borda-esquerda do TentCard do app). Cor setada em
+// refreshHomeValues; oculta enquanto FASE vazia (sem fetch).
+static lv_obj_t *phaseAccent = nullptr;
+// LivePill — pilula "ao vivo" com dot verde pulsante no header (assinatura do
+// app, sinaliza dado fresco). Visivel so' quando wifiOk; togglada em
+// refreshHomeValues junto com o icone wifi.
+static lv_obj_t *livePill = nullptr;
 // lblTemp = numero grande do arc; lblEcHome/lblPhHome legacy.
 static lv_obj_t *lblEcHome = nullptr, *lblPhHome = nullptr;  // legacy
 static lv_obj_t *lblCiclo = nullptr, *ciclBar = nullptr;     // legacy
@@ -720,6 +728,54 @@ static void buildHome(lv_obj_t *tab) {
     }
   }, LV_EVENT_CLICKED, NULL);
 
+  // ── LivePill (DS): dot verde pulsante + "ao vivo" — espelha a pilula
+  // "( ● )" do app, sinaliza dado fresco. Fica a esquerda do cluster de
+  // icones. Visibilidade gated por wifiOk (refreshHomeValues): mostrar
+  // "ao vivo" pulsando offline seria mentira.
+  livePill = lv_obj_create(tab);
+  lv_obj_remove_style_all(livePill);
+  lv_obj_set_size(livePill, sw(78), sh(20));
+  lv_obj_align(livePill, LV_ALIGN_TOP_RIGHT, -sw(124), sh(9));
+  lv_obj_clear_flag(livePill, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_color(livePill, lv_color_hex(COL_CARD), 0);
+  lv_obj_set_style_bg_opa(livePill, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(livePill, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_border_width(livePill, 1, 0);
+  lv_obj_set_style_border_color(livePill, lv_color_hex(COL_BORDER), 0);
+  {
+    lv_obj_t *liveDot = lv_obj_create(livePill);
+    lv_obj_remove_style_all(liveDot);
+    lv_obj_set_size(liveDot, sw(8), sw(8));
+    lv_obj_align(liveDot, LV_ALIGN_LEFT_MID, sw(8), 0);
+    lv_obj_set_style_radius(liveDot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(liveDot, lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_bg_opa(liveDot, LV_OPA_COVER, 0);
+    lv_obj_set_style_shadow_color(liveDot, lv_color_hex(COL_PRIMARY), 0);
+    lv_obj_set_style_shadow_width(liveDot, sw(6), 0);
+    // Pulse infinito no halo (shadow_opa 0->70) — regiao minuscula, custo de
+    // redraw desprezivel (mesmo helper do bloom/ring-pulse de alertas).
+    startBreathe(liveDot, LV_OPA_0, LV_OPA_70, 1600);
+
+    lv_obj_t *liveLbl = lv_label_create(livePill);
+    lv_label_set_text(liveLbl, "ao vivo");
+    lv_obj_set_style_text_color(liveLbl, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(liveLbl, FONT_CAPTION, 0);
+    lv_obj_align(liveLbl, LV_ALIGN_LEFT_MID, sw(20), 0);
+  }
+  lv_obj_add_flag(livePill, LV_OBJ_FLAG_HIDDEN);  // refreshHomeValues mostra qdo wifiOk
+
+  // ── Accent de fase (DS): linha 3px sob o header, cor = phaseColor(FASE).
+  // Espelha a borda-esquerda colorida do TentCard. Cor + visibilidade reais
+  // setadas em refreshHomeValues (oculta enquanto FASE vazia, sem fetch).
+  phaseAccent = lv_obj_create(tab);
+  lv_obj_remove_style_all(phaseAccent);
+  lv_obj_set_size(phaseAccent, SCREEN_W - sw(16), sh(3));
+  lv_obj_align(phaseAccent, LV_ALIGN_TOP_MID, 0, sh(38));
+  lv_obj_set_style_radius(phaseAccent, sh(2), 0);
+  lv_obj_set_style_bg_color(phaseAccent, lv_color_hex(phaseColor(FASE)), 0);
+  lv_obj_set_style_bg_opa(phaseAccent, LV_OPA_COVER, 0);
+  lv_obj_add_flag(phaseAccent, LV_OBJ_FLAG_HIDDEN);
+
   // Single-face redesign: sem botao flip. Tap no arc cicla TEMP/pH/EC/FLORACAO.
   // Mini-cards UMID/VPD/PPFD ficam sempre visiveis a direita.
 
@@ -1184,6 +1240,11 @@ extern "C" void refreshHomeValues() {
     lv_obj_set_style_image_recolor(lblWifi,
       lv_color_hex(wifiOk ? COL_PRIMARY : COL_DIM), 0);
   }
+  // LivePill: visivel so' quando online (espelha o estado do icone wifi).
+  if (livePill) {
+    if (wifiOk) lv_obj_clear_flag(livePill, LV_OBJ_FLAG_HIDDEN);
+    else        lv_obj_add_flag(livePill, LV_OBJ_FLAG_HIDDEN);
+  }
 
   // Arc principal: re-renderiza no modo atual com valores frescos
   updateArcMode();
@@ -1218,6 +1279,11 @@ extern "C" void refreshHomeValues() {
     if (FASE[0]) {
       lv_obj_clear_flag(lblCycleBadge, LV_OBJ_FLAG_HIDDEN);
       uint32_t pc = phaseColor(FASE);
+      // Accent de fase no header acompanha a cor da fase atual.
+      if (phaseAccent) {
+        lv_obj_set_style_bg_color(phaseAccent, lv_color_hex(pc), 0);
+        lv_obj_clear_flag(phaseAccent, LV_OBJ_FLAG_HIDDEN);
+      }
       lv_label_set_text(lblCycleBadge, FASE);
       lv_obj_set_style_text_color(lblCycleBadge, lv_color_hex(pc), 0);
       lv_obj_set_style_bg_color(lblCycleBadge, lv_color_hex(pc), 0);
@@ -1237,9 +1303,10 @@ extern "C" void refreshHomeValues() {
         else lv_obj_clear_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
       }
     } else {
-      // Sem fase ainda — oculta badge + barra
+      // Sem fase ainda — oculta badge + barra + accent
       lv_obj_add_flag(lblCycleBadge, LV_OBJ_FLAG_HIDDEN);
       if (cycleProgress) lv_obj_add_flag(cycleProgress, LV_OBJ_FLAG_HIDDEN);
+      if (phaseAccent) lv_obj_add_flag(phaseAccent, LV_OBJ_FLAG_HIDDEN);
     }
   }
 

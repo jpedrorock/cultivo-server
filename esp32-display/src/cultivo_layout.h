@@ -37,16 +37,17 @@
 // referenciam — mas valor agora bate com o DS real do web app.
 // ────────────────────────────────────────────────────────────────────────────
 
-// Background: oklch(0.09 0.008 240) — quase preto com tint frio
-#define COL_BG      0x0A0E14
-// Card: oklch(0.14 0.010 240) — step de elevação sobre BG
-#define COL_CARD    0x131820
-// Border: oklch(0.18 0.010 240) — sutil, mal visível
-#define COL_BORDER  0x1F2937
-// Foreground: oklch(0.97 0 0) — branco off
+// Background: oklch(0.16 0.014 152) — quase preto com tint verde-quente (Forest)
+// Hue alinhado ao app/site (era 240 frio; app migrou pra ~152 verde-quente).
+#define COL_BG      0x09100B
+// Card: oklch(0.21 0.018 152) — step de elevação sobre BG (verde-quente)
+#define COL_CARD    0x121A14
+// Border: oklch(0.28 0.030 152) — sutil, mal visível (verde-quente)
+#define COL_BORDER  0x1D2D21
+// Foreground: oklch(0.97 0 0) — branco off (neutro, sem hue)
 #define COL_TEXT    0xF9FAFB
-// Muted-foreground: oklch(0.46 0.008 240) — cinza médio
-#define COL_DIM     0x6B7280
+// Muted-foreground: oklch(0.55 0.023 152) — cinza médio com tint verde
+#define COL_DIM     0x68766B
 
 // Primary: oklch(0.62 0.17 145) — verde vibrante, "marca" do Cultivo.
 // COL_GRN e COL_PRIMARY apontam pro mesmo verde por compatibilidade,
@@ -63,17 +64,19 @@
 #define COL_BLU     0x60A5FA    // wifi/info
 #define COL_AMBER   0xE0A32E    // EC
 
-// ── Phase tokens (espelha .dark phase palette do client/src/index.css) ──────
+// ── Phase tokens (canônico: client/src/lib/phaseColors.ts + index.css) ──────
 // Cor da fase de cultivo — usada em badges no header, indicadores de ciclo.
-// Importante: FLORACAO e' MAGENTA (#BE4BDB), nao verde — verde e' VEGA.
-#define COL_PHASE_SEEDLING    0x8EC58C
-#define COL_PHASE_VEGETATIVE  0x40C057
-#define COL_PHASE_FLOWERING   0xBE4BDB
-#define COL_PHASE_FLUSHING    0x20C997
-#define COL_PHASE_HARVEST     0xFD7C36
-#define COL_PHASE_DRYING      0xE0A32E
-#define COL_PHASE_CURING      0xB07E3A
-#define COL_PHASE_MAINTENANCE 0x93C5FD
+// Hexes sincronizados 1:1 com PHASE_COLORS do app (mesma cor no display e app).
+// Importante: FLORACAO e' VIOLETA (#C44BDB), nao verde — verde e' VEGA.
+#define COL_PHASE_SEEDLING    0x72DB4A   // lime — muda/germinação      (hue 130)
+#define COL_PHASE_VEGETATIVE  0x40C057   // verde-floresta — vega       (hue 145)
+#define COL_PHASE_PRE_FLORA   0xB57EDC   // lavanda — pré-flora/stretch (violeta claro)
+#define COL_PHASE_FLOWERING   0xC44BDB   // violeta — floração          (hue 305)
+#define COL_PHASE_FLUSHING    0x20C897   // teal — flush pré-colheita   (hue 185)
+#define COL_PHASE_HARVEST     0xF57230   // laranja — colheita          (hue 38)
+#define COL_PHASE_DRYING      0xD8A230   // âmbar — secagem             (hue 75)
+#define COL_PHASE_CURING      0xC09040   // dourado — cura              (hue 65)
+#define COL_PHASE_MAINTENANCE 0x5C7DE0   // índigo-azul — manutenção    (hue 245)
 
 // ── Motion tokens ───────────────────────────────────────────────────────────
 // Durations em ms — bate com --motion-* do CSS (menos breath que o app
@@ -128,12 +131,16 @@ static inline uint32_t phaseColor(const char *fase) {
   if (!fase || !*fase) return COL_PRIMARY;
   // Comparacao case-sensitive — server envia uppercase ("VEGA", "FLORA").
   if (fase[0] == 'V')                 return COL_PHASE_VEGETATIVE;  // VEGA
+  if (fase[0] == 'P')                 return COL_PHASE_PRE_FLORA;   // PRE_FLORA
   if (fase[0] == 'F' && fase[1] == 'L') {
     if (fase[2] == 'O')               return COL_PHASE_FLOWERING;   // FLORA, FLORACAO
     if (fase[2] == 'U')               return COL_PHASE_FLUSHING;    // FLUSHING
   }
   if (fase[0] == 'D')                 return COL_PHASE_DRYING;      // DRYING
-  if (fase[0] == 'C')                 return COL_PHASE_CURING;      // CURING
+  if (fase[0] == 'C') {
+    if (fase[1] == 'L')               return COL_PHASE_SEEDLING;    // CLONING (= lime)
+    return COL_PHASE_CURING;                                        // CURING
+  }
   if (fase[0] == 'H')                 return COL_PHASE_HARVEST;     // HARVEST
   if (fase[0] == 'M')                 return COL_PHASE_MAINTENANCE; // MAINTENANCE
   if (fase[0] == 'S')                 return COL_PHASE_SEEDLING;    // SEEDLING
