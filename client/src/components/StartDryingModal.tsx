@@ -13,8 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrophyIcon } from "@/components/TrophyIcon";
-import { CalendarDays, ClipboardCheck, Target, Sprout } from "lucide-react";
+import { HarvestCelebration } from "@/components/HarvestCelebration";
 import { toast } from "sonner";
 
 interface StartDryingModalProps {
@@ -33,7 +32,6 @@ export function StartDryingModal({ open, onClose, cycleId, cycleName }: StartDry
   const [celebrating, setCelebrating] = useState(false);
 
   const { data: tents } = trpc.tents.list.useQuery();
-  const { data: report } = trpc.cycles.harvestReport.useQuery({ cycleId }, { enabled: celebrating });
   const utils = trpc.useUtils();
 
   const transitionToDrying = trpc.cycles.transitionToDrying.useMutation({
@@ -64,29 +62,7 @@ export function StartDryingModal({ open, onClose, cycleId, cycleName }: StartDry
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         {celebrating ? (
-          <div className="text-center py-2">
-            <TrophyIcon tier="gold" size={76} className="mx-auto" />
-            <h3 className="text-xl font-bold text-foreground mt-2">Colheita concluída! 🎉</h3>
-            <p className="text-sm text-muted-foreground">{report?.strainName ?? cycleName}</p>
-            <div className="grid grid-cols-2 gap-3 mt-5">
-              {[
-                { Icon: CalendarDays, label: "Dias de cultivo", value: report ? `${report.days}` : "—" },
-                { Icon: ClipboardCheck, label: "Registros", value: report ? `${report.logsCount}` : "—" },
-                { Icon: Target, label: "Consistência", value: report ? `${report.pctLogged}%` : "—" },
-                { Icon: Sprout, label: "Plantas", value: report ? `${report.plantCount}` : "—" },
-              ].map((s) => (
-                <div key={s.label} className="flex flex-col items-center gap-0.5 rounded-xl border border-border/50 bg-muted/10 py-3">
-                  <s.Icon className="w-4 h-4 text-primary mb-0.5" />
-                  <span className="text-xl font-bold text-foreground tabular-nums leading-none">{s.value}</span>
-                  <span className="text-[11px] text-muted-foreground">{s.label}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-4">Boa colheita, grower! 🌿 Veja seus troféus no Progresso.</p>
-            <DialogFooter className="mt-5">
-              <Button onClick={onClose} className="w-full">Concluir</Button>
-            </DialogFooter>
-          </div>
+          <HarvestCelebration cycleId={cycleId} fallbackName={cycleName} onDone={onClose} />
         ) : (
         <>
         <DialogHeader>

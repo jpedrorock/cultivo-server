@@ -60,6 +60,7 @@ import { TodayMissionWidget } from "@/components/TodayMissionWidget";
 import { useSimpleMode } from "@/hooks/useSimpleMode";
 import { HomeLoadingState } from "@/components/HomeLoadingState";
 import { TentCard } from "@/components/TentCard";
+import { HarvestCelebration } from "@/components/HarvestCelebration";
 import { AdBanner } from "@/components/AdBanner";
 
 /**
@@ -339,16 +340,27 @@ export default function Home() {
     );
   };
 
+  // Colheita ao finalizar: guarda o ciclo finalizado pra mostrar a festa no dialog.
+  const [finalizeDone, setFinalizeDone] = useState<{ cycleId: number; name: string } | null>(null);
+
   const finalizeCycle = trpc.cycles.finalize.useMutation({
     onSuccess: () => {
       toast.success("Ciclo finalizado com sucesso!");
       utils.cycles.listActive.invalidate();
       utils.cycles.getByTent.invalidate();
+      utils.cycles.getActiveCyclesWithProgress.invalidate();
+      utils.plants.list.invalidate();
+      utils.gamification.getProgress.invalidate();
     },
     onError: (error) => {
       toast.error(`Erro ao finalizar ciclo: ${error.message}`);
     },
   });
+
+  const closeFinalize = () => {
+    setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" });
+    setFinalizeDone(null);
+  };
 
   const handleFinalizeCycle = (cycleId: number, tentName: string) => {
     setFinalizeCycleConfirm({ open: true, cycleId, tentName });
@@ -771,36 +783,44 @@ export default function Home() {
       </LazyMount>
 
       {/* Finalizar Ciclo Confirm Dialog */}
-      <Dialog open={finalizeCycleConfirm.open} onOpenChange={(open) => !open && setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" })}>
+      <Dialog open={finalizeCycleConfirm.open} onOpenChange={(open) => !open && closeFinalize()}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
-              <CheckCircle className="w-5 h-5" />
-              Finalizar Ciclo
-            </DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja finalizar o ciclo da{" "}
-              <span className="font-semibold text-foreground">{finalizeCycleConfirm.tentName}</span>?
-              Esta ação encerrará o ciclo ativo e não pode ser desfeita.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" })}>
-              Cancelar
-            </Button>
-            <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              onClick={() => {
-                if (finalizeCycleConfirm.cycleId) {
-                  finalizeCycle.mutate({ cycleId: finalizeCycleConfirm.cycleId });
-                  setFinalizeCycleConfirm({ open: false, cycleId: null, tentName: "" });
-                }
-              }}
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Finalizar Ciclo
-            </Button>
-          </DialogFooter>
+          {finalizeDone ? (
+            <HarvestCelebration cycleId={finalizeDone.cycleId} fallbackName={finalizeDone.name} onDone={closeFinalize} />
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-amber-600">
+                  <CheckCircle className="w-5 h-5" />
+                  Finalizar Ciclo
+                </DialogTitle>
+                <DialogDescription>
+                  Tem certeza que deseja finalizar o ciclo da{" "}
+                  <span className="font-semibold text-foreground">{finalizeCycleConfirm.tentName}</span>?
+                  Esta ação encerrará o ciclo ativo e não pode ser desfeita.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={closeFinalize}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  disabled={finalizeCycle.isPending}
+                  onClick={() => {
+                    const cid = finalizeCycleConfirm.cycleId;
+                    const nm = finalizeCycleConfirm.tentName;
+                    if (cid) {
+                      finalizeCycle.mutate({ cycleId: cid }, { onSuccess: () => setFinalizeDone({ cycleId: cid, name: nm }) });
+                    }
+                  }}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Finalizar Ciclo
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
         </div>
