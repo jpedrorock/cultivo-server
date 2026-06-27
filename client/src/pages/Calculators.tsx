@@ -1257,10 +1257,10 @@ function VPDCalculator() {
     p === "FLORA" ? "Floração" : p === "PRE_FLORA" ? "Pré-flora" : p === "CLONING" ? "Clonagem" : p === "MAINTENANCE" ? "Manutenção" : "Vegetativa";
   const target = PHASE_TARGET[refPhase];
   const verdict = vpdNum < target.min
-    ? { txt: "Abaixo do alvo — muito úmido", tone: "text-blue-400 border-blue-500/30 bg-blue-500/10", arrow: "↓" }
+    ? { txt: "Abaixo do alvo — muito úmido", tone: "text-blue-400 border-blue-500/30 bg-blue-500/10", num: "text-blue-400", arrow: "↓" }
     : vpdNum > target.max
-      ? { txt: "Acima do alvo — ar seco", tone: "text-amber-400 border-amber-500/30 bg-amber-500/10", arrow: "↑" }
-      : { txt: "No alvo", tone: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10", arrow: "✓" };
+      ? { txt: "Acima do alvo — ar seco", tone: "text-amber-400 border-amber-500/30 bg-amber-500/10", num: "text-amber-400", arrow: "↑" }
+      : { txt: `No alvo — ${target.label}`, tone: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10", num: "text-emerald-400", arrow: "✓" };
 
   return (
     <div className="space-y-6 pb-8">
@@ -1306,25 +1306,27 @@ function VPDCalculator() {
             <div className="mono text-xs uppercase tracking-[0.3em] text-muted-foreground mb-2">VPD</div>
             <div className="flex items-baseline gap-2">
               <span
-                className={`mono text-7xl lg:text-8xl font-light tracking-tight leading-none ${activeZone.textColor}`}
+                className={`mono text-7xl lg:text-8xl font-light tracking-tight leading-none ${verdict.num}`}
                 style={{ filter: "drop-shadow(0 0 10px currentColor)" }}
               >
                 {vpdFixed}
               </span>
               <span className="mono text-base text-muted-foreground">kPa</span>
             </div>
-            <div className={`mt-4 inline-flex items-center self-start gap-1.5 px-3 py-1.5 rounded-full text-xs mono uppercase tracking-widest border ${activeZone.color} ${activeZone.borderColor} ${activeZone.textColor}`}>
-              ▸ {activeZone.label}
+            <div className={`mt-4 inline-flex items-center self-start gap-1.5 px-3 py-1.5 rounded-full text-xs mono uppercase tracking-widest border ${verdict.tone}`}>
+              {verdict.arrow} {verdict.txt}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">{activeZone.sub}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Faixa geral: {activeZone.label} · alvo {target.label} {target.min.toFixed(1)}–{target.max.toFixed(1)} kPa
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Referência pra fase do ciclo */}
+      {/* Referência pra fase do ciclo — o veredito aparece no resultado acima */}
       <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tá bom pra fase?</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fase de referência</p>
           {(activeCycles as any[] | undefined)?.length ? (
             <select
               value={refTentId ?? ""}
@@ -1352,20 +1354,15 @@ function VPDCalculator() {
           ))}
         </div>
 
-        {refTent && (
+        {refTent ? (
           <p className="text-xs text-muted-foreground">
             {refTent.tentName} · {phaseLabelPt(refTent.phase)} · semana {refTent.currentWeek}
           </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Alvo {target.label}: {target.min.toFixed(1)}–{target.max.toFixed(1)} kPa — o veredito está no resultado acima
+          </p>
         )}
-
-        {/* Veredito */}
-        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${verdict.tone}`}>
-          <div>
-            <p className="text-sm font-bold">{verdict.arrow} {verdict.txt}</p>
-            <p className="text-xs opacity-80">Alvo {target.label}: {target.min.toFixed(1)}–{target.max.toFixed(1)} kPa</p>
-          </div>
-          <span className="mono text-lg font-bold">{vpdFixed}</span>
-        </div>
       </div>
 
       {/* Save to history */}
