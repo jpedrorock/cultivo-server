@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { InstallPWA } from "./components/InstallPWA";
 import { AddToHomeScreenPrompt } from "./components/AddToHomeScreenPrompt";
 import { BottomNav } from "./components/BottomNav";
+import { TrophyUnlockWatcher } from "./components/TrophyUnlockWatcher";
 import { Sidebar } from "./components/Sidebar";
 import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { SplashScreen } from "./components/SplashScreen";
@@ -302,6 +303,8 @@ function AuthenticatedAppInner() {
         )}
       </div>
       {!isDisplayMode && !isOnboarding && <BottomNav />}
+      {/* Cerimônia de unlock de troféu — watcher global (área autenticada) */}
+      {!isDisplayMode && !isOnboarding && <TrophyUnlockWatcher />}
       {/* Banner global de status de rede — mostra pílula amber quando offline,
           verde por 2s ao reconectar. Usa @capacitor/network em mobile e
           navigator.onLine no web. */}

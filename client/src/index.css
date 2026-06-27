@@ -2318,6 +2318,26 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* Cerimônia de unlock de troféu — entrada do troféu + pólen subindo */
+@keyframes trophy-pop {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-12deg); }
+  55%  { opacity: 1; transform: scale(1.12) rotate(4deg); }
+  75%  { transform: scale(0.97) rotate(-2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes trophy-polen {
+  0%   { opacity: 0; transform: translateY(40px) scale(0.5); }
+  15%  { opacity: 0.75; }
+  100% { opacity: 0; transform: translateY(-200px) scale(1.1); }
+}
+.trophy-pop   { animation: trophy-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.trophy-polen { animation-name: trophy-polen; animation-timing-function: linear; animation-iteration-count: infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .trophy-pop { animation: none; }
+  .trophy-polen { animation-duration: 0.01s; }
+}
+
 .jardim-particle { animation: jardim-float-up 1s ease-out forwards; }
 .jardim-bubble   { animation: jardim-pop 0.35s ease-out forwards; }
 
