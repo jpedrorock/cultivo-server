@@ -41,14 +41,17 @@ export function FinishCloningDialog({
   const [seedlingCount, setSeedlingCount] = useState<number>(clonesCount);
   const utils = trpc.useUtils();
 
-  // Buscar estufas disponíveis (sem ciclo ativo)
+  // Buscar estufas destino: vazias OU em vegetativo (mudas compartilham o ciclo)
   const { data: allTents } = trpc.tents.list.useQuery();
   const { data: activeCycles } = trpc.cycles.listActive.useQuery();
 
-  // Filtrar estufas que não têm ciclo ativo
-  const availableTents = allTents?.filter(
-    (tent) => !activeCycles?.some((cycle: any) => cycle.tentId === tent.id)
-  );
+  // Mudas entram em estufa vazia (novo ciclo) ou em vegetativo (compartilham).
+  // Floração/secagem ficam de fora.
+  const availableTents = allTents?.filter((tent) => {
+    const hasActiveCycle = activeCycles?.some((cycle: any) => cycle.tentId === tent.id);
+    if (!hasActiveCycle) return true; // vazia
+    return tent.category === "VEGA"; // em vegetativo → pode juntar mais mudas
+  });
 
   const finishCloningMutation = trpc.cycles.finishCloning.useMutation({
     onSuccess: (data) => {
@@ -111,7 +114,7 @@ export function FinishCloningDialog({
             <label className="text-sm font-medium">Estufa Destino</label>
             <Select value={selectedTentId} onValueChange={setSelectedTentId}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione uma estufa vazia" />
+                <SelectValue placeholder="Selecione uma estufa" />
               </SelectTrigger>
               <SelectContent>
                 {availableTents && availableTents.length > 0 ? (
@@ -122,13 +125,13 @@ export function FinishCloningDialog({
                   ))
                 ) : (
                   <div className="p-2 text-sm text-muted-foreground">
-                    Nenhuma estufa disponível. Finalize um ciclo primeiro.
+                    Nenhuma estufa vazia ou em vegetativo disponível.
                   </div>
                 )}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Apenas estufas sem ciclo ativo são exibidas
+              Estufas vazias ou em vegetativo — mudas na mesma estufa compartilham o ciclo
             </p>
           </div>
 
@@ -138,7 +141,7 @@ export function FinishCloningDialog({
               <li>• {seedlingCount} mudas serão criadas</li>
               <li>• Mudas herdarão a genética de {motherPlantName}</li>
               <li>• Ciclo da estufa atual voltará para MANUTENÇÃO</li>
-              <li>• Novo ciclo VEGETATIVO será criado na estufa destino</li>
+              <li>• As mudas entram em VEGETATIVO na estufa destino (compartilham o ciclo se já houver mudas lá)</li>
             </ul>
           </div>
         </div>

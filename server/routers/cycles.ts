@@ -803,7 +803,9 @@ export const cyclesRouter = router({
           throw new Error("Estufa destino não encontrada");
         }
         
-        // Verificar se estufa destino está vazia (sem ciclo ativo)
+        // Mudas podem entrar numa estufa VAZIA (cria novo ciclo) ou numa estufa
+        // em VEGETATIVO (compartilham o ciclo existente — dá pra juntar mudas de
+        // mães diferentes). Só floração/secagem bloqueiam.
         const [existingCycle] = await database
           .select()
           .from(cycles)
@@ -811,9 +813,9 @@ export const cyclesRouter = router({
             eq(cycles.tentId, input.targetTentId),
             eq(cycles.status, "ACTIVE")
           ));
-        
-        if (existingCycle) {
-          throw new Error(`Estufa ${targetTent.name} já possui um ciclo ativo. Finalize o ciclo atual antes de criar mudas.`);
+
+        if (existingCycle && targetTent.category !== "VEGA") {
+          throw new Error(`Estufa ${targetTent.name} está em ${targetTent.category} — mudas só entram em estufa vazia ou em vegetativo.`);
         }
         
         // Criar mudas
@@ -845,15 +847,18 @@ export const cyclesRouter = router({
             });
         }
         
-        // Criar novo ciclo na estufa destino (fase VEGA)
-        await database
-          .insert(cycles)
-          .values({
-            tentId: input.targetTentId,
-            strainId: motherPlant.strainId,
-            startDate: new Date(),
-            status: "ACTIVE",
-          });
+        // Estufa vazia → cria novo ciclo VEGA. Estufa já em vegetativo → as mudas
+        // entram no ciclo existente (compartilham), sem criar um ciclo duplicado.
+        if (!existingCycle) {
+          await database
+            .insert(cycles)
+            .values({
+              tentId: input.targetTentId,
+              strainId: motherPlant.strainId,
+              startDate: new Date(),
+              status: "ACTIVE",
+            });
+        }
         
         // Atualizar categoria da estufa destino para VEGA
         await database
