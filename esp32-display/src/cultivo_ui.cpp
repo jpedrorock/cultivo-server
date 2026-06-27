@@ -376,7 +376,15 @@ static lv_obj_t *idleVpdDot    = nullptr;
 static lv_obj_t *idleAlertIco  = nullptr;   // luz de alerta (icone pulsante, estilo painel)
 
 extern "C" void cultivoUI_showIdleOverlay(void) {
-  if (idleOverlay) return;  // ja mostrando
+  if (idleOverlay) {
+    // Ja existe — so REEXIBE (nao recria). Persistir o overlay e' o fix
+    // definitivo do travamento: zero delete/realocacao de ~20 objs no
+    // sleep/wake. Traz pra frente + atualiza os valores.
+    lv_obj_clear_flag(idleOverlay, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(idleOverlay);
+    cultivoUI_tickIdleOverlay();
+    return;
+  }
   idleOverlay = lv_obj_create(lv_layer_top());
   lv_obj_remove_style_all(idleOverlay);
   lv_obj_set_size(idleOverlay, SCREEN_W, SCREEN_H);
@@ -517,16 +525,13 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
 
 extern "C" void cultivoUI_hideIdleOverlay(void) {
   if (!idleOverlay) return;
-  // IMPORTANTE: hideIdleOverlay roda dentro do screenWake() <- touchpad_read
-  // (indev read callback). Deletar essa arvore grande (~20 objs + anims) ali,
-  // sincronamente, corrompe o estado do indev / estoura a stack de 16KB do loop
-  // no ESP -> device travava no screensaver (nao saia no toque). delete_async
-  // adia a remocao pro proximo lv_timer_handler, fora do callback. Zeramos os
-  // ponteiros JA pra ninguem referenciar os objetos enquanto a remocao nao roda.
-  lv_obj_delete_async(idleOverlay);
-  idleOverlay = idleClockLbl = idleDateLbl = idlePhaseLbl = idleStatusLbl =
-    idleTempLbl = idleRhLbl = idleVpdLbl = idleTempDot = idleRhDot = idleVpdDot =
-    idleAlertIco = nullptr;
+  // So ESCONDE — nunca deleta. Esta funcao roda de dentro do screenWake() <-
+  // touchpad_read (indev cb); deletar a arvore grande ali corrompia o indev /
+  // estourava a stack de 16KB do ESP -> travava no screensaver em ALGUNS
+  // devices (undefined behavior, depende do estado de heap). Com hide/show o
+  // overlay e' criado 1x e so alterna LV_OBJ_FLAG_HIDDEN: zero delete, zero
+  // realocacao, zero risco. Os ponteiros seguem validos pro tick.
+  lv_obj_add_flag(idleOverlay, LV_OBJ_FLAG_HIDDEN);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
