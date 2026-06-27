@@ -16,6 +16,17 @@ const CELEBRATE_LEAVES = ["🌿", "💚", "✨", "🍃", "🌱", "💚", "✨", 
 // Estrelas que sobem no level-up de estágio.
 const LEVELUP_STARS = ["⭐", "✨", "🌟", "✨", "⭐", "🌟", "✨", "⭐"];
 
+// Pólen/luz do cenário vivo (posições/tamanhos/ritmos fixos por índice).
+const MOTES = [
+  { left: 12, size: 5, dur: 9, delay: 0, c: "#cfe9b0" },
+  { left: 26, size: 3, dur: 7, delay: 1.6, c: "#ffe6a8" },
+  { left: 40, size: 4, dur: 11, delay: 3.2, c: "#cfe9b0" },
+  { left: 55, size: 3, dur: 8, delay: 0.8, c: "#ffe6a8" },
+  { left: 68, size: 5, dur: 10, delay: 2.4, c: "#cfe9b0" },
+  { left: 82, size: 3, dur: 6.5, delay: 4, c: "#ffe6a8" },
+  { left: 90, size: 4, dur: 9.5, delay: 1.2, c: "#cfe9b0" },
+];
+
 // Ações de cuidar: cada uma com sua microreação + destino no quick-log.
 type CareAction = "water" | "env" | "photo";
 const CARE_ACTIONS: { Icon: typeof Droplet; label: string; action: CareAction; href: string }[] = [
@@ -168,6 +179,25 @@ export default function Jardim() {
           <div className="space-y-4">
             {/* Planta viva */}
             <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 text-center">
+              {/* Cenário vivo — pólen/luz flutuando ao fundo */}
+              <span className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+                {MOTES.map((m, i) => (
+                  <span
+                    key={i}
+                    className="jardim-mote absolute rounded-full"
+                    style={{
+                      left: `${m.left}%`,
+                      bottom: "10%",
+                      width: m.size,
+                      height: m.size,
+                      background: m.c,
+                      filter: "blur(0.5px)",
+                      animationDuration: `${m.dur}s`,
+                      animationDelay: `${m.delay}s`,
+                    }}
+                  />
+                ))}
+              </span>
               {/* Celebração ao voltar de um registro */}
               {celebrating && (
                 <>

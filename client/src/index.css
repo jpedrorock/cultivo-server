@@ -2305,6 +2305,15 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 }
 .jardim-twinkle { animation: jardim-twinkle 1.8s ease-in-out infinite; }
 
+/* Cenário vivo — pólen/luz flutuando suave no fundo do card */
+@keyframes jardim-mote {
+  0%   { opacity: 0; transform: translate(0, 8px); }
+  25%  { opacity: 0.5; }
+  75%  { opacity: 0.5; }
+  100% { opacity: 0; transform: translate(10px, -52px); }
+}
+.jardim-mote { animation-name: jardim-mote; animation-timing-function: linear; animation-iteration-count: infinite; }
+
 .jardim-particle { animation: jardim-float-up 1s ease-out forwards; }
 .jardim-bubble   { animation: jardim-pop 0.35s ease-out forwards; }
 
@@ -2312,5 +2321,5 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
   .plant-idle-happy, .plant-idle-thirsty, .plant-idle-sad, .plant-reacting, .plant-celebrate { animation: none; }
   .jardim-particle, .jardim-bubble, .jardim-falling, .jardim-glow,
   .jardim-drop, .jardim-breeze, .jardim-flash { animation-duration: 0.01s; }
-  .jardim-attention, .jardim-twinkle { animation: none; }
+  .jardim-attention, .jardim-twinkle, .jardim-mote { animation: none; }
 }
