@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { LivingPlant, type PlantStage, type PlantMood } from "@/components/LivingPlant";
@@ -15,6 +15,14 @@ import { readLastMood, writeLastMood } from "@/lib/gardenMood";
 const CELEBRATE_LEAVES = ["🌿", "💚", "✨", "🍃", "🌱", "💚", "✨", "🌿", "🍃", "🌱", "✨", "💚"];
 // Estrelas que sobem no level-up de estágio.
 const LEVELUP_STARS = ["⭐", "✨", "🌟", "✨", "⭐", "🌟", "✨", "⭐"];
+
+// Ações de cuidar: cada uma com sua microreação + destino no quick-log.
+type CareAction = "water" | "env" | "photo";
+const CARE_ACTIONS: { Icon: typeof Droplet; label: string; action: CareAction; href: string }[] = [
+  { Icon: Droplet, label: "Regar", action: "water", href: "/quick-log?mode=status" },
+  { Icon: Thermometer, label: "Ambiente", action: "env", href: "/quick-log?mode=status" },
+  { Icon: Camera, label: "Foto", action: "photo", href: "/quick-log?mode=plant" },
+];
 
 // Falas da planta ao ser tocada (por humor).
 const PET_PHRASES: Record<PlantMood, string[]> = {
@@ -43,6 +51,7 @@ const STAGES = ["Semente", "Muda", "Vegetativo", "Floração", "Maturação", "C
 
 export default function Jardim() {
   const { data, isLoading, refetch } = trpc.garden.getState.useQuery();
+  const [, navigate] = useLocation();
 
   // Reação ao toque na planta: wiggle + partículas + balão de fala.
   const [reacting, setReacting] = useState(false);
@@ -119,6 +128,15 @@ export default function Jardim() {
     timers.current.push(setTimeout(() => setPhrase(null), 1500));
   };
 
+  // Cuidar: microreação no card (gota/brisa/flash) + planta reage, então vai pro registro.
+  const [action, setAction] = useState<CareAction | null>(null);
+  const handleCare = (a: CareAction, href: string) => {
+    haptics.light().catch(() => {});
+    setAction(a);
+    setReacting(true);
+    timers.current.push(setTimeout(() => navigate(href), 600));
+  };
+
   return (
     <PageLayout
       header={
@@ -192,6 +210,28 @@ export default function Jardim() {
                   </span>
                 </>
               )}
+              {/* Microreação de cuidar */}
+              {action === "photo" && (
+                <span className="jardim-flash pointer-events-none absolute inset-0 z-40 rounded-2xl bg-white" />
+              )}
+              {action === "water" && (
+                <span className="pointer-events-none absolute inset-0 z-30">
+                  {["💧", "💧", "💧"].map((d, i) => (
+                    <span key={i} className="jardim-drop absolute text-lg" style={{ left: `${42 + i * 8}%`, top: "16%", animationDelay: `${i * 90}ms` }}>
+                      {d}
+                    </span>
+                  ))}
+                </span>
+              )}
+              {action === "env" && (
+                <span className="pointer-events-none absolute inset-0 z-30">
+                  {["🍃", "🌬️", "🍃"].map((d, i) => (
+                    <span key={i} className="jardim-breeze absolute text-base" style={{ left: "6%", top: `${30 + i * 14}%`, animationDelay: `${i * 100}ms` }}>
+                      {d}
+                    </span>
+                  ))}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={petPlant}
@@ -247,17 +287,17 @@ export default function Jardim() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-1">Cuidar da planta</p>
               <div className="grid grid-cols-3 gap-3">
-                {[
-                  { Icon: Droplet, label: "Regar" },
-                  { Icon: Thermometer, label: "Ambiente" },
-                  { Icon: Camera, label: "Foto" },
-                ].map((c) => (
-                  <Link key={c.label} href="/quick-log">
-                    <div className="flex flex-col items-center gap-1.5 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-colors py-4 cursor-pointer">
-                      <c.Icon className="w-6 h-6 text-primary" />
-                      <span className="text-xs font-medium text-foreground">{c.label}</span>
-                    </div>
-                  </Link>
+                {CARE_ACTIONS.map((c) => (
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => handleCare(c.action, c.href)}
+                    disabled={action !== null}
+                    className="flex flex-col items-center gap-1.5 rounded-xl border border-border/50 bg-card hover:bg-muted/30 active:scale-[0.97] transition-[background-color,transform] py-4 disabled:opacity-60"
+                  >
+                    <c.Icon className={cn("w-6 h-6 text-primary", action === c.action && "plant-reacting")} />
+                    <span className="text-xs font-medium text-foreground">{c.label}</span>
+                  </button>
                 ))}
               </div>
               <p className="text-[11px] text-center text-muted-foreground mt-2">

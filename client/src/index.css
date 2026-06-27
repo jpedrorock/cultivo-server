@@ -2263,6 +2263,26 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 .plant-celebrate    { animation: plant-celebrate 1.2s ease-in-out; }
 .jardim-falling     { animation: jardim-fall 2.2s ease-in forwards; }
 
+/* Microreações de cuidar — gota (regar), brisa (ambiente), flash (foto) */
+@keyframes jardim-drop {
+  0%   { opacity: 0; transform: translateY(-28px) scale(0.7); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(46px) scale(1); }
+}
+@keyframes jardim-breeze {
+  0%   { opacity: 0; transform: translateX(-44px) rotate(-8deg); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(64px) rotate(8deg); }
+}
+@keyframes jardim-flash {
+  0%   { opacity: 0; }
+  22%  { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+.jardim-drop   { animation: jardim-drop 0.7s ease-in forwards; }
+.jardim-breeze { animation: jardim-breeze 0.8s ease-out forwards; }
+.jardim-flash  { animation: jardim-flash 0.6s ease-out forwards; }
+
 /* Level-up de estágio — flash dourado expansivo atrás da planta */
 @keyframes jardim-glow-burst {
   0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
@@ -2276,5 +2296,6 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 
 @media (prefers-reduced-motion: reduce) {
   .plant-idle-happy, .plant-idle-thirsty, .plant-idle-sad, .plant-reacting, .plant-celebrate { animation: none; }
-  .jardim-particle, .jardim-bubble, .jardim-falling, .jardim-glow { animation-duration: 0.01s; }
+  .jardim-particle, .jardim-bubble, .jardim-falling, .jardim-glow,
+  .jardim-drop, .jardim-breeze, .jardim-flash { animation-duration: 0.01s; }
 }
