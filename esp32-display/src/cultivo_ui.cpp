@@ -2290,6 +2290,11 @@ extern "C" {
 
 static lv_obj_t *histChart    = nullptr;
 static lv_obj_t *histStatsLbl = nullptr;  // "Agora X · Min Y · Max Z"
+// Tap-to-read: cursor vertical (lv_chart nativo — posiciona certo sozinho) +
+// tooltip no topo com valor+tempo do ponto tocado. João pediu "clicar em cima
+// pra ver a temperatura". applyHistData reseta quando os dados mudam.
+static lv_chart_cursor_t *histCursor = nullptr;
+static lv_obj_t *histCursorLbl = nullptr;
 static lv_obj_t *histXAxisLbl = nullptr;  // "-24h ... agora"
 static lv_obj_t *histPeriodLbl = nullptr; // "ultimas 24h" clicavel
 static lv_chart_series_t *histSer = nullptr;
@@ -2376,6 +2381,12 @@ static void applyHistData() {
 
   lv_chart_refresh(histChart);
 
+  // Tap-to-read reseta quando os dados mudam: esconde o tooltip e leva o
+  // cursor pro ponto mais recente (agora).
+  if (histCursorLbl) lv_obj_add_flag(histCursorLbl, LV_OBJ_FLAG_HIDDEN);
+  if (histCursor && histCount > 0)
+    lv_chart_set_cursor_point(histChart, histCursor, histSer, HIST_POINTS - 1);
+
   // Atualiza header de stats. Formato:
   //   "Agora 24.5°C ↑+0.3  Min 21.2  Max 27.8"
   //
@@ -2444,6 +2455,42 @@ static void histMetricCb(lv_event_t *e) {
   applyHistData();
 }
 
+// Tap-to-read: enquanto o dedo pressiona/arrasta sobre o chart, mostra o valor
+// (e quando) do ponto mais proximo. lv_chart_get_pressed_point da o id sob o
+// toque; o cursor nativo desenha a linha vertical no ponto; o tooltip no topo
+// mostra "26.4°C · ha 6h" na cor da metrica.
+static void histChartPressCb(lv_event_t *e) {
+  (void)e;
+  if (!histChart || !histSer || !histCursorLbl) return;
+  uint32_t id = lv_chart_get_pressed_point(histChart);
+  if (id == LV_CHART_POINT_NONE) return;
+  int32_t *ys = lv_chart_get_y_array(histChart, histSer);
+  if (!ys) return;
+  int32_t raw = ys[id];
+  if (raw == LV_CHART_POINT_NONE) return;  // slot vazio (sem dado naquele ponto)
+
+  auto &m = HIST_METRICS[histMetric];
+  float val = (float)raw / m.scale;
+
+  // Tempo relativo: slot mais a direita (HIST_POINTS-1) = agora. Cada slot
+  // cobre periodo/HIST_POINTS (24h->1h, 7d->7h, 30d->30h).
+  int slotsAgo = (int)(HIST_POINTS - 1) - (int)id;
+  int totalH   = (histPeriod == 0) ? 24 : (histPeriod == 1) ? 168 : 720;
+  int hoursAgo = slotsAgo * (totalH / HIST_POINTS);
+  char tbuf[16];
+  if (slotsAgo <= 0)       snprintf(tbuf, sizeof(tbuf), "agora");
+  else if (hoursAgo < 48)  snprintf(tbuf, sizeof(tbuf), "ha %dh", hoursAgo);
+  else                     snprintf(tbuf, sizeof(tbuf), "ha %dd", hoursAgo / 24);
+
+  char buf[48];
+  snprintf(buf, sizeof(buf), "%.*f%s \xC2\xB7 %s", m.decimals, val, m.unit, tbuf);
+  lv_label_set_text(histCursorLbl, buf);
+  lv_obj_set_style_text_color(histCursorLbl, lv_color_hex(m.color), 0);
+  lv_obj_clear_flag(histCursorLbl, LV_OBJ_FLAG_HIDDEN);
+
+  if (histCursor) lv_chart_set_cursor_point(histChart, histCursor, histSer, id);
+}
+
 static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_pad_all(tab, 0, 0);
   lv_obj_clear_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
@@ -2510,6 +2557,27 @@ static void buildHistorico(lv_obj_t *tab) {
   lv_obj_set_style_radius(histChart, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
   lv_obj_set_style_pad_all(histChart, sw(6), 0);
   histSer = lv_chart_add_series(histChart, lv_color_hex(COL_PRIMARY), LV_CHART_AXIS_PRIMARY_Y);
+
+  // Tap-to-read (handler histChartPressCb): cursor vertical sutil que segue o
+  // toque + tooltip no topo com valor+tempo. Ambos ocultos ate' o 1o toque.
+  histCursor = lv_chart_add_cursor(histChart, lv_color_hex(COL_DIM), LV_DIR_VER);
+  histCursorLbl = lv_label_create(histChart);
+  lv_label_set_text(histCursorLbl, "");
+  lv_obj_set_style_text_font(histCursorLbl, FONT_CAPTION, 0);
+  lv_obj_set_style_text_color(histCursorLbl, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_bg_color(histCursorLbl, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(histCursorLbl, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_left(histCursorLbl, sw(6), 0);
+  lv_obj_set_style_pad_right(histCursorLbl, sw(6), 0);
+  lv_obj_set_style_pad_top(histCursorLbl, sh(2), 0);
+  lv_obj_set_style_pad_bottom(histCursorLbl, sh(2), 0);
+  lv_obj_set_style_radius(histCursorLbl, RADIUS_SM, 0);
+  lv_obj_set_style_border_width(histCursorLbl, 1, 0);
+  lv_obj_set_style_border_color(histCursorLbl, lv_color_hex(COL_BORDER), 0);
+  lv_obj_align(histCursorLbl, LV_ALIGN_TOP_MID, 0, sh(3));
+  lv_obj_add_flag(histCursorLbl, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(histChart, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(histChart, histChartPressCb, LV_EVENT_PRESSING, NULL);
 
   // Pulse "live" no outline do chart — feel de monitor ativo. Cor inicial
   // = TEMP (laranja); applyHistData troca a cor do outline conforme metrica
