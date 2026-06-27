@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.19"
+#define FW_VERSION "0.5.20"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -4239,8 +4239,10 @@ void loop() {
   // severidade (se piezo soldado e enabled na config).
   if (alertPending) {
     alertPending = false;
+    // Sem banner e sem buzzer (pedido Joao — "fica incomodando toda hora").
+    // showAlert agora so' acende a luz de alerta pulsante da tela de descanso.
     cultivoUI_showAlert(alertBufId, alertBufType, alertBufMetric, alertBufMessage);
-    buzzerAlertPattern(alertBufType);  // no-op se buzzer off
+    (void)buzzerAlertPattern;  // mantida p/ uso futuro, mas nao toca em alerta
   }
   // Config modal request — deferido pra rodar com stack do loop() (~16KB),
   // nao do event_cb (~8KB). Criar 6 paginas + ~60 widgets era pesado demais.

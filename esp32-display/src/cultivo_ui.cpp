@@ -364,6 +364,7 @@ static lv_obj_t *idleVpdLbl    = nullptr;
 static lv_obj_t *idleTempDot   = nullptr;   // dot de status por metrica (verde/ambar)
 static lv_obj_t *idleRhDot     = nullptr;
 static lv_obj_t *idleVpdDot    = nullptr;
+static lv_obj_t *idleAlertIco  = nullptr;   // luz de alerta (icone pulsante, estilo painel)
 
 extern "C" void cultivoUI_showIdleOverlay(void) {
   if (idleOverlay) return;  // ja mostrando
@@ -406,6 +407,19 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_set_style_pad_top(idlePhaseLbl, sh(3), 0);
   lv_obj_set_style_pad_bottom(idlePhaseLbl, sh(3), 0);
   lv_obj_align(idlePhaseLbl, LV_ALIGN_TOP_RIGHT, -sw(14), sh(11));
+
+  // Luz de alerta (estilo painel de carro): icone pulsante quando ha alerta
+  // ativo. Sem texto. Cor/visibilidade definidas no tick. Comeca oculto.
+  idleAlertIco = lv_image_create(idleOverlay);
+  lv_image_set_src(idleAlertIco, &ic_alert);
+  lv_obj_set_style_image_recolor(idleAlertIco, lv_color_hex(COL_RED), 0);
+  lv_obj_set_style_image_recolor_opa(idleAlertIco, LV_OPA_COVER, 0);
+  lv_obj_set_style_transform_zoom(idleAlertIco, 192, 0);   // ~75% (32->24px)
+  lv_obj_set_style_shadow_color(idleAlertIco, lv_color_hex(COL_RED), 0);
+  lv_obj_set_style_shadow_width(idleAlertIco, sw(14), 0);
+  lv_obj_align(idleAlertIco, LV_ALIGN_TOP_MID, 0, sh(9));
+  startBreathe(idleAlertIco, LV_OPA_0, LV_OPA_90, 900);
+  lv_obj_add_flag(idleAlertIco, LV_OBJ_FLAG_HIDDEN);
 
   // ── Centro: relogio com glow na cor da fase + data ─────────────────────
   idleClockLbl = lv_label_create(idleOverlay);
@@ -496,118 +510,40 @@ extern "C" void cultivoUI_hideIdleOverlay(void) {
   if (!idleOverlay) return;
   lv_obj_del(idleOverlay);
   idleOverlay = idleClockLbl = idleDateLbl = idlePhaseLbl = idleStatusLbl =
-    idleTempLbl = idleRhLbl = idleVpdLbl = idleTempDot = idleRhDot = idleVpdDot = nullptr;
+    idleTempLbl = idleRhLbl = idleVpdLbl = idleTempDot = idleRhDot = idleVpdDot =
+    idleAlertIco = nullptr;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
 // ALERT OVERLAY — modal que cobre tela quando server pushou alerta via SSE
 // ════════════════════════════════════════════════════════════════════════════════
-static lv_obj_t *alertOverlay = nullptr;
-static int       alertOverlayId = 0;
-static CultivoAlertAckFn onAlertAck = nullptr;
+// Alert "light" (estilo luz de painel de carro): SSE alert acende um icone
+// pulsante na tela de descanso por ALERT_LIGHT_TTL_SEC; SEM banner e SEM
+// buzzer (pedido Joao — o banner ficava incomodando). O detalhe fica no app.
+static CultivoAlertAckFn onAlertAck = nullptr;  // mantido (registrado pelo main)
+static bool     g_alertActive = false;
+static uint32_t g_alertColor  = COL_RED;
+static time_t   g_alertSec    = 0;
+#define ALERT_LIGHT_TTL_SEC 900   // 15 min sem alerta novo -> apaga a luz
 
 extern "C" void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb) {
   onAlertAck = cb;
 }
 
-// Banner alerta no TOPO da tela — ~64px altura, slide-in animado.
-// Antes era full-screen modal cobrindo tudo. Agora mostra info essencial
-// sem bloquear interacao com o app abaixo (tap no banner dispensa).
-//
-// Layout:
-//  [icon] [SEVERIDADE — METRICA   x]
-//         [mensagem curta...        ]
-//
-// Severidade -> cor da border esquerda (stripe colorido)
+// Alerta do SSE: NAO mostra mais banner (incomodava "toda hora"). So' acende a
+// "luz" de alerta da tela de descanso (icone pulsante, sem texto) — o detalhe
+// do alerta o usuario ve no app. Severidade vira cor (vermelho/ambar).
 extern "C" void cultivoUI_showAlert(int alertId, const char *type, const char *metric, const char *message) {
-  if (alertOverlay) lv_obj_del(alertOverlay);
-  alertOverlay = lv_obj_create(lv_layer_top());
-  alertOverlayId = alertId;
-  lv_obj_remove_style_all(alertOverlay);
-
-  // Banner: ~64px altura, margem horizontal de 8px (nao toca bordas)
-  const int bannerH = sh(60);
-  const int bannerW = SCREEN_W - sw(16);
-  lv_obj_set_size(alertOverlay, bannerW, bannerH);
-  lv_obj_align(alertOverlay, LV_ALIGN_TOP_MID, 0, sh(8));
-  lv_obj_set_style_bg_color(alertOverlay, lv_color_hex(COL_CARD), 0);
-  lv_obj_set_style_bg_opa(alertOverlay, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(alertOverlay, RADIUS_LG, 0);
-  lv_obj_set_style_shadow_width(alertOverlay, 16, 0);
-  lv_obj_set_style_shadow_color(alertOverlay, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_shadow_opa(alertOverlay, LV_OPA_50, 0);
-  lv_obj_set_style_shadow_ofs_y(alertOverlay, 4, 0);
-  lv_obj_set_style_pad_all(alertOverlay, sw(10), 0);
-  lv_obj_clear_flag(alertOverlay, LV_OBJ_FLAG_SCROLLABLE);
-
-  // Cor da stripe esquerda por severidade
-  uint32_t sevC = COL_RED;
-  if (type && !strcmp(type, "OUT_OF_RANGE")) sevC = COL_YEL;
-  else if (type && !strcmp(type, "TREND"))   sevC = COL_AMBER;
-  lv_obj_set_style_border_color(alertOverlay, lv_color_hex(sevC), 0);
-  lv_obj_set_style_border_width(alertOverlay, sw(4), 0);
-  lv_obj_set_style_border_side(alertOverlay, LV_BORDER_SIDE_LEFT, 0);
-
-  // Icone alert na esquerda
-  lv_obj_t *ico = lv_image_create(alertOverlay);
-  lv_image_set_src(ico, &ic_alert);
-  lv_obj_set_style_image_recolor(ico, lv_color_hex(sevC), 0);
-  lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-  lv_obj_align(ico, LV_ALIGN_LEFT_MID, 0, 0);
-
-  // Header curto: "SEVERIDADE — METRICA" na linha de cima
-  lv_obj_t *lblHdr = lv_label_create(alertOverlay);
-  char hdrBuf[48];
-  // Encurta severity pra cabeçalho: OUT_OF_RANGE -> "FORA RANGE" etc
-  const char *sevShort = type;
-  if      (type && !strcmp(type, "OUT_OF_RANGE")) sevShort = "FORA RANGE";
-  else if (type && !strcmp(type, "SAFETY_LIMIT")) sevShort = "LIMITE";
-  else if (type && !strcmp(type, "TREND"))         sevShort = "TENDENCIA";
-  snprintf(hdrBuf, sizeof(hdrBuf), "%s  %s", sevShort ? sevShort : "ALERTA", metric ? metric : "");
-  lv_label_set_text(lblHdr, hdrBuf);
-  lv_obj_set_style_text_color(lblHdr, lv_color_hex(sevC), 0);
-  lv_obj_set_style_text_font(lblHdr, FONT_CAPTION, 0);
-  lv_obj_align(lblHdr, LV_ALIGN_TOP_LEFT, sw(40), 0);
-
-  // Mensagem corrida (1 linha, dot overflow)
-  lv_obj_t *lblMsg = lv_label_create(alertOverlay);
-  lv_label_set_text(lblMsg, message ? message : "");
-  lv_label_set_long_mode(lblMsg, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(lblMsg, bannerW - sw(60));
-  lv_obj_set_style_text_color(lblMsg, lv_color_hex(COL_TEXT), 0);
-  lv_obj_set_style_text_font(lblMsg, FONT_BODY, 0);
-  lv_obj_align(lblMsg, LV_ALIGN_LEFT_MID, sw(40), sh(8));
-
-  // "x" pra dispensar no canto superior direito
-  lv_obj_t *lblClose = lv_label_create(alertOverlay);
-  lv_label_set_text(lblClose, LV_SYMBOL_CLOSE);
-  lv_obj_set_style_text_color(lblClose, lv_color_hex(COL_DIM), 0);
-  lv_obj_set_style_text_font(lblClose, &lv_font_montserrat_14, 0);
-  lv_obj_align(lblClose, LV_ALIGN_TOP_RIGHT, 0, 0);
-
-  // Tap em qualquer lugar do banner — dispara ack + remove banner
-  lv_obj_add_flag(alertOverlay, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(alertOverlay, [](lv_event_t *e) {
-    int id = alertOverlayId;
-    if (alertOverlay) {
-      lv_obj_del(alertOverlay);
-      alertOverlay = nullptr;
-    }
-    if (onAlertAck) onAlertAck(id);
-  }, LV_EVENT_CLICKED, NULL);
-
-  // Anim slide-in do topo (efeito sutil de notificacao chegando)
-  lv_obj_set_y(alertOverlay, -bannerH);
-  lv_anim_t a;
-  lv_anim_init(&a);
-  lv_anim_set_var(&a, alertOverlay);
-  lv_anim_set_values(&a, -bannerH, sh(8));
-  lv_anim_set_time(&a, MOTION_MED);
-  lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-    lv_obj_set_y((lv_obj_t*)obj, v);
-  });
-  lv_anim_start(&a);
+  (void)alertId; (void)metric; (void)message;
+  g_alertActive = true;
+  g_alertSec    = time(nullptr);
+  g_alertColor  = (type && !strcmp(type, "SAFETY_LIMIT")) ? COL_RED : COL_AMBER;
+  // Se a tela de descanso ja' estiver visivel, reflete na hora (senao o tick pega).
+  if (idleAlertIco) {
+    lv_obj_set_style_image_recolor(idleAlertIco, lv_color_hex(g_alertColor), 0);
+    lv_obj_set_style_shadow_color(idleAlertIco, lv_color_hex(g_alertColor), 0);
+    lv_obj_clear_flag(idleAlertIco, LV_OBJ_FLAG_HIDDEN);
+  }
 }
 
 // ── Overlay de OTA (feedback do "Verificar atualizacao") ──────────────────────
@@ -735,6 +671,20 @@ extern "C" void cultivoUI_tickIdleOverlay(void) {
     lv_obj_set_style_text_color(idleStatusLbl, lv_color_hex(sc), 0);
     lv_obj_set_style_bg_color(idleStatusLbl, lv_color_hex(sc), 0);
     lv_obj_align(idleStatusLbl, LV_ALIGN_CENTER, 0, sh(28));
+  }
+
+  // Luz de alerta (painel): pulsa se ha alerta recente (SSE); expira por TTL
+  // pra nao ficar acesa pra sempre. Cor por severidade. Sem texto.
+  if (idleAlertIco) {
+    bool show = g_alertActive && (time(nullptr) - g_alertSec < ALERT_LIGHT_TTL_SEC);
+    if (g_alertActive && !show) g_alertActive = false;  // expirou
+    if (show) {
+      lv_obj_set_style_image_recolor(idleAlertIco, lv_color_hex(g_alertColor), 0);
+      lv_obj_set_style_shadow_color(idleAlertIco, lv_color_hex(g_alertColor), 0);
+      lv_obj_clear_flag(idleAlertIco, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_add_flag(idleAlertIco, LV_OBJ_FLAG_HIDDEN);
+    }
   }
 }
 
