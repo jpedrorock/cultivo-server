@@ -64,8 +64,16 @@ export default function Jardim() {
   const { data, isLoading, refetch } = trpc.garden.getState.useQuery();
   const [, navigate] = useLocation();
 
-  // Reação ao toque na planta: wiggle + partículas + balão de fala.
-  const [reacting, setReacting] = useState(false);
+  // Carrossel de plantas.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (el) setActiveIdx(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+  };
+
+  // Reação ao toque na planta: wiggle + partículas + balão de fala (na planta tocada).
+  const [reactingIdx, setReactingIdx] = useState<number | null>(null);
   const [burst, setBurst] = useState(0);
   const [phrase, setPhrase] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -127,15 +135,15 @@ export default function Jardim() {
 
   const mood = (data && "hasGarden" in data && data.hasGarden ? data.mood : "happy") as PlantMood;
 
-  const petPlant = () => {
+  const petPlant = (idx: number) => {
     haptics.light().catch(() => {});
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    setReacting(true);
+    setReactingIdx(idx);
     setBurst((b) => b + 1);
     const phrases = PET_PHRASES[mood];
     setPhrase(phrases[burst % phrases.length]);
-    timers.current.push(setTimeout(() => setReacting(false), 650));
+    timers.current.push(setTimeout(() => setReactingIdx(null), 650));
     timers.current.push(setTimeout(() => setPhrase(null), 1500));
   };
 
@@ -144,7 +152,7 @@ export default function Jardim() {
   const handleCare = (a: CareAction, href: string) => {
     haptics.light().catch(() => {});
     setAction(a);
-    setReacting(true);
+    setReactingIdx(activeIdx);
     timers.current.push(setTimeout(() => navigate(href), 600));
   };
 
@@ -262,53 +270,70 @@ export default function Jardim() {
                   ))}
                 </span>
               )}
-              <button
-                type="button"
-                onClick={petPlant}
-                aria-label="Fazer carinho na planta"
-                className="relative mx-auto block rounded-2xl focus-visible:outline-none active:scale-[0.98] transition-transform"
-                style={{ background: "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(91,191,58,0.14), transparent 70%)" }}
-              >
-                {/* Balão de fala */}
-                {phrase && (
-                  <span
-                    key={`bubble-${burst}`}
-                    className="jardim-bubble absolute left-1/2 -top-1 -translate-x-1/2 z-10 whitespace-nowrap rounded-full bg-foreground text-background text-xs font-semibold px-3 py-1 shadow-lg"
-                  >
-                    {phrase}
-                  </span>
-                )}
-                {/* Partículas que sobem */}
-                {burst > 0 && (
-                  <span key={`burst-${burst}`} className="pointer-events-none absolute inset-0 z-10">
-                    {PET_PARTICLES[mood].map((p, i) => (
-                      <span
-                        key={i}
-                        className="jardim-particle absolute text-base"
-                        style={{
-                          left: `${30 + i * 9}%`,
-                          bottom: "38%",
-                          animationDelay: `${i * 55}ms`,
-                        }}
-                      >
-                        {p}
-                      </span>
-                    ))}
-                  </span>
-                )}
-                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} celebrating={celebrating || !!levelUp} fromMood={fromMood} />
-              </button>
-              <p className="text-lg font-bold text-foreground mt-1">{data.tentName}</p>
-              <p className="text-xs text-muted-foreground">
-                {data.weekNum > 0 ? `Semana ${data.weekNum} · ` : ""}{data.stageName}
-              </p>
+              {/* Carrossel das plantas (≤3). Compartilham ciclo → mesmo estágio; muda nome/strain. */}
               {(() => {
-                const MoodIcon = MOOD_ICON[data.mood as PlantMood];
+                const slides = data.plants.length > 0 ? data.plants : [{ id: 0, name: data.tentName, strain: null as string | null }];
                 return (
-                  <span className={cn("inline-flex items-center gap-1.5 mt-2 text-sm font-medium px-3 py-1 rounded-full bg-muted/40", MOOD_TONE[data.mood as PlantMood])}>
-                    <MoodIcon className="w-4 h-4" />
-                    {data.moodLabel}
-                  </span>
+                  <>
+                    <div ref={scrollRef} onScroll={onScroll} className="no-scrollbar relative z-10 flex snap-x snap-mandatory overflow-x-auto">
+                      {slides.map((p, idx) => (
+                        <div key={p.id} className="flex w-full shrink-0 snap-center flex-col items-center">
+                          <button
+                            type="button"
+                            onClick={() => petPlant(idx)}
+                            aria-label="Fazer carinho na planta"
+                            className="relative mx-auto block rounded-2xl focus-visible:outline-none active:scale-[0.98] transition-transform"
+                            style={{ background: "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(91,191,58,0.14), transparent 70%)" }}
+                          >
+                            {reactingIdx === idx && phrase && (
+                              <span
+                                key={`bubble-${burst}`}
+                                className="jardim-bubble absolute left-1/2 -top-1 -translate-x-1/2 z-10 whitespace-nowrap rounded-full bg-foreground text-background text-xs font-semibold px-3 py-1 shadow-lg"
+                              >
+                                {phrase}
+                              </span>
+                            )}
+                            {reactingIdx === idx && burst > 0 && (
+                              <span key={`burst-${burst}`} className="pointer-events-none absolute inset-0 z-10">
+                                {PET_PARTICLES[mood].map((pp, i) => (
+                                  <span
+                                    key={i}
+                                    className="jardim-particle absolute text-base"
+                                    style={{ left: `${30 + i * 9}%`, bottom: "38%", animationDelay: `${i * 55}ms` }}
+                                  >
+                                    {pp}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} />
+                          </button>
+                          <p className="text-lg font-bold text-foreground mt-1">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {p.strain ? `${p.strain} · ` : ""}{data.weekNum > 0 ? `Semana ${data.weekNum} · ` : ""}{data.stageName}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Humor (compartilhado pela estufa) */}
+                    {(() => {
+                      const MoodIcon = MOOD_ICON[mood];
+                      return (
+                        <span className={cn("inline-flex items-center gap-1.5 mt-2 text-sm font-medium px-3 py-1 rounded-full bg-muted/40", MOOD_TONE[mood])}>
+                          <MoodIcon className="w-4 h-4" />
+                          {data.moodLabel}
+                        </span>
+                      );
+                    })()}
+                    {/* Bolinhas do carrossel */}
+                    {slides.length > 1 && (
+                      <div className="flex justify-center gap-1.5 mt-3">
+                        {slides.map((_, i) => (
+                          <span key={i} className={cn("h-1.5 rounded-full transition-all", i === activeIdx ? "w-4 bg-primary" : "w-1.5 bg-muted")} />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 );
               })()}
             </div>

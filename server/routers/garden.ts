@@ -3,10 +3,10 @@
  * principal do usuário. Lógica pura em server/lib/plantGame.ts. Ver
  * GAME-MODE-CONCEPT.md.
  */
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, getIdealValuesByTent } from "../db";
-import { tents, cycles, dailyLogs, plants } from "../../drizzle/schema";
+import { tents, cycles, dailyLogs, plants, strains } from "../../drizzle/schema";
 import { computePlantStage, computePlantMood, STAGE_NAME, MOOD_LABEL } from "../lib/plantGame";
 
 export const gardenRouter = router({
@@ -63,10 +63,13 @@ export const gardenRouter = router({
 
     const mood = computePlantMood({ registeredToday, envOk, daysSinceLog });
 
-    const [pc] = (await database
-      .select({ n: sql<number>`count(*)` })
+    // Plantas da estufa (carrossel do Jardim). Compartilham o ciclo → mesmo
+    // estágio; o que muda é nome/strain.
+    const plantRows = await database
+      .select({ id: plants.id, name: plants.name, strain: strains.name })
       .from(plants)
-      .where(eq(plants.currentTentId, tent.id))) as Array<{ n: number }>;
+      .leftJoin(strains, eq(plants.strainId, strains.id))
+      .where(and(eq(plants.currentTentId, tent.id), eq(plants.status, "ACTIVE")));
 
     return {
       hasGarden: true as const,
@@ -79,7 +82,8 @@ export const gardenRouter = router({
       weekNum: hasCycle ? Math.max(1, (floraStarted ? weeksSinceFlora : weeksSinceStart) + 1) : 0,
       registeredToday,
       daysSinceLog,
-      plantCount: Number(pc?.n ?? 0),
+      plants: plantRows.map((p) => ({ id: p.id, name: p.name, strain: p.strain ?? null })),
+      plantCount: plantRows.length,
     };
   }),
 });

@@ -2314,6 +2314,10 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 }
 .jardim-mote { animation-name: jardim-mote; animation-timing-function: linear; animation-iteration-count: infinite; }
 
+/* Carrossel de plantas — esconde a barra de rolagem */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 .jardim-particle { animation: jardim-float-up 1s ease-out forwards; }
 .jardim-bubble   { animation: jardim-pop 0.35s ease-out forwards; }
 
