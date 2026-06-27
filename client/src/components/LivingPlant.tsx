@@ -4,8 +4,22 @@
  * /illustrations/jardim/, basta virar HAS_ART = true (o componente troca pra
  * <img> stage-{n}-{mood}.png). Ver GAME-MODE-CONCEPT.md.
  */
+import { useEffect, useRef, useState } from "react";
+
 export type PlantStage = 1 | 2 | 3 | 4 | 5 | 6;
 export type PlantMood = "happy" | "thirsty" | "sad";
+
+type Rgb = [number, number, number];
+function hexToRgb(h: string): Rgb {
+  const n = parseInt(h.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbStr(c: Rgb): string {
+  return `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+}
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 // Vira true quando o João dropar as artes em client/public/illustrations/jardim/
 const HAS_ART = false;
@@ -31,6 +45,7 @@ export function LivingPlant({
   reacting = false,
   celebrating = false,
   animate = true,
+  fromMood,
 }: {
   stage: PlantStage;
   mood: PlantMood;
@@ -38,6 +53,8 @@ export function LivingPlant({
   reacting?: boolean;
   celebrating?: boolean;
   animate?: boolean;
+  /** Humor anterior — se difere de `mood`, a planta "se levanta" animando do antigo pro novo. */
+  fromMood?: PlantMood;
 }) {
   // Classe da animação: celebração > wiggle do toque > idle do humor.
   const animClass = !animate
@@ -47,6 +64,38 @@ export function LivingPlant({
       : reacting
         ? "plant-reacting"
         : IDLE_CLASS[mood];
+
+  // Tween de transição de humor: droop (folhas sobem) + cor (murcho → verde).
+  const start = fromMood && fromMood !== mood ? fromMood : mood;
+  const [vis, setVis] = useState<{ d: number; c: Rgb }>(() => ({ d: MOOD_DROOP[start], c: hexToRgb(MOOD_COLOR[start]) }));
+  const visRef = useRef(vis);
+  visRef.current = vis;
+  const rafRef = useRef(0);
+  useEffect(() => {
+    const d1 = MOOD_DROOP[mood];
+    const c1 = hexToRgb(MOOD_COLOR[mood]);
+    // Ponto de partida: o humor anterior (se houver) ou o estado atual visível.
+    const s = fromMood && fromMood !== mood
+      ? { d: MOOD_DROOP[fromMood], c: hexToRgb(MOOD_COLOR[fromMood]) }
+      : visRef.current;
+    if ((s.d === d1 && s.c[0] === c1[0] && s.c[1] === c1[1] && s.c[2] === c1[2]) || !animate || prefersReducedMotion()) {
+      setVis({ d: d1, c: c1 });
+      return;
+    }
+    setVis(s);
+    const t0 = performance.now();
+    const dur = 900;
+    cancelAnimationFrame(rafRef.current);
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setVis({ d: lerp(s.d, d1, e), c: [lerp(s.c[0], c1[0], e), lerp(s.c[1], c1[1], e), lerp(s.c[2], c1[2], e)] });
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mood, fromMood, animate]);
 
   if (HAS_ART) {
     return (
@@ -61,8 +110,8 @@ export function LivingPlant({
     );
   }
 
-  const color = MOOD_COLOR[mood];
-  const droop = MOOD_DROOP[mood];
+  const color = rgbStr(vis.c);
+  const droop = vis.d;
   const pairs = Math.min(4, stage <= 1 ? 1 : stage);
   const stemTopY = 48 - Math.min(stage, 5) * 4;
 

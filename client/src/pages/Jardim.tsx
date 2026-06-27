@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { haptics } from "@/lib/haptics";
 import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
 import { readLastStage, writeLastStage } from "@/lib/gardenStage";
+import { readLastMood, writeLastMood } from "@/lib/gardenMood";
 
 // Folhas que caem na celebração (posições/emojis fixos por índice).
 const CELEBRATE_LEAVES = ["🌿", "💚", "✨", "🍃", "🌱", "💚", "✨", "🌿", "🍃", "🌱", "✨", "💚"];
@@ -84,6 +85,24 @@ export default function Jardim() {
     }
     // Primeira vez ou sem subida: só sincroniza o marcador.
     writeLastStage(data.tentId, data.stage);
+  }, [data]);
+
+  // Transição de humor: se o humor mudou desde a última visita, a planta anima do antigo pro novo.
+  const [fromMood, setFromMood] = useState<PlantMood | undefined>(undefined);
+  useEffect(() => {
+    if (!data || !("hasGarden" in data) || !data.hasGarden) return;
+    const prev = readLastMood(data.tentId) as PlantMood | null;
+    if (prev && prev !== data.mood) {
+      setFromMood(prev);
+      // Persiste o novo humor só ao FIM da transição (sobrevive ao double-mount do StrictMode).
+      const t = setTimeout(() => {
+        writeLastMood(data.tentId, data.mood);
+        setFromMood(undefined);
+      }, 1100);
+      return () => clearTimeout(t);
+    }
+    writeLastMood(data.tentId, data.mood);
+    setFromMood(undefined);
   }, [data]);
 
   const mood = (data && "hasGarden" in data && data.hasGarden ? data.mood : "happy") as PlantMood;
@@ -207,7 +226,7 @@ export default function Jardim() {
                     ))}
                   </span>
                 )}
-                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} celebrating={celebrating || !!levelUp} />
+                <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reacting} celebrating={celebrating || !!levelUp} fromMood={fromMood} />
               </button>
               <p className="text-lg font-bold text-foreground mt-1">{data.tentName}</p>
               <p className="text-xs text-muted-foreground">
