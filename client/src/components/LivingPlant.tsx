@@ -140,10 +140,18 @@ export function LivingPlant({
         leaves.slice(0, 3).map((l, i) => (
           <circle key={`p${i}`} cx={l.cx} cy={l.cy - 4} r="2" fill="#caa6d6" />
         ))}
-      {/* Tricomas (maturação/colheita) */}
+      {/* Tricomas (maturação/colheita) — cintilam dourado quando prontos */}
       {showTrichomes &&
         leaves.slice(0, 4).map((l, i) => (
-          <circle key={`t${i}`} cx={l.cx + 3} cy={l.cy - 5} r="1.5" fill="#ffcf6a" />
+          <circle
+            key={`t${i}`}
+            cx={l.cx + 3}
+            cy={l.cy - 5}
+            r="1.5"
+            fill="#ffcf6a"
+            className={animate ? "jardim-twinkle" : ""}
+            style={animate ? { animationDelay: `${i * 240}ms` } : undefined}
+          />
         ))}
       {/* Vaso */}
       <path d="M40 110 L80 110 L75 140 Q60 144 45 140 Z" fill={POT_BG[mood]} stroke={color} strokeWidth="1.4" />

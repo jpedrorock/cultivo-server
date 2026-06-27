@@ -293,7 +293,10 @@ export default function Jardim() {
                     type="button"
                     onClick={() => handleCare(c.action, c.href)}
                     disabled={action !== null}
-                    className="flex flex-col items-center gap-1.5 rounded-xl border border-border/50 bg-card hover:bg-muted/30 active:scale-[0.97] transition-[background-color,transform] py-4 disabled:opacity-60"
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-xl border border-border/50 bg-card hover:bg-muted/30 active:scale-[0.97] transition-[background-color,transform] py-4 disabled:opacity-60",
+                      c.action === "water" && mood !== "happy" && action === null && "jardim-attention",
+                    )}
                   >
                     <c.Icon className={cn("w-6 h-6 text-primary", action === c.action && "plant-reacting")} />
                     <span className="text-xs font-medium text-foreground">{c.label}</span>

@@ -2291,6 +2291,20 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
 }
 .jardim-glow { animation: jardim-glow-burst 1.5s ease-out forwards; }
 
+/* Estados de atenção — botão "Regar" pulsa quando a planta precisa de água */
+@keyframes jardim-attention {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); border-color: rgba(245, 158, 11, 0.4); }
+  50%      { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.22); border-color: rgba(245, 158, 11, 0.9); }
+}
+.jardim-attention { animation: jardim-attention 2.2s ease-in-out infinite; }
+
+/* Colheita/maturação — tricomas cintilam dourado */
+@keyframes jardim-twinkle {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+.jardim-twinkle { animation: jardim-twinkle 1.8s ease-in-out infinite; }
+
 .jardim-particle { animation: jardim-float-up 1s ease-out forwards; }
 .jardim-bubble   { animation: jardim-pop 0.35s ease-out forwards; }
 
@@ -2298,4 +2312,5 @@ html.pwa-standalone [data-sonner-toaster][data-y-position="top"] {
   .plant-idle-happy, .plant-idle-thirsty, .plant-idle-sad, .plant-reacting, .plant-celebrate { animation: none; }
   .jardim-particle, .jardim-bubble, .jardim-falling, .jardim-glow,
   .jardim-drop, .jardim-breeze, .jardim-flash { animation-duration: 0.01s; }
+  .jardim-attention, .jardim-twinkle { animation: none; }
 }
