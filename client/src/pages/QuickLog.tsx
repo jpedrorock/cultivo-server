@@ -19,6 +19,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { savePendingLog, isOnline } from "@/lib/offlineStorage";
 import { haptics } from "@/lib/haptics";
 import { markGardenCare } from "@/lib/gardenCare";
+import { useSimpleMode } from "@/hooks/useSimpleMode";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { cn } from "@/lib/utils";
 import { getCircleStyle, getPHColor, getValidationColor } from "@/lib/quickLogColors";
@@ -54,6 +55,7 @@ export default function QuickLog() {
   // No demo já entra no fluxo "status" e pula a seleção de estufa (step 0):
   // usamos uma estufa de exemplo sintética, então começa no step 1 (Temperatura).
   const [currentStep, setCurrentStep] = useState(isDemo ? 1 : 0);
+  const [simpleMode] = useSimpleMode(); // Modo iniciante: registro essencial (temp+umidade+rega+foto)
   const [logMode, setLogMode] = useState<'status' | 'plant' | 'trichome' | null>(isDemo ? 'status' : urlMode);
   const [confirmClose, setConfirmClose] = useState(false);
   const stepScrollRef = useRef<HTMLDivElement>(null);
@@ -110,6 +112,11 @@ export default function QuickLog() {
     if (currentStep === 0 && sensorReading !== undefined && sensorReading?.isFresh && logMode === 'status') {
       return setCurrentStep(3);
     }
+    // Modo iniciante: registro essencial — após a Rega vai direto pro Resumo
+    // (pula Runoff/pH/EC/PPFD, que são coisas de avançado).
+    if (logMode === 'status' && simpleMode && currentStep === 3) {
+      return setCurrentStep(8);
+    }
     if (logMode === 'status' && isOrganic) {
       if (currentStep === 3) return setCurrentStep(5); // Rega → pH (pula Runoff)
       if (currentStep === 5) return setCurrentStep(7); // pH → PPFD (pula EC)
@@ -122,6 +129,9 @@ export default function QuickLog() {
     const isOrganic = (selectedTent as any)?.cultivationMethod === 'ORGANIC';
     if (currentStep === 3 && sensorReading !== undefined && sensorReading?.isFresh && logMode === 'status') {
       return setCurrentStep(0);
+    }
+    if (logMode === 'status' && simpleMode && currentStep === 8) {
+      return setCurrentStep(3); // Resumo → Rega (volta pulando o avançado)
     }
     if (logMode === 'status' && isOrganic) {
       if (currentStep === 7) return setCurrentStep(5); // PPFD → pH (pula EC)
@@ -295,8 +305,8 @@ export default function QuickLog() {
       if (currentPlantIndex < plants.length - 1) {
         haptics.light();
         setCurrentPlantIndex(currentPlantIndex + 1);
-      } else if (isFloraPhase && logMode === 'plant') {
-        // Propõe registro de tricomas após saúde (só no modo planta)
+      } else if (isFloraPhase && logMode === 'plant' && !simpleMode) {
+        // Propõe registro de tricomas após saúde (só no modo planta; iniciante não vê)
         haptics.light();
         setCurrentTrichomeIndex(0);
         setRecordTrichomes(null);
