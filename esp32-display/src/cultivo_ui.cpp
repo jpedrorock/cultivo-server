@@ -255,6 +255,15 @@ static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
   return c;
 }
 
+// Encolhe um icone rasterizado (32px) via transform com pivot no centro (fica
+// centralizado na propria box). zoom 256=100%; ~140=55% (~18px). Feedback Joao:
+// icones grandes demais no device vs o mock (que usava icones finos).
+static inline void shrinkIcon(lv_obj_t *img, int32_t zoom) {
+  lv_obj_set_style_transform_pivot_x(img, 16, 0);
+  lv_obj_set_style_transform_pivot_y(img, 16, 0);
+  lv_obj_set_style_transform_zoom(img, zoom, 0);
+}
+
 static void anim_shadow_opa_cb(void *obj, int32_t v) {
   lv_obj_set_style_shadow_opa((lv_obj_t*)obj, v, 0);
 }
@@ -710,6 +719,7 @@ static void buildHome(lv_obj_t *tab) {
   lv_image_set_src(wifiIcon, wifiOk ? &ic_wifi : &ic_wifi_off);
   lv_obj_set_style_image_recolor(wifiIcon, lv_color_hex(wifiOk ? COL_PRIMARY : COL_DIM), 0);
   lv_obj_set_style_image_recolor_opa(wifiIcon, LV_OPA_COVER, 0);
+  shrinkIcon(wifiIcon, 140);
   lv_obj_align(wifiIcon, LV_ALIGN_TOP_RIGHT, -sw(4), sh(4));
   lblWifi = wifiIcon;
   // Tap no icone — se offline, pede reconexao ao app (vai forcar WiFi
@@ -733,6 +743,7 @@ static void buildHome(lv_obj_t *tab) {
   lv_image_set_src(btnCfg, &ic_settings);
   lv_obj_set_style_image_recolor(btnCfg, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_image_recolor_opa(btnCfg, LV_OPA_COVER, 0);
+  shrinkIcon(btnCfg, 140);
   lv_obj_align(btnCfg, LV_ALIGN_TOP_RIGHT, -sw(44), sh(4));
   lv_obj_add_flag(btnCfg, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_ext_click_area(btnCfg, sw(8));
@@ -749,6 +760,7 @@ static void buildHome(lv_obj_t *tab) {
   lv_image_set_src(refreshIcon, &ic_refresh);
   lv_obj_set_style_image_recolor(refreshIcon, lv_color_hex(COL_DIM), 0);
   lv_obj_set_style_image_recolor_opa(refreshIcon, LV_OPA_COVER, 0);
+  shrinkIcon(refreshIcon, 140);
   lv_obj_align(refreshIcon, LV_ALIGN_TOP_RIGHT, -sw(84), sh(4));
   lv_obj_add_flag(refreshIcon, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_ext_click_area(refreshIcon, sw(8));
@@ -928,6 +940,7 @@ static void buildHome(lv_obj_t *tab) {
     lv_image_set_src(ico, icon);
     lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
     lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    shrinkIcon(ico, 140);
     lv_obj_align(ico, LV_ALIGN_TOP_LEFT, 0, sh(2));
 
     lv_obj_t *lb = lv_label_create(c);
@@ -2765,6 +2778,7 @@ static void buildNavbar(lv_obj_t *parent) {
     lv_obj_t *ic = lv_image_create(btn);
     lv_image_set_src(ic, NAV_ICONS_IMG[i]);
     lv_obj_set_style_image_recolor_opa(ic, LV_OPA_COVER, 0);
+    shrinkIcon(ic, 150);
     lv_obj_center(ic);
     navIcons[i] = ic;
   }
