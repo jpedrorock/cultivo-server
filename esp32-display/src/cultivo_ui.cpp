@@ -353,12 +353,17 @@ static uint32_t freshnessColor(int ageSec) {
 // interno do LVGL nao suporta floating-point format (default config).
 // Usar snprintf padrao do C numa string buffer + lv_label_set_text.
 // ════════════════════════════════════════════════════════════════════════════════
-static lv_obj_t *idleOverlay    = nullptr;
+static lv_obj_t *idleOverlay   = nullptr;
 static lv_obj_t *idleClockLbl  = nullptr;
+static lv_obj_t *idleDateLbl   = nullptr;   // "sex . 27 jun"
+static lv_obj_t *idlePhaseLbl  = nullptr;   // pilula "<Fase> . Sem X/Y"
+static lv_obj_t *idleStatusLbl = nullptr;   // veredito natural (tudo certo / atencao)
 static lv_obj_t *idleTempLbl   = nullptr;
 static lv_obj_t *idleRhLbl     = nullptr;
 static lv_obj_t *idleVpdLbl    = nullptr;
-static lv_obj_t *idleVpdZoneLbl = nullptr;  // zona VPD: IDEAL/UMIDO/SECO
+static lv_obj_t *idleTempDot   = nullptr;   // dot de status por metrica (verde/ambar)
+static lv_obj_t *idleRhDot     = nullptr;
+static lv_obj_t *idleVpdDot    = nullptr;
 
 extern "C" void cultivoUI_showIdleOverlay(void) {
   if (idleOverlay) return;  // ja mostrando
@@ -366,68 +371,132 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_remove_style_all(idleOverlay);
   lv_obj_set_size(idleOverlay, SCREEN_W, SCREEN_H);
   lv_obj_set_pos(idleOverlay, 0, 0);
-  lv_obj_set_style_bg_color(idleOverlay, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_color(idleOverlay, lv_color_hex(COL_BG), 0);
   lv_obj_set_style_bg_opa(idleOverlay, LV_OPA_COVER, 0);
   lv_obj_clear_flag(idleOverlay, LV_OBJ_FLAG_SCROLLABLE);
 
-  char buf[32];
+  uint32_t pc = phaseColor(FASE);
 
-  // Clock gigante centro-superior (FONT_VALUE = 40px no real hw)
+  // ── Topo-esq: dot "ao vivo" pulsante + nome da estufa ──────────────────
+  lv_obj_t *liveDot = lv_obj_create(idleOverlay);
+  lv_obj_remove_style_all(liveDot);
+  lv_obj_set_size(liveDot, sw(8), sw(8));
+  lv_obj_align(liveDot, LV_ALIGN_TOP_LEFT, sw(16), sh(15));
+  lv_obj_set_style_radius(liveDot, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_bg_color(liveDot, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(liveDot, LV_OPA_COVER, 0);
+  lv_obj_set_style_shadow_color(liveDot, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_shadow_width(liveDot, sw(6), 0);
+  startBreathe(liveDot, LV_OPA_0, LV_OPA_70, 1600);
+
+  lv_obj_t *tentLbl = lv_label_create(idleOverlay);
+  lv_label_set_text(tentLbl, TENT_NAME[0] ? TENT_NAME : "Estufa");
+  lv_obj_set_style_text_color(tentLbl, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(tentLbl, FONT_BODY, 0);
+  lv_obj_align(tentLbl, LV_ALIGN_TOP_LEFT, sw(30), sh(11));
+
+  // ── Topo-dir: pilula da fase ("<Fase> . Sem X/Y") — texto/cor no tick ──
+  idlePhaseLbl = lv_label_create(idleOverlay);
+  lv_label_set_text(idlePhaseLbl, "");
+  lv_obj_set_style_text_font(idlePhaseLbl, FONT_CAPTION, 0);
+  lv_obj_set_style_bg_opa(idlePhaseLbl, LV_OPA_20, 0);
+  lv_obj_set_style_radius(idlePhaseLbl, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_pad_left(idlePhaseLbl, sw(8), 0);
+  lv_obj_set_style_pad_right(idlePhaseLbl, sw(8), 0);
+  lv_obj_set_style_pad_top(idlePhaseLbl, sh(3), 0);
+  lv_obj_set_style_pad_bottom(idlePhaseLbl, sh(3), 0);
+  lv_obj_align(idlePhaseLbl, LV_ALIGN_TOP_RIGHT, -sw(14), sh(11));
+
+  // ── Centro: relogio com glow na cor da fase + data ─────────────────────
   idleClockLbl = lv_label_create(idleOverlay);
   lv_label_set_text(idleClockLbl, "--:--");
   lv_obj_set_style_text_color(idleClockLbl, lv_color_hex(COL_TEXT), 0);
   lv_obj_set_style_text_font(idleClockLbl, FONT_VALUE, 0);
-  lv_obj_align(idleClockLbl, LV_ALIGN_CENTER, 0, -sh(40));
+  // Glow: sombra colorida na cor da fase (lado luminoso do site). Barato — so'
+  // a bbox do label, nao por glifo; da o halo atras da hora. Cor no tick.
+  lv_obj_set_style_shadow_color(idleClockLbl, lv_color_hex(pc), 0);
+  lv_obj_set_style_shadow_width(idleClockLbl, sw(30), 0);
+  lv_obj_set_style_shadow_opa(idleClockLbl, LV_OPA_40, 0);
+  lv_obj_align(idleClockLbl, LV_ALIGN_CENTER, 0, -sh(34));
 
-  // Temp (esquerda) — laranja PHASE_HARVEST
-  idleTempLbl = lv_label_create(idleOverlay);
-  if (isnan(tempC)) lv_label_set_text(idleTempLbl, "--");
-  else {
-    snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
-    lv_label_set_text(idleTempLbl, buf);
-  }
-  lv_obj_set_style_text_color(idleTempLbl, lv_color_hex(COL_PHASE_HARVEST), 0);
-  lv_obj_set_style_text_font(idleTempLbl, FONT_TITLE, 0);
-  lv_obj_align(idleTempLbl, LV_ALIGN_CENTER, -sw(80), sh(40));
+  idleDateLbl = lv_label_create(idleOverlay);
+  lv_label_set_text(idleDateLbl, "");
+  lv_obj_set_style_text_color(idleDateLbl, lv_color_hex(COL_DIM), 0);
+  lv_obj_set_style_text_font(idleDateLbl, FONT_CAPTION, 0);
+  lv_obj_align(idleDateLbl, LV_ALIGN_CENTER, 0, sh(2));
 
-  // Umid (centro) — ciano
-  idleRhLbl = lv_label_create(idleOverlay);
-  if (isnan(rh)) lv_label_set_text(idleRhLbl, "--");
-  else {
-    snprintf(buf, sizeof(buf), "%.0f%%", rh);
-    lv_label_set_text(idleRhLbl, buf);
-  }
-  lv_obj_set_style_text_color(idleRhLbl, lv_color_hex(COL_CYN), 0);
-  lv_obj_set_style_text_font(idleRhLbl, FONT_TITLE, 0);
-  lv_obj_align(idleRhLbl, LV_ALIGN_CENTER, 0, sh(40));
+  // Veredito em linguagem natural (pilula) — texto/cor no tick
+  idleStatusLbl = lv_label_create(idleOverlay);
+  lv_label_set_text(idleStatusLbl, "");
+  lv_obj_set_style_text_font(idleStatusLbl, FONT_CAPTION, 0);
+  lv_obj_set_style_bg_opa(idleStatusLbl, LV_OPA_20, 0);
+  lv_obj_set_style_radius(idleStatusLbl, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_pad_left(idleStatusLbl, sw(10), 0);
+  lv_obj_set_style_pad_right(idleStatusLbl, sw(10), 0);
+  lv_obj_set_style_pad_top(idleStatusLbl, sh(3), 0);
+  lv_obj_set_style_pad_bottom(idleStatusLbl, sh(3), 0);
+  lv_obj_align(idleStatusLbl, LV_ALIGN_CENTER, 0, sh(28));
 
-  // VPD (direita) — cor dinamica por zona: verde=IDEAL, azul=UMIDO, amarelo=SECO
-  idleVpdLbl = lv_label_create(idleOverlay);
-  if (isnan(vpd)) lv_label_set_text(idleVpdLbl, "--");
-  else {
-    snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
-    lv_label_set_text(idleVpdLbl, buf);
-  }
-  lv_obj_set_style_text_color(idleVpdLbl,
-    lv_color_hex(isnan(vpd) ? COL_DIM : vpdColor(vpd)), 0);
-  lv_obj_set_style_text_font(idleVpdLbl, FONT_TITLE, 0);
-  lv_obj_align(idleVpdLbl, LV_ALIGN_CENTER, sw(80), sh(38));
+  // ── Rodape: 3 cards flat (TEMP/UMID/VPD) com dot de status ─────────────
+  int icMargin = sw(16);
+  int icGap    = sw(8);
+  int icCardW  = (SCREEN_W - icMargin * 2 - icGap * 2) / 3;
+  int icCardH  = sh(60);
+  int icCardY  = SCREEN_H - icCardH - sh(12);
+  auto makeIdleCard = [&](int x, const lv_image_dsc_t *icon, const char *label,
+                          uint32_t color, lv_obj_t **valOut, lv_obj_t **dotOut) {
+    lv_obj_t *c = lv_obj_create(idleOverlay);
+    lv_obj_remove_style_all(c);
+    lv_obj_set_size(c, icCardW, icCardH);
+    lv_obj_set_pos(c, x, icCardY);
+    lv_obj_set_style_bg_color(c, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(c, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(c, 1, 0);
+    lv_obj_set_style_radius(c, 10, 0);
+    lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Indicador de zona VPD — "IDEAL" / "UMIDO" / "SECO" em fonte caption
-  idleVpdZoneLbl = lv_label_create(idleOverlay);
-  lv_label_set_text(idleVpdZoneLbl, isnan(vpd) ? "" : vpdZone(vpd));
-  lv_obj_set_style_text_color(idleVpdZoneLbl,
-    lv_color_hex(isnan(vpd) ? COL_DIM : vpdColor(vpd)), 0);
-  lv_obj_set_style_text_font(idleVpdZoneLbl, FONT_CAPTION, 0);
-  lv_obj_align(idleVpdZoneLbl, LV_ALIGN_CENTER, sw(80), sh(54));
+    lv_obj_t *ico = lv_image_create(c);
+    lv_image_set_src(ico, icon);
+    lv_obj_set_style_image_recolor(ico, lv_color_hex(color), 0);
+    lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
+    lv_obj_set_style_transform_zoom(ico, 160, 0);   // ~62% (32->20px)
+    lv_obj_align(ico, LV_ALIGN_TOP_LEFT, sw(8), sh(7));
 
-  cultivoUI_tickIdleOverlay();  // update inicial do clock
+    lv_obj_t *lbl = lv_label_create(c);
+    lv_label_set_text(lbl, label);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
+    lv_obj_align(lbl, LV_ALIGN_TOP_LEFT, sw(26), sh(9));
+
+    lv_obj_t *v = lv_label_create(c);
+    lv_label_set_text(v, "--");
+    lv_obj_set_style_text_color(v, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_text_font(v, FONT_TITLE, 0);
+    lv_obj_align(v, LV_ALIGN_BOTTOM_LEFT, sw(8), -sh(6));
+    *valOut = v;
+
+    lv_obj_t *dot = lv_obj_create(c);
+    lv_obj_remove_style_all(dot);
+    lv_obj_set_size(dot, sw(7), sw(7));
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(dot, lv_color_hex(COL_DIM), 0);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+    lv_obj_align(dot, LV_ALIGN_TOP_RIGHT, -sw(8), sh(9));
+    *dotOut = dot;
+  };
+  makeIdleCard(icMargin,                         &ic_thermometer, "TEMP",    COL_PHASE_HARVEST, &idleTempLbl, &idleTempDot);
+  makeIdleCard(icMargin + icCardW + icGap,       &ic_droplet,     "UMIDADE", COL_CYN,           &idleRhLbl,   &idleRhDot);
+  makeIdleCard(icMargin + (icCardW + icGap) * 2, &ic_activity,    "VPD",     COL_PRIMARY,       &idleVpdLbl,  &idleVpdDot);
+
+  cultivoUI_tickIdleOverlay();  // preenche clock/data/fase/status/valores
 }
 
 extern "C" void cultivoUI_hideIdleOverlay(void) {
   if (!idleOverlay) return;
   lv_obj_del(idleOverlay);
-  idleOverlay = idleClockLbl = idleTempLbl = idleRhLbl = idleVpdLbl = idleVpdZoneLbl = nullptr;
+  idleOverlay = idleClockLbl = idleDateLbl = idlePhaseLbl = idleStatusLbl =
+    idleTempLbl = idleRhLbl = idleVpdLbl = idleTempDot = idleRhDot = idleVpdDot = nullptr;
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -595,54 +664,77 @@ extern "C" void cultivoUI_showOtaStatus(const char *msg, int autoHideMs) {
 
 extern "C" void cultivoUI_tickIdleOverlay(void) {
   if (!idleOverlay || !idleClockLbl) return;
-  // Le time corrente. configTime no firmware seta TZ BRT-3.
-  // localtime_r e thread-safe; usado pra evitar buffer estatico.
+  // Hora/data via configTime (TZ BRT-3). localtime_r thread-safe.
+  // CRITICO: snprintf padrao + lv_label_set_text — lv_label_set_text_fmt usa
+  // lv_snprintf INTERNO que NAO suporta %f no default config (bug em prod).
   time_t now = time(nullptr);
   struct tm tmInfo;
-  char buf[32];
-  if (now > 1700000000 && localtime_r(&now, &tmInfo)) {  // sanity: time pos-2023
-    // %d e' integer — lv_snprintf suporta. Mas usamos snprintf padrao
-    // pra consistencia com os labels float abaixo.
+  char buf[48];
+  if (now > 1700000000 && localtime_r(&now, &tmInfo)) {  // sanity: pos-2023
     snprintf(buf, sizeof(buf), "%02d:%02d", tmInfo.tm_hour, tmInfo.tm_min);
     lv_label_set_text(idleClockLbl, buf);
+    if (idleDateLbl) {
+      static const char *wd[7] = {"dom","seg","ter","qua","qui","sex","sab"};
+      static const char *mo[12] = {"jan","fev","mar","abr","mai","jun",
+                                   "jul","ago","set","out","nov","dez"};
+      snprintf(buf, sizeof(buf), "%s \xC2\xB7 %d %s",
+               wd[tmInfo.tm_wday % 7], tmInfo.tm_mday, mo[tmInfo.tm_mon % 12]);
+      lv_label_set_text(idleDateLbl, buf);
+    }
   } else {
     lv_label_set_text(idleClockLbl, "--:--");  // NTP ainda nao sincronizou
+    if (idleDateLbl) lv_label_set_text(idleDateLbl, "sincronizando...");
   }
-  // Refresh tambem dos valores ambientais.
-  // CRITICO: usar snprintf padrao + lv_label_set_text — lv_label_set_text_fmt
-  // usa lv_snprintf INTERNO que NAO suporta %f no default config; renderiza
-  // como "F°C" literal sem o numero (bug visto em produção).
-  if (idleTempLbl) {
-    if (isnan(tempC)) lv_label_set_text(idleTempLbl, "--");
-    else {
-      snprintf(buf, sizeof(buf), "%.1f\xC2\xB0""C", tempC);
-      lv_label_set_text(idleTempLbl, buf);
-    }
-  }
-  if (idleRhLbl) {
-    if (isnan(rh)) lv_label_set_text(idleRhLbl, "--");
-    else {
-      snprintf(buf, sizeof(buf), "%.0f%%", rh);
-      lv_label_set_text(idleRhLbl, buf);
-    }
-  }
-  if (idleVpdLbl) {
-    if (isnan(vpd)) {
-      lv_label_set_text(idleVpdLbl, "--");
-      lv_obj_set_style_text_color(idleVpdLbl, lv_color_hex(COL_DIM), 0);
+
+  // Glow do relogio + pilula da fase seguem a cor da fase atual.
+  uint32_t pc = phaseColor(FASE);
+  lv_obj_set_style_shadow_color(idleClockLbl, lv_color_hex(pc), 0);
+  if (idlePhaseLbl) {
+    if (FASE[0]) {
+      if (semana > 0 && totalSem > 0)
+        snprintf(buf, sizeof(buf), "%s \xC2\xB7 Sem %d/%d", FASE, semana, totalSem);
+      else
+        snprintf(buf, sizeof(buf), "%s", FASE);
+      lv_label_set_text(idlePhaseLbl, buf);
+      lv_obj_set_style_text_color(idlePhaseLbl, lv_color_hex(pc), 0);
+      lv_obj_set_style_bg_color(idlePhaseLbl, lv_color_hex(pc), 0);
+      lv_obj_clear_flag(idlePhaseLbl, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_align(idlePhaseLbl, LV_ALIGN_TOP_RIGHT, -sw(14), sh(11));
     } else {
-      snprintf(buf, sizeof(buf), "%.2fkPa", vpd);
-      lv_label_set_text(idleVpdLbl, buf);
-      lv_obj_set_style_text_color(idleVpdLbl, lv_color_hex(vpdColor(vpd)), 0);
+      lv_obj_add_flag(idlePhaseLbl, LV_OBJ_FLAG_HIDDEN);
     }
   }
-  if (idleVpdZoneLbl) {
-    if (isnan(vpd)) {
-      lv_label_set_text(idleVpdZoneLbl, "");
-    } else {
-      lv_label_set_text(idleVpdZoneLbl, vpdZone(vpd));
-      lv_obj_set_style_text_color(idleVpdZoneLbl, lv_color_hex(vpdColor(vpd)), 0);
+
+  // Metricas + dot de status por metrica (verde=ideal, ambar=fora). Faixas
+  // generosas (so' um glance — o alerta real vem do server).
+  int okCount = 0, totalM = 0;
+  auto upd = [&](lv_obj_t *lbl, lv_obj_t *dot, float val, const char *fmt, bool ok) {
+    if (!lbl) return;
+    if (isnan(val)) {
+      lv_label_set_text(lbl, "--");
+      if (dot) lv_obj_set_style_bg_color(dot, lv_color_hex(COL_DIM), 0);
+      return;
     }
+    char b[16];
+    snprintf(b, sizeof(b), fmt, val);
+    lv_label_set_text(lbl, b);
+    if (dot) lv_obj_set_style_bg_color(dot, lv_color_hex(ok ? COL_PRIMARY : COL_AMBER), 0);
+    totalM++; if (ok) okCount++;
+  };
+  upd(idleTempLbl, idleTempDot, tempC, "%.1f\xC2\xB0", !isnan(tempC) && tempC >= 18.0f && tempC <= 30.0f);
+  upd(idleRhLbl,   idleRhDot,   rh,    "%.0f%%",       !isnan(rh)    && rh    >= 40.0f && rh    <= 75.0f);
+  upd(idleVpdLbl,  idleVpdDot,  vpd,   "%.2f",         !isnan(vpd)   && vpd   >= 0.8f  && vpd   <= 1.5f);
+
+  // Veredito em linguagem natural (inspirado no Modo Simples do app).
+  if (idleStatusLbl) {
+    uint32_t sc; const char *st;
+    if (totalM == 0)            { sc = COL_DIM;     st = "conectando..."; }
+    else if (okCount == totalM) { sc = COL_PRIMARY; st = "tudo certo"; }
+    else                        { sc = COL_AMBER;   st = "precisa de atencao"; }
+    lv_label_set_text(idleStatusLbl, st);
+    lv_obj_set_style_text_color(idleStatusLbl, lv_color_hex(sc), 0);
+    lv_obj_set_style_bg_color(idleStatusLbl, lv_color_hex(sc), 0);
+    lv_obj_align(idleStatusLbl, LV_ALIGN_CENTER, 0, sh(28));
   }
 }
 
