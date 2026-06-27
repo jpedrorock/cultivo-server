@@ -232,34 +232,25 @@ static lv_obj_t *btnModePpfd, *btnModeLux;
 // cor da metrica, mantendo o bottom near-black. Aplicar APOS makeCard.
 //   factor = 30..80 fica subtle (recomendado 50). 0=preto, 255=cor pura.
 static void tintCard(lv_obj_t *c, uint32_t color, uint8_t factor = 50) {
-  uint8_t r = ((color >> 16) & 0xFF) * factor / 255;
-  uint8_t g = ((color >> 8)  & 0xFF) * factor / 255;
-  uint8_t b = ( color        & 0xFF) * factor / 255;
-  uint32_t top = ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
-  lv_obj_set_style_bg_color(c, lv_color_hex(top), 0);
-  // bg_grad_color ja' eh 0x050811 do makeCard — mantemos o fade pra preto
+  // Flat (feedback Joao: "mais flat"): cards uniformes COL_CARD. A identidade
+  // de cor vem do icone/sparkline/badge, nao de um gradiente no card.
+  (void)color; (void)factor;
+  lv_obj_set_style_bg_color(c, lv_color_hex(COL_CARD), 0);
 }
 
 static lv_obj_t* makeCard(lv_obj_t *parent, int x, int y, int w, int h) {
   lv_obj_t *c = lv_obj_create(parent);
   lv_obj_set_size(c, w, h);
   lv_obj_set_pos(c, x, y);
-  lv_obj_set_style_bg_color(c, lv_color_hex(0x243142), 0);
-  lv_obj_set_style_bg_grad_color(c, lv_color_hex(0x050811), 0);
-  lv_obj_set_style_bg_grad_dir(c, LV_GRAD_DIR_VER, 0);
-  lv_obj_set_style_bg_main_stop(c, 0, 0);
-  lv_obj_set_style_bg_grad_stop(c, 230, 0);
+  // Flat (feedback Joao: "mais flat"): bg solido COL_CARD, SEM gradiente e SEM
+  // sombra pesada. Separacao do fundo vem da border finissima COL_BORDER.
+  lv_obj_set_style_bg_color(c, lv_color_hex(COL_CARD), 0);
   lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(c, lv_color_hex(COL_BORDER), 0);
   lv_obj_set_style_border_width(c, 1, 0);
   lv_obj_set_style_radius(c, 10, 0);
   lv_obj_set_style_pad_all(c, 6, 0);
-  lv_obj_set_style_shadow_color(c, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_shadow_width(c, 12, 0);
-  lv_obj_set_style_shadow_opa(c, LV_OPA_50, 0);
-  lv_obj_set_style_shadow_spread(c, 0, 0);
-  lv_obj_set_style_shadow_ofs_x(c, 0, 0);
-  lv_obj_set_style_shadow_ofs_y(c, 4, 0);
+  lv_obj_set_style_shadow_width(c, 0, 0);
   lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
   return c;
 }
@@ -668,7 +659,9 @@ static void buildHome(lv_obj_t *tab) {
   // Sem icone refresh — server ja' faz polling a cada 30s, refresh manual
   // ficou redundante. Tap no card UMID continua disponivel como atalho
   // discreto pra quem quiser forcar pull on-demand (mostra toast).
-  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_TITLE, LV_ALIGN_TOP_LEFT, sw(8), sh(10));
+  // Titulo em FONT_BODY (era FONT_TITLE 24px — grande demais p/ o header,
+  // feedback Joao "elementos grandes"; mais perto do mock aprovado).
+  lblTitle = makeLabel(tab, TENT_NAME, COL_TEXT, FONT_BODY, LV_ALIGN_TOP_LEFT, sw(8), sh(12));
   lblSub = nullptr;  // legacy — semana/fase agora no card CICLO
 
   lv_obj_t *wifiIcon = lv_image_create(tab);
@@ -770,7 +763,7 @@ static void buildHome(lv_obj_t *tab) {
   phaseAccent = lv_obj_create(tab);
   lv_obj_remove_style_all(phaseAccent);
   lv_obj_set_size(phaseAccent, SCREEN_W - sw(16), sh(3));
-  lv_obj_align(phaseAccent, LV_ALIGN_TOP_MID, 0, sh(38));
+  lv_obj_align(phaseAccent, LV_ALIGN_TOP_MID, 0, sh(43));
   lv_obj_set_style_radius(phaseAccent, sh(2), 0);
   lv_obj_set_style_bg_color(phaseAccent, lv_color_hex(phaseColor(FASE)), 0);
   lv_obj_set_style_bg_opa(phaseAccent, LV_OPA_COVER, 0);
@@ -780,11 +773,14 @@ static void buildHome(lv_obj_t *tab) {
   // Mini-cards UMID/VPD/PPFD ficam sempre visiveis a direita.
 
   // Corpo: arc grande a esquerda + mini-cards a direita.
-  int bodyY = sh(42);
+  // bodyY mais baixo (era sh42): da' respiro pro header+accent nao ficarem
+  // "colados" e encolhe um tico o arc/cards (feedback Joao: elementos grandes).
+  int bodyY = sh(52);
   int bodyH = TAB_H - bodyY - sh(4);
   int halfW = SCREEN_W / 2;
 
   int arcSize = (bodyH < halfW - sw(8)) ? bodyH : halfW - sw(8);
+  arcSize = arcSize * 88 / 100;  // ~12% menor: mais respiro em volta (feedback Joao)
   arcTemp = lv_arc_create(tab);
   lv_obj_set_size(arcTemp, arcSize, arcSize);
   lv_obj_set_pos(arcTemp, (halfW - arcSize) / 2, bodyY + (bodyH - arcSize) / 2);
