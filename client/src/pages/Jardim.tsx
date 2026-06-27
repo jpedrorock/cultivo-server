@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown, Flower2, ArrowRight } from "lucide-react";
+import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown, Flower2, ArrowRight, Bot } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { LivingPlant, type PlantStage, type PlantMood } from "@/components/LivingPlant";
 import { EmptyState } from "@/components/EmptyState";
@@ -136,6 +136,10 @@ export default function Jardim() {
   }, [data]);
 
   const mood = (data && "hasGarden" in data && data.hasGarden ? data.mood : "happy") as PlantMood;
+
+  // Viço: cai com o tempo sem registro (dia 0-1 = 1.0 → dia 4+ = 0, congelada/P&B).
+  const daysSinceLog = data && "hasGarden" in data && data.hasGarden ? data.daysSinceLog : 0;
+  const vitality = Math.max(0, Math.min(1, 1 - (daysSinceLog - 1) / 3));
 
   const petPlant = (idx: number) => {
     haptics.light().catch(() => {});
@@ -347,7 +351,7 @@ export default function Jardim() {
                                 ))}
                               </span>
                             )}
-                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} />
+                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} vitality={vitality} />
                           </button>
                           <p className="text-lg font-bold text-foreground mt-1">{p.name}</p>
                           <p className="text-xs text-muted-foreground">
@@ -366,6 +370,20 @@ export default function Jardim() {
                         </span>
                       );
                     })()}
+                    {/* Voz do Cultivisor — aparece quando ela começa a desbotar */}
+                    {daysSinceLog >= 2 && (
+                      <div className={cn(
+                        "mt-3 mx-auto max-w-[280px] flex items-center gap-2 rounded-xl border px-3 py-2 text-left",
+                        daysSinceLog >= 4 ? "border-amber-500/30 bg-amber-500/10" : "border-border/50 bg-muted/20",
+                      )}>
+                        <Bot className={cn("w-4 h-4 shrink-0", daysSinceLog >= 4 ? "text-amber-400" : "text-blue-400")} />
+                        <p className="text-xs text-muted-foreground leading-snug">
+                          {daysSinceLog >= 4
+                            ? `Faz ${daysSinceLog} dias… ela ficou em preto e branco aqui na minha memória. Me conta como ela está? 🌫️`
+                            : `Faz ${daysSinceLog} dias que você não registra — como ela tá?`}
+                        </p>
+                      </div>
+                    )}
                     {/* Bolinhas do carrossel */}
                     {slides.length > 1 && (
                       <div className="flex justify-center gap-1.5 mt-3">

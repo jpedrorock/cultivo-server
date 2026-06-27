@@ -46,6 +46,7 @@ export function LivingPlant({
   celebrating = false,
   animate = true,
   fromMood,
+  vitality = 1,
 }: {
   stage: PlantStage;
   mood: PlantMood;
@@ -55,15 +56,25 @@ export function LivingPlant({
   animate?: boolean;
   /** Humor anterior — se difere de `mood`, a planta "se levanta" animando do antigo pro novo. */
   fromMood?: PlantMood;
+  /** 0–1: viço. 1 = colorida/viva; cai com o tempo sem registro até 0 = preto-e-branco/congelada. */
+  vitality?: number;
 }) {
-  // Classe da animação: celebração > wiggle do toque > idle do humor.
+  // Sem registro há tempo → desbota (satura↓) e CONGELA (idle pausado).
+  const frozen = vitality < 0.15;
+
+  // Classe da animação: celebração > wiggle do toque > idle do humor (parado se congelada).
   const animClass = !animate
     ? ""
     : celebrating
       ? "plant-celebrate"
       : reacting
         ? "plant-reacting"
-        : IDLE_CLASS[mood];
+        : frozen
+          ? ""
+          : IDLE_CLASS[mood];
+
+  // Filtro de viço: satura conforme vitality; transição suave faz a cor "voltar" ao registrar.
+  const vitalityStyle = { filter: `saturate(${vitality})`, transition: "filter 1.2s ease" };
 
   // Tween de transição de humor: droop (folhas sobem) + cor (murcho → verde).
   const start = fromMood && fromMood !== mood ? fromMood : mood;
@@ -105,7 +116,7 @@ export function LivingPlant({
         width={size}
         height={size * 1.2}
         alt=""
-        style={{ objectFit: "contain" }}
+        style={{ objectFit: "contain", ...vitalityStyle }}
       />
     );
   }
@@ -128,7 +139,7 @@ export function LivingPlant({
   const showTrichomes = stage >= 5;
 
   return (
-    <svg viewBox="0 0 120 150" width={size} height={size * 1.25} xmlns="http://www.w3.org/2000/svg" role="img" aria-label={`planta estágio ${stage} ${mood}`} className={`plant-stage ${animClass}`}>
+    <svg viewBox="0 0 120 150" width={size} height={size * 1.25} xmlns="http://www.w3.org/2000/svg" role="img" aria-label={`planta estágio ${stage} ${mood}`} className={`plant-stage ${animClass}`} style={vitalityStyle}>
       <g stroke={color} strokeWidth="3" strokeLinecap="round" fill={color}>
         <line x1="60" y1="110" x2="60" y2={stemTopY} />
         {leaves.map((l, i) => (
