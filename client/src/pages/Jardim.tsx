@@ -338,22 +338,60 @@ export default function Jardim() {
               </p>
             </div>
 
-            {/* Jornada de crescimento */}
+            {/* Jornada — corrida pelos estágios */}
             <div className="rounded-2xl border border-border/50 bg-card p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Jornada</p>
-              <div className="flex items-center justify-between">
-                {STAGES.map((name, i) => {
-                  const stageNum = i + 1;
-                  const done = stageNum < data.stage;
-                  const current = stageNum === data.stage;
-                  return (
-                    <div key={name} className="flex flex-col items-center gap-1 flex-1">
-                      <div className={cn("w-2.5 h-2.5 rounded-full", current ? "bg-primary ring-2 ring-primary/30" : done ? "bg-primary/60" : "bg-muted")} />
-                      <span className={cn("text-[8.5px] text-center leading-tight", current ? "text-primary font-medium" : "text-muted-foreground")}>{name}</span>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Jornada</p>
+                <span className="text-[11px] font-semibold text-primary">{data.stage}/{STAGES.length} · {data.stageName}</span>
               </div>
+              {(() => {
+                const pct = ((data.stage - 1) / (STAGES.length - 1)) * 100;
+                return (
+                  <>
+                    {/* pista */}
+                    <div className="relative h-2 rounded-full bg-muted mt-8 mb-2.5">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary/70 to-primary transition-[width] duration-700 ease-out"
+                        style={{ width: `${pct}%` }}
+                      />
+                      {/* marcadores de cada estágio */}
+                      {STAGES.map((_, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full",
+                            i + 1 <= data.stage ? "bg-background/70" : "bg-foreground/20",
+                          )}
+                          style={{ left: `${(i / (STAGES.length - 1)) * 100}%` }}
+                        />
+                      ))}
+                      {/* corredor — a plantinha avançando */}
+                      <div
+                        className="absolute -top-[26px] -translate-x-1/2 transition-[left] duration-700 ease-out text-lg leading-none"
+                        style={{ left: `${pct}%` }}
+                      >
+                        🌱
+                      </div>
+                      {/* linha de chegada */}
+                      <span className="absolute -top-1 right-0 translate-x-1/2 text-sm leading-none">🏁</span>
+                    </div>
+                    {/* rótulos */}
+                    <div className="flex">
+                      {STAGES.map((name, i) => (
+                        <span
+                          key={name}
+                          className={cn(
+                            "flex-1 text-[8.5px] text-center leading-tight",
+                            i + 1 === data.stage ? "text-primary font-semibold" : "text-muted-foreground",
+                          )}
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}
