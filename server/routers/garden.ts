@@ -63,6 +63,19 @@ export const gardenRouter = router({
 
     const mood = computePlantMood({ registeredToday, envOk, daysSinceLog });
 
+    // "Pronto pro flip?" — veg chegou no fim da duração da strain (hora de 12/12).
+    let readyToFlip = false;
+    let flipDueTs: number | null = null;
+    if (cycle && !floraStarted && !cycle.preFloraStartDate) {
+      const [st] = (await database
+        .select({ vegaWeeks: strains.vegaWeeks })
+        .from(strains)
+        .where(eq(strains.id, cycle.strainId!))) as Array<{ vegaWeeks: number }>;
+      const vegaWeeks = st?.vegaWeeks ?? 4;
+      flipDueTs = new Date(cycle.startDate).getTime() + vegaWeeks * 7 * 86400000;
+      readyToFlip = now >= flipDueTs;
+    }
+
     // Plantas da estufa (carrossel do Jardim). Compartilham o ciclo → mesmo
     // estágio; o que muda é nome/strain.
     const plantRows = await database
@@ -75,6 +88,9 @@ export const gardenRouter = router({
       hasGarden: true as const,
       tentId: tent.id,
       tentName: tent.name,
+      cycleId: cycle?.id ?? null,
+      readyToFlip,
+      flipDueTs,
       stage,
       stageName: STAGE_NAME[stage],
       mood,

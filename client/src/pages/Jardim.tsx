@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown } from "lucide-react";
+import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown, Flower2, ArrowRight } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { LivingPlant, type PlantStage, type PlantMood } from "@/components/LivingPlant";
 import { EmptyState } from "@/components/EmptyState";
+import { StartFloraModal } from "@/components/StartFloraModal";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { haptics } from "@/lib/haptics";
+import { scheduleLocalNotification, cancelLocalNotifications } from "@/lib/localNotifications";
 import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
 import { readLastStage, writeLastStage } from "@/lib/gardenStage";
 import { readLastMood, writeLastMood } from "@/lib/gardenMood";
@@ -156,6 +158,27 @@ export default function Jardim() {
     timers.current.push(setTimeout(() => navigate(href), 600));
   };
 
+  // Passagem veg→flora: modal de floração + push "tá na hora do flip".
+  const [floraModalOpen, setFloraModalOpen] = useState(false);
+  const hasG = data && "hasGarden" in data && data.hasGarden;
+  const flipDueTs = hasG ? data.flipDueTs : null;
+  const flipTentId = hasG ? data.tentId : null;
+  useEffect(() => {
+    if (!flipTentId || !flipDueTs) return;
+    const id = 810000 + flipTentId; // estável por estufa → reagenda sem duplicar
+    if (flipDueTs > Date.now()) {
+      scheduleLocalNotification({
+        id,
+        title: "Hora do flip? 🌸",
+        body: "Tua planta tá pronta pra floração — mude o fotoperíodo pra 12/12.",
+        at: new Date(flipDueTs),
+        extra: { type: "flip", tentId: flipTentId },
+      }).catch(() => {});
+    } else {
+      cancelLocalNotifications([id]).catch(() => {});
+    }
+  }, [flipDueTs, flipTentId]);
+
   return (
     <PageLayout
       header={
@@ -185,6 +208,24 @@ export default function Jardim() {
           />
         ) : (
           <div className="space-y-4">
+            {/* Passagem: hora do flip pra floração */}
+            {data.readyToFlip && data.cycleId && (
+              <button
+                type="button"
+                onClick={() => setFloraModalOpen(true)}
+                className="w-full text-left rounded-2xl border-2 border-fuchsia-500/40 bg-fuchsia-500/10 p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
+              >
+                <div className="w-10 h-10 rounded-xl bg-fuchsia-500/20 flex items-center justify-center shrink-0">
+                  <Flower2 className="w-5 h-5 text-fuchsia-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-foreground">Hora do flip pra floração? 🌸</p>
+                  <p className="text-xs text-muted-foreground">Tua planta está pronta — fotoperíodo vai pra 12/12</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-fuchsia-400 shrink-0" />
+              </button>
+            )}
+
             {/* Planta viva */}
             <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 text-center">
               {/* Cenário vivo — pólen/luz flutuando ao fundo */}
@@ -418,6 +459,18 @@ export default function Jardim() {
                 );
               })()}
             </div>
+
+            {data.cycleId && (
+              <StartFloraModal
+                open={floraModalOpen}
+                onClose={() => {
+                  setFloraModalOpen(false);
+                  refetch();
+                }}
+                cycleId={data.cycleId}
+                cycleName={data.tentName}
+              />
+            )}
           </div>
         )}
       </main>
