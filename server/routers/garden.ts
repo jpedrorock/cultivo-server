@@ -7,7 +7,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, getIdealValuesByTent } from "../db";
 import { tents, cycles, dailyLogs, plants, strains } from "../../drizzle/schema";
-import { computePlantStage, computePlantMood, STAGE_NAME, MOOD_LABEL } from "../lib/plantGame";
+import { computePlantStage, computePlantMood, computeReadyToFlip, STAGE_NAME, MOOD_LABEL } from "../lib/plantGame";
 
 export const gardenRouter = router({
   getState: protectedProcedure.query(async ({ ctx }) => {
@@ -64,6 +64,7 @@ export const gardenRouter = router({
     const mood = computePlantMood({ registeredToday, envOk, daysSinceLog });
 
     // "Pronto pro flip?" — veg chegou no fim da duração da strain (hora de 12/12).
+    // Lógica pura em computeReadyToFlip; aqui só busca vegaWeeks quando faz sentido.
     let readyToFlip = false;
     let flipDueTs: number | null = null;
     if (cycle && !floraStarted && !cycle.preFloraStartDate) {
@@ -71,9 +72,14 @@ export const gardenRouter = router({
         .select({ vegaWeeks: strains.vegaWeeks })
         .from(strains)
         .where(eq(strains.id, cycle.strainId!))) as Array<{ vegaWeeks: number }>;
-      const vegaWeeks = st?.vegaWeeks ?? 4;
-      flipDueTs = new Date(cycle.startDate).getTime() + vegaWeeks * 7 * 86400000;
-      readyToFlip = now >= flipDueTs;
+      ({ readyToFlip, flipDueTs } = computeReadyToFlip({
+        hasCycle: true,
+        floraStarted: false,
+        preFloraStarted: false,
+        startDateMs: new Date(cycle.startDate).getTime(),
+        vegaWeeks: st?.vegaWeeks ?? 4,
+        now,
+      }));
     }
 
     // Plantas da estufa (carrossel do Jardim). Compartilham o ciclo → mesmo

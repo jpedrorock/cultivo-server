@@ -54,3 +54,27 @@ export function computePlantMood(input: {
   if (input.registeredToday && input.envOk) return "happy";
   return "thirsty";
 }
+
+const WEEK_MS = 7 * 86400000;
+
+/**
+ * "Pronto pro flip pra floração?" — a veg chegou no fim da duração da strain
+ * (`vegaWeeks`), então é hora de mudar o fotoperíodo pra 12/12. Puro/testável.
+ *
+ * Só vale com ciclo ativo em vegetativo (sem flora nem pré-flora iniciadas).
+ * `flipDueTs` = início do ciclo + vegaWeeks; `readyToFlip` = já passou.
+ */
+export function computeReadyToFlip(input: {
+  hasCycle: boolean;
+  floraStarted: boolean;
+  preFloraStarted: boolean;
+  startDateMs: number;
+  vegaWeeks: number;
+  now: number;
+}): { readyToFlip: boolean; flipDueTs: number | null } {
+  if (!input.hasCycle || input.floraStarted || input.preFloraStarted) {
+    return { readyToFlip: false, flipDueTs: null };
+  }
+  const flipDueTs = input.startDateMs + input.vegaWeeks * WEEK_MS;
+  return { readyToFlip: input.now >= flipDueTs, flipDueTs };
+}
