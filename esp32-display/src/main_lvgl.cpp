@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.21"
+#define FW_VERSION "0.5.22"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"

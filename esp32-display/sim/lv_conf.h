@@ -55,6 +55,11 @@
 #define LV_USE_OS LV_OS_NONE
 
 /*====================
+ * Snapshot (captura 1:1 pro preview no chat — modo --shot do sim_main)
+ *====================*/
+#define LV_USE_SNAPSHOT 1
+
+/*====================
  * Widgets
  *====================*/
 /* Todos ativos por default no 9.2 — deixamos como vem */

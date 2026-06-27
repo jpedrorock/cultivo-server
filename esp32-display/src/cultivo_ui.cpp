@@ -517,7 +517,13 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
 
 extern "C" void cultivoUI_hideIdleOverlay(void) {
   if (!idleOverlay) return;
-  lv_obj_del(idleOverlay);
+  // IMPORTANTE: hideIdleOverlay roda dentro do screenWake() <- touchpad_read
+  // (indev read callback). Deletar essa arvore grande (~20 objs + anims) ali,
+  // sincronamente, corrompe o estado do indev / estoura a stack de 16KB do loop
+  // no ESP -> device travava no screensaver (nao saia no toque). delete_async
+  // adia a remocao pro proximo lv_timer_handler, fora do callback. Zeramos os
+  // ponteiros JA pra ninguem referenciar os objetos enquanto a remocao nao roda.
+  lv_obj_delete_async(idleOverlay);
   idleOverlay = idleClockLbl = idleDateLbl = idlePhaseLbl = idleStatusLbl =
     idleTempLbl = idleRhLbl = idleVpdLbl = idleTempDot = idleRhDot = idleVpdDot =
     idleAlertIco = nullptr;
