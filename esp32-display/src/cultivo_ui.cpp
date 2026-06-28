@@ -393,9 +393,7 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_set_style_bg_opa(idleOverlay, LV_OPA_COVER, 0);
   lv_obj_clear_flag(idleOverlay, LV_OBJ_FLAG_SCROLLABLE);
 
-  uint32_t pc = phaseColor(FASE);
-
-  // ── Topo-esq: dot "ao vivo" pulsante + nome da estufa ──────────────────
+  // ── Topo-esq: dot "ao vivo" (estatico) + nome da estufa ────────────────
   lv_obj_t *liveDot = lv_obj_create(idleOverlay);
   lv_obj_remove_style_all(liveDot);
   lv_obj_set_size(liveDot, sw(8), sw(8));
@@ -403,9 +401,8 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_set_style_radius(liveDot, LV_RADIUS_CIRCLE, 0);
   lv_obj_set_style_bg_color(liveDot, lv_color_hex(COL_PRIMARY), 0);
   lv_obj_set_style_bg_opa(liveDot, LV_OPA_COVER, 0);
-  lv_obj_set_style_shadow_color(liveDot, lv_color_hex(COL_PRIMARY), 0);
-  lv_obj_set_style_shadow_width(liveDot, sw(6), 0);
-  startBreathe(liveDot, LV_OPA_0, LV_OPA_70, 1600);
+  // Sem shadow/breathe — screensaver flat e a prova de travamento: a criacao
+  // pesada (sombras + anims) congelava showIdleOverlay em devices c/ pouco heap.
 
   lv_obj_t *tentLbl = lv_label_create(idleOverlay);
   lv_label_set_text(tentLbl, TENT_NAME[0] ? TENT_NAME : "Estufa");
@@ -432,10 +429,7 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_obj_set_style_image_recolor(idleAlertIco, lv_color_hex(COL_RED), 0);
   lv_obj_set_style_image_recolor_opa(idleAlertIco, LV_OPA_COVER, 0);
   lv_obj_set_style_transform_zoom(idleAlertIco, 192, 0);   // ~75% (32->24px)
-  lv_obj_set_style_shadow_color(idleAlertIco, lv_color_hex(COL_RED), 0);
-  lv_obj_set_style_shadow_width(idleAlertIco, sw(14), 0);
   lv_obj_align(idleAlertIco, LV_ALIGN_TOP_MID, 0, sh(9));
-  startBreathe(idleAlertIco, LV_OPA_0, LV_OPA_90, 900);
   lv_obj_add_flag(idleAlertIco, LV_OBJ_FLAG_HIDDEN);
 
   // ── Centro: relogio com glow na cor da fase + data ─────────────────────
@@ -443,11 +437,8 @@ extern "C" void cultivoUI_showIdleOverlay(void) {
   lv_label_set_text(idleClockLbl, "--:--");
   lv_obj_set_style_text_color(idleClockLbl, lv_color_hex(COL_TEXT), 0);
   lv_obj_set_style_text_font(idleClockLbl, FONT_VALUE, 0);
-  // Glow: sombra colorida na cor da fase (lado luminoso do site). Barato — so'
-  // a bbox do label, nao por glifo; da o halo atras da hora. Cor no tick.
-  lv_obj_set_style_shadow_color(idleClockLbl, lv_color_hex(pc), 0);
-  lv_obj_set_style_shadow_width(idleClockLbl, sw(30), 0);
-  lv_obj_set_style_shadow_opa(idleClockLbl, LV_OPA_40, 0);
+  // Sem glow/shadow: a sombra de 30px no relogio grande era a alocacao + render
+  // mais pesados da tela e travavam showIdleOverlay em devices com pouco heap.
   lv_obj_align(idleClockLbl, LV_ALIGN_CENTER, 0, -sh(34));
 
   idleDateLbl = lv_label_create(idleOverlay);
@@ -644,7 +635,6 @@ extern "C" void cultivoUI_tickIdleOverlay(void) {
 
   // Glow do relogio + pilula da fase seguem a cor da fase atual.
   uint32_t pc = phaseColor(FASE);
-  lv_obj_set_style_shadow_color(idleClockLbl, lv_color_hex(pc), 0);
   if (idlePhaseLbl) {
     if (FASE[0]) {
       if (semana > 0 && totalSem > 0)
