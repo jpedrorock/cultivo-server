@@ -6,7 +6,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, getIdealValuesByTent } from "../db";
-import { tents, cycles, dailyLogs, plants, strains, plantHealthLogs } from "../../drizzle/schema";
+import { tents, cycles, dailyLogs, plants, strains, plantHealthLogs, plantStructures } from "../../drizzle/schema";
 import { computePlantStage, computePlantMood, computeReadyToFlip, STAGE_NAME, MOOD_LABEL } from "../lib/plantGame";
 
 export const gardenRouter = router({
@@ -117,6 +117,24 @@ export const gardenRouter = router({
       }
     }
 
+    // Forma do treino → nº de colas (topping/FIM criam tops ativos). 1 = natural.
+    const topsByPlant: Record<number, number> = {};
+    if (plantIds.length) {
+      const structRows = (await database
+        .select({ plantId: plantStructures.plantId, nodesJson: plantStructures.nodesJson })
+        .from(plantStructures)
+        .where(inArray(plantStructures.plantId, plantIds))) as Array<{ plantId: number; nodesJson: string }>;
+      for (const s of structRows) {
+        try {
+          const nodes = JSON.parse(s.nodesJson) as Array<{ type?: string; state?: string }>;
+          const tops = nodes.filter((n) => n.type === "top" && n.state === "active").length;
+          topsByPlant[s.plantId] = Math.max(1, Math.min(8, tops));
+        } catch {
+          /* json inválido → ignora (cai no default 1) */
+        }
+      }
+    }
+
     return {
       hasGarden: true as const,
       tentId: tent.id,
@@ -132,7 +150,7 @@ export const gardenRouter = router({
       registeredToday,
       daysSinceLog,
       env: { state: envState, tempC: lastTempC, rhPct: lastRhPct },
-      plants: plantRows.map((p) => ({ id: p.id, name: p.name, strain: p.strain ?? null, health: healthByPlant[p.id] ?? null })),
+      plants: plantRows.map((p) => ({ id: p.id, name: p.name, strain: p.strain ?? null, health: healthByPlant[p.id] ?? null, topCount: topsByPlant[p.id] ?? 1 })),
       plantCount: plantRows.length,
     };
   }),

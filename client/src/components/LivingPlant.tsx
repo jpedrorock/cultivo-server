@@ -58,6 +58,7 @@ export function LivingPlant({
   vitality = 1,
   health,
   env = "unknown",
+  topCount = 1,
 }: {
   stage: PlantStage;
   mood: PlantMood;
@@ -73,6 +74,8 @@ export function LivingPlant({
   health?: PlantHealth | null;
   /** Ambiente da estufa — postura: hot = murcha/caída, cold = encolhida/curvada, ok = ereta. */
   env?: PlantEnv;
+  /** Nº de colas (treino: topping/FIM). 1 = natural; >1 = leque de colas. */
+  topCount?: number;
 }) {
   // Sem registro há tempo → desbota (satura↓) e CONGELA (idle pausado).
   const frozen = vitality < 0.15;
@@ -149,7 +152,15 @@ export function LivingPlant({
     leaves.push({ cx: 42, cy: y, rot: -30 + droop, rx });
     leaves.push({ cx: 78, cy: y, rot: 30 - droop, rx });
   }
-  leaves.push({ cx: 60, cy: stemTopY, rot: 0, rx: 8 });
+
+  // Coroa de colas (treino): 1 = topo central; >1 = leque (topping/FIM = mais colas).
+  const colas = Math.max(1, Math.min(8, topCount));
+  const crownTops = colas <= 1
+    ? [{ x: 60, y: stemTopY }]
+    : Array.from({ length: colas }, (_, i) => {
+        const spread = Math.min(46, 16 + colas * 6);
+        return { x: 60 - spread / 2 + (spread * i) / (colas - 1), y: stemTopY - 3 };
+      });
 
   // Saúde: as folhas mais baixas (velhas) amarelam/mancham primeiro.
   const severity = health ? HEALTH_SEVERITY[health] : 0;
@@ -177,6 +188,13 @@ export function LivingPlant({
             fill={sickSet.has(i) ? sickColor : undefined}
             stroke={sickSet.has(i) ? sickColor : undefined}
           />
+        ))}
+        {/* Coroa de colas — reflete o treino (topping/FIM = mais colas) */}
+        {crownTops.map((t, i) => (
+          <g key={`cola${i}`}>
+            {colas > 1 && <line x1="60" y1={stemTopY + 3} x2={t.x} y2={t.y} />}
+            <ellipse cx={t.x} cy={t.y - 4} rx="7" ry="4.5" transform={`rotate(${(t.x - 60) * 1.4} ${t.x} ${t.y - 4})`} />
+          </g>
         ))}
       </g>
       {/* Manchas de saúde (estresse/doente) nas folhas amareladas */}
