@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.25"
+#define FW_VERSION "0.5.26"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -57,6 +57,12 @@ static NetConfig netCfg = {
 // Sleep timeout do display em ms — configuravel via cfg modal. Salvo em NVS
 // como "sleepSec" (segundos pra storage humano-legivel). 0 = never sleep.
 static uint32_t screenSleepMs = 30000;  // default 30s
+
+// Watchdog de heartbeat (ver watchdogTaskFn): loop() incrementa g_loopBeat;
+// uma task no core 0 reinicia o device se a UI (core 1) parar de bater. g_wdtPause
+// suspende o check durante flash (ArduinoOTA/portal) pra nao rebootar no meio.
+volatile uint32_t g_loopBeat = 0;
+volatile bool     g_wdtPause = false;
 
 // Buzzer (piezo passivo opcional no GPIO BUZZER_PIN). Default OFF — user
 // habilita via cfg modal Display. Sem hardware solderdo, no-op silencioso.
@@ -1663,11 +1669,13 @@ static void handlePortalUpdateDone() {
 static void handlePortalUpdateUpload() {
   HTTPUpload &up = apServer->upload();
   if (up.status == UPLOAD_FILE_START) {
+    g_wdtPause = true;  // pausa o watchdog durante o flash do portal
     Serial.printf("[ap] update upload: %s\n", up.filename.c_str());
     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) Update.printError(Serial);
   } else if (up.status == UPLOAD_FILE_WRITE) {
     if (Update.write(up.buf, up.currentSize) != up.currentSize) Update.printError(Serial);
   } else if (up.status == UPLOAD_FILE_END) {
+    g_wdtPause = false;
     if (Update.end(true)) Serial.printf("[ap] update %u bytes ok\n", up.totalSize);
     else Update.printError(Serial);
   }
@@ -3520,6 +3528,31 @@ static void sseTaskFn(void *param) {
   }
 }
 
+// Watchdog de heartbeat — roda no core 0 (sobrevive a um hang da UI no core 1).
+// loop() incrementa g_loopBeat; se parar de bater por >20s a UI travou (render/
+// LVGL/deadlock) e o device se reinicia sozinho em vez de ficar congelado pra
+// sempre. Foi o caso do screensaver: travava DENTRO da task da UI, antes do meu
+// check de heap (que roda na mesma task) -> so' um watchdog externo recupera.
+static void watchdogTaskFn(void *param) {
+  (void)param;
+  while (g_loopBeat == 0) vTaskDelay(pdMS_TO_TICKS(500));  // arma so' apos a loop comecar
+  uint32_t last = g_loopBeat;
+  uint32_t stalledMs = 0;
+  for (;;) {
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    if (g_wdtPause)            { last = g_loopBeat; stalledMs = 0; continue; }  // flash em curso
+    if (g_loopBeat != last)    { last = g_loopBeat; stalledMs = 0; continue; }  // bateu, ok
+    stalledMs += 2000;
+    if (stalledMs >= 20000) {
+      Serial.printf("[wdt] UI travada %ums (heap=%u) -> reboot de seguranca\n",
+                    (unsigned)stalledMs, (unsigned)ESP.getFreeHeap());
+      Serial.flush();
+      delay(50);
+      ESP.restart();
+    }
+  }
+}
+
 static void startNetTask() {
   if (netTaskHandle) return;
   // Stack 8KB: cobre TLS handshake (~4KB) + JSON parsing (~2KB) com folga
@@ -3535,7 +3568,10 @@ static void startNetTask() {
   // WiFiClientSecure alive + readStringUntil buffers). Core 0 separado
   // do LVGL pra TLS handshake nao travar UI.
   xTaskCreatePinnedToCore(sseTaskFn, "sseTask", 12288, NULL, 1, &sseTaskHandle, 0);
-  Serial.println("[net] netTask + tapTask + sseTask iniciadas no core 0");
+  // wdtTask: watchdog de heartbeat (prioridade 2 > demais, pra sempre rodar).
+  // Reinicia o device se a UI (loop, core 1) travar >20s — recovery do hang.
+  xTaskCreatePinnedToCore(watchdogTaskFn, "wdtTask", 3072, NULL, 2, NULL, 0);
+  Serial.println("[net] netTask + tapTask + sseTask + wdtTask iniciadas no core 0");
 }
 
 // ════════════════════════════════════════════════════════════════════════════════
@@ -3553,9 +3589,9 @@ static void startOTA() {
 
   ArduinoOTA.setHostname(hostname);
   ArduinoOTA.setPassword(otaPass);
-  ArduinoOTA.onStart([]() { Serial.println("[ota] iniciando update"); });
+  ArduinoOTA.onStart([]() { g_wdtPause = true; Serial.println("[ota] iniciando update"); });
   ArduinoOTA.onEnd([]()   { Serial.println("[ota] concluido, rebootando"); });
-  ArduinoOTA.onError([](ota_error_t err) { Serial.printf("[ota] erro %u\n", err); });
+  ArduinoOTA.onError([](ota_error_t err) { g_wdtPause = false; Serial.printf("[ota] erro %u\n", err); });
   ArduinoOTA.begin();
   Serial.printf("[ota] host=%s.local pass=%s\n", hostname, otaPass);
 }
@@ -4165,6 +4201,7 @@ void setup() {
 }
 
 void loop() {
+  g_loopBeat++;  // heartbeat pro watchdog (core 0) — prova que a UI nao travou
   // Modo AP portal: so' processa requests HTTP + UI (overlay "MODO SETUP")
   if (apPortalActive) {
     if (apServer) apServer->handleClient();
