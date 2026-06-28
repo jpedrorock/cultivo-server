@@ -27,6 +27,21 @@ function rgbStr(c: Rgb): string {
   return `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
 }
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+// Assinatura visual por strain (determinística do nome) → cada cepa tem folha/cor própria.
+function strainHash(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h;
+}
+function strainTraits(key: string | null | undefined): { leafMul: number; hueShift: number } {
+  if (!key) return { leafMul: 1, hueShift: 0 };
+  const h = strainHash(key);
+  return {
+    leafMul: 0.82 + ((h % 100) / 100) * 0.4, // 0.82–1.22 (folha fina ↔ larga)
+    hueShift: (((h >>> 8) % 37) - 18),        // -18°..+18° (verde mais lima ↔ mais azulado)
+  };
+}
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -59,6 +74,7 @@ export function LivingPlant({
   health,
   env = "unknown",
   topCount = 1,
+  strainKey,
 }: {
   stage: PlantStage;
   mood: PlantMood;
@@ -76,7 +92,10 @@ export function LivingPlant({
   env?: PlantEnv;
   /** Nº de colas (treino: topping/FIM). 1 = natural; >1 = leque de colas. */
   topCount?: number;
+  /** Nome da strain — dá folha/cor próprias (assinatura visual determinística). */
+  strainKey?: string | null;
 }) {
+  const { leafMul, hueShift } = strainTraits(strainKey);
   // Sem registro há tempo → desbota (satura↓) e CONGELA (idle pausado).
   const frozen = vitality < 0.15;
 
@@ -91,8 +110,8 @@ export function LivingPlant({
           ? ""
           : IDLE_CLASS[mood];
 
-  // Filtro de viço: satura conforme vitality; transição suave faz a cor "voltar" ao registrar.
-  const vitalityStyle = { filter: `saturate(${vitality})`, transition: "filter 1.2s ease" };
+  // Filtro: viço (satura) + tom da strain (hue-rotate). Transição suave faz a cor "voltar".
+  const vitalityStyle = { filter: `saturate(${vitality}) hue-rotate(${hueShift}deg)`, transition: "filter 1.2s ease" };
 
   // Tween de transição de humor: droop (folhas sobem) + cor (murcho → verde).
   const start = fromMood && fromMood !== mood ? fromMood : mood;
@@ -148,7 +167,7 @@ export function LivingPlant({
   const leaves: { cx: number; cy: number; rot: number; rx: number }[] = [];
   for (let i = 0; i < pairs; i++) {
     const y = stemTopY + 10 + i * 16;
-    const rx = 16 - i * 1.5;
+    const rx = (16 - i * 1.5) * leafMul; // largura da folha = traço da strain
     leaves.push({ cx: 42, cy: y, rot: -30 + droop, rx });
     leaves.push({ cx: 78, cy: y, rot: 30 - droop, rx });
   }

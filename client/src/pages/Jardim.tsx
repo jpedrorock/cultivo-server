@@ -351,7 +351,7 @@ export default function Jardim() {
                                 ))}
                               </span>
                             )}
-                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} vitality={vitality} health={p.health} env={data.env.state as PlantEnv} topCount={p.topCount} />
+                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} vitality={vitality} health={p.health} env={data.env.state as PlantEnv} topCount={p.topCount} strainKey={p.strain} />
                           </button>
                           <p className="text-lg font-bold text-foreground mt-1">{p.name}</p>
                           <p className="text-xs text-muted-foreground">
