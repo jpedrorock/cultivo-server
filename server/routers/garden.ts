@@ -6,7 +6,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, getIdealValuesByTent } from "../db";
-import { tents, cycles, dailyLogs, plants, strains } from "../../drizzle/schema";
+import { tents, cycles, dailyLogs, plants, strains, plantHealthLogs } from "../../drizzle/schema";
 import { computePlantStage, computePlantMood, computeReadyToFlip, STAGE_NAME, MOOD_LABEL } from "../lib/plantGame";
 
 export const gardenRouter = router({
@@ -90,6 +90,20 @@ export const gardenRouter = router({
       .leftJoin(strains, eq(plants.strainId, strains.id))
       .where(and(eq(plants.currentTentId, tent.id), eq(plants.status, "ACTIVE")));
 
+    // Saúde mais recente por planta (espelho: SICK → folha amarela etc).
+    const plantIds = plantRows.map((p) => p.id);
+    const healthByPlant: Record<number, "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING"> = {};
+    if (plantIds.length) {
+      const healthRows = (await database
+        .select({ plantId: plantHealthLogs.plantId, healthStatus: plantHealthLogs.healthStatus })
+        .from(plantHealthLogs)
+        .where(inArray(plantHealthLogs.plantId, plantIds))
+        .orderBy(desc(plantHealthLogs.logDate))) as Array<{ plantId: number; healthStatus: "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING" }>;
+      for (const r of healthRows) {
+        if (!(r.plantId in healthByPlant)) healthByPlant[r.plantId] = r.healthStatus; // 1º = mais recente
+      }
+    }
+
     return {
       hasGarden: true as const,
       tentId: tent.id,
@@ -104,7 +118,7 @@ export const gardenRouter = router({
       weekNum: hasCycle ? Math.max(1, (floraStarted ? weeksSinceFlora : weeksSinceStart) + 1) : 0,
       registeredToday,
       daysSinceLog,
-      plants: plantRows.map((p) => ({ id: p.id, name: p.name, strain: p.strain ?? null })),
+      plants: plantRows.map((p) => ({ id: p.id, name: p.name, strain: p.strain ?? null, health: healthByPlant[p.id] ?? null })),
       plantCount: plantRows.length,
     };
   }),

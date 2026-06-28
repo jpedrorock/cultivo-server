@@ -8,6 +8,11 @@ import { useEffect, useRef, useState } from "react";
 
 export type PlantStage = 1 | 2 | 3 | 4 | 5 | 6;
 export type PlantMood = "happy" | "thirsty" | "sad";
+export type PlantHealth = "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING";
+
+// Severidade visual da saúde: nº de folhas que adoecem (de baixo pra cima) + cor.
+const HEALTH_SEVERITY: Record<PlantHealth, number> = { HEALTHY: 0, RECOVERING: 1, STRESSED: 2, SICK: 3 };
+const SICK_COLOR = ["#d9c84e", "#c2a23a", "#9a7b2e"]; // amarelo → marrom (mais doente = mais escuro)
 
 type Rgb = [number, number, number];
 function hexToRgb(h: string): Rgb {
@@ -47,6 +52,7 @@ export function LivingPlant({
   animate = true,
   fromMood,
   vitality = 1,
+  health,
 }: {
   stage: PlantStage;
   mood: PlantMood;
@@ -58,6 +64,8 @@ export function LivingPlant({
   fromMood?: PlantMood;
   /** 0–1: viço. 1 = colorida/viva; cai com o tempo sem registro até 0 = preto-e-branco/congelada. */
   vitality?: number;
+  /** Saúde registrada — SICK/STRESSED amarelam/mancham folhas; HEALTHY/null = normal. */
+  health?: PlantHealth | null;
 }) {
   // Sem registro há tempo → desbota (satura↓) e CONGELA (idle pausado).
   const frozen = vitality < 0.15;
@@ -135,6 +143,14 @@ export function LivingPlant({
   }
   leaves.push({ cx: 60, cy: stemTopY, rot: 0, rx: 8 });
 
+  // Saúde: as folhas mais baixas (velhas) amarelam/mancham primeiro.
+  const severity = health ? HEALTH_SEVERITY[health] : 0;
+  const sickIdx = severity > 0
+    ? leaves.map((l, i) => ({ i, cy: l.cy })).sort((a, b) => b.cy - a.cy).slice(0, severity).map((o) => o.i)
+    : [];
+  const sickSet = new Set(sickIdx);
+  const sickColor = SICK_COLOR[Math.min(severity, SICK_COLOR.length) - 1] ?? SICK_COLOR[0];
+
   const showPistils = stage >= 4;
   const showTrichomes = stage >= 5;
 
@@ -143,9 +159,23 @@ export function LivingPlant({
       <g stroke={color} strokeWidth="3" strokeLinecap="round" fill={color}>
         <line x1="60" y1="110" x2="60" y2={stemTopY} />
         {leaves.map((l, i) => (
-          <ellipse key={i} cx={l.cx} cy={l.cy} rx={l.rx} ry="5" transform={`rotate(${l.rot} ${l.cx} ${l.cy})`} />
+          <ellipse
+            key={i}
+            cx={l.cx}
+            cy={l.cy}
+            rx={l.rx}
+            ry="5"
+            transform={`rotate(${l.rot} ${l.cx} ${l.cy})`}
+            fill={sickSet.has(i) ? sickColor : undefined}
+            stroke={sickSet.has(i) ? sickColor : undefined}
+          />
         ))}
       </g>
+      {/* Manchas de saúde (estresse/doente) nas folhas amareladas */}
+      {severity >= 2 &&
+        sickIdx.map((i) => (
+          <circle key={`spot${i}`} cx={leaves[i].cx - 2} cy={leaves[i].cy + 1.5} r="1.5" fill="#5e4420" />
+        ))}
       {/* Pistilos (floração) */}
       {showPistils &&
         leaves.slice(0, 3).map((l, i) => (

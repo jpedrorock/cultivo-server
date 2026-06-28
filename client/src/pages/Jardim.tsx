@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown, Flower2, ArrowRight, Bot } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
-import { LivingPlant, type PlantStage, type PlantMood } from "@/components/LivingPlant";
+import { LivingPlant, type PlantStage, type PlantMood, type PlantHealth } from "@/components/LivingPlant";
 import { EmptyState } from "@/components/EmptyState";
 import { StartFloraModal } from "@/components/StartFloraModal";
 import { trpc } from "@/lib/trpc";
@@ -317,7 +317,7 @@ export default function Jardim() {
               )}
               {/* Carrossel das plantas (≤3). Compartilham ciclo → mesmo estágio; muda nome/strain. */}
               {(() => {
-                const slides = data.plants.length > 0 ? data.plants : [{ id: 0, name: data.tentName, strain: null as string | null }];
+                const slides = data.plants.length > 0 ? data.plants : [{ id: 0, name: data.tentName, strain: null as string | null, health: null as PlantHealth | null }];
                 return (
                   <>
                     <div ref={scrollRef} onScroll={onScroll} className="no-scrollbar relative z-10 flex snap-x snap-mandatory overflow-x-auto">
@@ -351,7 +351,7 @@ export default function Jardim() {
                                 ))}
                               </span>
                             )}
-                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} vitality={vitality} />
+                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} vitality={vitality} health={p.health} />
                           </button>
                           <p className="text-lg font-bold text-foreground mt-1">{p.name}</p>
                           <p className="text-xs text-muted-foreground">
