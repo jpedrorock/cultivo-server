@@ -9,6 +9,10 @@ import { useEffect, useRef, useState } from "react";
 export type PlantStage = 1 | 2 | 3 | 4 | 5 | 6;
 export type PlantMood = "happy" | "thirsty" | "sad";
 export type PlantHealth = "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING";
+export type PlantEnv = "hot" | "cold" | "ok" | "unknown";
+
+// Postura por ambiente: calor → folhas caem (murcha); frio → folhas curvam pra cima (encolhe).
+const ENV_DROOP: Record<PlantEnv, number> = { hot: 13, cold: -15, ok: 0, unknown: 0 };
 
 // Severidade visual da saúde: nº de folhas que adoecem (de baixo pra cima) + cor.
 const HEALTH_SEVERITY: Record<PlantHealth, number> = { HEALTHY: 0, RECOVERING: 1, STRESSED: 2, SICK: 3 };
@@ -53,6 +57,7 @@ export function LivingPlant({
   fromMood,
   vitality = 1,
   health,
+  env = "unknown",
 }: {
   stage: PlantStage;
   mood: PlantMood;
@@ -66,6 +71,8 @@ export function LivingPlant({
   vitality?: number;
   /** Saúde registrada — SICK/STRESSED amarelam/mancham folhas; HEALTHY/null = normal. */
   health?: PlantHealth | null;
+  /** Ambiente da estufa — postura: hot = murcha/caída, cold = encolhida/curvada, ok = ereta. */
+  env?: PlantEnv;
 }) {
   // Sem registro há tempo → desbota (satura↓) e CONGELA (idle pausado).
   const frozen = vitality < 0.15;
@@ -130,7 +137,8 @@ export function LivingPlant({
   }
 
   const color = rgbStr(vis.c);
-  const droop = vis.d;
+  // Droop final = humor (vis.d) + postura do ambiente (calor cai / frio curva pra cima).
+  const droop = vis.d + ENV_DROOP[env];
   const pairs = Math.min(4, stage <= 1 ? 1 : stage);
   const stemTopY = 48 - Math.min(stage, 5) * 4;
 

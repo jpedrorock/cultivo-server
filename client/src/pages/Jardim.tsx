@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown, Flower2, ArrowRight, Bot } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
-import { LivingPlant, type PlantStage, type PlantMood, type PlantHealth } from "@/components/LivingPlant";
+import { LivingPlant, type PlantStage, type PlantMood, type PlantHealth, type PlantEnv } from "@/components/LivingPlant";
 import { EmptyState } from "@/components/EmptyState";
 import { StartFloraModal } from "@/components/StartFloraModal";
 import { trpc } from "@/lib/trpc";
@@ -351,7 +351,7 @@ export default function Jardim() {
                                 ))}
                               </span>
                             )}
-                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} vitality={vitality} health={p.health} />
+                            <LivingPlant stage={data.stage as PlantStage} mood={data.mood as PlantMood} size={150} reacting={reactingIdx === idx} celebrating={celebrating || !!levelUp} fromMood={fromMood} vitality={vitality} health={p.health} env={data.env.state as PlantEnv} />
                           </button>
                           <p className="text-lg font-bold text-foreground mt-1">{p.name}</p>
                           <p className="text-xs text-muted-foreground">
@@ -360,16 +360,24 @@ export default function Jardim() {
                         </div>
                       ))}
                     </div>
-                    {/* Humor (compartilhado pela estufa) */}
-                    {(() => {
-                      const MoodIcon = MOOD_ICON[mood];
-                      return (
-                        <span className={cn("inline-flex items-center gap-1.5 mt-2 text-sm font-medium px-3 py-1 rounded-full bg-muted/40", MOOD_TONE[mood])}>
-                          <MoodIcon className="w-4 h-4" />
-                          {data.moodLabel}
-                        </span>
-                      );
-                    })()}
+                    {/* Humor + clima (compartilhados pela estufa) */}
+                    <div className="flex items-center justify-center flex-wrap gap-1.5 mt-2">
+                      {(() => {
+                        const MoodIcon = MOOD_ICON[mood];
+                        return (
+                          <span className={cn("inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full bg-muted/40", MOOD_TONE[mood])}>
+                            <MoodIcon className="w-4 h-4" />
+                            {data.moodLabel}
+                          </span>
+                        );
+                      })()}
+                      {data.env.state === "hot" && (
+                        <span className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full bg-amber-500/15 text-amber-500">🥵 Calor</span>
+                      )}
+                      {data.env.state === "cold" && (
+                        <span className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full bg-blue-500/15 text-blue-400">🥶 Frio</span>
+                      )}
+                    </div>
                     {/* Voz do Cultivisor — aparece quando ela começa a desbotar */}
                     {daysSinceLog >= 2 && (
                       <div className={cn(

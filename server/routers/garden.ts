@@ -46,16 +46,29 @@ export const gardenRouter = router({
     const daysSinceLog = lastReadingAt ? Math.floor((now - lastReadingAt) / 86400000) : 99;
     const registeredToday = lastReadingAt ? now - lastReadingAt < 86400000 : false;
 
-    // Ambiente ok? última leitura vs faixa ideal.
+    // Ambiente: ok? (pro humor) + estado pra POSTURA (calor/frio) + valores reais.
     let envOk = true;
+    let envState: "hot" | "cold" | "ok" | "unknown" = "unknown";
+    let lastTempC: number | null = null;
+    let lastRhPct: number | null = null;
     try {
       const ideal = await getIdealValuesByTent(tent.id);
+      const tRaw = latest?.tempC != null ? parseFloat(String(latest.tempC)) : null;
+      const rRaw = latest?.rhPct != null ? parseFloat(String(latest.rhPct)) : null;
+      const t = tRaw != null && Number.isFinite(tRaw) ? tRaw : null;
+      const r = rRaw != null && Number.isFinite(rRaw) ? rRaw : null;
+      lastTempC = t;
+      lastRhPct = r;
       if (ideal && latest) {
-        const t = latest.tempC != null ? parseFloat(String(latest.tempC)) : null;
-        const r = latest.rhPct != null ? parseFloat(String(latest.rhPct)) : null;
         const tempOk = t == null || ideal.tempMin == null || ideal.tempMax == null || (t >= ideal.tempMin && t <= ideal.tempMax);
         const rhOk = r == null || ideal.rhMin == null || ideal.rhMax == null || (r >= ideal.rhMin && r <= ideal.rhMax);
         envOk = tempOk && rhOk;
+        if (t != null && ideal.tempMax != null && t > ideal.tempMax) envState = "hot";
+        else if (t != null && ideal.tempMin != null && t < ideal.tempMin) envState = "cold";
+        else if (r != null && ideal.rhMin != null && r < ideal.rhMin) envState = "hot"; // ar muito seco = estresse de calor
+        else if (t != null) envState = "ok";
+      } else if (t != null) {
+        envState = "ok"; // tem leitura, sem ideal → assume ok
       }
     } catch {
       envOk = true; // sem ideais → não penaliza
@@ -118,6 +131,7 @@ export const gardenRouter = router({
       weekNum: hasCycle ? Math.max(1, (floraStarted ? weeksSinceFlora : weeksSinceStart) + 1) : 0,
       registeredToday,
       daysSinceLog,
+      env: { state: envState, tempC: lastTempC, rhPct: lastRhPct },
       plants: plantRows.map((p) => ({ id: p.id, name: p.name, strain: p.strain ?? null, health: healthByPlant[p.id] ?? null })),
       plantCount: plantRows.length,
     };
