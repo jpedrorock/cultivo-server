@@ -28,7 +28,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.24"
+#define FW_VERSION "0.5.25"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -458,6 +458,26 @@ static bool isCurrentlyInDarkPeriod() {
 }
 
 static void sleepTimerCb(lv_timer_t *) {
+  // ── Monitor de heap (roda a cada ~60s) ────────────────────────────────────
+  // Diagnostica leak ao longo do tempo (loga free/min/psram) E faz reboot de
+  // SEGURANCA se o heap interno ficar critico — recupera o device sozinho em
+  // vez de travar/OOM (bug "trava overnight e nao volta"). Reiniciar e' melhor
+  // que ficar congelado: no boot ele volta a funcionar.
+  static uint32_t heapTick = 0;
+  if (++heapTick >= 60) {
+    heapTick = 0;
+    uint32_t freeH = ESP.getFreeHeap();
+    Serial.printf("[heap] free=%u min=%u psram=%u\n",
+                  (unsigned)freeH, (unsigned)ESP.getMinFreeHeap(),
+                  (unsigned)ESP.getFreePsram());
+    if (freeH < 14000) {  // ~14KB: perto do OOM — reinicia antes de travar
+      Serial.printf("[heap] CRITICO (%u) -> reboot de seguranca\n",
+                    (unsigned)freeH);
+      delay(50);
+      ESP.restart();
+    }
+  }
+
   uint32_t inactive = lv_display_get_inactive_time(NULL);
   // No periodo escuro do cultivo, dorme depois de inatividade curta (5s)
   // pra nao deixar tela acesa poluindo luz no escuro da estufa. Em
