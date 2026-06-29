@@ -499,7 +499,7 @@ export async function allocateTuyaCameraStream(
 export async function controlTuyaDevice(
   deviceId: string,
   switchCode: string,
-  value: boolean,
+  value: boolean | number | string,   // bool=switch, number=percent/int, string=enum (ex: nível "3")
   accessId: string,
   accessSecret: string,
   region: TuyaRegion
@@ -509,6 +509,26 @@ export async function controlTuyaDevice(
   const body = { commands: [{ code: switchCode, value }] };
   const data = await tuyaPost(path, body, accessId, accessSecret, accessToken, region);
   return { success: Boolean(data.success), msg: data.msg };
+}
+
+/**
+ * Lê a especificação (functions controláveis) de um device Tuya.
+ * Usado pra descobrir DPs de nível/velocidade — ex: controlador de potência
+ * de exaustor com 5 níveis. Cada function tem:
+ *   - code:   ex "fan_speed_enum", "switch", "speed"
+ *   - type:   "Enum" | "Integer" | "Boolean" | "String"
+ *   - values: string JSON — {"range":["1".."5"]} p/ Enum, {"min","max","step"} p/ Integer
+ */
+export async function getTuyaDeviceSpec(
+  deviceId: string,
+  accessId: string,
+  accessSecret: string,
+  region: TuyaRegion
+): Promise<{ functions: { code: string; type: string; values: string }[] }> {
+  const { accessToken } = await getToken(accessId, accessSecret, region);
+  const data = await tuyaGet(`/v1.0/devices/${deviceId}/specifications`, accessId, accessSecret, accessToken, region);
+  const functions = (data.result?.functions ?? []) as { code: string; type: string; values: string }[];
+  return { functions };
 }
 
 /**

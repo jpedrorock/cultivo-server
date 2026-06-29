@@ -960,14 +960,26 @@ function registerDeviceRoutes(app: express.Application) {
       // Lê estado de TODOS os devices em paralelo (sem state se cfg ausente).
       // debug=true → cada call inclui debugDps (lista de DPs que o device expôs)
       // pra ajudar a diagnosticar quando switchOn=null.
-      const { getTuyaDeviceSwitchState } = await import('../lib/tuya');
-      const deviceStates = await Promise.allSettled(
-        tentDeviceRows.map((r: any) =>
-          cfg
-            ? getTuyaDeviceSwitchState(r.deviceId, cfg.accessId, cfg.accessSecret, cfg.region, { debug: true })
-            : Promise.resolve({ online: false, switchOn: null, switchCode: null, localKey: null, debugDps: [] as string[] })
-        )
-      );
+      const { getTuyaDeviceSwitchState, getTuyaDeviceSpec } = await import('../lib/tuya');
+      // DPs de nível/velocidade controláveis (ex: controlador de potência do
+      // exaustor com 5 níveis). Ordem = prioridade de match.
+      const LEVEL_CODES = ['fan_speed_enum', 'fan_speed', 'speed', 'windspeed', 'fan_speed_percent', 'percent_control', 'level', 'work_mode', 'bright_value', 'bright_value_v2', 'dimmer_value'];
+      const [deviceStates, deviceSpecs] = await Promise.all([
+        Promise.allSettled(
+          tentDeviceRows.map((r: any) =>
+            cfg
+              ? getTuyaDeviceSwitchState(r.deviceId, cfg.accessId, cfg.accessSecret, cfg.region, { debug: true })
+              : Promise.resolve({ online: false, switchOn: null, switchCode: null, localKey: null, debugDps: [] as string[] })
+          )
+        ),
+        Promise.allSettled(
+          tentDeviceRows.map((r: any) =>
+            cfg
+              ? getTuyaDeviceSpec(r.deviceId, cfg.accessId, cfg.accessSecret, cfg.region)
+              : Promise.resolve({ functions: [] as { code: string; type: string; values: string }[] })
+          )
+        ),
+      ]);
 
       tentDeviceRows.forEach((r: any, idx: number) => {
         const stateRes = deviceStates[idx];
@@ -982,6 +994,19 @@ function registerDeviceRoutes(app: express.Application) {
           `dps=[${(state as any).debugDps?.join(',') ?? ''}] ` +
           `${errMsg ? `error="${errMsg}"` : ''}`
         );
+        // Detecta canal de nível (ex: controlador de potência do exaustor) pela
+        // ficha técnica do device.
+        const specRes = deviceSpecs[idx];
+        const fns = specRes.status === 'fulfilled' ? ((specRes.value as any).functions ?? []) : [];
+        const lvlFn = fns.find((f: any) => LEVEL_CODES.includes(f.code));
+        let level: any = null;
+        if (lvlFn) {
+          let parsed: any = {};
+          try { parsed = JSON.parse(lvlFn.values || '{}'); } catch { /* values pode vir vazio */ }
+          // Enum -> {range:[...]}; Integer -> {min,max,step,scale}
+          level = { code: lvlFn.code, type: lvlFn.type, ...parsed };
+        }
+        console.log(`[Device] /scenes device=${r.deviceId} level=${level ? JSON.stringify(level) : 'none'} fns=[${fns.map((f: any) => f.code).join(',')}]`);
         items.push({
           type: 'device',
           id: r.deviceId as string,
@@ -994,6 +1019,10 @@ function registerDeviceRoutes(app: express.Application) {
           // device (porta 6668, AES) em vez de ir pela nuvem. null = sem local.
           localKey: (state as any).localKey ?? null,
           dp: state.switchCode ?? null,
+          // Controle de nível (slider). null = device só on/off.
+          level,
+          // specFns = ficha técnica crua (TEMP — descoberta do canal; remover depois).
+          specFns: fns,
         });
       });
 
