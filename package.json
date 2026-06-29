@@ -91,7 +91,7 @@
     "helmet": "^8.2.0",
     "hls.js": "^1.6.16",
     "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^0.453.0",
+    "lucide-react": "^1.22.0",
     "multer": "^2.2.0",
     "mysql2": "^3.22.5",
     "nanoid": "^5.1.16",
