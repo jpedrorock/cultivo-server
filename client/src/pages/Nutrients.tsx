@@ -24,6 +24,17 @@ import { Beaker, Printer, Loader2, Download, Droplets, Zap, FlaskConical, Sprout
 import { PageHeader } from "@/components/PageHeader";
 import { CalcEyebrow, CalcRunning } from "@/components/ui/calc-helpers";
 import { PageTransition } from "@/components/PageTransition";
+import { diagnoseNutrients, type PlantSymptom, type DiagnosisResult } from "@/lib/nutrientDiagnosis";
+
+// Chips de sintoma do diagnóstico (override sobre a receita Kroma).
+const SYMPTOM_CHIPS: { id: PlantSymptom; label: string; emoji: string }[] = [
+  { id: "chlorosis_new", label: "Folhas novas amareladas", emoji: "🟡" },
+  { id: "chlorosis_old", label: "Folhas velhas amareladas", emoji: "🟨" },
+  { id: "necrosis_tips", label: "Pontas queimadas", emoji: "🟤" },
+  { id: "twist_curl", label: "Folhas enroladas", emoji: "🌀" },
+  { id: "dark_green", label: "Verde muito escuro", emoji: "🟢" },
+  { id: "wilting", label: "Murcha", emoji: "🥀" },
+];
 
 type Phase = "CLONING" | "VEGA" | "PRE_FLORA" | "FLORA" | "MAINTENANCE" | "DRYING";
 
@@ -99,9 +110,13 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
       ];
     }
     if (week <= 7) {
-      // Flora 4–7 (EC Kroma 2,28) — Nitrato de Cálcio em 0,70 (não reduzir!)
+      // Flora 4–7 (EC ~2,40) — Nitrato de Cálcio em 0,90 g/L: meio-termo entre o
+      // 0,70 da planilha Kroma e o 1,12 do stretch. A Kroma assume acúmulo de N
+      // das semanas 1–3, mas substrato pequeno/runoff baixo não acumula → 0,70
+      // causava clorose em folhas novas (def. de N) na semana 6–7. 0,90 é o mínimo
+      // seguro; o diagnóstico por sintomas sobe pra 1,12 se houver clorose nova.
       return [
-        { name: "Nitrato de Cálcio",           gPerLiter: 0.70, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
+        { name: "Nitrato de Cálcio",           gPerLiter: 0.90, npk: "15.5-0-0", ca: 19, mg: 0,  fe: 0, s: 0  },
         { name: "Nitrato de Potássio",          gPerLiter: 0.50, npk: "13-0-38",  ca: 0,  mg: 0,  fe: 0, s: 0  },
         { name: "MKP (Fosfato Monopotássico)",  gPerLiter: 0.50, npk: "0-22-28",  ca: 0,  mg: 0,  fe: 0, s: 0  },
         { name: "Sulfato de Magnésio",          gPerLiter: 0.80, npk: "0-0-0",    ca: 0,  mg: 10, fe: 0, s: 13 },
@@ -132,7 +147,7 @@ const getProductsByPhaseWeek = (phase: Phase, week: number) => {
 function recipeEC(phase: Phase, week: number, products: { gPerLiter: number }[]): number {
   if (phase === "VEGA") return 2.49;
   if (phase === "PRE_FLORA") return 2.58;
-  if (phase === "FLORA") return week <= 3 ? 2.67 : week <= 7 ? 2.28 : 2.00;
+  if (phase === "FLORA") return week <= 3 ? 2.67 : week <= 7 ? 2.40 : 2.00;
   const totalGPerL = products.reduce((s, p) => s + p.gPerLiter, 0);
   return Math.round(totalGPerL * 0.91 * 100) / 100;
 }
@@ -467,13 +482,13 @@ function CompareTab() {
 // Reutilizado pelo seletor, pela receita e pelo painel de alertas de EC.
 function floraTarget(week: number): { mid: number; min: number; max: number } {
   if (week <= 3) return { mid: 2.67, min: 2.5, max: 2.8 };
-  if (week <= 7) return { mid: 2.28, min: 2.1, max: 2.4 };
+  if (week <= 7) return { mid: 2.40, min: 2.2, max: 2.6 };
   return { mid: 2.00, min: 1.8, max: 2.1 };
 }
 
 function getFloraSubphase(week: number): { label: string; ecTarget: string } {
   if (week <= 3) return { label: "Flora 1–3 (Stretch)", ecTarget: "EC 2,67" };
-  if (week <= 7) return { label: "Flora 4–7 (Bulking)", ecTarget: "EC 2,28" };
+  if (week <= 7) return { label: "Flora 4–7 (Bulking)", ecTarget: "EC 2,40" };
   return { label: "Finalização", ecTarget: "EC 2,00" };
 }
 
@@ -483,6 +498,11 @@ export default function Nutrients() {
   const [volumeL, setVolumeL] = useState(10);
   const [volumeStr, setVolumeStr] = useState("10");
   const [ecMeasuredStr, setEcMeasuredStr] = useState(""); // EC real medido (opcional)
+  // Diagnóstico por sintomas + runoff.
+  const [symptoms, setSymptoms] = useState<PlantSymptom[]>([]);
+  const [runoffPhStr, setRunoffPhStr] = useState("");
+  const [runoffEcStr, setRunoffEcStr] = useState("");
+  const [diag, setDiag] = useState<DiagnosisResult | null>(null);
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [selectedTentId, setSelectedTentId] = useState<string>("");
   const [historyTentFilter, setHistoryTentFilter] = useState<string>("all");
@@ -570,6 +590,29 @@ export default function Nutrients() {
 
     return alerts;
   })();
+
+  // Roda o diagnóstico (sintomas + runoff) e a receita ajustada por override.
+  const runDiagnosis = () => {
+    const ph = parseFloat(runoffPhStr.replace(",", "."));
+    const ec = parseFloat(runoffEcStr.replace(",", "."));
+    setDiag(diagnoseNutrients({
+      symptoms: symptoms.length ? symptoms : ["none"],
+      runoffPh: !isNaN(ph) && ph > 0 ? ph : null,
+      runoffEc: !isNaN(ec) && ec > 0 ? ec : null,
+      ecTarget: ecEstimated,
+    }));
+  };
+  const toggleSymptom = (s: PlantSymptom) => {
+    setDiag(null);
+    setSymptoms((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+  };
+  // Receita com os multiplicadores do diagnóstico aplicados (se houver).
+  const adjustedProducts = diag?.recipeMul
+    ? calculatedProducts.map((p) => {
+        const mul = diag.recipeMul![p.name] ?? 1;
+        return { ...p, gPerLiter: p.gPerLiter * mul, totalG: p.totalG * mul };
+      })
+    : null;
 
   const recordApplication = trpc.nutrients.recordApplication.useMutation({
     onSuccess: () => showToast.success("Receita salva com sucesso!"),
@@ -972,6 +1015,75 @@ export default function Nutrients() {
                     ) : "Salvar Receita"}
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* ── DIAGNÓSTICO POR SINTOMAS (override sobre a Kroma) ── */}
+            <Card className="border-amber-500/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2"><Leaf className="w-5 h-5 text-amber-400" /> 3. A planta tem algum sinal?</CardTitle>
+                <CardDescription>Marque o que você vê + (opcional) o pH/EC do runoff. O app ajusta a receita ou manda fazer flush.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {SYMPTOM_CHIPS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleSymptom(s.id)}
+                      className={`text-left text-sm rounded-xl border px-3 py-2.5 transition-colors ${symptoms.includes(s.id) ? "border-amber-500/50 bg-amber-500/10 text-foreground" : "border-border/40 text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {s.emoji} {s.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">pH do runoff</Label>
+                    <Input type="text" inputMode="decimal" placeholder="ex: 6.2" value={runoffPhStr}
+                      onChange={(e) => { const v = e.target.value.replace(",", "."); if (v === "" || /^\d*\.?\d*$/.test(v)) { setRunoffPhStr(v); setDiag(null); } }} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">EC do runoff (mS/cm)</Label>
+                    <Input type="text" inputMode="decimal" placeholder="ex: 1.8" value={runoffEcStr}
+                      onChange={(e) => { const v = e.target.value.replace(",", "."); if (v === "" || /^\d*\.?\d*$/.test(v)) { setRunoffEcStr(v); setDiag(null); } }} />
+                  </div>
+                </div>
+                <Button onClick={runDiagnosis} className="w-full">Diagnosticar</Button>
+
+                {diag && (
+                  <div className={`rounded-xl border p-4 space-y-3 ${diag.action === "flush" ? "border-sky-400/40 bg-sky-500/8" : diag.action === "maintain" ? "border-emerald-400/40 bg-emerald-500/8" : "border-amber-400/40 bg-amber-500/8"}`}>
+                    <p className="font-bold text-foreground">{diag.title}</p>
+                    <p className="text-sm text-muted-foreground">{diag.message}</p>
+                    {diag.flush && (
+                      <ul className="text-sm text-foreground/90 list-disc pl-5 space-y-0.5">
+                        <li>Volume: <strong>{diag.flush.volumeMul}×</strong> o normal</li>
+                        <li>Runoff alvo: <strong>{diag.flush.targetRunoffPct}%</strong></li>
+                        <li>Se o EC do runoff &gt; {diag.flush.repeatIfEcAbove}: repete o flush</li>
+                      </ul>
+                    )}
+                    {adjustedProducts && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Receita ajustada (g/L · {volumeL}L)</p>
+                        {adjustedProducts.map((p, i) => {
+                          const changed = !!diag.recipeMul?.[p.name] && diag.recipeMul[p.name] !== 1;
+                          return (
+                            <div key={i} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${changed ? "border-amber-400/40 bg-amber-500/10" : "border-border/40"}`}>
+                              <span className={changed ? "font-semibold" : ""}>{p.name}{changed ? " ⬆️" : ""}</span>
+                              <span className="mono font-bold">{p.gPerLiter.toFixed(2)} g/L · {p.totalG.toFixed(1)} g</span>
+                            </div>
+                          );
+                        })}
+                        {diag.ecMul && <p className="text-xs text-muted-foreground">EC alvo ajustado: ~{(ecEstimated * diag.ecMul).toFixed(2)} mS/cm</p>}
+                      </div>
+                    )}
+                    {diag.warnings.length > 0 && (
+                      <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-0.5">
+                        {diag.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
