@@ -29,7 +29,7 @@ export function HarvestCelebration({ cycleId, fallbackName, onDone }: HarvestCel
   return (
     <div className="text-center py-2">
       <TrophyIcon tier="gold" size={76} className="mx-auto" />
-      <h3 className="text-xl font-bold text-foreground mt-2">Colheita concluída! 🎉</h3>
+      <h3 className="text-xl font-bold text-foreground mt-2">Colheita concluída!</h3>
       <p className="text-sm text-muted-foreground">{report?.strainName ?? fallbackName ?? ""}</p>
       <div className="grid grid-cols-2 gap-3 mt-5">
         {stats.map((s) => (
@@ -40,7 +40,7 @@ export function HarvestCelebration({ cycleId, fallbackName, onDone }: HarvestCel
           </div>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground mt-4">Boa colheita, grower! 🌿 Veja seus troféus no Progresso.</p>
+      <p className="text-xs text-muted-foreground mt-4">Boa colheita, grower! Veja seus troféus no Progresso.</p>
       <DialogFooter className="mt-5">
         <Button onClick={onDone} className="w-full">Concluir</Button>
       </DialogFooter>

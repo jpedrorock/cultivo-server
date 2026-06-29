@@ -20,20 +20,21 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast as showToast } from "sonner";
-import { Beaker, Printer, Loader2, Download, Droplets, Zap, FlaskConical, Sprout, Leaf, Flower2, Wrench, Wind, ClipboardList, ArrowUpDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Beaker, Printer, Loader2, Download, Droplets, Droplet, Zap, FlaskConical, Sprout, Leaf, Flower2, Flame, Wrench, Wind, ClipboardList, ArrowUpDown, ArrowUp, TrendingUp, TrendingDown, Minus, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { CalcEyebrow, CalcRunning } from "@/components/ui/calc-helpers";
 import { PageTransition } from "@/components/PageTransition";
 import { diagnoseNutrients, type PlantSymptom, type DiagnosisResult } from "@/lib/nutrientDiagnosis";
 
 // Chips de sintoma do diagnóstico (override sobre a receita Kroma).
-const SYMPTOM_CHIPS: { id: PlantSymptom; label: string; emoji: string }[] = [
-  { id: "chlorosis_new", label: "Folhas novas amareladas", emoji: "🟡" },
-  { id: "chlorosis_old", label: "Folhas velhas amareladas", emoji: "🟨" },
-  { id: "necrosis_tips", label: "Pontas queimadas", emoji: "🟤" },
-  { id: "twist_curl", label: "Folhas enroladas", emoji: "🌀" },
-  { id: "dark_green", label: "Verde muito escuro", emoji: "🟢" },
-  { id: "wilting", label: "Murcha", emoji: "🥀" },
+const SYMPTOM_CHIPS: { id: PlantSymptom; label: string; Icon: typeof Leaf; color: string }[] = [
+  { id: "chlorosis_new", label: "Folhas novas amareladas", Icon: Leaf, color: "text-yellow-400" },
+  { id: "chlorosis_old", label: "Folhas velhas amareladas", Icon: Leaf, color: "text-amber-500" },
+  { id: "necrosis_tips", label: "Pontas queimadas", Icon: Flame, color: "text-orange-500" },
+  { id: "twist_curl", label: "Folhas enroladas", Icon: Wind, color: "text-sky-400" },
+  { id: "dark_green", label: "Verde muito escuro", Icon: Leaf, color: "text-green-600" },
+  { id: "wilting", label: "Murcha", Icon: Droplet, color: "text-blue-400" },
 ];
 
 type Phase = "CLONING" | "VEGA" | "PRE_FLORA" | "FLORA" | "MAINTENANCE" | "DRYING";
@@ -1031,9 +1032,9 @@ export default function Nutrients() {
                       key={s.id}
                       type="button"
                       onClick={() => toggleSymptom(s.id)}
-                      className={`text-left text-sm rounded-xl border px-3 py-2.5 transition-colors ${symptoms.includes(s.id) ? "border-amber-500/50 bg-amber-500/10 text-foreground" : "border-border/40 text-muted-foreground hover:text-foreground"}`}
+                      className={`flex items-center gap-2 text-left text-sm rounded-xl border px-3 py-2.5 transition-colors ${symptoms.includes(s.id) ? "border-amber-500/50 bg-amber-500/10 text-foreground" : "border-border/40 text-muted-foreground hover:text-foreground"}`}
                     >
-                      {s.emoji} {s.label}
+                      <s.Icon className={cn("w-4 h-4 shrink-0", s.color)} /> {s.label}
                     </button>
                   ))}
                 </div>
@@ -1053,7 +1054,12 @@ export default function Nutrients() {
 
                 {diag && (
                   <div className={`rounded-xl border p-4 space-y-3 ${diag.action === "flush" ? "border-sky-400/40 bg-sky-500/8" : diag.action === "maintain" ? "border-emerald-400/40 bg-emerald-500/8" : "border-amber-400/40 bg-amber-500/8"}`}>
-                    <p className="font-bold text-foreground">{diag.title}</p>
+                    <p className="font-bold text-foreground flex items-center gap-2">
+                      {diag.action === "flush" ? <Droplets className="w-4 h-4 shrink-0 text-sky-400" />
+                        : diag.action === "maintain" ? <Check className="w-4 h-4 shrink-0 text-emerald-400" />
+                        : <FlaskConical className="w-4 h-4 shrink-0 text-amber-400" />}
+                      {diag.title}
+                    </p>
                     <p className="text-sm text-muted-foreground">{diag.message}</p>
                     {diag.flush && (
                       <ul className="text-sm text-foreground/90 list-disc pl-5 space-y-0.5">
@@ -1069,7 +1075,7 @@ export default function Nutrients() {
                           const changed = !!diag.recipeMul?.[p.name] && diag.recipeMul[p.name] !== 1;
                           return (
                             <div key={i} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${changed ? "border-amber-400/40 bg-amber-500/10" : "border-border/40"}`}>
-                              <span className={changed ? "font-semibold" : ""}>{p.name}{changed ? " ⬆️" : ""}</span>
+                              <span className={cn("flex items-center gap-1.5", changed && "font-semibold")}>{p.name}{changed && <ArrowUp className="w-3.5 h-3.5 text-amber-400" />}</span>
                               <span className="mono font-bold">{p.gPerLiter.toFixed(2)} g/L · {p.totalG.toFixed(1)} g</span>
                             </div>
                           );

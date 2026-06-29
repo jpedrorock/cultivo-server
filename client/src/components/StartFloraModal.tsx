@@ -62,7 +62,7 @@ export function StartFloraModal({ open, onClose, cycleId, cycleName }: StartFlor
             <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-fuchsia-500/20 to-purple-500/20 flex items-center justify-center">
               <Flower2 className="w-11 h-11 text-fuchsia-400" />
             </div>
-            <h3 className="text-xl font-bold text-foreground mt-3">Floração iniciada! 🌸</h3>
+            <h3 className="text-xl font-bold text-foreground mt-3">Floração iniciada!</h3>
             <p className="text-sm text-muted-foreground">{cycleName}</p>
 
             {/* A passagem do fotoperíodo — o coração do flip */}
@@ -81,7 +81,7 @@ export function StartFloraModal({ open, onClose, cycleId, cycleName }: StartFlor
             </div>
 
             <p className="text-xs text-muted-foreground mt-5">
-              O fotoperíodo mudou pra 12/12 — as plantas vão começar a florir nas próximas semanas. 🌿
+              O fotoperíodo mudou pra 12/12 — as plantas vão começar a florir nas próximas semanas.
             </p>
             <DialogFooter className="mt-5">
               <Button onClick={onClose} className="w-full">Concluir</Button>

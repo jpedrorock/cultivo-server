@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown, Flower2, ArrowRight, Bot } from "lucide-react";
+import { Loader2, Sprout, Droplet, Thermometer, Camera, Smile, Meh, Frown, Flower2, ArrowRight, Bot, Leaf, Sparkles, Star, Snowflake, Flag, Wind } from "lucide-react";
 import { PageLayout } from "@/components/PageLayout";
 import { LivingPlant, type PlantStage, type PlantMood, type PlantHealth, type PlantEnv } from "@/components/LivingPlant";
 import { EmptyState } from "@/components/EmptyState";
@@ -13,10 +13,20 @@ import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
 import { readLastStage, writeLastStage } from "@/lib/gardenStage";
 import { readLastMood, writeLastMood } from "@/lib/gardenMood";
 
-// Folhas que caem na celebração (posições/emojis fixos por índice).
-const CELEBRATE_LEAVES = ["🌿", "💚", "✨", "🍃", "🌱", "💚", "✨", "🌿", "🍃", "🌱", "✨", "💚"];
+type ParticleIcon = { Icon: typeof Leaf; color: string };
+// Folhas que caem na celebração (ícones fixos por índice).
+const CELEBRATE_LEAVES: ParticleIcon[] = [
+  { Icon: Leaf, color: "text-emerald-400" }, { Icon: Sparkles, color: "text-green-300" }, { Icon: Sprout, color: "text-lime-400" },
+  { Icon: Leaf, color: "text-green-400" }, { Icon: Sprout, color: "text-emerald-400" }, { Icon: Sparkles, color: "text-lime-300" },
+  { Icon: Leaf, color: "text-emerald-400" }, { Icon: Sprout, color: "text-green-400" }, { Icon: Sparkles, color: "text-green-300" },
+  { Icon: Leaf, color: "text-lime-400" }, { Icon: Sprout, color: "text-emerald-400" }, { Icon: Sparkles, color: "text-green-300" },
+];
 // Estrelas que sobem no level-up de estágio.
-const LEVELUP_STARS = ["⭐", "✨", "🌟", "✨", "⭐", "🌟", "✨", "⭐"];
+const LEVELUP_STARS: ParticleIcon[] = [
+  { Icon: Star, color: "text-amber-300" }, { Icon: Sparkles, color: "text-yellow-300" }, { Icon: Star, color: "text-yellow-200" },
+  { Icon: Sparkles, color: "text-amber-300" }, { Icon: Star, color: "text-amber-300" }, { Icon: Sparkles, color: "text-yellow-200" },
+  { Icon: Star, color: "text-yellow-300" }, { Icon: Sparkles, color: "text-amber-300" },
+];
 
 // Pólen/luz do cenário vivo (posições/tamanhos/ritmos fixos por índice).
 const MOTES = [
@@ -39,15 +49,15 @@ const CARE_ACTIONS: { Icon: typeof Droplet; label: string; action: CareAction; h
 
 // Falas da planta ao ser tocada (por humor).
 const PET_PHRASES: Record<PlantMood, string[]> = {
-  happy: ["Tô feliz! 🌿", "Obrigada por cuidar 💚", "Crescendo forte!"],
-  thirsty: ["Tô com sede… 💧", "Bora registrar?", "Me dá um carinho 🌱"],
-  sad: ["Senti sua falta 🥺", "Volta sempre 🌱", "Vamos retomar?"],
+  happy: ["Tô feliz!", "Obrigada por cuidar", "Crescendo forte!"],
+  thirsty: ["Tô com sede…", "Bora registrar?", "Me dá um carinho"],
+  sad: ["Senti sua falta", "Volta sempre", "Vamos retomar?"],
 };
-// Partículas que sobem ao tocar (por humor).
-const PET_PARTICLES: Record<PlantMood, string[]> = {
-  happy: ["💚", "✨", "🌿", "💚", "✨", "🌱"],
-  thirsty: ["💧", "🌱", "💧", "🌿", "💧", "✨"],
-  sad: ["🌱", "💚", "🌿", "🌱", "✨", "💚"],
+// Partículas que sobem ao tocar (por humor) — ícones.
+const PET_PARTICLES: Record<PlantMood, ParticleIcon[]> = {
+  happy: [{ Icon: Sparkles, color: "text-green-300" }, { Icon: Leaf, color: "text-emerald-400" }, { Icon: Sprout, color: "text-lime-400" }, { Icon: Sparkles, color: "text-green-300" }, { Icon: Leaf, color: "text-emerald-400" }, { Icon: Sprout, color: "text-lime-400" }],
+  thirsty: [{ Icon: Droplet, color: "text-sky-400" }, { Icon: Sprout, color: "text-lime-400" }, { Icon: Droplet, color: "text-sky-300" }, { Icon: Leaf, color: "text-emerald-400" }, { Icon: Droplet, color: "text-sky-400" }, { Icon: Sparkles, color: "text-green-300" }],
+  sad: [{ Icon: Sprout, color: "text-lime-400" }, { Icon: Leaf, color: "text-emerald-400" }, { Icon: Sprout, color: "text-green-400" }, { Icon: Leaf, color: "text-lime-400" }, { Icon: Sparkles, color: "text-green-300" }, { Icon: Sprout, color: "text-emerald-400" }],
 };
 
 const MOOD_ICON: Record<PlantMood, typeof Smile> = {
@@ -173,7 +183,7 @@ export default function Jardim() {
     if (flipDueTs > Date.now()) {
       scheduleLocalNotification({
         id,
-        title: "Hora do flip? 🌸",
+        title: "Hora do flip?",
         body: "Tua planta tá pronta pra floração — mude o fotoperíodo pra 12/12.",
         at: new Date(flipDueTs),
         extra: { type: "flip", tentId: flipTentId },
@@ -223,7 +233,7 @@ export default function Jardim() {
                   <Flower2 className="w-5 h-5 text-fuchsia-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-foreground">Hora do flip pra floração? 🌸</p>
+                  <p className="text-sm font-bold text-foreground">Hora do flip pra floração?</p>
                   <p className="text-xs text-muted-foreground">Tua planta está pronta — fotoperíodo vai pra 12/12</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-fuchsia-400 shrink-0" />
@@ -255,18 +265,18 @@ export default function Jardim() {
               {celebrating && (
                 <>
                   <span className="pointer-events-none absolute inset-0 z-20">
-                    {CELEBRATE_LEAVES.map((leaf, i) => (
+                    {CELEBRATE_LEAVES.map((p, i) => (
                       <span
                         key={i}
-                        className="jardim-falling absolute text-lg"
+                        className="jardim-falling absolute"
                         style={{ left: `${5 + i * 8}%`, top: "-6%", animationDelay: `${i * 110}ms` }}
                       >
-                        {leaf}
+                        <p.Icon className={cn("w-4 h-4", p.color)} />
                       </span>
                     ))}
                   </span>
                   <span className="jardim-bubble absolute left-1/2 top-2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5 shadow-lg">
-                    Verdinha agradeceu o cuidado! 💚
+                    Verdinha agradeceu o cuidado!
                   </span>
                 </>
               )}
@@ -278,18 +288,18 @@ export default function Jardim() {
                     style={{ background: "radial-gradient(circle, rgba(255,207,106,0.55), transparent 70%)" }}
                   />
                   <span className="pointer-events-none absolute inset-0 z-20">
-                    {LEVELUP_STARS.map((s, i) => (
+                    {LEVELUP_STARS.map((p, i) => (
                       <span
                         key={i}
-                        className="jardim-particle absolute text-lg"
+                        className="jardim-particle absolute"
                         style={{ left: `${18 + i * 9}%`, bottom: "40%", animationDelay: `${i * 70}ms` }}
                       >
-                        {s}
+                        <p.Icon className={cn("w-4 h-4", p.color)} />
                       </span>
                     ))}
                   </span>
-                  <span className="jardim-bubble absolute left-1/2 top-2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-400 text-amber-950 text-sm font-extrabold px-4 py-1.5 shadow-lg">
-                    🎉 Novo estágio: {levelUp}!
+                  <span className="jardim-bubble absolute left-1/2 top-2 z-30 -translate-x-1/2 flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-400 text-amber-950 text-sm font-extrabold px-4 py-1.5 shadow-lg">
+                    <Sparkles className="w-4 h-4" /> Novo estágio: {levelUp}!
                   </span>
                 </>
               )}
@@ -299,18 +309,18 @@ export default function Jardim() {
               )}
               {action === "water" && (
                 <span className="pointer-events-none absolute inset-0 z-30">
-                  {["💧", "💧", "💧"].map((d, i) => (
-                    <span key={i} className="jardim-drop absolute text-lg" style={{ left: `${42 + i * 8}%`, top: "16%", animationDelay: `${i * 90}ms` }}>
-                      {d}
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="jardim-drop absolute" style={{ left: `${42 + i * 8}%`, top: "16%", animationDelay: `${i * 90}ms` }}>
+                      <Droplet className="w-4 h-4 text-sky-400" />
                     </span>
                   ))}
                 </span>
               )}
               {action === "env" && (
                 <span className="pointer-events-none absolute inset-0 z-30">
-                  {["🍃", "🌬️", "🍃"].map((d, i) => (
-                    <span key={i} className="jardim-breeze absolute text-base" style={{ left: "6%", top: `${30 + i * 14}%`, animationDelay: `${i * 100}ms` }}>
-                      {d}
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="jardim-breeze absolute" style={{ left: "6%", top: `${30 + i * 14}%`, animationDelay: `${i * 100}ms` }}>
+                      <Wind className="w-4 h-4 text-sky-300" />
                     </span>
                   ))}
                 </span>
@@ -343,10 +353,10 @@ export default function Jardim() {
                                 {PET_PARTICLES[mood].map((pp, i) => (
                                   <span
                                     key={i}
-                                    className="jardim-particle absolute text-base"
+                                    className="jardim-particle absolute"
                                     style={{ left: `${30 + i * 9}%`, bottom: "38%", animationDelay: `${i * 55}ms` }}
                                   >
-                                    {pp}
+                                    <pp.Icon className={cn("w-3.5 h-3.5", pp.color)} />
                                   </span>
                                 ))}
                               </span>
@@ -372,10 +382,10 @@ export default function Jardim() {
                         );
                       })()}
                       {data.env.state === "hot" && (
-                        <span className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full bg-amber-500/15 text-amber-500">🥵 Calor</span>
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full bg-amber-500/15 text-amber-500"><Thermometer className="w-4 h-4" /> Calor</span>
                       )}
                       {data.env.state === "cold" && (
-                        <span className="inline-flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full bg-blue-500/15 text-blue-400">🥶 Frio</span>
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full bg-blue-500/15 text-blue-400"><Snowflake className="w-4 h-4" /> Frio</span>
                       )}
                     </div>
                     {/* Voz do Cultivisor — aparece quando ela começa a desbotar */}
@@ -387,7 +397,7 @@ export default function Jardim() {
                         <Bot className={cn("w-4 h-4 shrink-0", daysSinceLog >= 4 ? "text-amber-400" : "text-blue-400")} />
                         <p className="text-xs text-muted-foreground leading-snug">
                           {daysSinceLog >= 4
-                            ? `Faz ${daysSinceLog} dias… ela ficou em preto e branco aqui na minha memória. Me conta como ela está? 🌫️`
+                            ? `Faz ${daysSinceLog} dias… ela ficou em preto e branco aqui na minha memória. Me conta como ela está?`
                             : `Faz ${daysSinceLog} dias que você não registra — como ela tá?`}
                         </p>
                       </div>
@@ -426,7 +436,7 @@ export default function Jardim() {
                 ))}
               </div>
               <p className="text-[11px] text-center text-muted-foreground mt-2">
-                Cuidar dela é registrar — cada registro deixa sua planta mais feliz. 🌿
+                Cuidar dela é registrar — cada registro deixa sua planta mais feliz.
               </p>
             </div>
 
@@ -459,13 +469,13 @@ export default function Jardim() {
                       ))}
                       {/* corredor — a plantinha avançando */}
                       <div
-                        className="absolute -top-[26px] -translate-x-1/2 transition-[left] duration-700 ease-out text-lg leading-none"
+                        className="absolute -top-[24px] -translate-x-1/2 transition-[left] duration-700 ease-out leading-none"
                         style={{ left: `${pct}%` }}
                       >
-                        🌱
+                        <Sprout className="w-4 h-4 text-primary" />
                       </div>
                       {/* linha de chegada */}
-                      <span className="absolute -top-1 right-0 translate-x-1/2 text-sm leading-none">🏁</span>
+                      <Flag className="absolute -top-1.5 right-0 translate-x-1/2 w-4 h-4 text-muted-foreground" />
                     </div>
                     {/* rótulos */}
                     <div className="flex">

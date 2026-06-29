@@ -48,7 +48,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (runoffEc != null && runoffEc > ecTarget * 1.3) {
     return {
       action: "flush",
-      title: "🚿 Flush primeiro",
+      title: "Flush primeiro",
       message: `EC do runoff (${runoffEc.toFixed(2)}) bem acima do alvo (${ecTarget.toFixed(2)}). Substrato saturado — faça flush antes de qualquer ajuste de receita.`,
       warnings: [`EC runoff > alvo × 1,3 = acúmulo crítico de sais (lockout provável).`],
       flush: { volumeMul: 2.0, targetRunoffPct: 30, repeatIfEcAbove: 1.5 },
@@ -59,7 +59,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (runoffPh != null && (runoffPh < 5.5 || runoffPh > 7.0)) {
     return {
       action: "flush",
-      title: "🚿 Flush (pH fora)",
+      title: "Flush (pH fora)",
       message: `pH do runoff ${runoffPh.toFixed(1)} fora da faixa (5,5–7,0) — lockout provável. Flush com água em pH 6,2–6,5 e reavalie.`,
       warnings: [`pH runoff ${runoffPh.toFixed(1)} trava a absorção mesmo com receita certa.`],
       flush: { volumeMul: 1.5, targetRunoffPct: 25, repeatIfEcAbove: 1.8 },
@@ -70,7 +70,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (has("necrosis_tips")) {
     return {
       action: "flush",
-      title: "🚿 Flush (pontas queimadas)",
+      title: "Flush (pontas queimadas)",
       message: "Pontas queimadas = excesso de sais / EC alto. Flush obrigatório e reduza o EC depois.",
       warnings: ["Necrose nas pontas = toxicidade de nutriente."],
       flush: { volumeMul: 2.0, targetRunoffPct: 35, repeatIfEcAbove: 1.2 },
@@ -81,7 +81,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (has("chlorosis_new")) {
     return {
       action: "adjust",
-      title: "⚗️ Mais nitrogênio",
+      title: "Mais nitrogênio",
       message: "Folhas novas amareladas = deficiência de N. Subindo o Nitrato de Cálcio +25% acima da receita Kroma.",
       warnings: ["Override por sintoma: ignora a redução de N da fase enquanto a clorose persistir."],
       recipeMul: { [CA]: 1.25 },
@@ -93,7 +93,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (has("twist_curl")) {
     return {
       action: "adjust",
-      title: "⚗️ Balanço Ca:Mg",
+      title: "Balanço Ca:Mg",
       message: "Folhas enroladas/twistadas = possível desequilíbrio Ca:Mg ou lockout. Reduzindo Ca, subindo Mg, aliviando o EC.",
       warnings: ["Se persistir, cheque o pH do runoff (lockout)."],
       recipeMul: { [CA]: 0.9, [MG]: 1.15 },
@@ -105,7 +105,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (has("dark_green")) {
     return {
       action: "adjust",
-      title: "⚗️ Menos nitrogênio",
+      title: "Menos nitrogênio",
       message: "Verde muito escuro / pontas em garra = excesso de N. Reduzindo o Nitrato de Cálcio −20%.",
       warnings: ["Excesso de N atrasa a floração."],
       recipeMul: { [CA]: 0.8 },
@@ -117,7 +117,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (has("chlorosis_old")) {
     return {
       action: "adjust",
-      title: "⚗️ Mais magnésio",
+      title: "Mais magnésio",
       message: "Folhas velhas amareladas (entre as nervuras) = deficiência de Mg. Subindo o Sulfato de Magnésio +20%.",
       warnings: [],
       recipeMul: { [MG]: 1.2 },
@@ -129,7 +129,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if (has("wilting")) {
     return {
       action: "adjust",
-      title: "💧 Cheque a rega",
+      title: "Cheque a rega",
       message: "Murcha = turgência baixa. Cheque a rega/raízes (encharcado ou seco demais) antes de mexer na receita.",
       warnings: ["Murcha raramente é nutriente — costuma ser água/raiz."],
     };
@@ -139,7 +139,7 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
   if ((symptoms.length === 0 || has("none")) && runoffEc != null && runoffEc >= 1.0 && runoffEc <= ecTarget * 1.15) {
     return {
       action: "maintain",
-      title: "✅ Mantém a receita",
+      title: "Mantém a receita",
       message: "Sem sintomas e runoff dentro da faixa. Mantém a receita Kroma da fase.",
       warnings: [],
     };
