@@ -2265,6 +2265,22 @@ static void copyStr(char *dst, size_t dstLen, const char *src) {
 extern "C" void cultivoUI_applyItems(const CultivoItem *src, int count) {
   if (count < 0) count = 0;
   if (count > SCENES_MAX) count = SCENES_MAX;
+
+  // A ESTRUTURA mudou (count ou ids/tipos diferentes do grid atual)? Se NAO
+  // mudou, atualiza os cards NO LUGAR em vez de destruir/recriar o grid. Isso
+  // resolve o "clico varias vezes": antes, o refresh de 30s recriava todos os
+  // botoes — um tap no meio disso era perdido (botao deletado embaixo do dedo)
+  // e o feedback otimista era revertido. Comparacao feita ANTES de sobrescrever.
+  bool sameStruct = (sceneTab != nullptr) && (count == sceneCount) && (count > 0)
+                    && (itemBtns[0] != nullptr);
+  if (sameStruct) {
+    for (int i = 0; i < count; i++) {
+      if (items[i].type != src[i].type || strcmp(items[i].id, src[i].id) != 0) {
+        sameStruct = false; break;
+      }
+    }
+  }
+
   sceneCount = count;
   for (int i = 0; i < count; i++) {
     copyStr(items[i].id,       sizeof(items[i].id),       src[i].id);
@@ -2279,8 +2295,16 @@ extern "C" void cultivoUI_applyItems(const CultivoItem *src, int count) {
     items[i].id[0] = items[i].name[0] = items[i].iconHint[0] = '\0';
     items[i].type = 0; items[i].state = false; items[i].executionSec = 0;
   }
-  printf("[ui] cultivoUI_applyItems count=%d\n", count);
-  rebuildSceneGrid();
+  printf("[ui] cultivoUI_applyItems count=%d inplace=%d\n", count, (int)sameStruct);
+
+  if (sameStruct) {
+    // Atualiza so' o estado dos devices (nao toca nos botoes -> taps preservados).
+    for (int i = 0; i < count; i++) {
+      if (items[i].type == 1 || items[i].type == 2) paintDeviceState(i);
+    }
+  } else {
+    rebuildSceneGrid();
+  }
 }
 
 // Legacy: mantida pra compat. Constroi CultivoItem[] com type=scene + iconHint
