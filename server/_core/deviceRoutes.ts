@@ -1155,7 +1155,9 @@ function registerDeviceRoutes(app: express.Application) {
       const r = await controlTuyaDevice(deviceId, code, value, cfg.accessId, cfg.accessSecret, cfg.region);
       const tuyaMs = Date.now() - _t0;
       console.log(`[Device] device-level device=${deviceId} ${code}=${JSON.stringify(value)} -> ${r.success ? 'OK' : 'FAIL'} (${r.msg ?? ''}) tuyaMs=${tuyaMs}`);
-      if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
+      // NÃO devolve 5xx em falha da Tuya (Cloudflare troca por página 502 e o
+      // ESP não vê o motivo). Devolve 200 com success=false + msg p/ diagnóstico.
+      if (!r.success) return res.json({ success: false, deviceId, code, value, msg: r.msg ?? 'Tuya retornou falha' });
 
       invalidateScenesCache(device.tentId);
       res.json({ success: true, deviceId, code, value, tuyaMs });
