@@ -965,14 +965,14 @@ function registerDeviceRoutes(app: express.Application) {
         tentDeviceRows.map((r: any) =>
           cfg
             ? getTuyaDeviceSwitchState(r.deviceId, cfg.accessId, cfg.accessSecret, cfg.region, { debug: true })
-            : Promise.resolve({ online: false, switchOn: null, switchCode: null, debugDps: [] as string[] })
+            : Promise.resolve({ online: false, switchOn: null, switchCode: null, localKey: null, debugDps: [] as string[] })
         )
       );
 
       tentDeviceRows.forEach((r: any, idx: number) => {
         const stateRes = deviceStates[idx];
         const ok = stateRes.status === 'fulfilled';
-        const state = ok ? stateRes.value : { online: false, switchOn: null, switchCode: null, debugDps: [] };
+        const state = ok ? stateRes.value : { online: false, switchOn: null, switchCode: null, localKey: null, debugDps: [] };
         const errMsg = ok ? null : (stateRes.reason instanceof Error ? stateRes.reason.message : String(stateRes.reason));
         // Log detalhado por device pra diagnosticar state=null em prod
         console.log(
@@ -990,6 +990,10 @@ function registerDeviceRoutes(app: express.Application) {
           iconHint: r.iconHint as string | null,
           state: state.switchOn,    // boolean | null
           online: state.online,
+          // Controle local na LAN: ESP usa localKey + dp pra falar direto com o
+          // device (porta 6668, AES) em vez de ir pela nuvem. null = sem local.
+          localKey: (state as any).localKey ?? null,
+          dp: state.switchCode ?? null,
         });
       });
 

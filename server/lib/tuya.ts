@@ -388,6 +388,7 @@ export interface TuyaSwitchState {
   online: boolean;
   switchOn: boolean | null;   // null = dispositivo não expõe switch DP
   switchCode: string | null;  // "switch", "switch_1", etc.
+  localKey: string | null;    // chave local (do device detail) p/ controle LAN no ESP
 }
 
 // Lista expandida de DP codes que representam um switch on/off em devices Tuya.
@@ -430,6 +431,9 @@ export async function getTuyaDeviceSwitchState(
   ]);
 
   const online = devData.success ? Boolean(devData.result?.online) : false;
+  // local_key vem no detalhe do device (/v1.0/devices/{id}) — usada pelo ESP
+  // pra controle local na LAN (toggle instantaneo, sem ida-e-volta a nuvem).
+  const localKey: string | null = devData.success ? ((devData.result?.local_key as string) ?? null) : null;
 
   let switchOn: boolean | null = null;
   let switchCode: string | null = null;
@@ -443,8 +447,8 @@ export async function getTuyaDeviceSwitchState(
   }
 
   return opts.debug
-    ? { online, switchOn, switchCode, debugDps: dpCodes }
-    : { online, switchOn, switchCode };
+    ? { online, switchOn, switchCode, localKey, debugDps: dpCodes }
+    : { online, switchOn, switchCode, localKey };
 }
 
 /**

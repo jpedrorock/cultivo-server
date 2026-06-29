@@ -2254,6 +2254,10 @@ static char    sceneIconHintLocal[SCENES_LOCAL_MAX][16] = {{0}};  // 16 cabe "de
 static uint8_t  sceneTypeLocal        [SCENES_LOCAL_MAX] = {0};
 static bool     sceneStateLocal       [SCENES_LOCAL_MAX] = {false};
 static uint16_t sceneExecutionSecLocal[SCENES_LOCAL_MAX] = {0};  // duracao p/ scenes (0=default 5s)
+// Controle local na LAN (devices): local_key (16 chars) + DP de toggle. Vem do
+// /scenes (servidor busca da Tuya). Vazio = sem local -> usa a nuvem.
+static char     sceneLocalKeyLocal[SCENES_LOCAL_MAX][24] = {{0}};
+static char     sceneDpLocal      [SCENES_LOCAL_MAX][16] = {{0}};
 static int      sceneCountLocal = 0;
 
 static volatile bool scenesNeedsRefresh = false;
@@ -2283,6 +2287,8 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
     sceneStateLocal[n]        = false;
     sceneIconHintLocal[n][0]  = '\0';
     sceneExecutionSecLocal[n] = 0;  // = default 5s no UI side
+    sceneLocalKeyLocal[n][0]  = '\0';
+    sceneDpLocal[n][0]        = '\0';
   } else {
     // Novo {items:[...]}: type "scene"|"device"|"automation"
     const char *typeStr = obj["type"] | "scene";
@@ -2304,10 +2310,15 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
     // no UI quando ausente ou 0.
     sceneExecutionSecLocal[n] = (uint16_t)(obj["executionSec"] | 0);
 
-    Serial.printf("[net]   [%d] type=%s name=%-15s state=%s iconHint=%s execSec=%u id=%s\n",
+    // Controle local: chave + DP (so' devices; servidor manda null p/ cenas).
+    copyToBuf(sceneLocalKeyLocal[n], sizeof(sceneLocalKeyLocal[n]), obj["localKey"] | "");
+    copyToBuf(sceneDpLocal[n],       sizeof(sceneDpLocal[n]),       obj["dp"] | "");
+
+    Serial.printf("[net]   [%d] type=%s name=%-15s state=%s iconHint=%s execSec=%u local=%s id=%s\n",
                   n, typeStr, sceneNamesLocal[n],
                   sceneStateLocal[n] ? "ON" : "OFF",
-                  sceneIconHintLocal[n], sceneExecutionSecLocal[n], sceneIdsLocal[n]);
+                  sceneIconHintLocal[n], sceneExecutionSecLocal[n],
+                  sceneLocalKeyLocal[n][0] ? "yes" : "no", sceneIdsLocal[n]);
   }
   return true;
 }
