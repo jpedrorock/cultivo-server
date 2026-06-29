@@ -1003,8 +1003,10 @@ function registerDeviceRoutes(app: express.Application) {
         if (lvlFn) {
           let parsed: any = {};
           try { parsed = JSON.parse(lvlFn.values || '{}'); } catch { /* values pode vir vazio */ }
+          // valor ATUAL do nível (do status) — posição inicial do slider
+          const cur = (state as any).debugDpsFull?.find((d: any) => d.code === lvlFn.code);
           // Enum -> {range:[...]}; Integer -> {min,max,step,scale}
-          level = { code: lvlFn.code, type: lvlFn.type, ...parsed };
+          level = { code: lvlFn.code, type: lvlFn.type, ...parsed, value: cur ? cur.value : null };
         }
         console.log(`[Device] /scenes device=${r.deviceId} level=${level ? JSON.stringify(level) : 'none'} fns=[${fns.map((f: any) => f.code).join(',')}]`);
         items.push({
@@ -1019,10 +1021,8 @@ function registerDeviceRoutes(app: express.Application) {
           // device (porta 6668, AES) em vez de ir pela nuvem. null = sem local.
           localKey: (state as any).localKey ?? null,
           dp: state.switchCode ?? null,
-          // Controle de nível (slider). null = device só on/off.
+          // Controle de nível (slider): {code, type, range|min/max, value}. null = só on/off.
           level,
-          // specFns = ficha técnica crua (TEMP — descoberta do canal; remover depois).
-          specFns: fns,
         });
       });
 
@@ -1118,6 +1118,50 @@ function registerDeviceRoutes(app: express.Application) {
     } catch (err: any) {
       console.error('[Device] device-toggle error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao alternar device' });
+    }
+  });
+
+  // POST /api/device/device-level — seta um DP de NÍVEL (slider) num device
+  // Tuya vinculado à estufa do display. Body: {deviceId, code, value}.
+  //   code  = DP de nível (ex "fan_speed_enum")
+  //   value = valor a setar (ex "level_3" p/ Enum, ou número p/ Integer/%)
+  // Usado pelo slider do controlador de potência do exaustor.
+  app.post('/api/device/device-level', async (req, res) => {
+    try {
+      const device = await validateDeviceToken(req);
+      if (!device) return res.status(401).json({ error: 'Token inválido' });
+
+      const deviceId = String(req.body?.deviceId ?? '').trim();
+      const code = String(req.body?.code ?? '').trim();
+      const value = req.body?.value;
+      if (!deviceId || !code || value === undefined || value === null) {
+        return res.status(400).json({ error: 'deviceId, code e value obrigatórios' });
+      }
+
+      // Valida que o device pertence à estufa do display (mesmo padrão do toggle)
+      const [bindRows]: any = await pool.execute(
+        `SELECT id FROM tentDevices WHERE tentId = ? AND deviceId = ? LIMIT 1`,
+        [device.tentId, deviceId]
+      );
+      if (bindRows.length === 0) {
+        return res.status(403).json({ error: 'Device não vinculado a esta estufa' });
+      }
+
+      const cfg = await getTuyaCfgForDevice(device);
+      if (!cfg) return res.status(404).json({ error: 'Nenhuma config Tuya ativa pro grupo' });
+
+      const { controlTuyaDevice } = await import('../lib/tuya');
+      const _t0 = Date.now();
+      const r = await controlTuyaDevice(deviceId, code, value, cfg.accessId, cfg.accessSecret, cfg.region);
+      const tuyaMs = Date.now() - _t0;
+      console.log(`[Device] device-level device=${deviceId} ${code}=${JSON.stringify(value)} -> ${r.success ? 'OK' : 'FAIL'} (${r.msg ?? ''}) tuyaMs=${tuyaMs}`);
+      if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
+
+      invalidateScenesCache(device.tentId);
+      res.json({ success: true, deviceId, code, value, tuyaMs });
+    } catch (err: any) {
+      console.error('[Device] device-level error:', err?.message);
+      res.status(500).json({ error: err?.message ?? 'Erro ao setar nível' });
     }
   });
 

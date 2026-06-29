@@ -404,6 +404,8 @@ const SWITCH_CODES = [
   "power", "on",
   // Tomadas multi-gang (1-6 gangs comuns)
   "switch_2", "switch_3", "switch_4", "switch_5", "switch_6",
+  // Controladores de ventilação/exaustor (on/off do fan)
+  "switch_fan", "fan_switch",
   // Variantes alternativas
   "sw1", "sw_1", "switch_main", "main_switch",
 ];
@@ -421,7 +423,7 @@ export async function getTuyaDeviceSwitchState(
   accessSecret: string,
   region: TuyaRegion,
   opts: { debug?: boolean } = {}
-): Promise<TuyaSwitchState & { debugDps?: string[] }> {
+): Promise<TuyaSwitchState & { debugDps?: string[]; debugDpsFull?: { code: string; value: any }[] }> {
   const { accessToken } = await getToken(accessId, accessSecret, region);
 
   // Busca info + status em paralelo
@@ -438,8 +440,10 @@ export async function getTuyaDeviceSwitchState(
   let switchOn: boolean | null = null;
   let switchCode: string | null = null;
   const dpCodes: string[] = [];
+  const dpFull: { code: string; value: any }[] = [];
   for (const s of (statusData.result ?? []) as { code: string; value: any }[]) {
     dpCodes.push(s.code);
+    dpFull.push({ code: s.code, value: s.value });
     if (SWITCH_CODES.includes(s.code) && switchCode === null) {
       switchCode = s.code;
       switchOn = Boolean(s.value);
@@ -447,7 +451,7 @@ export async function getTuyaDeviceSwitchState(
   }
 
   return opts.debug
-    ? { online, switchOn, switchCode, localKey, debugDps: dpCodes }
+    ? { online, switchOn, switchCode, localKey, debugDps: dpCodes, debugDpsFull: dpFull }
     : { online, switchOn, switchCode, localKey };
 }
 
