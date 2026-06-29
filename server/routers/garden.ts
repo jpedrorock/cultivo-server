@@ -7,7 +7,17 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, getIdealValuesByTent } from "../db";
 import { tents, cycles, dailyLogs, plants, strains, plantHealthLogs, plantStructures } from "../../drizzle/schema";
-import { computePlantStage, computePlantMood, computeReadyToFlip, STAGE_NAME, MOOD_LABEL } from "../lib/plantGame";
+import {
+  computePlantStage,
+  computePlantMood,
+  computeReadyToFlip,
+  computeEnvState,
+  countActiveTops,
+  latestHealthByPlant,
+  STAGE_NAME,
+  MOOD_LABEL,
+  type PlantHealth,
+} from "../lib/plantGame";
 
 export const gardenRouter = router({
   getState: protectedProcedure.query(async ({ ctx }) => {
@@ -63,13 +73,8 @@ export const gardenRouter = router({
         const tempOk = t == null || ideal.tempMin == null || ideal.tempMax == null || (t >= ideal.tempMin && t <= ideal.tempMax);
         const rhOk = r == null || ideal.rhMin == null || ideal.rhMax == null || (r >= ideal.rhMin && r <= ideal.rhMax);
         envOk = tempOk && rhOk;
-        if (t != null && ideal.tempMax != null && t > ideal.tempMax) envState = "hot";
-        else if (t != null && ideal.tempMin != null && t < ideal.tempMin) envState = "cold";
-        else if (r != null && ideal.rhMin != null && r < ideal.rhMin) envState = "hot"; // ar muito seco = estresse de calor
-        else if (t != null) envState = "ok";
-      } else if (t != null) {
-        envState = "ok"; // tem leitura, sem ideal → assume ok
       }
+      envState = computeEnvState({ tempC: t, rhPct: r, ideal: latest ? ideal : null });
     } catch {
       envOk = true; // sem ideais → não penaliza
     }
@@ -105,16 +110,14 @@ export const gardenRouter = router({
 
     // Saúde mais recente por planta (espelho: SICK → folha amarela etc).
     const plantIds = plantRows.map((p) => p.id);
-    const healthByPlant: Record<number, "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING"> = {};
+    let healthByPlant: Record<number, PlantHealth> = {};
     if (plantIds.length) {
       const healthRows = (await database
         .select({ plantId: plantHealthLogs.plantId, healthStatus: plantHealthLogs.healthStatus })
         .from(plantHealthLogs)
         .where(inArray(plantHealthLogs.plantId, plantIds))
-        .orderBy(desc(plantHealthLogs.logDate))) as Array<{ plantId: number; healthStatus: "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING" }>;
-      for (const r of healthRows) {
-        if (!(r.plantId in healthByPlant)) healthByPlant[r.plantId] = r.healthStatus; // 1º = mais recente
-      }
+        .orderBy(desc(plantHealthLogs.logDate))) as Array<{ plantId: number; healthStatus: PlantHealth }>;
+      healthByPlant = latestHealthByPlant(healthRows);
     }
 
     // Forma do treino → nº de colas (topping/FIM criam tops ativos). 1 = natural.
@@ -125,13 +128,7 @@ export const gardenRouter = router({
         .from(plantStructures)
         .where(inArray(plantStructures.plantId, plantIds))) as Array<{ plantId: number; nodesJson: string }>;
       for (const s of structRows) {
-        try {
-          const nodes = JSON.parse(s.nodesJson) as Array<{ type?: string; state?: string }>;
-          const tops = nodes.filter((n) => n.type === "top" && n.state === "active").length;
-          topsByPlant[s.plantId] = Math.max(1, Math.min(8, tops));
-        } catch {
-          /* json inválido → ignora (cai no default 1) */
-        }
+        topsByPlant[s.plantId] = countActiveTops(s.nodesJson);
       }
     }
 

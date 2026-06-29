@@ -55,6 +55,84 @@ export function computePlantMood(input: {
   return "thirsty";
 }
 
+// ── Espelho rico (E1–E4): derivações puras alimentadas pelo garden.getState ──
+
+export type PlantHealth = "HEALTHY" | "STRESSED" | "SICK" | "RECOVERING";
+export type EnvState = "hot" | "cold" | "ok" | "unknown";
+
+/** Faixas ideais da estufa (qualquer campo pode faltar). */
+export interface IdealBand {
+  tempMin: number | null;
+  tempMax: number | null;
+  rhMin: number | null;
+  rhMax: number | null;
+}
+
+/**
+ * E2 — estado do ambiente pra POSTURA da planta (calor derruba folha, frio
+ * curva pra cima). Temp fora da faixa manda; ar muito seco (RH < rhMin) conta
+ * como estresse de calor. Sem leitura → "unknown"; com leitura e sem ideal →
+ * "ok". Valores não-finitos viram null (tratados como ausência de leitura).
+ */
+export function computeEnvState(input: {
+  tempC: number | null;
+  rhPct: number | null;
+  ideal: IdealBand | null;
+}): EnvState {
+  const t = input.tempC != null && Number.isFinite(input.tempC) ? input.tempC : null;
+  const r = input.rhPct != null && Number.isFinite(input.rhPct) ? input.rhPct : null;
+  const ideal = input.ideal;
+  if (ideal) {
+    if (t != null && ideal.tempMax != null && t > ideal.tempMax) return "hot";
+    if (t != null && ideal.tempMin != null && t < ideal.tempMin) return "cold";
+    if (r != null && ideal.rhMin != null && r < ideal.rhMin) return "hot"; // ar muito seco = estresse de calor
+    if (t != null) return "ok";
+    return "unknown";
+  }
+  return t != null ? "ok" : "unknown";
+}
+
+/**
+ * E3 — nº de colas a partir da forma treinada (`plantStructures.nodesJson`):
+ * conta os nós `type:"top"` ativos (topping/FIM criam tops), clampado em 1–8.
+ * JSON inválido ou zero tops → 1 (planta natural, uma cola central).
+ */
+export function countActiveTops(nodesJson: string): number {
+  try {
+    const nodes = JSON.parse(nodesJson) as Array<{ type?: string; state?: string }>;
+    const tops = nodes.filter((n) => n.type === "top" && n.state === "active").length;
+    return Math.max(1, Math.min(8, tops));
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * E1 — saúde mais recente por planta. Recebe os logs JÁ ordenados do mais
+ * recente pro mais antigo (desc por data); o primeiro de cada planta vence.
+ */
+export function latestHealthByPlant(
+  rows: Array<{ plantId: number; healthStatus: PlantHealth }>,
+): Record<number, PlantHealth> {
+  const out: Record<number, PlantHealth> = {};
+  for (const r of rows) {
+    if (!(r.plantId in out)) out[r.plantId] = r.healthStatus; // 1º = mais recente
+  }
+  return out;
+}
+
+/** Severidade da saúde (espelho: quanto maior, mais a planta amarela/mancha). */
+export const HEALTH_SEVERITY: Record<PlantHealth, number> = {
+  HEALTHY: 0,
+  RECOVERING: 1,
+  STRESSED: 2,
+  SICK: 3,
+};
+
+export function healthSeverity(status: PlantHealth | null): number {
+  return status ? HEALTH_SEVERITY[status] : 0;
+}
+
 const WEEK_MS = 7 * 86400000;
 
 /**
