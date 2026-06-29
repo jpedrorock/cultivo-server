@@ -42,6 +42,12 @@ static bool     g_tuyaUdpKeyReady = false;
 static bool     g_tuyaBegun = false;
 static uint32_t g_tuyaSeq = 1;
 static int      g_tuyaDiscDbgPkts = 0;  // loga os primeiros pacotes crus p/ debug
+// KILL-SWITCH: controle local DESLIGADO por ora. A v0.5.28 (1a versao do Tuya
+// local) causou reboot-loop na Estufa C (device de pouco heap) — o custo de
+// memoria da descoberta (2 sockets UDP + JsonDocument por pacote) estourou.
+// Com false, begin/set viram no-op -> device estavel + toggle usa a nuvem
+// (comportamento da v0.5.27). Religar (true) quando o code estiver enxuto.
+static bool     g_tuyaLocalEnabled = false;
 
 // Chave global da descoberta UDP = md5("yGAdlopoPVldABfn") (fixa do protocolo).
 static void tuyaUdpKeyInit() {
@@ -135,7 +141,7 @@ static void tuyaParseDiscovery(uint8_t *pkt, int n, bool encrypted) {
 }
 
 static void tuyaLocalBegin() {
-  if (g_tuyaBegun) return;
+  if (!g_tuyaLocalEnabled || g_tuyaBegun) return;  // kill-switch: no-op se desligado
   tuyaUdpKeyInit();
   bool a = g_tuyaUdp6667.begin(6667);
   bool b = g_tuyaUdp6666.begin(6666);
@@ -174,6 +180,7 @@ static int tuyaDpIndex(const char *dpCode) {
 
 // Liga/desliga local. true = device confirmou (ack); false -> caller usa nuvem.
 static bool tuyaLocalSet(const char *devId, const char *localKey, const char *dpCode, bool on) {
+  if (!g_tuyaLocalEnabled) return false;  // kill-switch: cai pra nuvem
   const TuyaDisc *d = tuyaFindDisc(devId);
   if (!d)            { Serial.printf("[tuya-local] %s sem IP -> nuvem\n", devId); return false; }
   if (d->ver != 3)   { Serial.printf("[tuya-local] %s ver=3.%u (so 3.3) -> nuvem\n", devId, d->ver); return false; }
