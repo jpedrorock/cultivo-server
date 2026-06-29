@@ -33,7 +33,7 @@ include ':capacitor-status-bar'
 project(':capacitor-status-bar').projectDir = new File('../node_modules/.pnpm/@capacitor+status-bar@8.0.2_@capacitor+core@8.4.1/node_modules/@capacitor/status-bar/android')
 
 include ':revenuecat-purchases-capacitor'
-project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.1.5_@capacitor+core@8.4.1/node_modules/@revenuecat/purchases-capacitor/android')
+project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.2.0_@capacitor+core@8.4.1/node_modules/@revenuecat/purchases-capacitor/android')
 
 include ':sentry-capacitor'
-project(':sentry-capacitor').projectDir = new File('../node_modules/.pnpm/@sentry+capacitor@4.0.0_@capacitor+core@8.4.1_@sentry+react@10.56.0_react@19.2.7_/node_modules/@sentry/capacitor/android')
+project(':sentry-capacitor').projectDir = new File('../node_modules/.pnpm/@sentry+capacitor@4.2.0_@capacitor+core@8.4.1_@sentry+react@10.62.0_react@19.2.7_/node_modules/@sentry/capacitor/android')
