@@ -1072,8 +1072,10 @@ function registerDeviceRoutes(app: express.Application) {
         return res.status(422).json({ error: 'Dispositivo não expõe switch (não controlável)' });
       }
 
+      const _tuyaT0 = Date.now();
       const r = await controlTuyaDevice(deviceId, switchCode, desired, cfg.accessId, cfg.accessSecret, cfg.region);
-      console.log(`[Device] device-toggle device=${deviceId} switchCode=${switchCode} -> ${desired} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''})`);
+      const tuyaMs = Date.now() - _tuyaT0;
+      console.log(`[Device] device-toggle device=${deviceId} switchCode=${switchCode} -> ${desired} (${r.success ? 'OK' : 'FAIL'}: ${r.msg ?? ''}) tuyaMs=${tuyaMs}`);
       if (!r.success) return res.status(502).json({ error: r.msg ?? 'Tuya retornou falha' });
 
       // NÃO re-consultamos a Tuya aqui — economiza 1 chamada por toggle.
@@ -1083,7 +1085,7 @@ function registerDeviceRoutes(app: express.Application) {
       // desperdiçada: o firmware ignorava o resultado de qualquer forma.
       invalidateScenesCache(device.tentId);
 
-      res.json({ success: true, deviceId, state: desired });
+      res.json({ success: true, deviceId, state: desired, tuyaMs });
     } catch (err: any) {
       console.error('[Device] device-toggle error:', err?.message);
       res.status(500).json({ error: err?.message ?? 'Erro ao alternar device' });
