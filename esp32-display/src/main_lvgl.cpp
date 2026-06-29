@@ -11,6 +11,9 @@
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <WiFiUdp.h>          // descoberta Tuya local (broadcast UDP 6666/6667)
+#include <MD5Builder.h>       // chave global da descoberta UDP (md5 fixo)
+#include "mbedtls/aes.h"      // AES-128-ECB pro protocolo Tuya local (3.3)
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
 #include <Update.h>
@@ -21,6 +24,7 @@
 #include "fonts/cultivo_fonts.h"
 #include "hal_platform.h"
 #include "cultivo_ui.h"     // UI compartilhada com sim — fase 2 da refatoracao
+#include "tuya_local.h"     // controle local (LAN) dos devices Tuya — real-only
 
 // FONT_* macros e extern declarations vêm de hal_platform.h
 
@@ -28,7 +32,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.27"
+#define FW_VERSION "0.5.28"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -3293,6 +3297,12 @@ static void netTaskFn(void *param) {
       continue;
     }
 
+    // Descoberta Tuya local (LAN): inicia 1x + drena os broadcasts toda iteracao.
+    // Mantem o mapa devId->IP fresco pro toggle local instantaneo. Barato (UDP),
+    // sem chamada a nuvem; roda mesmo com tela apagada.
+    tuyaLocalBegin();
+    tuyaLocalDiscoveryPump();
+
     if (!bootWarmed) {
       bootWarmed = true;
       Serial.println("[net] boot warm-up: tasks + plants");
@@ -3815,7 +3825,16 @@ static void processSceneTap(int idx) {
     Serial.printf("[device] toggle idx=%d id=%s name=%s -> desired=%s\n",
                   idx, id, name, desired ? "ON" : "OFF");
     bool realState = desired;
-    bool ok = wifiOk && postDeviceToggle(id, desired, &realState);
+    // 1) LOCAL primeiro — instantaneo (~0.2s) e ZERO chamada a nuvem Tuya.
+    //    So' considera sucesso se o device respondeu (ack); senao cai pra nuvem.
+    bool ok = false;
+    if (sceneLocalKeyLocal[idx][0] &&
+        tuyaLocalSet(id, sceneLocalKeyLocal[idx], sceneDpLocal[idx], desired)) {
+      ok = true; realState = desired;
+      Serial.println("[device] toggled via LOCAL (LAN) — sem nuvem");
+    }
+    // 2) fallback: nuvem (caminho atual; tambem cobre devices 3.4/sem IP)
+    if (!ok) ok = wifiOk && postDeviceToggle(id, desired, &realState);
     if (!ok) {
       Serial.println("[device] POST falhou ou offline — reverte UI");
       deviceToggleResIdx    = idx;
