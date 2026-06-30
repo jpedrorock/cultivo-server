@@ -13,6 +13,16 @@ import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
 import { readLastStage, writeLastStage } from "@/lib/gardenStage";
 import { readLastMood, writeLastMood } from "@/lib/gardenMood";
 import { getCompanionName } from "@/lib/companionStorage";
+import { computeGardenCall, worstHealthOf, type GardenCallCta } from "@/lib/gardenCall";
+
+// Rótulo do botão de ação da chamada do dia (Pilar 2), por tipo de CTA.
+const CTA_LABEL: Record<Exclude<GardenCallCta, null>, string> = {
+  register: "Registrar",
+  env: "Ver ambiente",
+  health: "Registrar saúde",
+  flip: "Iniciar floração",
+  trichomes: "Ver a planta",
+};
 
 type ParticleIcon = { Icon: typeof Leaf; color: string };
 // Folhas que caem na celebração (ícones fixos por índice).
@@ -195,6 +205,57 @@ export default function Jardim() {
       cancelLocalNotifications([id]).catch(() => {});
     }
   }, [flipDueTs, flipTentId]);
+
+  // Pilar 2 — a chamada do dia: a única necessidade mais importante, na voz do
+  // Cultivisor, usando o nome da companheira.
+  const gardenCall = data && "hasGarden" in data && data.hasGarden
+    ? computeGardenCall({
+        daysSinceLog: data.daysSinceLog,
+        registeredToday: data.registeredToday,
+        readyToFlip: data.readyToFlip,
+        envState: data.env.state,
+        stage: data.stage,
+        worstHealth: worstHealthOf(data.plants),
+        companionName,
+      })
+    : null;
+
+  // Roteia o botão de ação da chamada pro fluxo certo.
+  const runCall = (cta: GardenCallCta) => {
+    switch (cta) {
+      case "register": return handleCare("water", "/quick-log?mode=status");
+      case "env": return handleCare("env", "/quick-log?mode=status");
+      case "health": return navigate("/quick-log?mode=plant");
+      case "trichomes": return navigate("/quick-log?mode=plant");
+      case "flip": setFloraModalOpen(true); return;
+      default: return;
+    }
+  };
+
+  // Push gentil da chamada — máx 1/dia, só necessidade real, agendado pra tarde
+  // (18h) e nunca à noite. Id estável por estufa → reagenda sem duplicar.
+  const callTentId = hasG ? data.tentId : null;
+  const callId = gardenCall?.id ?? null;
+  const callText = gardenCall?.text ?? null;
+  const callIsNeed = gardenCall?.isNeed ?? false;
+  useEffect(() => {
+    if (!callTentId || !callText) return;
+    const id = 820000 + callTentId;
+    const now = new Date();
+    const at = new Date(now);
+    at.setHours(18, 0, 0, 0);
+    if (callIsNeed && at.getTime() > now.getTime()) {
+      scheduleLocalNotification({
+        id,
+        title: companionName ?? "Seu Jardim",
+        body: callText,
+        at,
+        extra: { type: "gardenCall", tentId: callTentId },
+      }).catch(() => {});
+    } else {
+      cancelLocalNotifications([id]).catch(() => {});
+    }
+  }, [callId, callText, callIsNeed, callTentId, companionName]);
 
   return (
     <PageLayout
@@ -393,18 +454,32 @@ export default function Jardim() {
                         <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full bg-blue-500/15 text-blue-400"><Snowflake className="w-4 h-4" /> Frio</span>
                       )}
                     </div>
-                    {/* Voz do Cultivisor — aparece quando ela começa a desbotar */}
-                    {daysSinceLog >= 2 && (
+                    {/* A chamada do dia (Pilar 2) — a voz do Cultivisor, sempre presente */}
+                    {gardenCall && (
                       <div className={cn(
-                        "mt-3 mx-auto max-w-[280px] flex items-center gap-2 rounded-xl border px-3 py-2 text-left",
-                        daysSinceLog >= 4 ? "border-amber-500/30 bg-amber-500/10" : "border-border/50 bg-muted/20",
+                        "mt-3 mx-auto max-w-[300px] flex items-start gap-2 rounded-xl border px-3 py-2.5 text-left",
+                        gardenCall.tone === "urgent" ? "border-amber-500/40 bg-amber-500/10"
+                          : gardenCall.tone === "nudge" ? "border-border/60 bg-muted/25"
+                          : "border-border/40 bg-muted/10",
                       )}>
-                        <Bot className={cn("w-4 h-4 shrink-0", daysSinceLog >= 4 ? "text-amber-400" : "text-blue-400")} />
-                        <p className="text-xs text-muted-foreground leading-snug">
-                          {daysSinceLog >= 4
-                            ? `Faz ${daysSinceLog} dias… ${companionName ? `a ${companionName}` : "ela"} ficou em preto e branco aqui na minha memória. Me conta como ela está?`
-                            : `Faz ${daysSinceLog} dias que você não registra — como ${companionName ? `a ${companionName}` : "ela"} tá?`}
-                        </p>
+                        <Bot className={cn(
+                          "w-4 h-4 shrink-0 mt-0.5",
+                          gardenCall.tone === "urgent" ? "text-amber-400"
+                            : gardenCall.tone === "nudge" ? "text-blue-400" : "text-emerald-400",
+                        )} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground leading-snug">{gardenCall.text}</p>
+                          {gardenCall.cta && (
+                            <button
+                              type="button"
+                              onClick={() => runCall(gardenCall.cta)}
+                              disabled={action !== null}
+                              className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                            >
+                              {CTA_LABEL[gardenCall.cta]} <ArrowRight className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                     {/* Bolinhas do carrossel */}
