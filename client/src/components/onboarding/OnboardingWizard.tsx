@@ -32,6 +32,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { markWizardDone } from "@/lib/wizardStorage";
 import { haptics } from "@/lib/haptics";
+import { LivingPlant } from "@/components/LivingPlant";
+import { setCompanionName as persistCompanionName } from "@/lib/companionStorage";
 import {
   TENT_PRESETS,
   presetLabel,
@@ -47,7 +49,7 @@ export { markWizardDone, isWizardDone } from "@/lib/wizardStorage";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
-type Step = "cultivo" | "size" | "strain" | "plantCount" | "plantNames" | "creating" | "done";
+type Step = "cultivo" | "size" | "strain" | "plantCount" | "plantNames" | "creating" | "ritual";
 type CultivoType = "ORGANIC" | "MINERAL";
 
 type StrainPick =
@@ -146,6 +148,9 @@ export default function OnboardingWizard() {
   const [strainQuery, setStrainQuery] = useState("");
   const [plantCount, setPlantCount] = useState(1);
   const [plantNames, setPlantNames] = useState<string[]>([]);
+  // Ritual de início (Pilar 1): nome da companheira + a estufa criada (pro redirect).
+  const [companionName, setCompanionName] = useState("");
+  const [createdTentId, setCreatedTentId] = useState<number | null>(null);
 
   // tRPC
   const utils = trpc.useUtils();
@@ -293,14 +298,24 @@ export default function OnboardingWizard() {
       }
 
       markWizardDone();
-      setStep("done");
-      // E5: encadeia pro tutorial de registro (QuickLog real em modo demo, não
-      // persiste) → detalhe da estufa criada. O demo lê ?then=.
-      setTimeout(() => setLocation(`/quick-log?demo=1&then=${encodeURIComponent(`/tent/${tent.id}`)}`), 1300);
+      setCreatedTentId(tent.id);
+      // Pilar 1: o ritual de início — nomear a companheira antes do tutorial.
+      // Pré-preenche com a 1ª planta (ou a strain) pra dar um ponto de partida.
+      setCompanionName((names[0]?.trim() || strainName || "").trim());
+      setStep("ritual");
     } catch (e: any) {
       cultivoToast.error("Erro ao configurar", e?.message ?? String(e));
       setStep("plantCount");
     }
+  }
+
+  // Fecha o ritual: salva o nome da companheira e encadeia pro tutorial (E5:
+  // QuickLog real em modo demo, não persiste) → detalhe da estufa. O demo lê ?then=.
+  function completeRitual() {
+    haptics.success().catch(() => {});
+    persistCompanionName(companionName);
+    const then = createdTentId ? `&then=${encodeURIComponent(`/tent/${createdTentId}`)}` : "";
+    setLocation(`/quick-log?demo=1${then}`);
   }
 
   // ── Navegação (voltar) ─────────────────────────────────────────────────────
@@ -313,7 +328,7 @@ export default function OnboardingWizard() {
   }
 
   const stepIndex = STEP_ORDER.indexOf(step);
-  const progress = step === "done" || step === "creating" ? STEP_ORDER.length : Math.max(0, stepIndex);
+  const progress = step === "ritual" || step === "creating" ? STEP_ORDER.length : Math.max(0, stepIndex);
   const isQuestion = stepIndex >= 0;
 
   // Transição slide entre passos
@@ -525,16 +540,31 @@ export default function OnboardingWizard() {
                 </div>
               )}
 
-              {/* ── Done ── */}
-              {step === "done" && (
-                <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
-                  <div className="w-20 h-20 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
-                    <Check className="w-10 h-10 text-primary" strokeWidth={2.5} />
-                  </div>
+              {/* ── Ritual de início (Pilar 1) ── */}
+              {step === "ritual" && (
+                <div className="flex flex-col items-center justify-center gap-5 py-4 text-center">
+                  <LivingPlant stage={1} mood="happy" size={116} />
                   <div className="space-y-1.5">
-                    <p className="text-xl font-black">Estufa criada! 🎉</p>
-                    <p className="text-sm text-muted-foreground max-w-xs">Agora um exemplo rápido de como registrar o dia a dia...</p>
+                    <h1 className="text-[1.6rem] leading-tight font-black tracking-tight text-foreground">Toda planta merece um nome.</h1>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">Essa é a sua companheira — ela cresce com você até a colheita.</p>
                   </div>
+                  <div className="w-full max-w-xs">
+                    <Input
+                      autoFocus
+                      value={companionName}
+                      onChange={(e) => setCompanionName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && companionName.trim()) completeRitual(); }}
+                      placeholder="Dê um nome a ela"
+                      maxLength={40}
+                      className="text-center bg-white/[0.06] border-white/12 backdrop-blur-xl"
+                    />
+                  </div>
+                  <p className="text-sm font-medium text-primary min-h-[1.25rem]">
+                    {companionName.trim() ? `Vou cuidar da ${companionName.trim()} até a colheita.` : " "}
+                  </p>
+                  <Button onClick={completeRitual} disabled={!companionName.trim()} className="w-full max-w-xs" size="lg">
+                    Bora juntos <Sprout className="w-4 h-4 ml-1.5" />
+                  </Button>
                 </div>
               )}
             </motion.div>
@@ -543,7 +573,7 @@ export default function OnboardingWizard() {
       </main>
 
       {/* Footer: voltar (só nas perguntas 2+) */}
-      {isQuestion && stepIndex > 0 && step !== "creating" && step !== "done" && (
+      {isQuestion && stepIndex > 0 && step !== "creating" && step !== "ritual" && (
         <footer className="shrink-0 px-6 pb-4 pt-1">
           <button onClick={goBack} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" /> Voltar

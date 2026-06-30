@@ -12,6 +12,7 @@ import { scheduleLocalNotification, cancelLocalNotifications } from "@/lib/local
 import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
 import { readLastStage, writeLastStage } from "@/lib/gardenStage";
 import { readLastMood, writeLastMood } from "@/lib/gardenMood";
+import { getCompanionName } from "@/lib/companionStorage";
 
 type ParticleIcon = { Icon: typeof Leaf; color: string };
 // Folhas que caem na celebração (ícones fixos por índice).
@@ -75,6 +76,8 @@ const STAGES = ["Semente", "Muda", "Vegetativo", "Floração", "Maturação", "C
 export default function Jardim() {
   const { data, isLoading, refetch } = trpc.garden.getState.useQuery();
   const [, navigate] = useLocation();
+  // Companheira do ritual de início (Pilar 1) — o Jardim a chama pelo nome.
+  const [companionName] = useState<string | null>(() => getCompanionName());
 
   // Carrossel de plantas.
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -203,7 +206,9 @@ export default function Jardim() {
             </div>
             <div className="flex-1">
               <h1 className="text-xl font-bold text-foreground">Meu Jardim</h1>
-              <p className="text-xs text-muted-foreground">Cuide da sua planta — ela cresce de verdade</p>
+              <p className="text-xs text-muted-foreground">
+                {companionName ? `${companionName} está crescendo com você` : "Cuide da sua planta — ela cresce de verdade"}
+              </p>
             </div>
           </div>
         </div>
@@ -397,8 +402,8 @@ export default function Jardim() {
                         <Bot className={cn("w-4 h-4 shrink-0", daysSinceLog >= 4 ? "text-amber-400" : "text-blue-400")} />
                         <p className="text-xs text-muted-foreground leading-snug">
                           {daysSinceLog >= 4
-                            ? `Faz ${daysSinceLog} dias… ela ficou em preto e branco aqui na minha memória. Me conta como ela está?`
-                            : `Faz ${daysSinceLog} dias que você não registra — como ela tá?`}
+                            ? `Faz ${daysSinceLog} dias… ${companionName ? `a ${companionName}` : "ela"} ficou em preto e branco aqui na minha memória. Me conta como ela está?`
+                            : `Faz ${daysSinceLog} dias que você não registra — como ${companionName ? `a ${companionName}` : "ela"} tá?`}
                         </p>
                       </div>
                     )}
