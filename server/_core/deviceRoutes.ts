@@ -999,7 +999,10 @@ function registerDeviceRoutes(app: express.Application) {
         // ficha técnica do device.
         const specRes = deviceSpecs[idx];
         const fns = specRes.status === 'fulfilled' ? ((specRes.value as any).functions ?? []) : [];
-        const lvlFn = fns.find((f: any) => LEVEL_CODES.includes(f.code));
+        // Prioriza pela ordem de LEVEL_CODES (não pela ordem da ficha): assim
+        // pega fan_speed (% direto) antes de fan_speed_enum (presets).
+        let lvlFn: any = null;
+        for (const lc of LEVEL_CODES) { lvlFn = fns.find((f: any) => f.code === lc); if (lvlFn) break; }
         let level: any = null;
         if (lvlFn) {
           let parsed: any = {};
