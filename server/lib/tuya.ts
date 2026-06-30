@@ -531,15 +531,24 @@ export async function controlTuyaDevice(
  *   - type:   "Enum" | "Integer" | "Boolean" | "String"
  *   - values: string JSON — {"range":["1".."5"]} p/ Enum, {"min","max","step"} p/ Integer
  */
+// A spec (lista de DPs + ranges do MODELO) é ESTÁTICA → cacheia 6h pra não
+// gastar 1 chamada de API por refresh do /scenes (a cada ~90s na aba Dispositivos).
+type TuyaSpecFn = { code: string; type: string; values: string };
+const specCache = new Map<string, { fns: TuyaSpecFn[]; at: number }>();
+const SPEC_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+
 export async function getTuyaDeviceSpec(
   deviceId: string,
   accessId: string,
   accessSecret: string,
   region: TuyaRegion
-): Promise<{ functions: { code: string; type: string; values: string }[] }> {
+): Promise<{ functions: TuyaSpecFn[] }> {
+  const cached = specCache.get(deviceId);
+  if (cached && Date.now() - cached.at < SPEC_CACHE_TTL_MS) return { functions: cached.fns };
   const { accessToken } = await getToken(accessId, accessSecret, region);
   const data = await tuyaGet(`/v1.0/devices/${deviceId}/specifications`, accessId, accessSecret, accessToken, region);
-  const functions = (data.result?.functions ?? []) as { code: string; type: string; values: string }[];
+  const functions = (data.result?.functions ?? []) as TuyaSpecFn[];
+  if (functions.length) specCache.set(deviceId, { fns: functions, at: Date.now() });
   return { functions };
 }
 
