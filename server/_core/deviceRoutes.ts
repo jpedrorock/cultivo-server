@@ -961,9 +961,10 @@ function registerDeviceRoutes(app: express.Application) {
       // debug=true → cada call inclui debugDps (lista de DPs que o device expôs)
       // pra ajudar a diagnosticar quando switchOn=null.
       const { getTuyaDeviceSwitchState, getTuyaDeviceSpec } = await import('../lib/tuya');
-      // DPs de nível/velocidade controláveis (ex: controlador de potência do
-      // exaustor com 5 níveis). Ordem = prioridade de match.
-      const LEVEL_CODES = ['fan_speed_enum', 'fan_speed', 'speed', 'windspeed', 'fan_speed_percent', 'percent_control', 'level', 'work_mode', 'bright_value', 'bright_value_v2', 'dimmer_value'];
+      // DPs de nível/velocidade controláveis. Ordem = prioridade. Preferimos o
+      // controle DIRETO em % (fan_speed Integer 1-100) ao enum de presets
+      // (fan_speed_enum, que é só p/ agendamento e não muda a velocidade ao vivo).
+      const LEVEL_CODES = ['fan_speed', 'fan_speed_percent', 'percent_control', 'speed', 'windspeed', 'fan_speed_enum', 'level', 'bright_value', 'bright_value_v2', 'dimmer_value', 'work_mode'];
       const [deviceStates, deviceSpecs] = await Promise.all([
         Promise.allSettled(
           tentDeviceRows.map((r: any) =>
@@ -1133,10 +1134,13 @@ function registerDeviceRoutes(app: express.Application) {
 
       const deviceId = String(req.body?.deviceId ?? '').trim();
       const code = String(req.body?.code ?? '').trim();
-      const value = req.body?.value;
+      let value = req.body?.value;
       if (!deviceId || !code || value === undefined || value === null) {
         return res.status(400).json({ error: 'deviceId, code e value obrigatórios' });
       }
+      // DP Integer (ex fan_speed % 1-100) espera NUMBER; o ESP manda string.
+      // Coage string só-dígitos -> number. Enum (ex "level_3") fica string.
+      if (typeof value === 'string' && /^\d+$/.test(value)) value = Number(value);
 
       // Valida que o device pertence à estufa do display (mesmo padrão do toggle)
       const [bindRows]: any = await pool.execute(
