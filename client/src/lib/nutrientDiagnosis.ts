@@ -23,6 +23,19 @@ export interface DiagnosisInput {
   runoffPh?: number | null;
   runoffEc?: number | null;   // mS/cm
   ecTarget: number;           // EC alvo da fase atual (de recipeEC)
+  /** Histórico de runoff da estufa, MAIS-RECENTE-PRIMEIRO (de dailyLogs). */
+  runoffHistory?: Array<{ ph?: number | null; ec?: number | null }>;
+}
+
+/**
+ * EC do runoff em tendência de alta? Recebe o histórico mais-recente-primeiro;
+ * true se as 3 leituras de EC mais recentes sobem no tempo (≥2 altas seguidas):
+ * ec[mais antigo] < ec[meio] < ec[mais recente]. Puro/testável.
+ */
+export function isEcRising(history: Array<{ ec?: number | null }> | undefined): boolean {
+  const ecs = (history ?? []).map((h) => h.ec).filter((e): e is number => e != null && Number.isFinite(e));
+  if (ecs.length < 3) return false; // mais-recente-primeiro: ecs[0] é a última leitura
+  return ecs[0] > ecs[1] && ecs[1] > ecs[2];
 }
 
 export interface DiagnosisResult {
@@ -41,7 +54,7 @@ const CA = "Nitrato de Cálcio";
 const MG = "Sulfato de Magnésio";
 
 export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
-  const { symptoms, runoffPh, runoffEc, ecTarget } = input;
+  const { symptoms, runoffPh, runoffEc, ecTarget, runoffHistory } = input;
   const has = (s: PlantSymptom) => symptoms.includes(s);
 
   // 1) EC do runoff muito alto → substrato saturado de sais → flush antes de tudo.
@@ -52,6 +65,19 @@ export function diagnoseNutrients(input: DiagnosisInput): DiagnosisResult {
       message: `EC do runoff (${runoffEc.toFixed(2)}) bem acima do alvo (${ecTarget.toFixed(2)}). Substrato saturado — faça flush antes de qualquer ajuste de receita.`,
       warnings: [`EC runoff > alvo × 1,3 = acúmulo crítico de sais (lockout provável).`],
       flush: { volumeMul: 2.0, targetRunoffPct: 30, repeatIfEcAbove: 1.5 },
+    };
+  }
+
+  // 1b) Flush PREVENTIVO por tendência: o EC ainda não estourou o ×1,3, mas
+  // vem subindo nas últimas leituras E já passou do alvo×1,15 → pega o acúmulo
+  // de sais antes de virar lockout. Só dispara com histórico suficiente.
+  if (runoffEc != null && runoffEc > ecTarget * 1.15 && isEcRising(runoffHistory)) {
+    return {
+      action: "flush",
+      title: "Flush preventivo",
+      message: `O EC do runoff vem subindo nas últimas leituras e já está em ${runoffEc.toFixed(2)} (alvo ${ecTarget.toFixed(2)}). Faça um flush leve agora pra evitar o acúmulo de sais antes que vire lockout.`,
+      warnings: ["Tendência de alta no EC do runoff — agir cedo evita queimadura/lockout."],
+      flush: { volumeMul: 1.5, targetRunoffPct: 25, repeatIfEcAbove: 1.3 },
     };
   }
 

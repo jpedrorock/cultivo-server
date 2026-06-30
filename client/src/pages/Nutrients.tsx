@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { CalcEyebrow, CalcRunning } from "@/components/ui/calc-helpers";
 import { PageTransition } from "@/components/PageTransition";
-import { diagnoseNutrients, type PlantSymptom, type DiagnosisResult } from "@/lib/nutrientDiagnosis";
+import { diagnoseNutrients, isEcRising, type PlantSymptom, type DiagnosisResult } from "@/lib/nutrientDiagnosis";
 import { type Phase, getProductsByPhaseWeek, recipeEC, applyRecipeMul } from "@/lib/nutrientRecipe";
 
 // Chips de sintoma do diagnóstico (override sobre a receita Kroma).
@@ -459,6 +459,27 @@ export default function Nutrients() {
    
   }, [activeCycles, effectiveTentId]);
 
+  // Histórico de runoff da estufa (Fase 2): alimenta o flush preventivo por
+  // tendência + auto-preenche os inputs de pH/EC com a última leitura (editável).
+  const recentRunoffQ = trpc.dailyLogs.recentRunoff.useQuery(
+    { tentId: Number(effectiveTentId), limit: 5 },
+    { enabled: !!effectiveTentId }
+  );
+  const runoffHistory = recentRunoffQ.data ?? [];
+  const latestRunoff = runoffHistory[0] ?? null;
+  const ecRising = isEcRising(runoffHistory);
+
+  // Auto-preenche pH/EC do runoff com a última leitura, preservando edição do user.
+  const autoFilledRunoff = useRef<{ ph: string; ec: string }>({ ph: "", ec: "" });
+  useEffect(() => {
+    const ph = latestRunoff?.ph != null ? String(latestRunoff.ph) : "";
+    const ec = latestRunoff?.ec != null ? String(latestRunoff.ec) : "";
+    setRunoffPhStr((prev) => (prev === "" || prev === autoFilledRunoff.current.ph ? ph : prev));
+    setRunoffEcStr((prev) => (prev === "" || prev === autoFilledRunoff.current.ec ? ec : prev));
+    autoFilledRunoff.current = { ph, ec };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestRunoff?.ph, latestRunoff?.ec, effectiveTentId]);
+
   const applications = trpc.nutrients.listApplications.useQuery(
     historyTentFilter !== "all" || historyPhaseFilter !== "all"
       ? {
@@ -515,6 +536,7 @@ export default function Nutrients() {
       runoffPh: !isNaN(ph) && ph > 0 ? ph : null,
       runoffEc: !isNaN(ec) && ec > 0 ? ec : null,
       ecTarget: ecEstimated,
+      runoffHistory,
     }));
   };
   const toggleSymptom = (s: PlantSymptom) => {
@@ -961,6 +983,14 @@ export default function Nutrients() {
                       onChange={(e) => { const v = e.target.value.replace(",", "."); if (v === "" || /^\d*\.?\d*$/.test(v)) { setRunoffEcStr(v); setDiag(null); } }} />
                   </div>
                 </div>
+                {ecRising ? (
+                  <p className="flex items-center gap-1.5 text-xs text-amber-400">
+                    <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+                    EC do runoff vem subindo nas últimas leituras — o diagnóstico pode sugerir um flush preventivo.
+                  </p>
+                ) : latestRunoff && (latestRunoff.ph != null || latestRunoff.ec != null) ? (
+                  <p className="text-xs text-muted-foreground">Preenchido com a última leitura da estufa — pode editar.</p>
+                ) : null}
                 <Button onClick={runDiagnosis} className="w-full">Diagnosticar</Button>
 
                 {diag && (

@@ -24,6 +24,27 @@ export const dailyLogsRouter = router({
         await validateTentOwnership(input.tentId, ctx.user.groupId);
         return db.getDailyLogs(input.tentId, input.limit);
       }),
+    // Últimas N leituras de runoff (pH/EC) da estufa, mais-recente-primeiro.
+    // Alimenta o diagnóstico da calculadora (flush preventivo por tendência).
+    // Reusa o dailyLogs (ph/ec já SÃO a leitura de runoff — ver schema).
+    recentRunoff: protectedProcedure
+      .input(z.object({ tentId: z.number(), limit: z.number().min(1).max(20).default(5) }))
+      .query(async ({ input, ctx }) => {
+        const database = await getDb();
+        if (!database) throw new Error("Database not available");
+        await validateTentOwnership(input.tentId, ctx.user.groupId);
+        const rows = await database
+          .select({ logDate: dailyLogs.logDate, ph: dailyLogs.ph, ec: dailyLogs.ec })
+          .from(dailyLogs)
+          .where(and(eq(dailyLogs.tentId, input.tentId), or(isNotNull(dailyLogs.ph), isNotNull(dailyLogs.ec))))
+          .orderBy(desc(dailyLogs.logDate))
+          .limit(input.limit);
+        return rows.map((r) => ({
+          logDate: r.logDate,
+          ph: r.ph != null ? parseFloat(String(r.ph)) : null,
+          ec: r.ec != null ? parseFloat(String(r.ec)) : null,
+        }));
+      }),
     // getHistoricalWithTargets removido - usar getDailyLogs diretamente
     create: protectedProcedure
       .input(
