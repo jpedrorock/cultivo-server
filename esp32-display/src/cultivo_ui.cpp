@@ -100,6 +100,7 @@ static CultivoRefreshFn      onRefresh     = nullptr;
 static CultivoSceneTriggerFn onSceneTrigger = nullptr;
 static CultivoWifiReconnectFn onWifiReconnect = nullptr;
 static CultivoHistPeriodFn   onHistPeriod  = nullptr;
+static CultivoDeviceLevelFn  onDeviceLevel = nullptr;
 
 extern "C" void cultivoUI_setLuxSaveHandler(CultivoSaveLuxFn cb)         { onLuxSave    = cb; }
 extern "C" void cultivoUI_setPhEcSaveHandler(CultivoSavePhEcFn cb)       { onPhEcSave   = cb; }
@@ -108,6 +109,7 @@ extern "C" void cultivoUI_setRefreshHandler(CultivoRefreshFn cb)         { onRef
 extern "C" void cultivoUI_setSceneTriggerHandler(CultivoSceneTriggerFn cb) { onSceneTrigger = cb; }
 extern "C" void cultivoUI_setWifiReconnectHandler(CultivoWifiReconnectFn cb) { onWifiReconnect = cb; }
 extern "C" void cultivoUI_setHistPeriodHandler(CultivoHistPeriodFn cb)   { onHistPeriod = cb; }
+extern "C" void cultivoUI_setDeviceLevelHandler(CultivoDeviceLevelFn cb) { onDeviceLevel = cb; }
 
 // Estado de refresh em andamento + spin do icone refresh top-right.
 // refreshIcon = ponteiro pro ic_refresh do header (setado em buildHome).
@@ -1772,6 +1774,8 @@ typedef struct {
   bool     state;           // device/automation on/off
   char     iconHint[16];    // "light"/"fan"/"dehumidifier"/etc
   uint16_t executionSec;    // duracao scene em segundos (0 = default 5s)
+  uint8_t  levelCount;      // 0 = sem nivel (so' on/off); N = N niveis (slider)
+  uint8_t  levelValue;      // nivel atual 1..N (posicao do slider)
 } ItemStorage;
 static ItemStorage items[SCENES_MAX];
 static int sceneCount = 0;  // mantem nome legado p/ minimizar diff
@@ -1998,6 +2002,156 @@ static void sceneConfirm(int idx) {
   lv_obj_set_style_text_font(yesL, FONT_TITLE, 0);
 }
 
+// ── Overlay de NÍVEL (controlador de potência, ex: exaustor) ──────────────────
+// Tela cheia (como a rega/confirm). Slider GRANDE 1..N + número + On/Off +
+// Fechar. Resolve o slider apertado do card: aqui o slider é grande e nao
+// briga com o clique do card. Vive no lv_layer_top.
+static lv_obj_t *levelOverlay    = nullptr;
+static lv_obj_t *levelNumLabel   = nullptr;
+static int       levelOverlayIdx = -1;
+
+static lv_obj_t *levelPwBtn   = nullptr;  // botao On/Off do overlay (estado visual)
+static lv_obj_t *levelPwLabel = nullptr;
+
+static void levelOverlayClose() {
+  // delete ASYNC (fora do callback): deletar de dentro do toque do botao trava
+  // a UI (mesmo bug do screensaver). Defer pra depois do processamento do evento.
+  if (levelOverlay) { lv_obj_delete_async(levelOverlay); levelOverlay = nullptr; }
+  levelNumLabel = nullptr;
+  levelPwBtn = nullptr; levelPwLabel = nullptr;
+  levelOverlayIdx = -1;
+}
+
+// Pinta o botao On/Off com o estado atual (Ligado=verde / Desligado=neutro).
+static void paintLevelPw() {
+  if (!levelPwBtn || !levelPwLabel || levelOverlayIdx < 0 || levelOverlayIdx >= SCENES_MAX) return;
+  bool on = items[levelOverlayIdx].state;
+  lv_obj_set_style_bg_color(levelPwBtn, lv_color_hex(on ? COL_PRIMARY : COL_CARD), 0);
+  lv_label_set_text(levelPwLabel, on ? "Ligado" : "Desligado");
+  lv_obj_set_style_text_color(levelPwLabel, lv_color_hex(on ? COL_BG : COL_TEXT), 0);
+}
+
+// Slider do overlay: número AO VIVO no arraste (VALUE_CHANGED) + POST no soltar
+// (RELEASED). Os dois eventos evitam que um toque "perdido" deixe sem comando.
+static void levelOverlaySliderCb(lv_event_t *e) {
+  lv_obj_t *sl = (lv_obj_t *)lv_event_get_target(e);
+  lv_event_code_t code = lv_event_get_code(e);
+  int idx = levelOverlayIdx;
+  if (idx < 0 || idx >= SCENES_MAX) return;
+  int val = (int)lv_slider_get_value(sl);
+  if (levelNumLabel) {
+    char nb[16];
+    if (items[idx].levelCount > 10) snprintf(nb, sizeof(nb), "%d%%", val);
+    else                            snprintf(nb, sizeof(nb), "Nivel %d", val);
+    lv_label_set_text(levelNumLabel, nb);
+  }
+  if (code == LV_EVENT_RELEASED) {
+    items[idx].levelValue = (uint8_t)val;
+    printf("[ui] level overlay idx=%d -> %d/%d (POST)\n", idx, val, items[idx].levelCount);
+    if (onDeviceLevel) onDeviceLevel(idx, val);
+  }
+}
+
+static void openLevelOverlay(int idx) {
+  if (idx < 0 || idx >= sceneCount) return;
+  levelOverlayClose();
+  levelOverlayIdx = idx;
+  printf("[ui] openLevel idx=%d cnt=%d val=%d\n", idx, items[idx].levelCount, items[idx].levelValue);
+  uint8_t cnt = items[idx].levelCount;
+  uint8_t cur = items[idx].levelValue < 1 ? 1 : items[idx].levelValue;
+
+  levelOverlay = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(levelOverlay);
+  lv_obj_set_size(levelOverlay, SCREEN_W, SCREEN_H);
+  lv_obj_set_style_bg_color(levelOverlay, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_bg_opa(levelOverlay, LV_OPA_COVER, 0);
+  lv_obj_clear_flag(levelOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+  // Título (nome do device)
+  lv_obj_t *title = lv_label_create(levelOverlay);
+  lv_label_set_text(title, items[idx].name);
+  lv_obj_set_style_text_color(title, lv_color_hex(COL_TEXT), 0);
+  lv_obj_set_style_text_font(title, FONT_TITLE, 0);
+  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, sh(16));
+
+  // Número do nível (grande, verde). >10 = controle em % (ex 1-100); senão presets.
+  bool pct = (cnt > 10);
+  levelNumLabel = lv_label_create(levelOverlay);
+  char nb[16];
+  if (pct) snprintf(nb, sizeof(nb), "%d%%", cur);
+  else     snprintf(nb, sizeof(nb), "Nivel %d", cur);
+  lv_label_set_text(levelNumLabel, nb);
+  lv_obj_set_style_text_color(levelNumLabel, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_text_font(levelNumLabel, FONT_TITLE, 0);
+  lv_obj_align(levelNumLabel, LV_ALIGN_CENTER, 0, -sh(34));
+
+  // Slider GRANDE 1..N (knob folgado p/ pegar facil)
+  lv_obj_t *sl = lv_slider_create(levelOverlay);
+  lv_slider_set_range(sl, 1, cnt);
+  lv_slider_set_value(sl, cur, LV_ANIM_OFF);
+  lv_obj_set_width(sl, SCREEN_W - sw(64));
+  lv_obj_set_height(sl, sh(14));
+  lv_obj_align(sl, LV_ALIGN_CENTER, 0, sh(4));
+  lv_obj_set_style_bg_color(sl, lv_color_hex(COL_BORDER),  LV_PART_MAIN);
+  lv_obj_set_style_bg_color(sl, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(sl, lv_color_hex(COL_PRIMARY), LV_PART_KNOB);
+  lv_obj_set_style_pad_all(sl, sh(8), LV_PART_KNOB);
+  lv_obj_add_event_cb(sl, levelOverlaySliderCb, LV_EVENT_VALUE_CHANGED, NULL);
+  lv_obj_add_event_cb(sl, levelOverlaySliderCb, LV_EVENT_RELEASED, NULL);
+
+  // Labels min/max (1 ... N)
+  lv_obj_t *lmin = lv_label_create(levelOverlay);
+  lv_label_set_text(lmin, "1");
+  lv_obj_set_style_text_color(lmin, lv_color_hex(COL_DIM), 0);
+  lv_obj_align_to(lmin, sl, LV_ALIGN_OUT_LEFT_MID, -sw(8), 0);
+  lv_obj_t *lmax = lv_label_create(levelOverlay);
+  char mb[6]; snprintf(mb, sizeof(mb), "%d", cnt);
+  lv_label_set_text(lmax, mb);
+  lv_obj_set_style_text_color(lmax, lv_color_hex(COL_DIM), 0);
+  lv_obj_align_to(lmax, sl, LV_ALIGN_OUT_RIGHT_MID, sw(8), 0);
+
+  const lv_coord_t bw = (SCREEN_W - sw(56)) / 2;
+  const lv_coord_t bh = sh(46);
+
+  // On/Off (esquerda) — MOSTRA o estado (Ligado=verde / Desligado=neutro) e
+  // toggla no tap (atualiza na hora + manda via onSceneTrigger).
+  lv_obj_t *pw = lv_obj_create(levelOverlay);
+  lv_obj_remove_style_all(pw);
+  lv_obj_set_size(pw, bw, bh);
+  lv_obj_align(pw, LV_ALIGN_BOTTOM_LEFT, sw(16), -sh(16));
+  lv_obj_set_style_bg_opa(pw, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(pw, lv_color_hex(COL_BORDER), 0);
+  lv_obj_set_style_border_width(pw, 1, 0);
+  lv_obj_set_style_radius(pw, RADIUS_LG, 0);
+  lv_obj_clear_flag(pw, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(pw, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(pw, [](lv_event_t *) {
+    int i = levelOverlayIdx;
+    if (i >= 0 && i < SCENES_MAX) { items[i].state = !items[i].state; paintLevelPw(); if (onSceneTrigger) onSceneTrigger(i); }
+  }, LV_EVENT_CLICKED, NULL);
+  levelPwBtn   = pw;
+  levelPwLabel = lv_label_create(pw);
+  lv_obj_center(levelPwLabel);
+  paintLevelPw();   // estado atual: Ligado/Desligado + cor
+
+  // Fechar (direita, primary)
+  lv_obj_t *cl = lv_obj_create(levelOverlay);
+  lv_obj_remove_style_all(cl);
+  lv_obj_set_size(cl, bw, bh);
+  lv_obj_align(cl, LV_ALIGN_BOTTOM_RIGHT, -sw(16), -sh(16));
+  lv_obj_set_style_bg_color(cl, lv_color_hex(COL_PRIMARY), 0);
+  lv_obj_set_style_bg_opa(cl, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(cl, RADIUS_LG, 0);
+  lv_obj_clear_flag(cl, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(cl, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(cl, [](lv_event_t *) { levelOverlayClose(); }, LV_EVENT_CLICKED, NULL);
+  lv_obj_t *clL = lv_label_create(cl);
+  lv_label_set_text(clL, "Fechar");
+  lv_obj_center(clL);
+  lv_obj_set_style_text_color(clL, lv_color_hex(COL_BG), 0);
+  lv_obj_set_style_text_font(clL, FONT_TITLE, 0);
+}
+
 static void sceneClickCb(lv_event_t *e) {
   int idx = (int)(intptr_t)lv_event_get_user_data(e);
   if (idx < 0 || idx >= sceneCount) return;
@@ -2017,6 +2171,9 @@ static void sceneClickCb(lv_event_t *e) {
   }
 
   if (items[idx].type == 1 || items[idx].type == 2) {
+    // Device com NÍVEL (controlador de potência): abre o overlay GRANDE de
+    // controle (slider + on/off) em vez de só togglar no card.
+    if (items[idx].levelCount > 0) { openLevelOverlay(idx); return; }
     // Device/automation — FEEDBACK OTIMISTA: inverte o state e pinta ON/OFF na
     // HORA do toque (a rede roda no fundo, no tapTask). O servidor agora devolve
     // o estado desejado imediatamente (sem re-consulta — removida no fix de cota),
@@ -2058,6 +2215,9 @@ static void cdClose() {
 
 // Exposto pro main_lvgl: pausa o fetchScenes enquanto o countdown está na tela.
 extern "C" bool cultivoUI_isCountdownActive(void) { return cdOverlay != nullptr; }
+// Overlay de nível aberto → main pausa o fetchScenes (mesma defesa da rega:
+// rebuildar o grid com o overlay aberto travava a UI).
+extern "C" bool cultivoUI_isLevelOverlayActive(void) { return levelOverlay != nullptr; }
 
 static void cdUpdateLabel() {
   if (cdTimeLabel) {
@@ -2228,14 +2388,16 @@ static void rebuildSceneGrid() {
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(btn, sceneClickCb, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
-    // Icone top
+    bool hasLevel = (items[i].levelCount > 0);
+
+    // Icone top (mais alto quando ha slider, p/ liberar espaco embaixo)
     lv_obj_t *ico = lv_image_create(btn);
     lv_image_set_src(ico, iconImg);
     lv_obj_set_style_image_recolor(ico, lv_color_hex(iconColor), 0);
     lv_obj_set_style_image_recolor_opa(ico, LV_OPA_COVER, 0);
-    lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, sh(12));
+    lv_obj_align(ico, LV_ALIGN_TOP_MID, 0, hasLevel ? sh(8) : sh(12));
 
-    // Label embaixo
+    // Label nome — topo quando ha slider, embaixo no card normal
     lv_obj_t *lbl = lv_label_create(btn);
     lv_label_set_text(lbl, items[i].name);
     lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
@@ -2243,7 +2405,32 @@ static void rebuildSceneGrid() {
     lv_obj_set_style_text_color(lbl, lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_text_font(lbl, FONT_CAPTION, 0);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
+    if (hasLevel) lv_obj_align(lbl, LV_ALIGN_TOP_MID, 0, sh(36));
+    else          lv_obj_align(lbl, LV_ALIGN_BOTTOM_MID, 0, -sh(4));
+
+    // Indicador de nivel (READ-ONLY): barra mostrando o nivel atual. NAO e'
+    // interativo -> tocar o card abre o overlay grande (openLevelOverlay).
+    if (hasLevel) {
+      uint8_t lvNow = items[i].levelValue < 1 ? 1 : items[i].levelValue;
+      lv_obj_t *bar = lv_bar_create(btn);
+      lv_bar_set_range(bar, 1, items[i].levelCount);
+      lv_bar_set_value(bar, lvNow, LV_ANIM_OFF);
+      lv_obj_set_width(bar, btnW - sw(16));
+      lv_obj_set_height(bar, sh(6));
+      lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, -sh(20));
+      lv_obj_set_style_bg_color(bar, lv_color_hex(COL_BORDER),  LV_PART_MAIN);
+      lv_obj_set_style_bg_color(bar, lv_color_hex(COL_PRIMARY), LV_PART_INDICATOR);
+
+      // Numero do nivel (N/total)
+      lv_obj_t *lnum = lv_label_create(btn);
+      char nb[8];
+      if (items[i].levelCount > 10) snprintf(nb, sizeof(nb), "%d%%", lvNow);
+      else                          snprintf(nb, sizeof(nb), "%d/%d", lvNow, items[i].levelCount);
+      lv_label_set_text(lnum, nb);
+      lv_obj_set_style_text_color(lnum, lv_color_hex(COL_DIM), 0);
+      lv_obj_set_style_text_font(lnum, FONT_CAPTION, 0);
+      lv_obj_align(lnum, LV_ALIGN_BOTTOM_MID, 0, -sh(3));
+    }
 
     // Salva refs + aplica estado on/off (so' efetivo em devices).
     // Contador de cena não vive mais no card (overlay dedicado sobrevive ao
@@ -2289,11 +2476,14 @@ extern "C" void cultivoUI_applyItems(const CultivoItem *src, int count) {
     items[i].type         = src[i].type;
     items[i].state        = src[i].state;
     items[i].executionSec = src[i].executionSec;
+    items[i].levelCount   = src[i].levelCount;
+    items[i].levelValue   = src[i].levelValue;
   }
   // Limpa slots nao usados (evita render de lixo se shrink)
   for (int i = count; i < SCENES_MAX; i++) {
     items[i].id[0] = items[i].name[0] = items[i].iconHint[0] = '\0';
     items[i].type = 0; items[i].state = false; items[i].executionSec = 0;
+    items[i].levelCount = 0; items[i].levelValue = 0;
   }
   printf("[ui] cultivoUI_applyItems count=%d inplace=%d\n", count, (int)sameStruct);
 

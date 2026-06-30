@@ -82,6 +82,9 @@ typedef struct {
   bool        state;       // device/automation on/off (ignorado p/ scene)
   const char *iconHint;    // "light"|"fan"|"pump"|"heater"|"ac"|"" (default)
   uint16_t    executionSec; // duracao da cena em segundos (scene only); 0 = default 5s
+  // Controle de nivel (ex: controlador de potencia do exaustor, 5 niveis).
+  uint8_t     levelCount;  // 0 = sem nivel (so' on/off); N = N niveis no slider
+  uint8_t     levelValue;  // nivel atual 1..N (0 = desconhecido). Posicao do slider.
 } CultivoItem;
 
 void cultivoUI_applyItems(const CultivoItem *items, int count);
@@ -92,6 +95,12 @@ void cultivoUI_applyScenes(const char *names[], int count);
 // App chama quando confirmar (ou rejeitar) o toggle de um device — UI
 // atualiza visual on/off. Util quando POST /device-toggle responde.
 void cultivoUI_setDeviceState(int idx, bool state);
+
+// App registra handler chamado quando o usuario SOLTA o slider de nivel de um
+// device (ex: potencia do exaustor). idx = item no grid; levelIndex = novo
+// nivel 1..N. App resolve o DP/valor e POSTa /api/device/device-level.
+typedef void (*CultivoDeviceLevelFn)(int idx, int levelIndex);
+void cultivoUI_setDeviceLevelHandler(CultivoDeviceLevelFn cb);
 
 // Spin do icone de um item no grid Cenas (feedback visual de refresh em
 // andamento — card com iconHint=refresh/sensor). startItemSpin gira o
@@ -236,6 +245,7 @@ void cultivoUI_showOtaStatus(const char *msg, int autoHideMs);
 // true enquanto o overlay de countdown de cena está na tela. O netTask usa pra
 // pausar o fetchScenes (não rebuildar o grid nem gastar quota Tuya durante o timer).
 bool cultivoUI_isCountdownActive(void);
+bool cultivoUI_isLevelOverlayActive(void);
 
 typedef void (*CultivoAlertAckFn)(int alertId);
 void cultivoUI_setAlertAckHandler(CultivoAlertAckFn cb);

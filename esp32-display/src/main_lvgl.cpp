@@ -32,7 +32,7 @@
 // CONFIGURACAO — editavel via gear icon no header (persiste em NVS)
 // Defaults aplicados quando NVS esta vazio (primeira boot).
 // ════════════════════════════════════════════════════════════════════════════════
-#define FW_VERSION "0.5.29"
+#define FW_VERSION "0.5.35"
 
 // Configuração de rede — agrupada em struct para facilitar passagem
 // por referência em futuras refatorações e documentar o que é "config"
@@ -269,6 +269,13 @@ static volatile bool otaCheckPending = false;
 static volatile int  sceneTapQueue[SCENE_TAP_QUEUE_SZ] = {0};
 static volatile int  sceneTapQHead = 0;  // próximo a ler (tapTask)
 static volatile int  sceneTapQTail = 0;  // próximo a escrever (handler do toque)
+// Fila de mudança de NÍVEL (slider): {idx do item, novo nível 1..N}. Mesmo
+// padrão da fila de tap — handler (thread UI) escreve, tapTask drena + POSTa.
+#define LEVEL_TAP_QUEUE_SZ 8
+static volatile uint8_t levelTapIdx [LEVEL_TAP_QUEUE_SZ] = {0};
+static volatile uint8_t levelTapVal [LEVEL_TAP_QUEUE_SZ] = {0};
+static volatile int     levelTapQHead = 0;
+static volatile int     levelTapQTail = 0;
 static volatile bool deviceTogglePendingUI = false;
 static int           deviceToggleResIdx    = -1;
 static bool          deviceToggleResState  = false;
@@ -1896,6 +1903,8 @@ static bool httpBegin(HTTPClient &http, const char *url) {
     // Bundle inclui ISRG Root X1, Root X2 e intermediate E8 — cobre Cloudflare
     // (app.cultivo.pro) que nao envia o intermediate na chain TLS.
     httpSecureClient.setCACert(LE_ROOTS);
+    // tapTask (toggle): setCACert (NAO setInsecure — testei em v0.5.33 e o
+    // Cloudflare rejeitava o handshake sem validacao da chain -> HTTP -1).
     httpSecureClientTap.setCACert(LE_ROOTS);
     httpClientsInited = true;
   }
@@ -2262,6 +2271,14 @@ static uint16_t sceneExecutionSecLocal[SCENES_LOCAL_MAX] = {0};  // duracao p/ s
 // /scenes (servidor busca da Tuya). Vazio = sem local -> usa a nuvem.
 static char     sceneLocalKeyLocal[SCENES_LOCAL_MAX][24] = {{0}};
 static char     sceneDpLocal      [SCENES_LOCAL_MAX][16] = {{0}};
+// Controle de NIVEL (controlador de potencia, ex exaustor): DP code (ex
+// "fan_speed_enum") + opcoes do enum ("level_1".."level_5") + nivel atual.
+// count 0 = device so' on/off (sem slider).
+#define LEVEL_OPTS_MAX 6
+static uint8_t  sceneLevelCountLocal[SCENES_LOCAL_MAX] = {0};
+static uint8_t  sceneLevelValueLocal[SCENES_LOCAL_MAX] = {0};
+static char     sceneLevelCodeLocal [SCENES_LOCAL_MAX][24] = {{0}};
+static char     sceneLevelOptsLocal [SCENES_LOCAL_MAX][LEVEL_OPTS_MAX][14] = {{{0}}};
 static int      sceneCountLocal = 0;
 
 static volatile bool scenesNeedsRefresh = false;
@@ -2285,6 +2302,10 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
   if (!id || !*id) return false;
   copyToBuf(sceneIdsLocal[n],   sizeof(sceneIdsLocal[n]),   id);
   copyToBuf(sceneNamesLocal[n], sizeof(sceneNamesLocal[n]), name);
+  // Reset do nivel (preenchido no branch de device abaixo, se houver)
+  sceneLevelCountLocal[n] = 0;
+  sceneLevelValueLocal[n] = 0;
+  sceneLevelCodeLocal[n][0] = '\0';
   if (isLegacyFormat) {
     // Legacy {scenes:[...]} sempre type=scene, sem iconHint, sem state
     sceneTypeLocal[n]         = 0;
@@ -2323,6 +2344,43 @@ static bool parseItemSlot(JsonObject obj, int n, bool isLegacyFormat) {
                   sceneStateLocal[n] ? "ON" : "OFF",
                   sceneIconHintLocal[n], sceneExecutionSecLocal[n],
                   sceneLocalKeyLocal[n][0] ? "yes" : "no", sceneIdsLocal[n]);
+
+    // Controle de NIVEL (slider do controlador de potencia). Server manda
+    // level={code, range:[...], value}. So' tratamos Enum (range de opcoes).
+    if (sceneTypeLocal[n] == 1) {
+      JsonObject lvl = obj["level"];
+      if (!lvl.isNull()) {
+        copyToBuf(sceneLevelCodeLocal[n], sizeof(sceneLevelCodeLocal[n]), lvl["code"] | "");
+        sceneLevelOptsLocal[n][0][0] = '\0';
+        JsonArray range = lvl["range"].as<JsonArray>();
+        if (!range.isNull() && range.size() > 0) {
+          // ENUM (presets ex level_1..level_5): slider 1..count, manda a STRING.
+          int oc = 0;
+          for (JsonVariant v : range) {
+            if (oc >= LEVEL_OPTS_MAX) break;
+            copyToBuf(sceneLevelOptsLocal[n][oc], sizeof(sceneLevelOptsLocal[n][oc]), v.as<const char *>());
+            oc++;
+          }
+          sceneLevelCountLocal[n] = (uint8_t)oc;
+          const char *cur = lvl["value"] | "";
+          sceneLevelValueLocal[n] = 1;
+          for (int k = 0; k < oc; k++) {
+            if (!strcmp(sceneLevelOptsLocal[n][k], cur)) { sceneLevelValueLocal[n] = (uint8_t)(k + 1); break; }
+          }
+          Serial.printf("[level] %s ENUM code=%s niveis=%d atual=%s(%d)\n",
+                        sceneNamesLocal[n], sceneLevelCodeLocal[n], oc, cur, sceneLevelValueLocal[n]);
+        } else if (!lvl["max"].isNull()) {
+          // INTEGER (controle real %, ex fan_speed 1-100): slider 1..max, manda
+          // o NÚMERO (opts vazio = inteiro). Server coage string->number.
+          int mx = lvl["max"] | 100; if (mx < 1) mx = 1; if (mx > 100) mx = 100;
+          int cv = lvl["value"] | 1;  if (cv < 1) cv = 1;  if (cv > mx) cv = mx;
+          sceneLevelCountLocal[n] = (uint8_t)mx;
+          sceneLevelValueLocal[n] = (uint8_t)cv;
+          Serial.printf("[level] %s PCT code=%s max=%d atual=%d\n",
+                        sceneNamesLocal[n], sceneLevelCodeLocal[n], mx, cv);
+        }
+      }
+    }
   }
   return true;
 }
@@ -3195,6 +3253,7 @@ static bool fetchScenes() {
 
 // Forward declaration — definido logo abaixo (depois do netTaskFn)
 static void processSceneTap(int idx);
+static void processLevelTap(int idx, int level);   // slider de nivel (controlador potencia)
 // Forward declarations dos workers de HTTP (definidos depois do tapTaskFn).
 static void doAlertAck();
 static void doHistPeriod();
@@ -3213,6 +3272,15 @@ static void tapTaskFn(void *param) {
       uint32_t t0 = millis();
       processSceneTap(tapIdx);
       logIfSlow("sceneTap", t0, 9000);
+    }
+    // Drena a fila de mudanca de NIVEL (slider) — POSTa /device-level.
+    while (levelTapQHead != levelTapQTail && wifiOk) {
+      int lh = levelTapQHead;
+      uint8_t lidx = levelTapIdx[lh], lval = levelTapVal[lh];
+      levelTapQHead = (levelTapQHead + 1) % LEVEL_TAP_QUEUE_SZ;
+      uint32_t t0 = millis();
+      processLevelTap((int)lidx, (int)lval);
+      logIfSlow("levelTap", t0, 9000);
     }
     if (taskTapPending && wifiOk) {
       uint32_t t0 = millis();
@@ -3359,7 +3427,7 @@ static void netTaskFn(void *param) {
     // grid destruiria a tela do timer, e não faz sentido gastar quota Tuya
     // checando estado de botões que nem estão visíveis (pedido do João).
     static bool netWasOnScenes = false;
-    const bool onScenes = (activeScreen == 4 && !screenAsleep && !cultivoUI_isCountdownActive());
+    const bool onScenes = (activeScreen == 4 && !screenAsleep && !cultivoUI_isCountdownActive() && !cultivoUI_isLevelOverlayActive());
     const bool justEnteredScenes = onScenes && !netWasOnScenes;
     netWasOnScenes = onScenes;
     if (onScenes &&
@@ -3716,7 +3784,9 @@ static bool postDeviceToggle(const char *deviceId, bool desiredState, bool *outR
            deviceId, desiredState ? "true" : "false");
   http.setTimeout(15000);  // server tem re-consulta Tuya 500ms + margem
   Serial.printf("[device] POST %s body=%s\n", url, body);
+  uint32_t _postT0 = millis();
   int code = http.POST(body);
+  uint32_t _postMs = millis() - _postT0;
   if (code != 200) {
     String errBody = http.getString();
     Serial.printf("[device] toggle HTTP %d body=%s\n",
@@ -3746,6 +3816,10 @@ static bool postDeviceToggle(const char *deviceId, bool desiredState, bool *outR
   // poll reverte; se executou, fica.
   bool serverState = doc["state"] | desiredState;
   if (outRealState) *outRealState = desiredState;  // optimistic
+  int _tuyaMs = doc["tuyaMs"] | -1;
+  Serial.printf("[timing] POST=%lums tuya=%dms rede+tls=%ldms\n",
+                (unsigned long)_postMs, _tuyaMs,
+                _tuyaMs >= 0 ? (long)_postMs - (long)_tuyaMs : -1L);
   Serial.printf("[device] toggle desired=%s server_state=%s (optimistic)\n",
                 desiredState ? "ON" : "OFF", serverState ? "ON" : "OFF");
   return true;
@@ -3798,6 +3872,61 @@ static void sceneTriggerHandler(int idx) {
   }
   sceneTapQueue[sceneTapQTail] = idx;
   sceneTapQTail = nextTail;  // tapTask drena a fila em ordem
+}
+
+// Handler do slider de NIVEL (thread UI) — enfileira {idx, nivel} pro tapTask
+// (nunca faz HTTP na thread da UI). idx do item, level = novo nivel 1..N.
+static void deviceLevelHandler(int idx, int level) {
+  if (idx < 0 || idx >= sceneCountLocal) return;
+  int nextTail = (levelTapQTail + 1) % LEVEL_TAP_QUEUE_SZ;
+  if (nextTail == levelTapQHead) { Serial.println("[level] fila cheia — ignorado"); return; }
+  levelTapIdx[levelTapQTail] = (uint8_t)idx;
+  levelTapVal[levelTapQTail] = (uint8_t)level;
+  levelTapQTail = nextTail;
+}
+
+// POST /api/device/device-level {deviceId, code, value} — seta o nivel (ex
+// fan_speed_enum=level_3). Mesmo cliente TLS dedicado do tapTask.
+static bool postDeviceLevel(const char *deviceId, const char *code, const char *value) {
+  if (!wifiOk) return false;
+  HTTPClient http;
+  char url[160];
+  snprintf(url, sizeof(url), "%s/api/device/device-level", SERVER_URL);
+  if (!httpBegin(http, url)) { Serial.println("[level] httpBegin falhou"); return false; }
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  http.addHeader("Content-Type", "application/json");
+  char body[176];
+  snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"code\":\"%s\",\"value\":\"%s\"}",
+           deviceId, code, value);
+  http.setTimeout(15000);
+  Serial.printf("[level] POST %s body=%s\n", url, body);
+  int code_http = http.POST(body);
+  String resp = http.getString();
+  http.end();
+  Serial.printf("[level] HTTP %d body=%s\n", code_http, resp.substring(0, 120).c_str());
+  return code_http == 200;
+}
+
+// Processa UMA mudanca de nivel da fila — chamado pelo tapTask (core 0).
+static void processLevelTap(int idx, int level) {
+  if (idx < 0 || idx >= sceneCountLocal) return;
+  if (level < 1 || level > (int)sceneLevelCountLocal[idx]) return;
+  const char *id   = sceneIdsLocal[idx];
+  const char *code = sceneLevelCodeLocal[idx];
+  if (!code[0]) { Serial.println("[level] code vazio"); return; }
+  char val[14];
+  if (sceneLevelOptsLocal[idx][0][0]) {
+    // ENUM: manda a opcao (ex "level_3")
+    strncpy(val, sceneLevelOptsLocal[idx][level - 1], sizeof(val) - 1);
+    val[sizeof(val) - 1] = '\0';
+  } else {
+    // INTEGER (%): manda o numero (ex "50") — server coage p/ number
+    snprintf(val, sizeof(val), "%d", level);
+  }
+  bool ok = postDeviceLevel(id, code, val);
+  if (ok) sceneLevelValueLocal[idx] = (uint8_t)level;  // confirma estado local
+  Serial.printf("[level] %s -> %s (%s) %s\n",
+                sceneNamesLocal[idx], val, code, ok ? "OK" : "FALHOU");
 }
 
 // Processa UM toque da fila — chamado pelo tapTask (core 0, stack OK).
@@ -3900,6 +4029,7 @@ static void buildUI() {
   cultivoUI_setConfigOpenHandler(requestOpenConfigModal);  // defer pra loop()
   cultivoUI_setRefreshHandler(refreshHandler);
   cultivoUI_setSceneTriggerHandler(sceneTriggerHandler);
+  cultivoUI_setDeviceLevelHandler(deviceLevelHandler);
   cultivoUI_setTaskToggleHandler(taskToggleHandler);
   cultivoUI_setPlantPhotoRequestHandler(plantPhotoRequestHandler);
   cultivoUI_setPlantDetailClosedHandler(plantDetailClosedHandler);
@@ -4205,6 +4335,8 @@ void setup() {
         buf[i].state        = sceneStateLocal[i];
         buf[i].iconHint     = sceneIconHintLocal[i];
         buf[i].executionSec = sceneExecutionSecLocal[i];
+        buf[i].levelCount   = sceneLevelCountLocal[i];
+        buf[i].levelValue   = sceneLevelValueLocal[i];
       }
       cultivoUI_applyItems(buf, sceneCountLocal);
     }
@@ -4265,6 +4397,8 @@ void loop() {
       buf[i].state        = sceneStateLocal[i];
       buf[i].iconHint     = sceneIconHintLocal[i];
       buf[i].executionSec = sceneExecutionSecLocal[i];
+      buf[i].levelCount   = sceneLevelCountLocal[i];
+      buf[i].levelValue   = sceneLevelValueLocal[i];
     }
     cultivoUI_applyItems(buf, sceneCountLocal);
   }
