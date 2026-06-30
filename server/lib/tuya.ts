@@ -511,7 +511,15 @@ export async function controlTuyaDevice(
   const { accessToken } = await getToken(accessId, accessSecret, region);
   const path = `/v1.0/devices/${deviceId}/commands`;
   const body = { commands: [{ code: switchCode, value }] };
-  const data = await tuyaPost(path, body, accessId, accessSecret, accessToken, region);
+  let data = await tuyaPost(path, body, accessId, accessSecret, accessToken, region);
+  // Retry em "device is offline": o status ONLINE do IoT Core às vezes flapa
+  // FALSO — o device está alcançável (o app Smart Life controla normal, até em
+  // dados móveis), mas a API de comando recusa. Visto no "Exaustor smart" (novo).
+  // Re-tenta até 3x com 600ms; costuma pegar uma janela em que está "online".
+  for (let tries = 0; !data.success && /offline/i.test(String(data.msg ?? '')) && tries < 3; tries++) {
+    await new Promise((r) => setTimeout(r, 600));
+    data = await tuyaPost(path, body, accessId, accessSecret, accessToken, region);
+  }
   return { success: Boolean(data.success), msg: data.msg };
 }
 
