@@ -384,18 +384,26 @@ function registerDeviceRoutes(app: express.Application) {
              ORDER BY id ASC LIMIT 10`,
             [tentId, lastSeenId]
           );
-          for (const r of rows as any[]) {
-            if (closed) return;
-            const payload = {
-              id: r.id,
-              type: r.alertType,
-              metric: r.metric,
-              message: r.message,
-              value: r.value != null ? parseFloat(r.value) : null,
-              t: Number(r.t),
-            };
-            res.write(`event: alert\ndata: ${JSON.stringify(payload)}\n\n`);
-            lastSeenId = Math.max(lastSeenId, r.id);
+          // COALESCE / anti-enxurrada: avança o cursor pra além de TODOS os
+          // novos deste lote, mas EMITE só o MAIS RECENTE (no máximo 1 por poll
+          // de 5s). Sem isso, com umidade alta persistente a tabela `alerts`
+          // enche e o SSE despejava 10/poll → o ESP engasgava no protetor de
+          // tela e o watchdog reiniciava em LOOP. 1 alerta/5s o display aguenta.
+          const list = rows as any[];
+          if (list.length > 0) {
+            const r = list[list.length - 1];
+            lastSeenId = Math.max(lastSeenId, ...list.map((x: any) => Number(x.id)));
+            if (!closed) {
+              const payload = {
+                id: r.id,
+                type: r.alertType,
+                metric: r.metric,
+                message: r.message,
+                value: r.value != null ? parseFloat(r.value) : null,
+                t: Number(r.t),
+              };
+              res.write(`event: alert\ndata: ${JSON.stringify(payload)}\n\n`);
+            }
           }
         } catch (e: any) {
           console.warn('[Device] stream poll error:', e?.message);
