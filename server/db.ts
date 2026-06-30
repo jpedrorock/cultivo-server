@@ -902,7 +902,31 @@ export async function checkAlertsForTent(tentId: number): Promise<{
     const recentCutoff = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2h ago
 
     for (const alert of alertsToInsert) {
-      // Dedup: skip if same tentId + metric already alerted in the last 2 hours
+      // Dedup PRIMÁRIO (anti-inundação, robusto): se já existe um alerta ATIVO
+      // (status NEW = não-visto) pra mesma estufa+métrica, NÃO cria outro.
+      // Mantém 1 alerta ativo por condição até o user marcar como visto. Imune a
+      // timezone/race do createdAt (checa o STATUS, não uma janela de tempo).
+      // Sem isso, uma condição persistente (ex: umidade alta) enchia a tabela
+      // `alerts` → o SSE despejava no display → reboot-loop do ESP.
+      const activeExisting = await db
+        .select({ id: alerts.id })
+        .from(alerts)
+        .where(
+          and(
+            eq(alerts.tentId, alert.tentId),
+            eq(alerts.metric, alert.metric),
+            eq(alerts.status, "NEW"),
+          )
+        )
+        .limit(1);
+
+      if (activeExisting.length > 0) {
+        console.log(`[Alerts] Já existe alerta NEW de ${alert.metric} para ${tent.name} — ignorando (anti-inundação)`);
+        continue;
+      }
+
+      // Dedup secundário (cooldown de re-aviso): se o user JÁ marcou como visto
+      // mas a condição persiste, segura um novo alerta por 2h.
       const existing = await db
         .select({ id: alertHistory.id })
         .from(alertHistory)
