@@ -14,6 +14,8 @@ import { readLastStage, writeLastStage } from "@/lib/gardenStage";
 import { readLastMood, writeLastMood } from "@/lib/gardenMood";
 import { getCompanionName } from "@/lib/companionStorage";
 import { computeGardenCall, worstHealthOf, type GardenCallCta } from "@/lib/gardenCall";
+import { GardenXpBar } from "@/components/GardenXpBar";
+import { GardenStreakBadge } from "@/components/GardenStreakBadge";
 
 // Rótulo do botão de ação da chamada do dia (Pilar 2), por tipo de CTA.
 const CTA_LABEL: Record<Exclude<GardenCallCta, null>, string> = {
@@ -85,6 +87,7 @@ const STAGES = ["Semente", "Muda", "Vegetativo", "Floração", "Maturação", "C
 
 export default function Jardim() {
   const { data, isLoading, refetch } = trpc.garden.getState.useQuery();
+  const { data: progress } = trpc.gamification.getProgress.useQuery();
   const [, navigate] = useLocation();
   // Companheira do ritual de início (Pilar 1) — o Jardim a chama pelo nome.
   const [companionName] = useState<string | null>(() => getCompanionName());
@@ -288,6 +291,15 @@ export default function Jardim() {
           />
         ) : (
           <div className="space-y-4">
+            {/* Pilar 3 — o progresso do grower (gamificação que já existe) */}
+            {progress && (
+              <div className="space-y-2">
+                <GardenXpBar score={progress.growScore} levelName={progress.level.name} progressPct={progress.level.progressPct} />
+                {progress.streak.current > 0 && (
+                  <GardenStreakBadge days={progress.streak.current} todayDone={progress.streak.todayDone} />
+                )}
+              </div>
+            )}
             {/* Passagem: hora do flip pra floração */}
             {data.readyToFlip && data.cycleId && (
               <button
