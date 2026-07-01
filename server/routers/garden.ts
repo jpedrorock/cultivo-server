@@ -3,10 +3,11 @@
  * principal do usuário. Lógica pura em server/lib/plantGame.ts. Ver
  * GAME-MODE-CONCEPT.md.
  */
+import { z } from "zod";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, getIdealValuesByTent } from "../db";
-import { tents, cycles, dailyLogs, plants, strains, plantHealthLogs, plantStructures } from "../../drizzle/schema";
+import { tents, cycles, dailyLogs, plants, strains, plantHealthLogs, plantStructures, users } from "../../drizzle/schema";
 import {
   computePlantStage,
   computePlantMood,
@@ -24,10 +25,19 @@ export const gardenRouter = router({
     const database = await getDb();
     if (!database) throw new Error("Banco indisponível");
     const groupId = ctx.user.groupId;
-    if (groupId == null) return { hasGarden: false as const };
+
+    // Companheira do ritual (Pilar 1b) — persiste no servidor agora.
+    const [me] = (await database
+      .select({ companionName: users.companionName })
+      .from(users)
+      .where(eq(users.id, ctx.user.id))
+      .limit(1)) as Array<{ companionName: string | null }>;
+    const companionName = me?.companionName ?? null;
+
+    if (groupId == null) return { hasGarden: false as const, companionName };
 
     const groupTents = await database.select().from(tents).where(eq(tents.groupId, groupId));
-    if (groupTents.length === 0) return { hasGarden: false as const };
+    if (groupTents.length === 0) return { hasGarden: false as const, companionName };
 
     // Estufa principal: a primeira com ciclo ativo; senão a primeira.
     const activeCycles = await database
@@ -134,6 +144,7 @@ export const gardenRouter = router({
 
     return {
       hasGarden: true as const,
+      companionName,
       tentId: tent.id,
       tentName: tent.name,
       cycleId: cycle?.id ?? null,
@@ -151,4 +162,23 @@ export const gardenRouter = router({
       plantCount: plantRows.length,
     };
   }),
+
+  // Ritual de início (Pilar 1b): nomeia/renomeia a companheira no servidor.
+  // `companionNamedAt` grava só na 1ª vez (o momento do ritual).
+  setCompanion: protectedProcedure
+    .input(z.object({ name: z.string().trim().min(1).max(60) }))
+    .mutation(async ({ ctx, input }) => {
+      const database = await getDb();
+      if (!database) throw new Error("Banco indisponível");
+      const [me] = (await database
+        .select({ namedAt: users.companionNamedAt })
+        .from(users)
+        .where(eq(users.id, ctx.user.id))
+        .limit(1)) as Array<{ namedAt: Date | null }>;
+      await database
+        .update(users)
+        .set({ companionName: input.name, ...(me?.namedAt ? {} : { companionNamedAt: new Date() }) })
+        .where(eq(users.id, ctx.user.id));
+      return { companionName: input.name };
+    }),
 });

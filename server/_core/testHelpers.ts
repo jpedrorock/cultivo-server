@@ -20,6 +20,8 @@ export const TEST_USER: User = {
   role: "user",
   groupId: 4,
   avatarUrl: null,
+  companionName: null,
+  companionNamedAt: null,
   approved: true,
   plan: "pro" as const,
   planExpiresAt: null,

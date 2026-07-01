@@ -915,6 +915,18 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    // Modo Jardim v2 Pilar 1b — companheira persistente no servidor.
+    // Nome escolhido no ritual de início (antes só em localStorage). Base pra
+    // cross-device + lembrar colheitas entre cultivos. Colunas nullable → zero
+    // backfill/risco pras contas existentes. Ver BEGINNER-GAME-PLAN.md v2.
+    id: 'add-users-companionName',
+    description: 'Adiciona users.companionName + companionNamedAt (Modo Jardim v2)',
+    run: async (c) => {
+      await addColumnIfNotExists(c, 'users', 'companionName', 'VARCHAR(60) NULL AFTER `avatarUrl`');
+      await addColumnIfNotExists(c, 'users', 'companionNamedAt', 'TIMESTAMP NULL AFTER `companionName`');
+    },
+  },
 ];
 
 // ── Políticas de ON DELETE para FKs ──────────────────────────────────────────

@@ -33,6 +33,8 @@ export function createTestContext(overrides?: Partial<TrpcContext>): TrpcContext
       role: 'user' as const,
       groupId: 4,
       avatarUrl: null,
+      companionName: null,
+      companionNamedAt: null,
       approved: true,
       plan: 'pro' as const,
       planExpiresAt: null,

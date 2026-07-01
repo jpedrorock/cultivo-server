@@ -12,7 +12,7 @@ import { scheduleLocalNotification, cancelLocalNotifications } from "@/lib/local
 import { hasPendingGardenCare, clearGardenCare } from "@/lib/gardenCare";
 import { readLastStage, writeLastStage } from "@/lib/gardenStage";
 import { readLastMood, writeLastMood } from "@/lib/gardenMood";
-import { getCompanionName } from "@/lib/companionStorage";
+import { getCompanionName, setCompanionName as cacheCompanionName } from "@/lib/companionStorage";
 import { computeGardenCall, worstHealthOf, type GardenCallCta } from "@/lib/gardenCall";
 import { GardenXpBar } from "@/components/GardenXpBar";
 import { GardenStreakBadge } from "@/components/GardenStreakBadge";
@@ -89,8 +89,15 @@ export default function Jardim() {
   const { data, isLoading, refetch } = trpc.garden.getState.useQuery();
   const { data: progress } = trpc.gamification.getProgress.useQuery();
   const [, navigate] = useLocation();
-  // Companheira do ritual de início (Pilar 1) — o Jardim a chama pelo nome.
-  const [companionName] = useState<string | null>(() => getCompanionName());
+  // Companheira do ritual (Pilar 1) — servidor é a fonte da verdade (Pilar 1b),
+  // com o localStorage como fallback offline / enquanto a query não chega.
+  const [localCompanion] = useState<string | null>(() => getCompanionName());
+  const serverCompanion = data && "companionName" in data ? data.companionName : null;
+  const companionName = serverCompanion ?? localCompanion;
+  // Espelha o nome do servidor no cache local (offline + outros leitores).
+  useEffect(() => {
+    if (serverCompanion) cacheCompanionName(serverCompanion);
+  }, [serverCompanion]);
 
   // Carrossel de plantas.
   const scrollRef = useRef<HTMLDivElement>(null);

@@ -157,6 +157,7 @@ export default function OnboardingWizard() {
   const createTent = trpc.tents.create.useMutation();
   const createStrain = trpc.strains.create.useMutation();
   const createPlant = trpc.plants.create.useMutation();
+  const setCompanion = trpc.garden.setCompanion.useMutation();
   const { data: userStrains = [] } = trpc.strains.list.useQuery(undefined, { enabled: step === "strain" });
 
   // Debounce da busca de strain
@@ -313,7 +314,10 @@ export default function OnboardingWizard() {
   // QuickLog real em modo demo, não persiste) → detalhe da estufa. O demo lê ?then=.
   function completeRitual() {
     haptics.success().catch(() => {});
-    persistCompanionName(companionName);
+    const name = companionName.trim();
+    persistCompanionName(name); // cache local (imediato + offline)
+    if (name) setCompanion.mutate({ name }); // servidor (cross-device); fire-and-forget
+
     const then = createdTentId ? `&then=${encodeURIComponent(`/tent/${createdTentId}`)}` : "";
     setLocation(`/quick-log?demo=1${then}`);
   }

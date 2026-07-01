@@ -54,6 +54,10 @@ export const users = mysqlTable("users", {
   groupId: int("groupId"),
   /** URL da foto de perfil (Google OAuth) */
   avatarUrl: text("avatarUrl"),
+  /** Nome da companheira do Modo Jardim (ritual de início). null = nunca nomeou. */
+  companionName: varchar("companionName", { length: 60 }),
+  /** Quando a companheira foi nomeada (o momento do ritual). */
+  companionNamedAt: timestamp("companionNamedAt"),
   /** Se o usuário foi aprovado por um admin (false = aguardando aprovação) */
   approved: boolean("approved").default(false).notNull(),
   /**
