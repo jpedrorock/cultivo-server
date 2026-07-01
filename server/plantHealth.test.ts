@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { and, eq } from 'drizzle-orm';
 import { appRouter } from './routers';
 import { createTestContext, DB_AVAILABLE } from './test-helpers';
+import { getDb } from './db';
+import { alerts } from '../drizzle/schema';
 
 describe.skipIf(!DB_AVAILABLE)('Plant Health - Update and Delete', () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
   let testPlantId: number;
+  let testTentId: number;
   let testHealthLogId: number;
 
   beforeAll(async () => {
@@ -20,6 +24,7 @@ describe.skipIf(!DB_AVAILABLE)('Plant Health - Update and Delete', () => {
       depth: 120,
       height: 200,
     });
+    testTentId = tent.id;
 
     const strainName = `Test Strain Health ${Date.now()}`;
     await caller.strains.create({
@@ -137,5 +142,27 @@ describe.skipIf(!DB_AVAILABLE)('Plant Health - Update and Delete', () => {
     const dates = logs.map(l => new Date(l.logDate).getTime());
     const sortedDates = [...dates].sort((a, b) => b - a);
     expect(dates).toEqual(sortedDates);
+  });
+
+  // Regressão do P1 (reboot-loop do ESP): marcar SICK repetido NÃO pode inundar
+  // a tabela `alerts`. O guard mantém no máximo 1 alerta HEALTH ativo (NEW) por
+  // estufa até o user marcar como visto.
+  it('marcar SICK repetido não inunda alerts (máx 1 HEALTH ativo por estufa)', async () => {
+    const database = await getDb();
+    if (!database) return;
+    const countActive = async () =>
+      (await database
+        .select({ id: alerts.id })
+        .from(alerts)
+        .where(and(eq(alerts.tentId, testTentId), eq(alerts.metric, 'HEALTH'), eq(alerts.status, 'NEW')))
+      ).length;
+
+    // 3 marcações SICK seguidas (condição persiste)
+    for (const s of ['Mofo', 'Mofo pior', 'Ainda doente']) {
+      await caller.plantHealth.create({ plantId: testPlantId, healthStatus: 'SICK', symptoms: s });
+    }
+
+    // Apesar das 3, só existe 1 alerta HEALTH ativo (o guard segurou o resto).
+    expect(await countActive()).toBe(1);
   });
 });

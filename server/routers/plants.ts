@@ -1534,15 +1534,27 @@ export const plantHealthRouter = router({
             .where(eq(plants.id, input.plantId))
             .limit(1);
           if (plant?.tentId) {
-            const detalhe = input.symptoms ? `: ${input.symptoms}` : "";
-            await database.insert(alerts).values({
-              tentId: plant.tentId,
-              alertType: "PLANT_HEALTH",
-              metric: "HEALTH",
-              logDate: new Date(),
-              message: `🌿 Planta "${plant.name}" marcada como DOENTE${detalhe}`,
-              status: "NEW",
-            });
+            // Anti-inundação (mesmo guard do checkAlertsForTent em db.ts): não
+            // cria outro alerta se já existe um NEW de HEALTH pra esta estufa.
+            // Sem isso, marcar a planta doente repetidamente enchia a tabela
+            // `alerts` → o SSE despejava no display → reboot-loop do ESP.
+            // `alerts` não tem plantId, então o dedup é por estufa+métrica.
+            const activeHealth = await database
+              .select({ id: alerts.id })
+              .from(alerts)
+              .where(and(eq(alerts.tentId, plant.tentId), eq(alerts.metric, "HEALTH"), eq(alerts.status, "NEW")))
+              .limit(1);
+            if (activeHealth.length === 0) {
+              const detalhe = input.symptoms ? `: ${input.symptoms}` : "";
+              await database.insert(alerts).values({
+                tentId: plant.tentId,
+                alertType: "PLANT_HEALTH",
+                metric: "HEALTH",
+                logDate: new Date(),
+                message: `Planta "${plant.name}" marcada como DOENTE${detalhe}`,
+                status: "NEW",
+              });
+            }
           }
         }
 
